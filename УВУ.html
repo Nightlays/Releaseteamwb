@@ -1,0 +1,1957 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>SWAT UwU отчёт (Allure)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      --wb-bg:#faf5ff; --wb-bg-2:#f8f7ff;
+      --wb-primary:#9b5cff; --wb-secondary:#ff5ac8; --wb-deep:#7c3aed;
+      --green:#22c55e; --red:#f43f5e;
+      --ring: 0 10px 30px rgba(155,92,255,.25);
+      --card: 0 12px 36px rgba(31,41,55,.08);
+      --r-xl:22px;
+    }
+    body{
+      background:
+        radial-gradient(1200px 600px at 0% -10%, rgba(155,92,255,.14), transparent 60%),
+        radial-gradient(900px 580px at 100% 0%, rgba(255,90,200,.10), transparent 55%),
+        var(--wb-bg);
+      color:#0f172a;
+    }
+    .brand-badge{display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;border-radius:999px;background:linear-gradient(180deg,#fff,#f8f7ff);box-shadow:var(--card)}
+    .brand-dot{width:14px;height:14px;border-radius:999px;background:radial-gradient(55% 55% at 35% 35%, #fff 0%, #ffd6f2 30%, var(--wb-primary) 100%);box-shadow:0 0 0 6px rgba(155,92,255,.15), 0 8px 22px rgba(155,92,255,.45) inset}
+    .card{background:linear-gradient(180deg,#fff 0%, #fbfbff 100%);border-radius:var(--r-xl);box-shadow:var(--card);border:1px solid #eeeeff}
+    .input{width:100%;padding:.7rem .9rem;border-radius:14px;background:#fff;border:1px solid #ecebff;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 20px rgba(124,58,237,.06);transition:.15s}
+    .input:focus{outline:0;border-color:#d8d6ff;box-shadow:0 0 0 4px rgba(155,92,255,.12)}
+    .tabs{display:flex;gap:.75rem;align-items:center;flex-wrap:nowrap}
+    .tab{
+      border:none; background:transparent; color:#6d28d9; padding:.35rem .9rem; font-weight:700; position:relative; font-size:.9rem; border-radius:999px; white-space:nowrap;
+    }
+    .tab[aria-selected="true"]{ color:#5b21b6; }
+    .tab[aria-selected="true"]::after{
+      content:""; position:absolute; left:12px; right:12px; bottom:-4px; height:2px;
+      background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+      border-radius:2px;
+    }
+    .btn{border:none;border-radius:16px;padding:.65rem 1rem;font-weight:700;transition:.15s}
+    .btn-ghost{background:#f5f3ff;color:#6d28d9;border:1px solid #ede9fe}
+    .btn-soft{background:#fff;border:1px solid #ede9fe;box-shadow:0 8px 22px rgba(124,58,237,.08);color:#6d28d9}
+    .btn-grad{background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));color:#fff;box-shadow:var(--ring)}
+    .btn-circle{width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;border:1px solid #e5defe;background:#f9f8ff;color:#6d28d9;font-size:.78rem}
+    .chip{display:inline-block;padding:.15rem .6rem;border-radius:999px;font-size:.75rem;color:#fff;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary))}
+    .hint{font-size:.85rem;color:#7c7f8c}
+    table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+    thead th{background:#f7f5ff;border-bottom:1px solid #ecebff;padding:.7rem .8rem;font-weight:700;color:#5b21b6}
+    td{border-bottom:1px dashed #eeeef8;padding:.6rem .7rem;vertical-align:top}
+    tbody tr:hover td{background:#faf9ff}
+    .wrap{white-space:nowrap;word-break:normal}
+
+    /* Чуть шире таблицы + весь текст в одну строку (ФИО/стрим не налезают на цифры) */
+    #summaryTable, #detailTablePersonStreams, #detailTablePersonCases, #detailTableStream{
+      table-layout:auto; width:max-content; min-width:100%;
+    }
+    #summaryTable th, #summaryTable td,
+    #detailTablePersonStreams th, #detailTablePersonStreams td,
+    #detailTablePersonCases th, #detailTablePersonCases td,
+    #detailTableStream th, #detailTableStream td{
+      white-space:nowrap; word-break:normal;
+    }
+    #summaryTable th, #summaryTable td,
+    #detailTablePersonStreams th, #detailTablePersonStreams td,
+    #detailTablePersonCases th, #detailTablePersonCases td,
+    #detailTableStream th, #detailTableStream td{
+      text-align:center;
+    }
+    #summaryTable th:first-child, #summaryTable td:first-child,
+    #detailTablePersonStreams th:first-child, #detailTablePersonStreams td:first-child,
+    #detailTablePersonCases th:first-child, #detailTablePersonCases td:first-child,
+    #detailTableStream th:first-child, #detailTableStream td:first-child{
+      text-align:left;
+    }
+
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .bar{height:8px;background:#eae6ff;border-radius:999px;overflow:hidden}
+    .bar>div{height:100%;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));width:0%}
+    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.75rem 1rem;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s;z-index:50}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:40}
+    .popover{
+      position:fixed; background:#111827; color:#e5e7eb; border-radius:12px; padding:.5rem .75rem;
+      font-size:.75rem; max-width:260px; box-shadow:0 12px 30px rgba(15,23,42,.35); z-index:30;
+    }
+    .detail-tab-active{ background:#ede9fe; border-color:#c4b5fd; color:#4c1d95; }
+    .sort-arrows{ display:inline-flex; flex-direction:column; margin-left:4px; font-size:9px; line-height:9px; opacity:.35; vertical-align:middle; }
+    .sort-arrow{ transition:.15s; }
+    .sort-arrow.sort-active{ opacity:1; color:#6d28d9; }
+  </style>
+</head>
+
+<body>
+  <div class="max-w-7xl mx-auto p-6 space-y-6">
+    <div class="flex items-center gap-3">
+      <div class="brand-badge"><span class="brand-dot"></span><strong>WB</strong></div>
+      <h1 class="text-2xl font-semibold">SWAT UwU отчёт</h1>
+    </div>
+
+    <section class="grid lg:grid-cols-3 gap-6 items-start">
+      <!-- Настройки -->
+      <div class="card p-5 space-y-4 lg:col-span-1">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Настройки</h3>
+          <span class="chip">SWAT</span>
+        </div>
+
+        <label class="block text-sm">
+          Версия релиза
+          <input id="relVersion" class="input mt-1" placeholder="например 7.3.5000">
+        </label>
+
+        <label class="block text-sm">
+          API токен Allure
+          <input id="apiToken" type="password" class="input mt-1" placeholder="Api-Token ... или Bearer ...">
+        </label>
+
+        <div class="text-sm space-y-2">
+          <div class="text-xs">
+            SWAT получаем
+            <a href="https://docs.google.com/document/d/1AYHrg_w_aCdiunytlDVmbmyQAxiHRr51Z0Djju4GAnE/edit?usp=sharing"
+               target="_blank" rel="noopener noreferrer" class="text-indigo-700 underline"> отсюда </a>
+          </div>
+
+          <div class="mt-1 flex items-center gap-4 text-xs">
+            <label class="inline-flex items-center gap-1">
+              <input id="chkHighBlocker" type="checkbox" class="rounded border-[#d4d4ff]" checked>
+              <span>High/Blocker</span>
+            </label>
+            <label class="inline-flex items-center gap-1">
+              <input id="chkSelective" type="checkbox" class="rounded border-[#d4d4ff]">
+              <span>Selective</span>
+            </label>
+          </div>
+        </div>
+
+        <button id="runBtn" type="button" class="btn btn-grad w-full mt-2">
+          Запустить сбор UwU
+        </button>
+
+        <div class="bar mt-3"><div id="progressBar"></div></div>
+        <div id="statusText" class="text-sm text-slate-500 mt-1">—</div>
+      </div>
+
+      <!-- Результаты -->
+      <div class="card p-5 space-y-4 lg:col-span-2">
+        <div class="flex items-center gap-3 relative">
+          <h3 class="font-semibold">Итоги</h3>
+
+          <div class="tabs">
+            <button id="tabPeople" class="tab" type="button" aria-selected="true">По сотрудникам</button>
+            <button id="tabStreams" class="tab" type="button" aria-selected="false">По стримам</button>
+          </div>
+
+          <button id="infoBtn" type="button" class="btn-circle"
+                  title="Клик по SWAT (ФИО) показывает детали его кейсов. Клик по стриму во вкладке «По стримам» показывает вклад SWAT в этом стриме.">
+            i
+          </button>
+          <div id="infoPopover" class="popover hidden"></div>
+
+          <div class="flex items-center gap-2 ml-auto">
+            <button id="exportExcelBtn" type="button" class="btn btn-soft text-xs px-3 py-1.5">Выгрузить Excel</button>
+            <button id="filterBtn" type="button" class="btn btn-soft text-sm">Фильтр</button>
+            <button id="filterResetInline" type="button" class="btn btn-ghost text-xs px-3 py-1.5 hidden">Сбросить</button>
+            <span id="filterBadge" class="w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
+          </div>
+        </div>
+
+        <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+          <table id="summaryTable" class="text-sm">
+            <thead>
+              <tr>
+                <th>SWAT (ФИО)</th>
+                <th>Пройдено кейсов</th>
+                <th>Сумма UwU</th>
+                <th>% кейсов с UwU</th>
+                <th>Ч/Ч</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5" class="text-center text-slate-500 py-3">
+                  Пока нет данных — нажми «Запустить сбор UwU».
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="summaryTotals" class="mt-2 text-sm"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast">Готово</div>
+
+  <!-- Модальное окно фильтра -->
+  <div id="filterModal" class="overlay">
+    <div class="card w-full max-w-md p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="filterTitle" class="font-semibold text-sm">Фильтр</h3>
+        <button id="filterClose" class="btn btn-ghost text-xs px-3 py-1.5">Закрыть</button>
+      </div>
+
+      <div class="space-y-3 text-sm">
+        <div>
+          <label class="block mb-1">
+            <span id="filterNameLabel">SWAT (ФИО)</span>
+            <input id="filterNameInput" list="filterNameList" class="input mt-1"
+                   placeholder="Оставь пустым, чтобы не фильтровать по имени">
+            <datalist id="filterNameList"></datalist>
+          </label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            UwU от
+            <input id="filterUwuMin" type="number" step="1" class="input mt-1" placeholder="мин. сумма">
+          </label>
+          <label class="block">
+            UwU до
+            <input id="filterUwuMax" type="number" step="1" class="input mt-1" placeholder="макс. сумма">
+          </label>
+        </div>
+
+        <div class="mt-1">
+          <div class="text-xs mb-1">Платформа</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnPlatformAndroid" type="button" class="btn btn-ghost w-full justify-center text-xs">Android</button>
+            <button id="btnPlatformiOS" type="button" class="btn btn-ghost w-full justify-center text-xs">iOS</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center pt-2">
+        <button id="filterReset" class="btn btn-ghost text-xs px-3 py-1.5">Сбросить</button>
+        <button id="filterSave" class="btn btn-grad text-sm px-4 py-2">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно деталей -->
+  <div id="detailModal" class="overlay">
+    <div class="card w-full max-w-3xl h-[80vh] flex flex-col">
+      <div class="flex items-center gap-2 border-b border-[#ecebff] px-5 py-3">
+        <button id="detailBack" class="btn btn-ghost rounded-full w-8 h-8 flex items-center justify-center px-0 py-0 text-sm">←</button>
+        <div id="detailTitle" class="font-semibold text-sm"></div>
+        <button id="detailExport" class="btn btn-soft text-xs px-3 py-1.5 ml-auto">Скачать Excel</button>
+      </div>
+
+      <div class="px-5 pt-3 border-b border-[#ecebff] hidden" id="detailPersonTabs">
+        <div class="flex items-center gap-3 text-xs">
+          <button id="detailTabPersonStreams" type="button" class="btn btn-ghost px-3 py-1.5" data-selected="true">По стримам</button>
+          <button id="detailTabPersonCases" type="button" class="btn btn-ghost px-3 py-1.5" data-selected="false">По тест кейсам</button>
+        </div>
+      </div>
+
+      <div class="p-5 overflow-auto">
+        <!-- режим сотрудника -->
+        <div id="detailPerson" class="hidden space-y-4">
+          <div id="detailPersonStreams">
+            <table id="detailTablePersonStreams" class="text-sm"></table>
+            <div id="detailTotalsPersonStreams" class="mt-2 text-sm"></div>
+          </div>
+
+          <div id="detailPersonCases" class="hidden">
+            <table id="detailTablePersonCases" class="text-sm"></table>
+          </div>
+        </div>
+
+        <!-- режим стрима -->
+        <div id="detailStream" class="hidden">
+          <table id="detailTableStream" class="text-sm"></table>
+          <div id="detailTotalsStream" class="mt-2 text-sm"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const BASE_URL = 'https://allure-testops.wb.ru';
+  const PROJECT_ID = 7;
+  const PAGE_SIZE = 1000;
+  const KINDS = ['Smoke', 'Selective'];
+  const SWAT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyyUSFLjoBZQ9OBOFVwCFp3Y90hwjHpTzI3pzojn3IE2M4DRUADAZQBkk1Ic8544OuGZw/exec';
+
+  const LS_TOKEN_KEY = 'swat_uwu_token';
+  const LS_FILTER_KEY = 'swat_uwu_filters';
+
+  const tokenInput = document.getElementById('apiToken');
+  const versionInput = document.getElementById('relVersion');
+  const chkHighBlocker = document.getElementById('chkHighBlocker');
+  const chkSelective = document.getElementById('chkSelective');
+
+  const btnPlatformAndroid = document.getElementById('btnPlatformAndroid');
+  const btnPlatformiOS = document.getElementById('btnPlatformiOS');
+
+  const runBtn = document.getElementById('runBtn');
+  const progressBar = document.getElementById('progressBar');
+  const statusText = document.getElementById('statusText');
+
+  const summaryTable = document.getElementById('summaryTable');
+  const summaryHead = summaryTable.querySelector('thead tr');
+  const summaryBody = summaryTable.querySelector('tbody');
+
+  const toast = document.getElementById('toast');
+
+  const tabPeople = document.getElementById('tabPeople');
+  const tabStreams = document.getElementById('tabStreams');
+
+  const filterBtn = document.getElementById('filterBtn');
+  const filterBadge = document.getElementById('filterBadge');
+  const filterResetInline = document.getElementById('filterResetInline');
+
+  const filterModal = document.getElementById('filterModal');
+  const filterTitle = document.getElementById('filterTitle');
+  const filterNameLabel = document.getElementById('filterNameLabel');
+  const filterNameInput = document.getElementById('filterNameInput');
+  const filterNameList = document.getElementById('filterNameList');
+  const filterUwuMin = document.getElementById('filterUwuMin');
+  const filterUwuMax = document.getElementById('filterUwuMax');
+  const filterClose = document.getElementById('filterClose');
+  const filterSave = document.getElementById('filterSave');
+  const filterReset = document.getElementById('filterReset');
+
+  const detailModal = document.getElementById('detailModal');
+  const detailBack = document.getElementById('detailBack');
+  const detailTitle = document.getElementById('detailTitle');
+  const detailExport = document.getElementById('detailExport');
+
+  const detailPerson = document.getElementById('detailPerson');
+  const detailPersonTabs = document.getElementById('detailPersonTabs');
+  const detailTabPersonStreams = document.getElementById('detailTabPersonStreams');
+  const detailTabPersonCases = document.getElementById('detailTabPersonCases');
+  const detailPersonStreams = document.getElementById('detailPersonStreams');
+  const detailPersonCases = document.getElementById('detailPersonCases');
+  const detailTablePersonStreams = document.getElementById('detailTablePersonStreams');
+  const detailTablePersonCases = document.getElementById('detailTablePersonCases');
+
+  const detailStream = document.getElementById('detailStream');
+  const detailTableStream = document.getElementById('detailTableStream');
+
+  const infoBtn = document.getElementById('infoBtn');
+  const infoPopover = document.getElementById('infoPopover');
+
+  const exportExcelBtn = document.getElementById('exportExcelBtn');
+
+  const summaryTotals = document.getElementById('summaryTotals');
+  const detailTotalsPersonStreams = document.getElementById('detailTotalsPersonStreams');
+  const detailTotalsStream = document.getElementById('detailTotalsStream');
+
+  let isRunning = false;
+  let activeTab = 'people'; // 'people' | 'streams'
+  const uwuCache = new Map();
+
+  let gPeopleStats = new Map();
+  let gCaseDetails = new Map();
+  let gStreamStats = new Map();
+  let gStreamSwatStats = new Map();
+
+  let filters = {
+    people: { name: '', uwuMin: '', uwuMax: '' },
+    streams: { name: '', uwuMin: '', uwuMax: '' },
+    platform: null
+  };
+
+  let gSwatNameMap = new Map();
+
+  let detailContext = null; // {type:'person'|'stream', key:string}
+  let detailPersonActiveTab = 'streams';
+
+  let platformFilter = null; // 'Android' | 'iOS' | null
+  let modalPlatformFilter = null;
+
+  const sortState = {
+    'summary-people': { key: null, dir: null },
+    'summary-streams': { key: null, dir: null },
+    'detail-person-streams': { key: null, dir: null },
+    'detail-stream': { key: null, dir: null }
+  };
+
+  function setProgress(p) {
+    const v = Math.max(0, Math.min(100, p || 0));
+    progressBar.style.width = v + '%';
+  }
+
+  function setStatus(text) {
+    statusText.textContent = text || '—';
+  }
+
+  function showToast(msg) {
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  function normalizeLogin(s) {
+    return (s || '').trim().toLowerCase();
+  }
+
+  function parseSwat(text) {
+    const set = new Set();
+    const nameMap = new Map();
+    (text || '').split(/\r?\n/).forEach(line => {
+      let t = line.trim();
+      if (!t) return;
+      t = t.replace(/^[-•]+/, '').trim();
+      if (!t) return;
+      const parts = t.split(/\s+/);
+      const loginRaw = (parts.shift() || '').replace(/^@/, '');
+      const loginNorm = normalizeLogin(loginRaw);
+      if (!loginNorm) return;
+      set.add(loginNorm);
+      const displayName = parts.join(' ').trim();
+      if (displayName) {
+        nameMap.set(loginNorm, displayName);
+      } else if (!nameMap.has(loginNorm)) {
+        nameMap.set(loginNorm, loginRaw);
+      }
+    });
+    return { set, nameMap };
+  }
+
+  function getSwatDisplayName(login) {
+    const key = normalizeLogin(login);
+    return gSwatNameMap.get(key) || login;
+  }
+
+  function authHeader(token) {
+    if (!token) return {};
+    token = token.trim();
+    if (/^(Api-Token|Bearer)\s/i.test(token)) {
+      return { 'Authorization': token };
+    }
+    return { 'Authorization': 'Api-Token ' + token };
+  }
+
+  function extractStreamName(launchName) {
+    if (!launchName) return '—';
+    const m = /Stream\s+([^\]]+)/i.exec(launchName);
+    if (m) return m[1].trim();
+    let n = String(launchName);
+    n = n.replace(/\[Android\]/gi,'')
+         .replace(/\[iOS\]/gi,'')
+         .replace(/\[High\/Blocker\]/gi,'')
+         .replace(/\[Selective\]/gi,'')
+         .replace(/\[DeployLab\]/gi,'')
+         .replace(/\[Smoke\]/gi,'')
+         .replace(/\[Regression\]/gi,'');
+    n = n.replace(/Stream/gi,'');
+    n = n.replace(/Регресс\s+[^\s]+/gi,'');
+    n = n.replace(/\s+/g,' ').trim();
+    return n || launchName;
+  }
+
+  // Платформа берётся из названия лаунча по приставке [Android]/[iOS]
+  function extractPlatformFromLaunchName(launchName) {
+    if (!launchName) return null;
+    if (/\[Android\]/i.test(launchName)) return 'Android';
+    if (/\[iOS\]/i.test(launchName)) return 'iOS';
+    return null;
+  }
+
+  async function apiGet(path, token, params = {}) {
+    const url = new URL(BASE_URL + path);
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) url.searchParams.append(k, String(v));
+    });
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { 'Accept': 'application/json', ...authHeader(token) }
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${path}`);
+    }
+    return res.json();
+  }
+
+  function buildSearch(term) {
+    const arr = [{ id: 'name', type: 'string', value: term }];
+    const json = JSON.stringify(arr);
+    return btoa(unescape(encodeURIComponent(json)));
+  }
+
+  async function findLaunches(version, token) {
+    const launches = new Map();
+
+    const useHighBlocker = chkHighBlocker ? chkHighBlocker.checked : false;
+    const useSelective = chkSelective ? chkSelective.checked : false;
+
+    if (!useHighBlocker && !useSelective) {
+      setStatus('Не выбрано ни High/Blocker, ни Selective — лаунчи не будут найдены.');
+      return [];
+    }
+
+    const useLegacyLogic = useHighBlocker && useSelective;
+    const terms = [];
+
+    if (useLegacyLogic) {
+      for (const kind of KINDS) {
+        const t = [`[${kind}] Регресс ${version}`];
+        if (kind === 'Smoke') {
+          t.push(`[High/Blocker][DeployLab] Регресс ${version}`);
+        }
+        if (kind === 'Selective') {
+          t.push(`[Selective][DeployLab] Регресс ${version}`);
+        }
+        for (const s of t) terms.push(s);
+      }
+    } else {
+      if (useHighBlocker) terms.push(`[High/Blocker][DeployLab] Регресс ${version}`);
+      if (useSelective) terms.push(`[Selective][DeployLab] Регресс ${version}`);
+    }
+
+    for (const term of terms) {
+      let page = 0;
+      while (true) {
+        const data = await apiGet('/api/launch', token, {
+          page,
+          size: PAGE_SIZE,
+          search: buildSearch(term),
+          projectId: PROJECT_ID,
+          preview: 'true',
+          sort: 'createdDate,desc'
+        });
+        const content = (data && (data.content || data)) || [];
+        if (!Array.isArray(content) || content.length === 0) break;
+        for (const it of content) {
+          const id = Number(it.id);
+          if (!Number.isNaN(id)) launches.set(id, it);
+        }
+        if (content.length < PAGE_SIZE) break;
+        page += 1;
+      }
+    }
+
+    return Array.from(launches.values());
+  }
+
+  async function listLeaf(launchId, token) {
+    let items = [];
+    let page = 0;
+    while (true) {
+      const data = await apiGet('/api/testresulttree/leaf', token, {
+        launchId,
+        sort: 'name,asc',
+        size: PAGE_SIZE,
+        page
+      });
+      const content = (data && data.content) || [];
+      if (!Array.isArray(content) || content.length === 0) break;
+      items = items.concat(content);
+      if (content.length < PAGE_SIZE) break;
+      page += 1;
+    }
+    return items;
+  }
+
+  async function getUwU(tcid, token) {
+    if (uwuCache.has(tcid)) return uwuCache.get(tcid);
+
+    let uwuVal = null;
+    let platformVal = null;
+
+    try {
+      const data = await apiGet(`/api/testcase/${tcid}/overview`, token);
+      const fields = (data && data.customFields) || [];
+
+      for (const cf of fields) {
+        const cfInfo = cf.customField || {};
+        const cfName = (cfInfo.name || '').trim();
+
+        if (cfName === 'UwU') {
+          let v = cf.name;
+          if (!v) {
+            const vals = cf.values || [];
+            if (vals.length && vals[0]) v = vals[0].name;
+          }
+          if (v) uwuVal = String(v);
+        } else if (cfName === 'Platform') {
+          let p = cf.name;
+          if (!p) {
+            const vals = cf.values || [];
+            if (vals.length && vals[0]) p = vals[0].name;
+          }
+          if (p) platformVal = String(p);
+        }
+      }
+    } catch (e) {
+      console.error('UwU fetch error for', tcid, e);
+    }
+
+    const result = { uwuRaw: uwuVal, platform: platformVal };
+    uwuCache.set(tcid, result);
+    return result;
+  }
+
+  function parseUwUNumber(raw) {
+    if (raw === null || raw === undefined) return 0;
+    const s = String(raw).trim();
+    if (!s || s === '0') return 0;
+    const num = parseFloat(s.replace(',', '.'));
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  function addToPlatformStats(container, uwuNum, hasUwU, platformValue) {
+    container.totalCases = (container.totalCases || 0) + 1;
+    container.uwuSum = (container.uwuSum || 0) + uwuNum;
+    container.uwuPresent = (container.uwuPresent || 0) + hasUwU;
+
+    const platKey = platformValue || '—';
+    if (!container.byPlatform) container.byPlatform = {};
+    const current = container.byPlatform[platKey] || { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+    current.totalCases += 1;
+    current.uwuSum += uwuNum;
+    current.uwuPresent += hasUwU;
+    container.byPlatform[platKey] = current;
+  }
+
+  function addDurationStats(container, durationMs, platformValue) {
+    const dur = Number(durationMs) || 0;
+    if (!dur) return;
+    container.durTotalMs = (container.durTotalMs || 0) + dur;
+
+    const platKey = platformValue || '—';
+    if (!container.durByPlatform) container.durByPlatform = {};
+    const current = container.durByPlatform[platKey] || { durTotalMs: 0 };
+    current.durTotalMs += dur;
+    container.durByPlatform[platKey] = current;
+  }
+
+  function aggregateStats(stats, platform) {
+    if (!stats) {
+      return { totalCases: 0, uwuSum: 0, uwuPresent: 0, durTotalMs: 0 };
+    }
+    if (!platform || (!stats.byPlatform && !stats.durByPlatform)) {
+      return {
+        totalCases: stats.totalCases || 0,
+        uwuSum: stats.uwuSum || 0,
+        uwuPresent: stats.uwuPresent || 0,
+        durTotalMs: stats.durTotalMs || 0
+      };
+    }
+
+    let totalCases = 0;
+    let uwuSum = 0;
+    let uwuPresent = 0;
+
+    if (stats.byPlatform && stats.byPlatform[platform]) {
+      const s = stats.byPlatform[platform];
+      totalCases += s.totalCases || 0;
+      uwuSum += s.uwuSum || 0;
+      uwuPresent += s.uwuPresent || 0;
+    }
+
+    let durTotalMs = 0;
+    if (stats.durByPlatform && stats.durByPlatform[platform]) {
+      durTotalMs += stats.durByPlatform[platform].durTotalMs || 0;
+    }
+
+    return { totalCases, uwuSum, uwuPresent, durTotalMs };
+  }
+
+  function isFilterActive(tab) {
+    const f = filters[tab];
+    if (!f) return false;
+    return !!(f.name || f.uwuMin || f.uwuMax || filters.platform);
+  }
+
+  function updateFilterBadge() {
+    const active = isFilterActive(activeTab);
+    if (active) {
+      filterBadge.classList.remove('hidden');
+      filterResetInline.classList.remove('hidden');
+    } else {
+      filterBadge.classList.add('hidden');
+      filterResetInline.classList.add('hidden');
+    }
+  }
+
+  function applyFilterRows(rows, tab) {
+    const f = filters[tab];
+    if (!f) return rows;
+
+    const nameKey = (f.name || '').trim().toLowerCase();
+    const min = f.uwuMin !== '' ? Number(f.uwuMin) : null;
+    const max = f.uwuMax !== '' ? Number(f.uwuMax) : null;
+
+    return rows.filter(r => {
+      if (nameKey) {
+        if (tab === 'people') {
+          const loginLower = r.login.toLowerCase();
+          const displayLower = getSwatDisplayName(r.login).toLowerCase();
+          if (loginLower !== nameKey && displayLower !== nameKey) return false;
+        } else {
+          if (r.stream.toLowerCase() !== nameKey) return false;
+        }
+      }
+      if (min !== null && r.uwuSum < min) return false;
+      if (max !== null && r.uwuSum > max) return false;
+      return true;
+    });
+  }
+
+  function formatUwU(value) {
+    const num = Number(value);
+    if (!num) return '-';
+    return num;
+  }
+
+  function formatHours(durMs) {
+    const ms = Number(durMs) || 0;
+    if (!ms) return '-';
+    const totalMinutes = Math.round(ms / 60000);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${h}.${String(m).padStart(2, '0')}`;
+  }
+
+  function sortRows(rows, scope) {
+    const state = sortState[scope];
+    if (!state || !state.key || !state.dir) return rows;
+
+    const dir = state.dir === 'asc' ? 1 : -1;
+    const key = state.key;
+    const arr = [...rows];
+
+    arr.sort((a, b) => {
+      if (key === 'name') {
+        const sa = (a && Object.prototype.hasOwnProperty.call(a, 'stream'))
+          ? String(a.stream || '').trim()
+          : String(getSwatDisplayName(a.login || '') || '').trim();
+
+        const sb = (b && Object.prototype.hasOwnProperty.call(b, 'stream'))
+          ? String(b.stream || '').trim()
+          : String(getSwatDisplayName(b.login || '') || '').trim();
+
+        return sa.localeCompare(sb, 'ru', { sensitivity: 'base' }) * dir;
+      }
+
+      let va = 0, vb = 0;
+      if (key === 'cases') {
+        va = Number(a.totalCases) || 0;
+        vb = Number(b.totalCases) || 0;
+      } else if (key === 'uwu') {
+        va = Number(a.uwuSum) || 0;
+        vb = Number(b.uwuSum) || 0;
+      } else if (key === 'percent') {
+        va = Number(a.percent) || 0;
+        vb = Number(b.percent) || 0;
+      } else if (key === 'hours') {
+        va = Number(a.durMs) || 0;
+        vb = Number(b.durMs) || 0;
+      } else {
+        return 0;
+      }
+
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+
+    return arr;
+  }
+
+  // ===== ИТОГО: синхронизация ширин колонок (чтобы ровно под таблицей) =====
+  function syncTotalsColumns(mainTable, totalsContainer) {
+    if (!mainTable || !totalsContainer) return;
+    const totalsTable = totalsContainer.querySelector('table[data-totals-table="1"]');
+    if (!totalsTable) return;
+
+    const ths = Array.from(mainTable.querySelectorAll('thead th'));
+    if (!ths.length) return;
+
+    const widths = ths.map(th => Math.ceil(th.getBoundingClientRect().width));
+    const sum = widths.reduce((a, b) => a + b, 0);
+
+    let colgroup = totalsTable.querySelector('colgroup');
+    if (!colgroup) {
+      colgroup = document.createElement('colgroup');
+      totalsTable.insertBefore(colgroup, totalsTable.firstChild);
+    }
+    colgroup.innerHTML = widths.map(w => `<col style="width:${w}px">`).join('');
+    totalsTable.style.width = sum + 'px';
+  }
+
+  function updateTotalsContainer(container, rows, mainTable) {
+    if (!container) return;
+    if (!rows || !rows.length) {
+      container.innerHTML = '';
+      return;
+    }
+
+    let totalCases = 0;
+    let totalUwU = 0;
+    let totalUwuPresent = 0;
+    let totalDurMs = 0;
+
+    rows.forEach(r => {
+      totalCases += Number(r.totalCases) || 0;
+      totalUwU += Number(r.uwuSum) || 0;
+      totalUwuPresent += Number(r.uwuPresent) || 0;
+      totalDurMs += Number(r.durMs) || 0;
+    });
+
+    const percent = totalCases > 0 ? (totalUwuPresent / totalCases) * 100 : 0;
+    const uwuDisplay = formatUwU(totalUwU);
+    const hhmm = formatHours(totalDurMs);
+
+    container.innerHTML = `
+      <div class="overflow-auto border border-[#ecebff] rounded-xl bg-[#f9f8ff]">
+        <table data-totals-table="1" class="text-sm" style="table-layout:fixed;width:max-content;min-width:100%">
+          <tbody>
+            <tr>
+              <td class="px-3 py-1.5 text-left whitespace-nowrap">Итого:</td>
+              <td class="px-3 py-1.5 text-center whitespace-nowrap">${totalCases}</td>
+              <td class="px-3 py-1.5 text-center whitespace-nowrap">${uwuDisplay}</td>
+              <td class="px-3 py-1.5 text-center whitespace-nowrap">${percent.toFixed(1)}%</td>
+              <td class="px-3 py-1.5 text-center whitespace-nowrap">${hhmm}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    // 2 кадра — чтобы точно после layout и подгонка была стабильнее
+    requestAnimationFrame(() => {
+      syncTotalsColumns(mainTable, container);
+      requestAnimationFrame(() => syncTotalsColumns(mainTable, container));
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    syncTotalsColumns(summaryTable, summaryTotals);
+    syncTotalsColumns(detailTablePersonStreams, detailTotalsPersonStreams);
+    syncTotalsColumns(detailTableStream, detailTotalsStream);
+  });
+
+  function attachSortHandlers(headRow, scope, rerenderFn) {
+    if (!headRow) return;
+
+    const applyIndicators = () => {
+      const state = sortState[scope];
+      headRow.querySelectorAll('th[data-sort-key]').forEach(th => {
+        const key = th.getAttribute('data-sort-key');
+        const up = th.querySelector('.sort-up');
+        const down = th.querySelector('.sort-down');
+        if (!up || !down) return;
+        const activeDir = state && state.key === key ? state.dir : null;
+        up.classList.toggle('sort-active', activeDir === 'asc');
+        down.classList.toggle('sort-active', activeDir === 'desc');
+      });
+    };
+
+    headRow.querySelectorAll('th[data-sort-key]').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', () => {
+        const key = th.getAttribute('data-sort-key');
+        const st = sortState[scope] || { key: null, dir: null };
+
+        if (st.key !== key) {
+          sortState[scope] = { key, dir: 'asc' };
+        } else if (st.dir === 'asc') {
+          sortState[scope] = { key, dir: 'desc' };
+        } else if (st.dir === 'desc') {
+          sortState[scope] = { key: null, dir: null };
+        } else {
+          sortState[scope] = { key, dir: 'asc' };
+        }
+
+        rerenderFn();
+      });
+    });
+
+    applyIndicators();
+  }
+
+  // ===== Показ сортировок сразу (без кликов по вкладкам) =====
+  function initSummarySortHeader() {
+    if (!summaryHead) return;
+
+    if (activeTab === 'people') {
+      summaryHead.innerHTML = `
+        <th data-sort-key="name">
+          SWAT (ФИО)
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="cases">
+          Пройдено кейсов
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="uwu">
+          Сумма UwU
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="percent">
+          % кейсов с UwU
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="hours">
+          Ч/Ч
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+      `;
+      attachSortHandlers(summaryHead, 'summary-people', renderCurrentTab);
+    } else {
+      // На случай если активная вкладка уже streams
+      summaryHead.innerHTML = `
+        <th data-sort-key="name">
+          Стрим
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="cases">
+          Пройдено кейсов
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="uwu">
+          Сумма UwU
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="percent">
+          % кейсов с UwU
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="hours">
+          Ч/Ч
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+      `;
+      attachSortHandlers(summaryHead, 'summary-streams', renderCurrentTab);
+    }
+  }
+
+  function renderPeopleSummary() {
+    summaryHead.innerHTML = `
+      <th data-sort-key="name">SWAT (ФИО) <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="cases">Пройдено кейсов <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="uwu">Сумма UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="percent">% кейсов с UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="hours">Ч/Ч <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+    `;
+    attachSortHandlers(summaryHead, 'summary-people', renderCurrentTab);
+
+    summaryBody.innerHTML = '';
+
+    const rows = [];
+    gPeopleStats.forEach((stats, login) => {
+      const agg = aggregateStats(stats, platformFilter);
+      const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+      rows.push({
+        login,
+        totalCases: agg.totalCases,
+        uwuSum: agg.uwuSum,
+        uwuPresent: agg.uwuPresent,
+        percent,
+        durMs: agg.durTotalMs || 0
+      });
+    });
+
+    const filtered = applyFilterRows(rows, 'people')
+      .filter(r => r.totalCases > 0 || r.uwuSum > 0 || r.uwuPresent > 0 || r.durMs > 0);
+
+    const sorted = sortRows(filtered, 'summary-people');
+
+    if (!sorted.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="text-center text-slate-500 py-3">Данных нет</td>';
+      summaryBody.appendChild(tr);
+      updateTotalsContainer(summaryTotals, [], summaryTable);
+      return;
+    }
+
+    for (const r of sorted) {
+      const percentStr = r.totalCases > 0 ? (r.percent).toFixed(1) + '%' : '0.0%';
+      const displayName = getSwatDisplayName(r.login);
+      const hhmm = formatHours(r.durMs);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="mono text-indigo-700 cursor-pointer hover:underline whitespace-nowrap" data-login="${r.login}">${displayName}</td>
+        <td>${r.totalCases}</td>
+        <td>${formatUwU(r.uwuSum)}</td>
+        <td>${percentStr}</td>
+        <td>${hhmm}</td>
+      `;
+      summaryBody.appendChild(tr);
+    }
+
+    summaryBody.querySelectorAll('td[data-login]').forEach(td => {
+      td.addEventListener('click', () => {
+        const login = td.getAttribute('data-login');
+        openPersonDetail(login);
+      });
+    });
+
+    updateTotalsContainer(summaryTotals, sorted, summaryTable);
+  }
+
+  function renderStreamSummary() {
+    summaryHead.innerHTML = `
+      <th data-sort-key="name">Стрим <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="cases">Пройдено кейсов <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="uwu">Сумма UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="percent">% кейсов с UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="hours">Ч/Ч <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+    `;
+    attachSortHandlers(summaryHead, 'summary-streams', renderCurrentTab);
+
+    summaryBody.innerHTML = '';
+
+    const rows = [];
+    gStreamStats.forEach((stats, stream) => {
+      const agg = aggregateStats(stats, platformFilter);
+      const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+      rows.push({
+        stream,
+        totalCases: agg.totalCases,
+        uwuSum: agg.uwuSum,
+        uwuPresent: agg.uwuPresent,
+        percent,
+        durMs: agg.durTotalMs || 0
+      });
+    });
+
+    const filtered = applyFilterRows(rows, 'streams')
+      .filter(r => r.totalCases > 0 || r.uwuSum > 0 || r.uwuPresent > 0 || r.durMs > 0);
+
+    const sorted = sortRows(filtered, 'summary-streams');
+
+    if (!sorted.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="text-center text-slate-500 py-3">Данных нет</td>';
+      summaryBody.appendChild(tr);
+      updateTotalsContainer(summaryTotals, [], summaryTable);
+      return;
+    }
+
+    for (const r of sorted) {
+      const percentStr = r.totalCases > 0 ? (r.percent).toFixed(1) + '%' : '0.0%';
+      const hhmm = formatHours(r.durMs);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="wrap cursor-pointer text-indigo-700 hover:underline" data-stream="${r.stream}">${r.stream}</td>
+        <td>${r.totalCases}</td>
+        <td>${formatUwU(r.uwuSum)}</td>
+        <td>${percentStr}</td>
+        <td>${hhmm}</td>
+      `;
+      summaryBody.appendChild(tr);
+    }
+
+    summaryBody.querySelectorAll('td[data-stream]').forEach(td => {
+      td.addEventListener('click', () => {
+        const stream = td.getAttribute('data-stream');
+        openStreamDetail(stream);
+      });
+    });
+
+    updateTotalsContainer(summaryTotals, sorted, summaryTable);
+  }
+
+  function renderCurrentTab() {
+    if (activeTab === 'people') {
+      renderPeopleSummary();
+    } else {
+      renderStreamSummary();
+    }
+    updateFilterBadge();
+  }
+
+  // ===== Excel (без изменений) =====
+  function ensureXlsx() {
+    if (typeof XLSX === 'undefined') {
+      alert('Библиотека XLSX не загружена, Excel сделать не могу.');
+      return false;
+    }
+    return true;
+  }
+
+  function buildGlobalExcel(version) {
+    if (!ensureXlsx()) return;
+    if (!gPeopleStats.size && !gStreamStats.size) {
+      alert('Нет данных для выгрузки. Сначала запусти сбор UwU.');
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // По сотрудникам
+    const allPeopleRows = [];
+    gPeopleStats.forEach((stats, login) => {
+      const agg = aggregateStats(stats, platformFilter);
+      const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+      allPeopleRows.push({ login, totalCases: agg.totalCases, uwuSum: agg.uwuSum, uwuPresent: agg.uwuPresent, percent });
+    });
+
+    const peopleRows = applyFilterRows(allPeopleRows, 'people')
+      .filter(r => r.totalCases > 0 || r.uwuSum > 0 || r.uwuPresent > 0);
+
+    peopleRows.sort((a, b) => b.uwuSum - a.uwuSum);
+
+    const aoaPeople = [['SWAT логин','SWAT ФИО','Пройдено кейсов','Сумма UwU','% кейсов с UwU']];
+    peopleRows.forEach(r => {
+      const percentRounded = Number(r.percent.toFixed(2));
+      aoaPeople.push([r.login, getSwatDisplayName(r.login), r.totalCases, r.uwuSum, percentRounded]);
+    });
+
+    const wsPeople = XLSX.utils.aoa_to_sheet(aoaPeople);
+    wsPeople['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 18 }, { wch: 12 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsPeople, 'По сотрудникам');
+
+    // По стримам
+    const allStreamRows = [];
+    gStreamStats.forEach((stats, stream) => {
+      const agg = aggregateStats(stats, platformFilter);
+      const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+      allStreamRows.push({ stream, totalCases: agg.totalCases, uwuSum: agg.uwuSum, uwuPresent: agg.uwuPresent, percent });
+    });
+
+    const streamRows = applyFilterRows(allStreamRows, 'streams')
+      .filter(r => r.totalCases > 0 || r.uwuSum > 0 || r.uwuPresent > 0);
+
+    streamRows.sort((a, b) => b.uwuSum - a.uwuSum);
+
+    const aoaStreams = [['Стрим','Пройдено кейсов','Сумма UwU','% кейсов с UwU']];
+    streamRows.forEach(r => {
+      const percentRounded = Number(r.percent.toFixed(2));
+      aoaStreams.push([r.stream, r.totalCases, r.uwuSum, percentRounded]);
+    });
+
+    const wsStreams = XLSX.utils.aoa_to_sheet(aoaStreams);
+    wsStreams['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsStreams, 'По стримам');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const ver = (version || 'unknown').replace(/[^\w.-]+/g,'_');
+
+    a.href = url;
+    a.download = `SWAT_UwU_${ver}_${stamp}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildPersonStreamsExcel(login) {
+    if (!ensureXlsx()) return;
+    const name = getSwatDisplayName(login);
+
+    const rows = [];
+    gStreamSwatStats.forEach((swMap, stream) => {
+      const stats = swMap.get(login);
+      if (stats) {
+        const agg = aggregateStats(stats, platformFilter);
+        if (agg.totalCases || agg.uwuSum || agg.uwuPresent) {
+          const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+          rows.push({ stream, totalCases: agg.totalCases, uwuSum: agg.uwuSum, uwuPresent: agg.uwuPresent, percent });
+        }
+      }
+    });
+
+    if (!rows.length) {
+      alert('Для этого SWAT нет данных по стримам.');
+      return;
+    }
+
+    rows.sort((a, b) => b.uwuSum - a.uwuSum);
+
+    const wb = XLSX.utils.book_new();
+    const aoa = [['SWAT логин','SWAT ФИО','Стрим','Пройдено кейсов','Сумма UwU','% кейсов с UwU']];
+    rows.forEach(r => {
+      const percentRounded = Number(r.percent.toFixed(2));
+      aoa.push([login, name, r.stream, r.totalCases, r.uwuSum, percentRounded]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Стримы SWAT');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const safeLogin = login.replace(/[^\w.-]+/g,'_');
+    a.href = url;
+    a.download = `SWAT_${safeLogin}_streams.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildPersonCasesExcel(login) {
+    if (!ensureXlsx()) return;
+    const details = gCaseDetails.get(login) || [];
+    if (!details.length) {
+      alert('Для этого SWAT нет данных по кейсам.');
+      return;
+    }
+
+    const name = getSwatDisplayName(login);
+    const wb = XLSX.utils.book_new();
+    const sorted = [...details].sort((a, b) => b.uwuNum - a.uwuNum);
+
+    const aoa = [['SWAT логин','SWAT ФИО','testCaseId','UwU']];
+    sorted.forEach(d => aoa.push([login, name, d.testCaseId, d.uwuNum]));
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 14 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Кейсы SWAT');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const safeLogin = login.replace(/[^\w.-]+/g,'_');
+    a.href = url;
+    a.download = `SWAT_${safeLogin}_cases.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildStreamExcel(stream) {
+    if (!ensureXlsx()) return;
+
+    const swMap = gStreamSwatStats.get(stream) || new Map();
+    if (!swMap.size) {
+      alert('Для этого стрима нет данных.');
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const aoa = [['Стрим','SWAT логин','SWAT ФИО','Пройдено кейсов','Сумма UwU','% кейсов с UwU']];
+
+    const rows = [];
+    swMap.forEach((stats, login) => {
+      const agg = aggregateStats(stats, platformFilter);
+      if (agg.totalCases || agg.uwuSum || agg.uwuPresent) {
+        const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+        rows.push({ login, totalCases: agg.totalCases, uwuSum: agg.uwuSum, uwuPresent: agg.uwuPresent, percent });
+      }
+    });
+
+    if (!rows.length) {
+      alert('Для этого стрима нет данных.');
+      return;
+    }
+
+    rows.sort((a, b) => b.uwuSum - a.uwuSum);
+    rows.forEach(r => {
+      const percentRounded = Number(r.percent.toFixed(2));
+      aoa.push([stream, r.login, getSwatDisplayName(r.login), r.totalCases, r.uwuSum, percentRounded]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 26 }, { wch: 18 }, { wch: 12 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'SWAT по стриму');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const safeStream = String(stream || 'stream').replace(/[^\w.-]+/g,'_');
+    a.href = url;
+    a.download = `SWAT_stream_${safeStream}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ===== Детали =====
+  const detailPersonTabsBlock = detailPersonTabs;
+
+  function setDetailPersonTab(tab) {
+    detailPersonActiveTab = tab;
+    if (!detailPersonTabsBlock) return;
+
+    if (tab === 'streams') {
+      detailPersonStreams.classList.remove('hidden');
+      detailPersonCases.classList.add('hidden');
+      detailTabPersonStreams.setAttribute('data-selected','true');
+      detailTabPersonCases.setAttribute('data-selected','false');
+      detailTabPersonStreams.classList.add('detail-tab-active');
+      detailTabPersonCases.classList.remove('detail-tab-active');
+      if (detailExport) detailExport.textContent = 'Скачать Excel (по стримам)';
+    } else {
+      detailPersonStreams.classList.add('hidden');
+      detailPersonCases.classList.remove('hidden');
+      detailTabPersonStreams.setAttribute('data-selected','false');
+      detailTabPersonCases.setAttribute('data-selected','true');
+      detailTabPersonStreams.classList.remove('detail-tab-active');
+      detailTabPersonCases.classList.add('detail-tab-active');
+      if (detailExport) detailExport.textContent = 'Скачать Excel (по тест кейсам)';
+    }
+  }
+
+  function openPersonDetail(login) {
+    const name = getSwatDisplayName(login);
+    detailContext = { type: 'person', key: login };
+    detailTitle.textContent = `Детали по SWAT: ${name}`;
+    if (detailExport) detailExport.textContent = 'Скачать Excel (по стримам)';
+
+    if (detailPersonTabsBlock) detailPersonTabsBlock.classList.remove('hidden');
+    detailPerson.classList.remove('hidden');
+    detailStream.classList.add('hidden');
+    setDetailPersonTab('streams');
+
+    // По стримам для конкретного SWAT
+    detailTablePersonStreams.innerHTML = `
+      <thead>
+        <tr>
+          <th data-sort-key="name">Стрим <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="cases">Пройдено кейсов <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="uwu">Сумма UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="percent">% кейсов с UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="hours">Ч/Ч <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const headStreams = detailTablePersonStreams.querySelector('thead tr');
+    attachSortHandlers(headStreams, 'detail-person-streams', () => {
+      if (detailContext && detailContext.type === 'person') {
+        openPersonDetail(detailContext.key);
+      }
+    });
+
+    const tbodyStreams = detailTablePersonStreams.querySelector('tbody');
+    const rows = [];
+
+    gStreamSwatStats.forEach((swMap, stream) => {
+      const stats = swMap.get(login);
+      if (stats) {
+        const agg = aggregateStats(stats, platformFilter);
+        if (agg.totalCases || agg.uwuSum || agg.uwuPresent || agg.durTotalMs) {
+          const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+          rows.push({
+            stream,
+            totalCases: agg.totalCases,
+            uwuSum: agg.uwuSum,
+            uwuPresent: agg.uwuPresent,
+            percent,
+            durMs: agg.durTotalMs || 0
+          });
+        }
+      }
+    });
+
+    const sortedStreams = sortRows(rows, 'detail-person-streams');
+
+    if (!sortedStreams.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="text-center text-slate-500 py-3">Данных нет</td>';
+      tbodyStreams.appendChild(tr);
+      updateTotalsContainer(detailTotalsPersonStreams, [], detailTablePersonStreams);
+    } else {
+      sortedStreams.forEach(r => {
+        const percentStr = r.totalCases > 0 ? (r.percent).toFixed(1) + '%' : '0.0%';
+        const hhmm = formatHours(r.durMs);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="wrap">${r.stream}</td>
+          <td>${r.totalCases}</td>
+          <td>${formatUwU(r.uwuSum)}</td>
+          <td>${percentStr}</td>
+          <td>${hhmm}</td>
+        `;
+        tbodyStreams.appendChild(tr);
+      });
+      updateTotalsContainer(detailTotalsPersonStreams, sortedStreams, detailTablePersonStreams);
+    }
+
+    // По тест кейсам (сортировка по убыванию UwU)
+    const details = gCaseDetails.get(login) || [];
+    const sortedDetails = [...details].sort((a, b) => b.uwuNum - a.uwuNum);
+
+    detailTablePersonCases.innerHTML = `
+      <thead>
+        <tr>
+          <th>SWAT (ФИО)</th>
+          <th>testCaseId</th>
+          <th>UwU</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const tbodyCases = detailTablePersonCases.querySelector('tbody');
+
+    if (!sortedDetails.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="3" class="text-center text-slate-500 py-3">Кейсов не найдено</td>';
+      tbodyCases.appendChild(tr);
+    } else {
+      sortedDetails.forEach(d => {
+        const allureUrl = `${BASE_URL}/project/${PROJECT_ID}/test-cases/${d.testCaseId}?treeId=14`;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="mono whitespace-nowrap">${name}</td>
+          <td><a href="${allureUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-700 hover:underline">${d.testCaseId}</a></td>
+          <td>${formatUwU(d.uwuNum)}</td>
+        `;
+        tbodyCases.appendChild(tr);
+      });
+    }
+
+    detailModal.style.display = 'flex';
+  }
+
+  function openStreamDetail(stream) {
+    const swMap = gStreamSwatStats.get(stream) || new Map();
+    detailContext = { type: 'stream', key: stream };
+
+    if (detailExport) detailExport.textContent = 'Скачать Excel';
+    detailTitle.textContent = `Детали по стриму: ${stream}`;
+
+    if (detailPersonTabsBlock) detailPersonTabsBlock.classList.add('hidden');
+    detailPerson.classList.add('hidden');
+    detailStream.classList.remove('hidden');
+
+    detailTableStream.innerHTML = `
+      <thead>
+        <tr>
+          <th data-sort-key="name">SWAT (ФИО) <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="cases">Пройдено кейсов <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="uwu">Сумма UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="percent">% кейсов с UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="hours">Ч/Ч <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const head = detailTableStream.querySelector('thead tr');
+    attachSortHandlers(head, 'detail-stream', () => {
+      if (detailContext && detailContext.type === 'stream') {
+        openStreamDetail(detailContext.key);
+      }
+    });
+
+    const tbody = detailTableStream.querySelector('tbody');
+    const rows = [];
+
+    swMap.forEach((stats, login) => {
+      const agg = aggregateStats(stats, platformFilter);
+      if (agg.totalCases || agg.uwuSum || agg.uwuPresent || agg.durTotalMs) {
+        const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+        rows.push({
+          login,
+          totalCases: agg.totalCases,
+          uwuSum: agg.uwuSum,
+          uwuPresent: agg.uwuPresent,
+          percent,
+          durMs: agg.durTotalMs || 0
+        });
+      }
+    });
+
+    const sorted = sortRows(rows, 'detail-stream');
+
+    if (!sorted.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="text-center text-slate-500 py-3">Данных нет</td>';
+      tbody.appendChild(tr);
+      updateTotalsContainer(detailTotalsStream, [], detailTableStream);
+    } else {
+      sorted.forEach(r => {
+        const percentStr = r.totalCases > 0 ? (r.percent).toFixed(1) + '%' : '0.0%';
+        const displayName = getSwatDisplayName(r.login);
+        const hhmm = formatHours(r.durMs);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="mono whitespace-nowrap">${displayName}</td>
+          <td>${r.totalCases}</td>
+          <td>${formatUwU(r.uwuSum)}</td>
+          <td>${percentStr}</td>
+          <td>${hhmm}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      updateTotalsContainer(detailTotalsStream, sorted, detailTableStream);
+    }
+
+    detailModal.style.display = 'flex';
+  }
+
+  detailBack.addEventListener('click', () => {
+    detailModal.style.display = 'none';
+    detailContext = null;
+  });
+
+  if (detailModal) {
+    detailModal.addEventListener('click', (e) => {
+      if (e.target === detailModal) {
+        detailModal.style.display = 'none';
+        detailContext = null;
+      }
+    });
+  }
+
+  if (detailTabPersonStreams) {
+    detailTabPersonStreams.addEventListener('click', () => setDetailPersonTab('streams'));
+  }
+  if (detailTabPersonCases) {
+    detailTabPersonCases.addEventListener('click', () => setDetailPersonTab('cases'));
+  }
+
+  if (detailExport) {
+    detailExport.addEventListener('click', () => {
+      if (!detailContext) return;
+      if (detailContext.type === 'person') {
+        if (detailPersonActiveTab === 'streams') buildPersonStreamsExcel(detailContext.key);
+        else buildPersonCasesExcel(detailContext.key);
+      } else if (detailContext.type === 'stream') {
+        buildStreamExcel(detailContext.key);
+      }
+    });
+  }
+
+  // ===== Платформа в фильтрах =====
+  function updatePlatformButtons() {
+    if (!btnPlatformAndroid || !btnPlatformiOS) return;
+    btnPlatformAndroid.classList.toggle('detail-tab-active', modalPlatformFilter === 'Android');
+    btnPlatformiOS.classList.toggle('detail-tab-active', modalPlatformFilter === 'iOS');
+  }
+
+  if (btnPlatformAndroid) {
+    btnPlatformAndroid.addEventListener('click', () => {
+      modalPlatformFilter = modalPlatformFilter === 'Android' ? null : 'Android';
+      updatePlatformButtons();
+    });
+  }
+  if (btnPlatformiOS) {
+    btnPlatformiOS.addEventListener('click', () => {
+      modalPlatformFilter = modalPlatformFilter === 'iOS' ? null : 'iOS';
+      updatePlatformButtons();
+    });
+  }
+
+  // ===== Фильтр =====
+  function openFilterModal() {
+    const f = filters[activeTab] || { name: '', uwuMin: '', uwuMax: '' };
+    filterTitle.textContent = activeTab === 'people' ? 'Фильтр по сотрудникам' : 'Фильтр по стримам';
+    filterNameLabel.textContent = activeTab === 'people' ? 'SWAT (ФИО)' : 'Стрим';
+
+    filterNameInput.value = f.name || '';
+    filterUwuMin.value = f.uwuMin !== '' ? f.uwuMin : '';
+    filterUwuMax.value = f.uwuMax !== '' ? f.uwuMax : '';
+
+    filterNameList.innerHTML = '';
+    if (activeTab === 'people') {
+      gPeopleStats.forEach((_v, login) => {
+        const opt = document.createElement('option');
+        opt.value = getSwatDisplayName(login);
+        filterNameList.appendChild(opt);
+      });
+    } else {
+      gStreamStats.forEach((_v, stream) => {
+        const opt = document.createElement('option');
+        opt.value = stream;
+        filterNameList.appendChild(opt);
+      });
+    }
+
+    modalPlatformFilter = platformFilter;
+    updatePlatformButtons();
+    filterModal.style.display = 'flex';
+  }
+
+  function closeFilterModal() {
+    filterModal.style.display = 'none';
+  }
+
+  filterBtn.addEventListener('click', openFilterModal);
+  filterClose.addEventListener('click', closeFilterModal);
+
+  if (filterModal) {
+    filterModal.addEventListener('click', (e) => {
+      if (e.target === filterModal) closeFilterModal();
+    });
+  }
+
+  filterSave.addEventListener('click', () => {
+    const name = (filterNameInput.value || '').trim();
+    const uwuMin = filterUwuMin.value !== '' ? Number(filterUwuMin.value) : '';
+    const uwuMax = filterUwuMax.value !== '' ? Number(filterUwuMax.value) : '';
+
+    filters[activeTab] = { name, uwuMin, uwuMax };
+    platformFilter = modalPlatformFilter;
+    filters.platform = platformFilter;
+
+    try { localStorage.setItem(LS_FILTER_KEY, JSON.stringify(filters)); } catch(e) {}
+    closeFilterModal();
+    renderCurrentTab();
+  });
+
+  function resetCurrentFilter() {
+    filters[activeTab] = { name: '', uwuMin: '', uwuMax: '' };
+    platformFilter = null;
+    modalPlatformFilter = null;
+    filters.platform = null;
+
+    updatePlatformButtons();
+    try { localStorage.setItem(LS_FILTER_KEY, JSON.stringify(filters)); } catch(e) {}
+    renderCurrentTab();
+  }
+
+  filterReset.addEventListener('click', () => {
+    resetCurrentFilter();
+    closeFilterModal();
+  });
+
+  filterResetInline.addEventListener('click', resetCurrentFilter);
+
+  // ===== Вкладки =====
+  function setActiveTab(tab) {
+    activeTab = tab;
+    tabPeople.setAttribute('aria-selected', tab === 'people' ? 'true' : 'false');
+    tabStreams.setAttribute('aria-selected', tab === 'streams' ? 'true' : 'false');
+    renderCurrentTab();
+  }
+
+  tabPeople.addEventListener('click', () => setActiveTab('people'));
+  tabStreams.addEventListener('click', () => setActiveTab('streams'));
+
+  // ===== Основной запуск =====
+  async function run() {
+    if (isRunning) return;
+
+    const token = (tokenInput.value || '').trim();
+    const version = (versionInput.value || '').trim();
+
+    if (!token || !version) {
+      alert('Нужны и версия релиза, и API токен.');
+      return;
+    }
+
+    try { localStorage.setItem(LS_TOKEN_KEY, token); } catch(e) {}
+
+    isRunning = true;
+    runBtn.disabled = true;
+    runBtn.classList.add('opacity-60', 'cursor-not-allowed');
+
+    setProgress(0);
+    setStatus('Читаю SWAT…');
+    uwuCache.clear();
+
+    try {
+      const res = await fetch(SWAT_ENDPOINT);
+      if (!res.ok) {
+        throw new Error('Не удалось загрузить SWAT (HTTP ' + res.status + ')');
+      }
+
+      const swText = await res.text();
+      const { set: swatSet, nameMap: swatNameMap } = parseSwat(swText);
+      gSwatNameMap = swatNameMap || new Map();
+
+      if (!swatSet.size) {
+        if (!confirm('SWAT-список пустой, продолжать?')) {
+          setStatus('Операция отменена: пустой SWAT');
+          return;
+        }
+      }
+
+      setProgress(5);
+      setStatus('Ищу лаунчи Smoke/Selective…');
+
+      const launches = await findLaunches(version, token);
+      if (!launches.length) {
+        setStatus('Лаунчи не найдены.');
+        gPeopleStats = new Map();
+        gStreamStats = new Map();
+        renderCurrentTab();
+        return;
+      }
+
+      const peopleStatsMap = new Map();
+      const caseDetails = new Map();
+      const streamStatsMap = new Map();
+      const streamSwatStats = new Map();
+
+      setStatus(`Найдено лаунчей: ${launches.length}. Читаю тест-кейсы…`);
+
+      let allLeaf = [];
+      let processedLaunches = 0;
+
+      for (const L of launches) {
+        const id = Number(L.id);
+        if (Number.isNaN(id)) continue;
+
+        const launchName = L.name || '';
+        const streamName = extractStreamName(launchName);
+        const platformName = extractPlatformFromLaunchName(launchName);
+
+        // Человек-часы по этому лаунчу
+        try {
+          const msData = await apiGet(`/api/launch/${id}/memberstats`, token, { size: 1000, page: 0 });
+          const members = (msData && msData.content) || [];
+
+          members.forEach(ms => {
+            const assignee = normalizeLogin(ms.assignee);
+            if (!assignee || !swatSet.has(assignee)) return;
+
+            const durMs = Number(ms.durationSum) || 0;
+            if (!durMs) return;
+
+            let pStats = peopleStatsMap.get(assignee);
+            if (!pStats) {
+              pStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+              peopleStatsMap.set(assignee, pStats);
+            }
+            addDurationStats(pStats, durMs, platformName);
+
+            let sStats = streamStatsMap.get(streamName);
+            if (!sStats) {
+              sStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+              streamStatsMap.set(streamName, sStats);
+            }
+            addDurationStats(sStats, durMs, platformName);
+
+            let swMap = streamSwatStats.get(streamName);
+            if (!swMap) {
+              swMap = new Map();
+              streamSwatStats.set(streamName, swMap);
+            }
+
+            let swStats = swMap.get(assignee);
+            if (!swStats) {
+              swStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+              swMap.set(assignee, swStats);
+            }
+            addDurationStats(swStats, durMs, platformName);
+          });
+        } catch(e) {
+          console.error('memberstats error for launch', id, e);
+        }
+
+        const items = await listLeaf(id, token);
+        items.forEach(it => {
+          it._launchId = id;
+          it._launchName = launchName;
+          it._streamName = streamName;
+          it._platform = platformName;
+        });
+
+        allLeaf = allLeaf.concat(items);
+        processedLaunches += 1;
+
+        const p = 5 + Math.round((processedLaunches / launches.length) * 25);
+        setProgress(p);
+        setStatus(`Читаю тест-кейсы… (${processedLaunches}/${launches.length})`);
+      }
+
+      setStatus(`Всего leaf-результатов: ${allLeaf.length}. Фильтрую SWAT…`);
+
+      const swatItems = allLeaf.filter(item => {
+        const tb = normalizeLogin(item.testedBy);
+        if (!tb || !swatSet.has(tb)) return false;
+        if (item.testCaseId == null) return false;
+        return true;
+      });
+
+      if (!swatItems.length) {
+        setStatus('SWAT-кейсов не найдено.');
+        gPeopleStats = new Map();
+        gStreamStats = new Map();
+        renderCurrentTab();
+        return;
+      }
+
+      setStatus(`SWAT-кейсов: ${swatItems.length}. Считаю UwU…`);
+
+      const concurrency = 10;
+      let index = 0;
+      let done = 0;
+
+      async function worker() {
+        while (true) {
+          const myIndex = index++;
+          if (myIndex >= swatItems.length) break;
+
+          const item = swatItems[myIndex];
+          const login = normalizeLogin(item.testedBy);
+          const tcid = Number(item.testCaseId);
+
+          if (!login || Number.isNaN(tcid)) {
+            done++;
+            continue;
+          }
+
+          const info = await getUwU(tcid, token);
+          const uwuNum = parseUwUNumber(info.uwuRaw);
+          const hasUwU = uwuNum > 0 ? 1 : 0;
+
+          const platformValue = item._platform || null;
+          const streamName = item._streamName || extractStreamName(item._launchName || '');
+
+          let pStats = peopleStatsMap.get(login);
+          if (!pStats) {
+            pStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+            peopleStatsMap.set(login, pStats);
+          }
+          addToPlatformStats(pStats, uwuNum, hasUwU, platformValue);
+
+          let list = caseDetails.get(login);
+          if (!list) {
+            list = [];
+            caseDetails.set(login, list);
+          }
+          list.push({ testCaseId: tcid, uwuNum });
+
+          let sStats = streamStatsMap.get(streamName);
+          if (!sStats) {
+            sStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+            streamStatsMap.set(streamName, sStats);
+          }
+          addToPlatformStats(sStats, uwuNum, hasUwU, platformValue);
+
+          let swMap = streamSwatStats.get(streamName);
+          if (!swMap) {
+            swMap = new Map();
+            streamSwatStats.set(streamName, swMap);
+          }
+
+          let swStats = swMap.get(login);
+          if (!swStats) {
+            swStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+            swMap.set(login, swStats);
+          }
+          addToPlatformStats(swStats, uwuNum, hasUwU, platformValue);
+
+          done++;
+          if (done % 10 === 0 || done === swatItems.length) {
+            const p = 30 + Math.round((done / swatItems.length) * 70);
+            setProgress(p);
+            setStatus(`Обработано SWAT-кейсов: ${done}/${swatItems.length}`);
+          }
+        }
+      }
+
+      const workers = [];
+      for (let i = 0; i < concurrency; i++) workers.push(worker());
+      await Promise.all(workers);
+
+      gPeopleStats = peopleStatsMap;
+      gCaseDetails = caseDetails;
+      gStreamStats = streamStatsMap;
+      gStreamSwatStats = streamSwatStats;
+
+      setStatus('Готово. Можно смотреть таблицу и выгружать Excel.');
+      renderCurrentTab();
+      showToast('UwU-отчёт собран');
+      setProgress(100);
+
+    } catch (e) {
+      console.error(e);
+      setStatus('Ошибка: ' + e.message);
+      showToast('Ошибка при выполнении: ' + e.message);
+      setProgress(0);
+    } finally {
+      isRunning = false;
+      runBtn.disabled = false;
+      runBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+    }
+  }
+
+  runBtn.addEventListener('click', run);
+
+  if (exportExcelBtn) {
+    exportExcelBtn.addEventListener('click', () => {
+      const version = (versionInput.value || '').trim();
+      buildGlobalExcel(version);
+    });
+  }
+
+  // Подсказка "i"
+  if (infoBtn && infoPopover) {
+    const msg = infoBtn.getAttribute('title') ||
+      'Клик по SWAT (ФИО) показывает детали его кейсов. Клик по стриму во вкладке «По стримам» показывает вклад SWAT в этом стриме.';
+    infoPopover.textContent = msg;
+
+    const hidePopover = () => infoPopover.classList.add('hidden');
+
+    infoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (infoPopover.classList.contains('hidden')) {
+        const rect = infoBtn.getBoundingClientRect();
+        const margin = 8;
+        let top = rect.bottom + margin;
+        let left = rect.left;
+
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+        const maxWidth = 260;
+
+        if (left + maxWidth + margin > viewportWidth) left = viewportWidth - maxWidth - margin;
+        if (left < margin) left = margin;
+
+        infoPopover.style.top = `${top}px`;
+        infoPopover.style.left = `${left}px`;
+        infoPopover.classList.remove('hidden');
+      } else {
+        hidePopover();
+      }
+    });
+
+    infoPopover.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', hidePopover);
+  }
+
+  // Init from storage
+  (function initFromStorage(){
+    try {
+      const savedToken = localStorage.getItem(LS_TOKEN_KEY);
+      if (savedToken) tokenInput.value = savedToken;
+    } catch(e) {}
+
+    try {
+      const savedFilters = localStorage.getItem(LS_FILTER_KEY);
+      if (savedFilters) {
+        const obj = JSON.parse(savedFilters);
+        if (obj && obj.people && obj.streams) {
+          filters.people = obj.people;
+          filters.streams = obj.streams;
+          if (Object.prototype.hasOwnProperty.call(obj, 'platform')) {
+            filters.platform = obj.platform;
+            platformFilter = obj.platform;
+          }
+        }
+      }
+    } catch(e) {}
+
+    // сортировки должны быть видимы сразу (до кликов по вкладкам)
+    initSummarySortHeader();
+    updateFilterBadge();
+  })();
+})();
+</script>
+</body>
+</html>
