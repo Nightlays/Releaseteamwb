@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Сбор ЧП</title>
+<style>
+
+  /* ---------------- Wildberries Theme (drop-in) ---------------- */
+  :root{
+    /* Базовая палитра (светлая) */
+    --bg:#faf7fc;            /* фон страницы */
+    --card:#ffffff;          /* фон карточек */
+    --text:#2a1446;          /* основной текст */
+    --muted:#8d77a6;         /* вторичный текст */
+
+    /* Бренд / акценты */
+    --wb:#cb11ab;            /* магента WB */
+    --wb-deep:#6e0bd4;       /* фирм. фиолетовый */
+    --grad:linear-gradient(135deg, var(--wb) 0%, var(--wb-deep) 100%);
+
+    /* Цвета метрик (читает JS) */
+    --c1:#7a3af9;            /* total */
+    --c2:#00c48c;            /* finished */
+    --c3:#ffb020;            /* remaining */
+    --c4:#ff5aad;            /* in_progress */
+
+    /* Контролы/бордеры */
+    --line:#efe5f7;
+    --line-strong:#e7d8f4;
+    --ink:#3a235b;
+    --btn-bg:#ffffff;
+    --btn-br:#e6d9f4;
+    --btn-hl:rgba(203,17,171,.08);
+
+    /* Семантика */
+    --ok:#12b76a;
+    --bad:#ef4444;
+
+    /* Доп. визуал */
+    --shadow-lg:0 14px 44px rgba(103,39,170,.12);
+    --shadow-md:0 10px 30px rgba(103,39,170,.10);
+    --shadow-sm:0 6px 20px rgba(103,39,170,.08);
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1000px 600px at 0% -10%, rgba(110,11,212,.05), transparent 60%) no-repeat,
+      linear-gradient(180deg,#fbf9fe 0%, #faf7fc 45%, #ffffff 100%);
+    color:var(--text);
+    font:14px/1.55 Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+
+  /* ----- Топ-бар с логотипом WB ----- */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.58));
+    backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar .inner{
+    max-width:1600px; margin:0 auto; padding:10px 20px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    font-weight:900; letter-spacing:.2px;
+  }
+  .brand .logo{
+    width:36px; height:28px; display:inline-block;
+    filter: drop-shadow(0 10px 20px rgba(203,17,171,.35));
+  }
+  .brand .title{
+    font-size:16px; color:var(--ink);
+  }
+  .topbar .actions{
+    margin-left:auto; display:flex; gap:8px;
+  }
+
+  .wrap{max-width:1600px;margin:24px auto;padding:0 20px}
+
+  /* Заголовок страницы */
+  h1{
+    margin:12px 0 14px;
+    font-weight:900; letter-spacing:.2px; font-size:28px;
+    display:flex; align-items:center; gap:12px;
+  }
+  h1::before{
+    content:"";
+    width:28px; height:28px; border-radius:10px;
+    background:var(--grad);
+    box-shadow:0 8px 24px rgba(110,11,212,.25), inset 0 0 0 1px rgba(255,255,255,.5);
+  }
+
+  /* Табы — стеклянные плашки */
+  .tabs{display:flex; gap:10px; margin:10px 0 16px}
+  .tabs button{
+    padding:10px 14px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    color:var(--ink);
+    cursor:pointer;
+    font-weight:800;
+    transition:.15s ease, transform .06s;
+    box-shadow:var(--shadow-sm);
+  }
+  .tabs button:hover{border-color:var(--line-strong); transform:translateY(-1px)}
+  .tabs button.active{
+    color:#fff; background:var(--grad); border-color:transparent;
+    box-shadow:0 10px 24px rgba(203,17,171,.28);
+  }
+
+  /* Карточки */
+  .card{
+    background:var(--card);
+    border-radius:18px;
+    border:1px solid var(--line);
+    box-shadow:var(--shadow-md);
+    padding:16px 16px 14px;
+    position:relative;
+    overflow:hidden;
+    transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .card::before{
+    content:"";
+    position:absolute; inset:0 0 auto 0; height:3px;
+    background:linear-gradient(90deg, var(--wb), var(--wb-deep));
+    opacity:.18;
+  }
+  .card:hover{ transform:translateY(-2px); box-shadow:var(--shadow-lg); border-color:var(--line-strong); }
+
+  .head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end}
+  .nums{color:var(--muted);font-variant-numeric:tabular-nums}
+
+  /* Гриды */
+  .panel{display:grid;gap:12px;grid-template-columns:repeat(12, minmax(0,1fr));align-items:end}
+  .grid{display:grid;gap:18px;margin-top:16px;grid-template-columns:repeat(4,minmax(360px,1fr))}
+  @media (max-width:1400px){ .grid{grid-template-columns:repeat(3,minmax(320px,1fr));} }
+  @media (max-width:1100px){ .grid{grid-template-columns:repeat(2,minmax(320px,1fr));} }
+  @media (max-width:700px){ .grid{grid-template-columns:1fr;} }
+
+  /* Формы */
+  .field{display:grid;grid-template-rows:auto auto;gap:8px}
+  .field label{font-size:12px;color:var(--muted)}
+  .panel input,.panel select{
+    height:44px;padding:10px 12px;border-radius:12px;
+    border:1px solid var(--line);
+    background:#fff;color:var(--ink);
+    outline:none; transition:.2s;
+    box-shadow:var(--shadow-sm);
+  }
+  .panel input::placeholder{color:#bda9d4}
+  .panel input:focus,.panel select:focus{
+    border-color:transparent;
+    box-shadow:0 0 0 4px rgba(203,17,171,.22), var(--shadow-md);
+  }
+
+  /* Кнопки */
+  .btn{
+    height:44px;padding:10px 14px;border-radius:12px;
+    border:1px solid var(--btn-br);
+    background:var(--btn-bg); color:var(--ink);
+    font-weight:900; cursor:pointer;
+    transition:transform .06s, background-color .15s, box-shadow .2s, border-color .15s, filter .15s;
+    box-shadow:var(--shadow-sm);
+  }
+  .btn:hover{background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
+  .btn:active{transform:translateY(1px) scale(.995)}
+  .btn:disabled{opacity:.55; cursor:not-allowed}
+
+  .btn.primary{
+    background:var(--grad); color:#fff; border-color:transparent;
+    box-shadow:0 12px 28px rgba(203,17,171,.30);
+  }
+  .btn.success{
+    background:linear-gradient(135deg,#12b76a,#0ea65f); color:#fff; border-color:transparent;
+    box-shadow:0 12px 28px rgba(18,183,106,.22);
+  }
+  .btn.danger{
+    background:linear-gradient(135deg,#ef4444,#db2c2c); color:#fff; border-color:transparent;
+    box-shadow:0 12px 28px rgba(239,68,68,.22);
+  }
+
+  /* Чип-кнопки */
+  .mini{
+    height:28px;padding:6px 10px;border-radius:999px;
+    border:1px solid var(--line);
+    background:#fff;color:var(--ink);
+    font-size:12px;font-weight:800; line-height:1;
+    cursor:pointer; transition:.15s;
+  }
+  .mini:hover{border-color:var(--line-strong); background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
+  .mini:active{transform:translateY(1px)}
+
+  /* Чарты */
+  .chart-wrap{
+    position:relative;height:340px;display:flex;align-items:center;justify-content:center;
+    background:conic-gradient(from 110deg at 80% -40%, rgba(203,17,171,.06), transparent 35%) no-repeat,
+               radial-gradient(800px 400px at 0% -10%, rgba(110,11,212,.06), transparent 60%) no-repeat;
+    border:1px solid var(--line);
+    border-radius:16px;
+  }
+  .chart{width:100%;height:100%}
+
+  /* KPI плитки */
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .kpi{
+    display:grid;grid-template-columns:1fr auto;gap:6px;
+    padding:8px 10px;border:1px solid var(--line);
+    border-radius:12px;background:linear-gradient(180deg, #fff, #fff) padding-box,
+                                    linear-gradient(90deg, rgba(203,17,171,.2), rgba(110,11,212,.2)) border-box;
+    font-size:12px;min-height:42px;min-width:0
+  }
+  .kpi .label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi .val{text-align:right;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* Логи */
+  .log{
+    white-space:pre-wrap;background:#fff;border-radius:12px;padding:12px;
+    color:var(--ink);max-height:300px;min-height:140px;overflow:auto;
+    border:1px solid var(--line);
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    box-shadow:var(--shadow-sm);
+  }
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:900px){ .split{grid-template-columns:1fr} }
+
+  /* Тост */
+  .toast{
+    position:fixed;right:16px;bottom:16px;
+    background:#fff;color:var(--ink);
+    border:1px solid var(--line);padding:10px 14px;border-radius:12px;
+    box-shadow:0 12px 40px rgba(110,11,212,.18);
+    opacity:0;pointer-events:none;transition:.25s;
+  }
+  .toast.show{opacity:1;transform:translateY(-6px)}
+
+  /* Срезы */
+  .snap-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-items:start}
+  .snap{
+    display:flex;align-items:center;gap:10px;
+    border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;min-width:0;
+    box-shadow:var(--shadow-sm);
+  }
+  .snap .title{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .snap .meta{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .snap .del{
+    height:28px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+    background:#fff;color:#a4167e; cursor:pointer
+  }
+  .snap .del:hover{background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
+
+  /* Прогресс */
+  .progress{
+    height:10px;background:#f5ecff;border-radius:999px;overflow:hidden;border:1px solid var(--line)
+  }
+  .progress>div{
+    height:100%;width:0;background:var(--grad); transition:width .25s ease
+  }
+
+  /* Таблицы */
+  table{border-collapse:separate;border-spacing:0;width:100%;font-variant-numeric:tabular-nums}
+  th,td{border:1px solid var(--line);padding:8px 10px;background:#fff}
+  th{
+    background:linear-gradient(180deg,#fcf8ff 0%,#fff 100%);
+    text-align:left;color:var(--ink); font-weight:900
+  }
+  td:first-child, th:first-child{border-top-left-radius:10px; border-bottom-left-radius:10px}
+  td:last-child,  th:last-child{border-top-right-radius:10px; border-bottom-right-radius:10px}
+
+  /* Пилюли / линии статуса */
+  .pill{display:inline-block;padding:3px 8px;border-radius:999px;font-weight:900}
+  .pill-ok{background:rgba(18,183,106,.12);color:#027a48;border:1px solid rgba(18,183,106,.25)}
+  .pill-bad{background:rgba(239,68,68,.12);color:#b42318;border:1px solid rgba(239,68,68,.25)}
+  .line-ok{color:#12b76a;font-weight:900}
+  .line-bad{color:#b42318;font-weight:900}
+
+  /* Фильтры блока РАН */
+  .filters{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;margin-top:10px}
+  .filters .field{grid-column:span 3}
+  .filters .field.small{grid-column:span 2}
+  @media (max-width:900px){ .filters .field{grid-column:span 6} .filters .field.small{grid-column:span 6} }
+
+  /* Ссылки/алерты */
+  .alert-row{margin:6px 0 14px 0}
+  .alert-row a{color:#7a3af9;text-decoration:none;font-weight:900}
+  .alert-row a:hover{text-decoration:underline}
+  .ok{color:var(--ok)}
+  .bad{color:var(--bad)}
+  .warn{color:var(--c3)}
+
+  /* Скроллбар (приятнее) */
+  ::-webkit-scrollbar{height:12px;width:12px}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(180deg, #dcb4ef, #f0bce8); border-radius:10px; border:3px solid #fff}
+
+  /* Readiness cards */
+  .release-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  @media (max-width:900px){ .release-row{grid-template-columns:1fr} }
+  .release-card{
+    border:1px solid var(--line); border-radius:12px; background:#fff; padding:12px;
+    box-shadow:var(--shadow-sm); display:grid; gap:10px;
+  }
+  .mini-grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+    gap:12px; align-items:stretch;
+  }
+  .mini-card{
+    border:1px solid var(--line); border-radius:12px; background:#fff;
+    box-shadow:var(--shadow-sm); padding:10px;
+    display:grid; grid-template-rows:auto 120px auto; align-items:center; text-align:center;
+  }
+  .mini-title{
+    font-weight:900; font-size:12px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .mini-title a{ color: inherit; text-decoration: none; }
+  .mini-title a:hover{ text-decoration: underline; }
+  .mini-fig{ position:relative; height:120px; }
+  .mini-fig canvas{ width:100%; height:100%; }
+  .mini-remaining{ font-size:12px; color:var(--muted); margin-top:6px; }
+  .release-title{display:flex;justify-content:space-between;align-items:center;font-weight:900}
+  .release-sub{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center}
+  .release-chip{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-weight:800;font-size:12px}
+  .release-chip strong{font-variant-numeric:tabular-nums}
+  .release-bar{height:10px;background:#f5ecff;border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+  .release-bar>div{height:100%;width:0;background:var(--grad);transition:width .25s ease}
+  .release-link{font-weight:900;color:#7a3af9;text-decoration:none}
+  .release-link:hover{text-decoration:underline}
+
+  /* Подтабы для срезов */
+  .subtabs{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px}
+  .subtabs .mini.active{ color:#fff; background:var(--grad); border-color:transparent; box-shadow:0 10px 24px rgba(203,17,171,.28); }
+
+
+/* Дополнительные блоки для нашей страницы */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn.pill{white-space:nowrap}
+
+.wrap{max-width:1600px;margin:16px auto;padding:0 20px}
+.sub{color:var(--muted);margin:8px 0 14px}
+.grid-2{display:grid;grid-template-columns:420px 1fr;gap:16px}
+.input, input[type="text"], input[type="password"]{width:100%;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:12px;padding:10px 12px}
+label{display:block;margin:10px 0 6px;color:var(--text)}
+.btn.primary{background:var(--grad);color:#fff;border:0}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.status{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:#fff}
+.status.ok{color:var(--ok);border-color:#c8e9d8}
+.status.err{color:var(--bad);border-color:#f6c7c7}
+.progress{height:8px;background:#fff;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.progress>i{display:block;height:100%;width:0%;background:var(--grad)}
+.log{white-space:pre-wrap;background:#fff;border:1px dashed var(--line);border-radius:12px;padding:10px;min-height:140px;max-height:280px;overflow:auto}
+.box{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;max-height:520px;overflow:auto}
+.mini{font-size:12px;color:var(--muted)}
+
+/* ====== Табличное представление итогов (аналог XLSX) ====== */
+.table-wrap{margin-top:12px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:#fff}
+.table{width:100%;border-collapse:separate;border-spacing:0}
+.table th,.table td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:8px 10px;white-space:nowrap}
+.table th:first-child,.table td:first-child{border-left:1px solid var(--line)}
+.table tr:first-child th{border-top:1px solid var(--line)}
+.table thead th{background:#f7f8ff;color:#111;font-weight:700;text-align:center}
+.table .qhdr{background:#fff2cc !important}
+.table .relhdr{background:#ededed !important}
+.table .subhdr{background:#d9d2e9 !important}
+.table .itogo-hdr{background:#d9d9d9 !important}
+.table .itogo{background:#eee !important;text-align:center;font-weight:600}
+.table .num{text-align:center}
+.sticky-head thead th{position:sticky;top:0;z-index:2}
+.platform-title{font-weight:800;font-size:16px;margin:10px 0 6px}
+/* --- FIX: выравнивание инструкции и чекбоксов --- */
+#proxyBase + .mini {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: #faf7fc;
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--line-strong);
+  border-radius: 4px;
+  background: #fff;
+  transition: all 0.2s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+input[type="checkbox"]:hover {
+  border-color: var(--wb);
+}
+input[type="checkbox"]:checked {
+  background: var(--grad);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(203, 17, 171, 0.2);
+}
+input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  color: #fff;
+  font-size: 13px;
+  top: 0;
+  left: 3px;
+  font-weight: 500;
+}
+    
+#totalsBox{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+</style>
+
+</head>
+<body>
+<div class="topbar">
+  <div class="inner">
+    <div class="brand">WB</div>
+    <div class="title">Сбор ЧП</div>
+    <div class="spacer"></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="panel head" style="align-items:flex-end; grid-template-columns:repeat(12,minmax(0,1fr)); gap:12px">
+    <div style="grid-column:span 12">
+      <div class="title" style="font-weight:800;font-size:22px">Сбор ЧП</div>
+      <div class="sub">Если CORS — используйте прокси. Поддержка и в виде <code>?url=</code>. Вы можете скачать готовый локальный прокси для macOS кнопкой ниже -  файл <code>local-cors-proxy-macos.zip</code> Далее нобходимо распаковать архив и внутри запустить start-proxy.command.</code>. Потом из терминала вставить адрес прокси который отобразится. Формат http://localhost:8787. Повторно вводить нигде ничего не нужно. Все сохраняется в локальное хранилище. Возможно прокси необходимо будет запускать в случае перезагрузки ноутбука</code>.</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="panel" style="grid-template-columns:repeat(12,1fr)">
+        <div style="grid-column:span 6">
+          <label>Начальный релиз</label>
+          <input id="startRel" class="input" type="text" placeholder="6.9.5000" value="7.3.3000"/>
+        </div>
+        <div style="grid-column:span 6">
+          <label>Конечный релиз</label>
+          <input id="endRel" class="input" type="text" placeholder="7.3.4000" value="7.3.4000"/>
+        </div>
+
+        <div style="grid-column:span 12"><div class="mini">API и токены</div></div>
+        <div style="grid-column:span 12">
+          <label>DeployLab API Base</label>
+          <input id="dlBase" class="input" type="text" value="https://deploy-lab-api.wb.ru" placeholder="https://deploy-lab-api.wb.ru"/>
+        </div>
+        <div style="grid-column:span 12">
+          <label>YouTrack Base URL</label>
+          <input id="ytBase" class="input" type="text" value="https://youtrack.wildberries.ru" placeholder="https://youtrack.example.com"/>
+        </div>
+
+        <div style="grid-column:span 6">
+          <label>DeployLab токен (без «Bearer»)</label>
+          <input id="dlToken" class="input" type="password" placeholder="•••••••••"/>
+        </div>
+        <div style="grid-column:span 6">
+          <label>YouTrack токен (без «Bearer»)</label>
+          <input id="ytToken" class="input" type="password" placeholder="•••••••••"/>
+        </div>
+
+        <div style="grid-column:span 12"><div class="mini">CORS / Прокси</div></div>
+        <div style="grid-column:span 12">
+          <label>Proxy Base (опц.)</label>
+          <input id="proxyBase" class="input" type="text" placeholder="http://localhost:8787"/>
+          <div class="mini">Если CORS — используйте прокси.</code>.</div>
+        </div>
+        <div style="grid-column:span 6"><label><input id="useProxy" type="checkbox"/> Использовать прокси</label></div>
+        <div style="grid-column:span 6"><label><input id="proxyAsQuery" type="checkbox"/> Прокси в виде <code>?url=</code></label></div>
+
+        <div style="grid-column:span 6"><label><input id="platAndroid" type="checkbox" checked/> Android</label></div>
+        <div style="grid-column:span 6"><label><input id="platIOS" type="checkbox" checked/> iOS</label></div>
+
+        <div style="grid-column:span 12;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px">
+          <button id="runBtn" class="btn primary">Запустить сбор</button>
+          <button id="checkProxy" class="btn pill">Проверить прокси</button>
+<a id="downloadProxyZip" class="btn pill" href="#">Локальный прокси (macOS)</a>
+          <button id="saveSettingsBtn" class="btn pill">Сохранить настройки</button>
+          <span id="status" class="status">Готов.</span>
+        </div>
+
+        <div style="grid-column:span 12;margin:12px 0 8px" class="progress"><i id="progressBar" style="width:0%"></i></div>
+
+        <div style="grid-column:span 12">
+          <div class="mini" style="margin:6px 0">Логи</div>
+          <div id="logs" class="log"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="panel" style="grid-template-columns:repeat(12,1fr);align-items:center">
+        <div style="grid-column:span 6"><div class="title" style="font-weight:700">Выгрузка</div></div>
+        <div style="grid-column:span 6; text-align:right">
+          <button id="downloadBtn" class="btn pill" disabled>Сначала запустите сбор</button>
+        </div>
+        <div style="grid-column:span 12"><div class="mini">Итоги по релизам</div></div>
+        <div style="grid-column:span 12">
+          <div class="box"><pre id="totalsBox" class="muted">—</pre></div><div class="table-wrap sticky-head" id="tableAndroid"></div><div class="table-wrap sticky-head" id="tableIOS"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js">
+function showToast(msg){
+  try{
+    const t = document.getElementById('toastBox');
+    if(!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2000);
+  }catch(_){}
+}
+</script>
+<script>
+const $ = (id)=>document.getElementById(id);
+const log = (msg, cls='')=>{ const s=document.createElement('div'); s.textContent='['+new Date().toLocaleTimeString()+'] '+msg; if(cls) s.className=cls; const el=$('logs'); el.appendChild(s); el.scrollTop=el.scrollHeight; };
+const setStatus=(t,cls='')=>{ const s=$('status'); s.classList.remove('ok','err','warn'); if(cls) s.classList.add(cls); s.textContent=t; };
+const setProgress=(p)=>{ const i=$('progressBar'); if(i) i.style.width=Math.max(0,Math.min(100,+p||0))+'%'; };
+
+/* Хранилище */
+const STORAGE_KEY='chp_full_cfg_v1';
+function saveCfg(){ const cfg={startRel:$('startRel').value.trim(), endRel:$('endRel').value.trim(), dlBase:$('dlBase').value.trim(), ytBase:$('ytBase').value.trim(), dlToken:$('dlToken').value, ytToken:$('ytToken').value, proxyBase:$('proxyBase').value.trim(), useProxy:$('useProxy').checked, proxyAsQuery:$('proxyAsQuery').checked, platAndroid:$('platAndroid').checked, platIOS:$('platIOS').checked}; localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+function saveSensitive(){
+  try{
+    const cfg = JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+    const dl = $('dlToken').value;
+    const yt = $('ytToken').value;
+    const pb = $('proxyBase').value.trim();
+    cfg.dlToken = dl;
+    cfg.ytToken = yt;
+    cfg.proxyBase = pb;
+    cfg.dlToken_b64 = __b64e(dl);
+    cfg.ytToken_b64 = __b64e(yt);
+    cfg.proxyBase_b64 = __b64e(pb);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+  }catch(e){}
+}
+(function restore(){ try{ const cfg=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'); for(const [k,v] of Object.entries(cfg)){ const el=$(k); if(!el) continue; if(typeof el.checked==='boolean') el.checked=!!v; else el.value = v ?? el.value; } }catch(e){} })();
+window.addEventListener('beforeunload', saveCfg);
+restoreSensitive();
+for(const id of ['startRel','endRel','dlBase','ytBase','dlToken','ytToken','proxyBase']) $(id).addEventListener('change', saveCfg);
+for(const id of ['dlToken','ytToken','proxyBase']) $(id).addEventListener('input', saveSensitive);
+for(const id of ['useProxy','proxyAsQuery','platAndroid','platIOS']) $(id).addEventListener('click', saveCfg);
+
+
+/* === Base64 helpers to safely store and restore sensitive fields === */
+function __b64e(str){ try { return btoa(unescape(encodeURIComponent(String(str||'')))); } catch(e){ return ''; } }
+function __b64d(b64){ try { return decodeURIComponent(escape(atob(String(b64||'')))); } catch(e){ return ''; } }
+
+function restoreSensitive(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const cfg = JSON.parse(raw||'{}');
+    const dl = cfg.dlToken_b64 ? __b64d(cfg.dlToken_b64) : (cfg.dlToken||'');
+    const yt = cfg.ytToken_b64 ? __b64d(cfg.ytToken_b64) : (cfg.ytToken||'');
+    const pb = cfg.proxyBase_b64 ? __b64d(cfg.proxyBase_b64) : (cfg.proxyBase||'');
+    if (document.getElementById('dlToken')) document.getElementById('dlToken').value = dl || document.getElementById('dlToken').value;
+    if (document.getElementById('ytToken')) document.getElementById('ytToken').value = yt || document.getElementById('ytToken').value;
+    if (document.getElementById('proxyBase')) document.getElementById('proxyBase').value = pb || document.getElementById('proxyBase').value;
+  }catch(e){ /* noop */ }
+}
+document.addEventListener('DOMContentLoaded', restoreSensitive);
+
+/* Диапазон релизов */
+function parseRelease(s){ const m=String(s).trim().match(/^(\d+)\.(\d+)\.(\d{1,4})$/); if(!m) return null; return [Number(m[1]),Number(m[2]),Number(m[3])]; }
+function expandReleaseRange(start,end){ let A=parseRelease(start), B=parseRelease(end); if(!A||!B) throw new Error('Неверный формат релизов. Пример: 7.3.3000'); const cmp=(x,y)=>x[0]-y[0]||x[1]-y[1]||x[2]-y[2]; if(cmp(A,B)>0){const t=A;A=B;B=t;} const toStr=(t)=>`${t[0]}.${t[1]}.${String(t[2]).padStart(4,'0')}`; const inc=(t)=>{t=t.slice(); t[2]+=1000; if(t[2]>=10000){t[2]=0; t[1]++; if(t[1]>=10){t[1]=0; t[0]++;}} return t;}; const out=[]; let cur=A; for(;;){ out.push(toStr(cur)); if(cur[0]===B[0]&&cur[1]===B[1]&&cur[2]===B[2]) break; cur=inc(cur); } return out; }
+const displayRelease = (rel)=>{ const parts=String(rel).split('.'); if(parts.length!==3) return String(rel); const [a,b,c]=parts; const n=Number(c); return `${a}.${b}.${(n>=1000? (n/1000|0) : n)}` };
+const toKey = (rel)=>{ const p=String(rel).split('.'); return p.length===3 ? displayRelease(rel) : String(rel); };
+
+/* Proxy/HTTP */
+function proxify(url){ const useProxy=$('useProxy').checked; if(!useProxy) return url; const base=$('proxyBase').value.trim().replace(/\/+$/,''); if(!base) return url; if ($('proxyAsQuery').checked){ return `${base}?url=${encodeURIComponent(url)}`; } try{ const u=new URL(url); return `${base}${u.pathname}${u.search||''}`; }catch{ return url; } }
+async function httpJSON(url, {headers={}, method='GET', yt=false, dl=false}={}){ const h=new Headers(headers||{}); if(dl){ h.set('Authorization-Deploy-Lab','Bearer '+$('dlToken').value.trim()); } if(yt){ h.set('Authorization','Bearer '+$('ytToken').value.trim()); h.set('Accept','application/json'); } const final=proxify(url); log('FETCH '+final); const r=await fetch(final,{method,headers:h}); const ct=(r.headers.get('content-type')||'').toLowerCase(); if(!r.ok) throw new Error(`${r.status} ${r.statusText}`); if(ct.includes('application/json')) return r.json(); const tx=await r.text(); try{ return JSON.parse(tx);}catch{ throw new Error(`HTML вместо JSON: ${tx.slice(0,120)}`); } }
+
+/* DeployLab */
+function dlReleaseURL(platform, rel){ const base=$('dlBase').value.trim().replace(/\/+$/,''); const prefix = platform==='Android' ? 'ANDROID' : 'IOS'; return `${base}/releaseboss/admin_panel/release/${prefix}_${rel}`; }
+function dlIssuesURL(platform, rel){ const base=$('dlBase').value.trim().replace(/\/+$/,''); const prefix = platform==='Android' ? 'ANDROID' : 'IOS'; return `${base}/releaseboss/admin_panel/release/${prefix}_${rel}/issues`; }
+async function fetchReleaseCutoff(platform, rel){ try{ const data=await httpJSON(dlReleaseURL(platform, rel), {dl:true}); for (const [k,v] of Object.entries(data||{})){ if(String(k).toLowerCase().includes('cutoff')){ if (typeof v==='number'){ const ts = v>10000000000 ? v/1000 : v; return new Date(ts*1000).toISOString(); } if (typeof v==='string') { const d=new Date(v); if(!isNaN(d)) return d.toISOString(); } } } }catch(e){ log(`[warn] cutoff ${platform} ${rel}: ${e.message}`,'err'); } return null; }
+async function fetchDeployIssueKeys(platform, rel){ try{ const list=await httpJSON(dlIssuesURL(platform, rel), {dl:true}); const keys=[]; if(Array.isArray(list)){ for (const it of list){ if (it && it.merged_after_cutoff===true){ const k=String(it.key||'').trim(); if(k) keys.push(k.toUpperCase()); } } } return keys; }catch(e){ log(`[err] issues ${platform} ${rel}: ${e.message}`,'err'); return []; } }
+
+/* YouTrack */
+function ytIssueURL(key){ const base=$('ytBase').value.trim().replace(/\/+$/,''); const fields = ['idReadable','summary','tags(name)','fields(projectCustomField(field(name)),value(name,$type),$type)'].join(','); return `${base}/api/issues/${encodeURIComponent(key)}?fields=${encodeURIComponent(fields)}&$top=-1`; }
+async function fetchIssueBrief(key){ try{ return await httpJSON(ytIssueURL(key), {yt:true}); } catch(e){ if(/404/.test(e.message)) return {}; log(`[err] YT ${key}: ${e.message}`,'err'); return {}; } }
+function pickFieldNames(issue, target){ const out=[]; const arr=issue?.fields||[]; for (const f of arr){ const fld=f?.projectCustomField?.field||{}; if ((fld.name||'').trim()===target){ const val=f.value; if (Array.isArray(val)){ for (const v of val){ const n=v?.name; if(n) out.push(n); } } else if (val && typeof val==='object'){ const n=val.name; if(n) out.push(n); } } } return out; }
+function pickFirstSubstreamField(issue){ const arr=issue?.fields||[]; for (const f of arr){ const name=(f?.projectCustomField?.field?.name||'').toLowerCase(); if (name.includes('substream')){ const out=[]; const val=f.value; if (Array.isArray(val)){ for (const v of val){ const n=v?.name; if(n) out.push(n); } } else if (val && typeof val==='object'){ const n=val.name; if(n) out.push(n); } return out; } } return []; }
+function pickSubstreamDynamic(issue, streamName){ if (String(streamName||'').trim().toLowerCase()==='финтех'){ const vals=pickFieldNames(issue, 'Product Финтех'); return vals||[]; } return pickFirstSubstreamField(issue); }
+function normalizeStream(streams){ if(!streams||!streams.length) return ''; const s=streams[0]; if (s.toLowerCase().includes('paygate') && s.includes('.')) return s.split('.').pop().trim(); return s; }
+
+/* Pool */
+async function withPool(items, limit, worker){ const ret=[]; let i=0; let active=0; let resolve, reject; const done=new Promise((res,rej)=>{resolve=res; reject=rej;}); const push=async()=>{ if(i>=items.length){ if(active===0) resolve(ret); return; } const idx=i++; const item=items[idx]; active++; try{ ret[idx]=await worker(item, idx); }catch(e){ ret[idx]=undefined; } finally{ active--; push(); } }; for (let k=0;k<Math.min(limit, items.length);k++) push(); return done; }
+
+/* Counts */
+async function computeReleaseCounts(platform, rel){ const cutoff = await fetchReleaseCutoff(platform, rel); const keys = await fetchDeployIssueKeys(platform, rel); if (!keys.length) return {row_counts:{}, total:0, cutoff}; const uniq=[...new Set(keys)]; const rows={}; const results = await withPool(uniq, 8, async (k)=>{ const issue = await fetchIssueBrief(k); const stream = normalizeStream(pickFieldNames(issue,'Stream')); const subs = pickSubstreamDynamic(issue, stream); const sub = subs[0]||''; const rowKey = sub ? `${stream} | ${sub}` : (stream||''); return rowKey || null; }); for (const rk of results){ if(!rk) continue; rows[rk]=(rows[rk]||0)+1; } const total = Object.values(rows).reduce((s,v)=>s+v,0); return {row_counts:rows, total, cutoff}; }
+async function buildCountsForPlatform(platform, releases){ const counts={}; const totalsByRelease={}; const cutoffs={}; await Promise.all(releases.map(async rel=>{ try{ const res=await computeReleaseCounts(platform, rel); const key=toKey(rel); totalsByRelease[key]=Number(res.total||0); cutoffs[key]=res.cutoff||null; for (const [rowKey,n] of Object.entries(res.row_counts||{})){ counts[rowKey]=counts[rowKey]||{}; counts[rowKey][key]=(counts[rowKey][key]||0)+Number(n||0); } }catch(e){ log(`[err] compute ${platform} ${rel}: ${e.message}`,'err'); } })); return {counts, totalsByRelease, cutoffs}; }
+
+/* Pyodide + XlsxWriter */
+let __py=null, __pyReady=false;
+async function ensurePyodide(){ if(__pyReady) return __py; setStatus('Загружаем Pyodide/XlsxWriter…'); __py = await loadPyodide({indexURL:"https://cdn.jsdelivr.net/pyodide/v0.26.1/full/"}); await __py.loadPackage('micropip'); await __py.runPythonAsync(`import micropip; await micropip.install("XlsxWriter==3.2.0")`); __pyReady=true; setStatus('Pyodide готов.','ok'); log('Pyodide/XlsxWriter готовы','ok'); return __py; }
+const PY_BUILDER = `
+import io, json
+import xlsxwriter
+from xlsxwriter.utility import xl_rowcol_to_cell, xl_range
+from datetime import datetime
+
+RU_MONTH_ABBR={1:"янв.",2:"фев.",3:"мар.",4:"апр.",5:"май",6:"июн.",7:"июл.",8:"авг.",9:"сен.",10:"окт.",11:"ноя.",12:"дек."}
+def _m(s):
+    if not s: return None
+    try:
+        s=str(s)
+        if s.endswith("Z"): s=s[:-1]+"+00:00"
+        return datetime.fromisoformat(s).month
+    except: return None
+def _q(m): return 1 if not m or m<=3 else 2 if m<=6 else 3 if m<=9 else 4
+def display_release(rel):
+    a,b,c = map(int, rel.split("."))
+    return f"{a}.{b}.{c//1000}"
+def build_column_plan(releases, cutoffs):
+    plan=[]; spans=[]; cq=None; qstart=None; cm=None; col=1
+    def close_m(q,m):
+        if m is not None: plan.append({"kind":"month_total","label":f"ИТОГО {RU_MONTH_ABBR.get(m,'')}", "q":q,"m":m})
+    def close_q(q): plan.append({"kind":"quarter_total","label":f"ИТОГО Q{q}","q":q})
+    for rel in releases:
+        m=_m((cutoffs or {}).get(rel)) or (cm if cm is not None else 1); q=_q(m)
+        if cq is None: cq=q; qstart=col; cm=m
+        elif q!=cq:
+            close_m(cq,cm); col+=1; close_q(cq); col+=1; spans.append((qstart,col-1,cq)); cq=q; qstart=col; cm=m
+        if m!=cm: close_m(cq,cm); col+=1; cm=m
+        plan.append({"kind":"release","label":display_release(rel),"rel":rel,"q":cq,"m":cm}); col+=1
+    if cq is not None:
+        close_m(cq,cm); col+=1; close_q(cq); col+=1; spans.append((qstart,col-1,cq))
+    return plan, spans
+def write_platform_block(ws, wb, start_row, title, releases, counts, totals_by_release, cutoffs, col_widths):
+    fTxt=wb.add_format({'border':1,'num_format':'@'})
+    fT  =wb.add_format({'border':1,'bold':True,'num_format':'@'})
+    fQ  =wb.add_format({'border':1,'bold':True,'align':'center','valign':'vcenter','bg_color':'#FFF2CC','num_format':'@'})
+    fR  =wb.add_format({'border':1,'bold':True,'align':'center','valign':'vcenter','bg_color':'#EDEDED','num_format':'@'})
+    fS  =wb.add_format({'border':1,'align':'center','valign':'vcenter','bg_color':'#D9D2E9','num_format':'@'})
+    fN  =wb.add_format({'border':1,'align':'center'})
+    fIH =wb.add_format({'border':1,'bold':True,'align':'center','valign':'vcenter','bg_color':'#D9D9D9','num_format':'@'})
+    fI  =wb.add_format({'border':1,'align':'center','bg_color':'#D9D9D9'})
+    def upd(c,v): col_widths[c]=max(col_widths.get(c,0),len("" if v is None else str(v)))
+    plan,spans = build_column_plan(releases, cutoffs)
+    ws.write_string(start_row,0,title,fT); upd(0,title)
+    rQ=start_row+1; rH=start_row+2; rS=start_row+3; rD=start_row+4
+    for c1,c2,q in spans:
+        ws.merge_range(rQ,c1,rQ,c2,f"Q{q}",fQ)
+        for c in range(c1,c2+1): upd(c, f"Q{q}")
+    ws.write_string(rH,0,"Стрим",fTxt); upd(0,"Стрим")
+    relCols=[]; relLabels=[]; c=1
+    for cd in plan:
+        if cd["kind"]=="release":
+            ws.write_string(rH,c,cd["label"],fR); relCols.append(c); relLabels.append(cd["label"])
+        else: ws.write_string(rH,c,cd["label"],fIH)
+        upd(c,cd["label"]); c+=1
+    if relCols:
+        rng = xl_range(rH, min(relCols), rH, max(relCols))
+        try: ws.ignore_errors({'number_stored_as_text':rng,'two_digit_text_year':rng})
+        except: pass
+    ws.write_string(rS,1,"количество черепиков",fS); upd(1,"количество черепиков")
+    for c in range(0,1+len(plan)): ws.write_blank(rS,c,None,fS)
+    def base(rk): return (rk.split(" | ")[0]).strip()
+    rows = sorted(list(counts.keys()) or [""], key=lambda rk:(base(rk).lower(), rk.lower()))
+    idx2=[]; c=1
+    for cd in plan: idx2.append((c,cd)); c+=1
+    def find_month_range(i):
+        left=None; j=i-1
+        while j>=0:
+            ci,cd = idx2[j]
+            if cd["kind"]=="release" and cd["q"]==idx2[i][1]["q"] and cd["m"]==idx2[i][1]["m"]:
+                left = ci if left is None else min(left,ci)
+            elif cd["kind"] in ("month_total","quarter_total"): break
+            j-=1
+        if left is None: return None
+        right = idx2[i-1][0]; return left,right
+    def quarter_ranges_before(i):
+        q=idx2[i][1]["q"]; rngs=[]; run=None; prev=None
+        for j in range(0,i):
+            ci,cd=idx2[j]
+            if cd["q"]==q and cd["kind"]=="release":
+                if run is None: run=ci; prev=ci
+                elif ci==prev+1: prev=ci
+                else: rngs.append((run,prev)); run=ci; prev=ci
+            else:
+                if run is not None: rngs.append((run,prev)); run=None; prev=None
+        if run is not None: rngs.append((run,prev))
+        return rngs
+    r=rD
+    for rk in rows:
+        ws.write_string(r,0,rk,fTxt); upd(0,rk)
+        c=1
+        for cd in plan:
+            if cd["kind"]=="release":
+                val=int((counts.get(rk, {}) or {}).get(cd["label"],0))
+                if val>0: ws.write_number(r,c,val,fN); upd(c,val)
+                else: ws.write_blank(r,c,None,fN)
+            elif cd["kind"]=="month_total":
+                i=next(i for i,(ci,_) in enumerate(idx2) if ci==c)
+                rr=find_month_range(i)
+                if rr:
+                    l,rt=rr; a1=xl_range(r,l,r,rt)
+                    ws.write_formula(r,c,f'=IF(SUM({a1})=0,"",SUM({a1}))',fI)
+                else: ws.write_blank(r,c,None,fI)
+            elif cd["kind"]=="quarter_total":
+                i=next(i for i,(ci,_) in enumerate(idx2) if ci==c)
+                rngs=quarter_ranges_before(i)
+                if rngs:
+                    parts=[xl_range(r,a,r,b) for a,b in rngs]
+                    joined=",".join(parts)
+                    ws.write_formula(r,c,f'=IF(SUM({joined})=0,"",SUM({joined}))',fI)
+                else: ws.write_blank(r,c,None,fI)
+            c+=1
+        r+=1
+    last=r-1
+    ws.write_string(r,0,"ИТОГО",fT); upd(0,"ИТОГО"); totalRow=r; c=1
+    for cd in plan:
+        colRange = xl_range(rD,c,last,c)
+        if cd["kind"]=="release": ws.write_formula(totalRow,c,f"=SUM({colRange})",fN)
+        else: ws.write_formula(totalRow,c,f'=IF(SUM({colRange})=0,"",SUM({colRange}))',fI)
+        c+=1
+    r+=1
+    maxCol = 1+len(plan)-1; helper = maxCol+3; hh=rH; fr=hh+1
+    ws.write_string(hh, helper, "Релиз", fTxt); upd(helper,"Релиз")
+    ws.write_string(hh, helper+1, "ЧП", fTxt); upd(helper+1,"ЧП")
+    relCols=[i+1 for i,p in enumerate(plan) if p["kind"]=="release"]
+    relLabels=[p["label"] for p in plan if p["kind"]=="release"]
+    for idx,ci in enumerate(relCols):
+        ws.write_string(fr+idx, helper, relLabels[idx], fTxt)
+        ws.write_formula(fr+idx, helper+1, f"={xl_rowcol_to_cell(totalRow, ci)}", fN)
+        upd(helper, relLabels[idx])
+    if relCols:
+        rng_h = xl_range(fr, helper, fr+len(relCols)-1, helper)
+        try: ws.ignore_errors({'number_stored_as_text':rng_h,'two_digit_text_year':rng_h})
+        except: pass
+    chart=wb.add_chart({'type':'area','subtype':'stacked'})
+    chart.set_title({'name': f'ЧП {title} по релизам'})
+    chart.set_x_axis({'name':'Релиз'})
+    chart.set_y_axis({'name':'ЧП','min':0})
+    chart.set_legend({'none': True})
+    chart.set_size({'width':1800,'height':570})
+    first=fr; last_r=fr+len(relCols)-1
+    if last_r>=first:
+        sheet=ws.get_name() if hasattr(ws,'get_name') else 'черепики_v2'
+        chart.add_series({'categories':[sheet,first,helper,last_r,helper],'values':[sheet,first,helper+1,last_r,helper+1]})
+        lab=wb.add_chart({'type':'line'})
+        lab.add_series({'categories':[sheet,first,helper,last_r,helper],'values':[sheet,first,helper+1,last_r,helper+1],'line':{'none':True},'marker':{'type':'none'},'data_labels':{'value':True,'position':'above'}})
+        chart.combine(lab)
+        ws.insert_chart(hh, helper+3, chart)
+    return r
+def build_excel_bytes(cfg_json):
+    cfg=json.loads(cfg_json)
+    releases   = cfg['releases']
+    and_counts = cfg['and_counts']; and_totals=cfg.get('and_totals',{}); and_cutoffs=cfg.get('and_cutoffs',{})
+    ios_counts = cfg['ios_counts']; ios_totals=cfg.get('ios_totals',{}); ios_cutoffs=cfg.get('ios_cutoffs',{})
+    bio=io.BytesIO(); wb=xlsxwriter.Workbook(bio,{'in_memory':True}); ws=wb.add_worksheet("черепики_v2"); ws.freeze_panes(0,1)
+    colw={}
+    row=0; row=write_platform_block(ws,wb,row,"Android",releases,and_counts,and_totals,and_cutoffs,colw)
+    row+=1; row=write_platform_block(ws,wb,row,"iOS",releases,ios_counts,ios_totals,ios_cutoffs,colw)
+    for c,w in colw.items(): ws.set_column(c,c,max(min(w*1.05+0.2,45),3))
+    wb.close(); return bio.getvalue()
+`;
+async function buildExcelInBrowser(payload){ const py=await ensurePyodide(); const json=JSON.stringify(payload).replace(/<\/script/gi,'<\/script'); await py.runPythonAsync(`payload_json = r'''${json}'''`); await py.runPythonAsync(PY_BUILDER + `
+wb_bytes = build_excel_bytes(payload_json)
+`); const bytes = py.globals.get('wb_bytes').toJs(); return new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); }
+
+
+/* ====== Построение плана колонок (как в XLSX) и рендер в HTML ====== */
+function monthFromIso(iso){ if(!iso) return null; const d=new Date(iso); return isNaN(d)? null : (d.getMonth()+1); }
+function quarterFromMonth(m){ if(!m) return 1; if(m<=3) return 1; if(m<=6) return 2; if(m<=9) return 3; return 4; }
+
+function buildColumnPlanJS(releases, cutoffs){
+  const plan=[]; const qSpans=[];
+  let currentQ=null, qStartCol=null, curMonth=null;
+  let colIdx=1; // 0-й — «Стрим»
+  const closeMonth=(qnum,mnum)=>{ if(mnum!=null) plan.push({kind:'month_total', label:`ИТОГО ${RU_MONTH_ABBR[mnum]||''}`, q:qnum, m:mnum}); };
+  const closeQuarter=(qnum)=>{ plan.push({kind:'quarter_total', label:`ИТОГО Q${qnum}`, q:qnum}); };
+  for (const rel of releases){
+    const iso = (cutoffs||{})[rel];
+    const mnum = monthFromIso(iso) ?? (curMonth ?? 1);
+    const qnum = quarterFromMonth(mnum);
+    if(currentQ===null){ currentQ=qnum; qStartCol=colIdx; curMonth=mnum; }
+    else if(qnum!==currentQ){
+      closeMonth(currentQ, curMonth); colIdx++;
+      closeQuarter(currentQ); colIdx++;
+      qSpans.push([qStartCol, colIdx-1, currentQ]);
+      currentQ=qnum; qStartCol=colIdx; curMonth=mnum;
+    }
+    if(mnum!==curMonth){ closeMonth(currentQ, curMonth); colIdx++; curMonth=mnum; }
+    plan.push({kind:'release', label:displayRelease(rel), rel, q:currentQ, m:curMonth}); colIdx++;
+  }
+  if(currentQ!==null){
+    closeMonth(currentQ, curMonth); colIdx++;
+    closeQuarter(currentQ); colIdx++;
+    qSpans.push([qStartCol, colIdx-1, currentQ]);
+  }
+  return {plan, qSpans};
+}
+
+const RU_MONTH_ABBR = {1:"янв.",2:"фев.",3:"мар.",4:"апр.",5:"май",6:"июн.",7:"июл.",8:"авг.",9:"сен.",10:"окт.",11:"ноя.",12:"дек."};
+
+function renderPlatformTable(targetId, title, releases, counts, cutoffs){
+  const {plan, qSpans} = buildColumnPlanJS(releases, cutoffs);
+  const target = document.getElementById(targetId);
+  if(!target){ return; }
+  const streamRows = Object.keys(counts||{});
+  const releaseCols = plan.filter(p=>p.kind==='release');
+  // Сортировка как в XLSX: по базовому stream имени
+  const base = (rk)=> (rk.split(" | ")[0]||"").trim();
+  streamRows.sort((a,b)=> (base(a).toLowerCase().localeCompare(base(b).toLowerCase()) || a.toLowerCase().localeCompare(b.toLowerCase())));
+  // Заголовки
+  let html = `<div class="platform-title">${title}</div><table class="table"><thead>`;
+  // Row 1: кварталы (colspan по диапазону)
+  html += `<tr><th class="qhdr"> </th>`;
+  // Нам нужно посчитать фактический colspan для каждого квартала
+  // Для простоты: пройдём план и посчитаем протяжённость между qSpans start-end
+  const colMap = []; // [idx->coldef], начиная со столбца 1
+  for (const p of plan){ colMap.push(p); }
+  for (const [c1,c2,qnum] of qSpans){
+    // c1/c2 — индексы с 1; ширина = c2-c1+1
+    const span = c2 - c1 + 1;
+    html += `<th class="qhdr" colspan="${span}">Q${qnum}</th>`;
+  }
+  html += `</tr>`;
+  // Row 2: заголовки колонок (релизы/итого)
+  html += `<tr><th class="relhdr">Стрим</th>`;
+  for (const p of plan){
+    const cls = p.kind==='release' ? 'relhdr' : 'itogo-hdr';
+    html += `<th class="${cls}">${p.label}</th>`;
+  }
+  html += `</tr>`;
+  // Row 3: подшапка
+  html += `<tr><th class="subhdr"> </th>`;
+  for (let i=0;i<plan.length;i++){
+    if(i===0){ html += `<th class="subhdr">количество черепиков</th>`; }
+    else { html += `<th class="subhdr"> </th>`; }
+  }
+  html += `</tr></thead><tbody>`;
+
+  // Поддержки: поиск диапазона релизов для month_total и quarter_total
+  const idxToKind = plan.map((p,i)=>({col:i+1, def:p}));
+  function findMonthRange(i){ // i — индекс в idxToKind (0-based) текущего столбца «итого месяца»
+    let left = null;
+    for (let j=i-1; j>=0; j--){
+      const cdef = idxToKind[j].def;
+      const cur  = idxToKind[i].def;
+      if (cdef.kind==='release' && cdef.q===cur.q && cdef.m===cur.m){
+        left = left==null ? idxToKind[j].col : Math.min(left, idxToKind[j].col);
+      } else if (cdef.kind==='month_total' || cdef.kind==='quarter_total'){
+        break;
+      }
+    }
+    if(left==null) return null;
+    const right = idxToKind[i-1].col;
+    return [left, right];
+  }
+  function quarterReleaseRangesBefore(i){
+    const qnum = idxToKind[i].def.q;
+    const ranges=[]; let runStart=null, prev=null;
+    for (let j=0; j<i; j++){
+      const c = idxToKind[j];
+      if (c.def.q===qnum && c.def.kind==='release'){
+        if(runStart==null){ runStart=c.col; prev=c.col; }
+        else if (c.col === prev+1){ prev=c.col; }
+        else { ranges.push([runStart, prev]); runStart=c.col; prev=c.col; }
+      } else {
+        if(runStart!=null){ ranges.push([runStart, prev]); runStart=null; prev=null; }
+      }
+    }
+    if(runStart!=null) ranges.push([runStart, prev]);
+    return ranges;
+  }
+
+  // Ряды данных
+  function valAt(rowKey, label){
+    const row = counts[rowKey] || {};
+    return Number(row[label]||0);
+  }
+  for (const rk of (streamRows.length? streamRows : [''])){
+    html += `<tr><td>${rk? rk : '&nbsp;'}</td>`;
+    for (let c=0;c<plan.length;c++){
+      const coldef = plan[c];
+      if(coldef.kind==='release'){
+        const v=valAt(rk, coldef.label);
+        html += v>0 ? `<td class="num">${v}</td>` : `<td class="num"> </td>`;
+      } else if(coldef.kind==='month_total'){
+        // просуммировать релизы слева в этом месяце/квартале
+        const i = c; // индекс текущего coldef
+        const rng = findMonthRange(i);
+        if(rng){
+          const [L,R] = rng;
+          let sum=0;
+          for (let j=L-1; j<=R-1; j++){
+            const p = plan[j-0];
+            if(p && p.kind==='release'){
+              sum += valAt(rk, p.label);
+            }
+          }
+          html += sum>0 ? `<td class="itogo num">${sum}</td>` : `<td class="itogo num"> </td>`;
+        } else {
+          html += `<td class="itogo"> </td>`;
+        }
+      } else if(coldef.kind==='quarter_total'){
+        const i=c;
+        const ranges = quarterReleaseRangesBefore(i);
+        let sum=0;
+        for (const [A,B] of ranges){
+          for (let j=A-1;j<=B-1;j++){
+            const p = plan[j];
+            if(p && p.kind==='release') sum += valAt(rk, p.label);
+          }
+        }
+        html += sum>0 ? `<td class="itogo num">${sum}</td>` : `<td class="itogo num"> </td>`;
+      }
+    }
+    html += `</tr>`;
+  }
+
+  // Итоговая строка
+  html += `<tr><td class="itogo-hdr" style="font-weight:800">ИТОГО</td>`;
+  // по каждому столбцу суммируем по всем рядам
+  for (let c=0;c<plan.length;c++){
+    const coldef = plan[c];
+    let sum=0;
+    if(coldef.kind==='release'){
+      for (const rk of streamRows){
+        sum += valAt(rk, coldef.label);
+      }
+      html += `<td class="num">${sum}</td>`;
+    } else if(coldef.kind==='month_total'){
+      const rng = findMonthRange(c);
+      if(rng){
+        const [L,R] = rng;
+        for (const rk of streamRows){
+          for (let j=L-1; j<=R-1; j++){
+            const p = plan[j];
+            if(p && p.kind==='release'){
+              sum += valAt(rk, p.label);
+            }
+          }
+        }
+        html += sum>0 ? `<td class="itogo num">${sum}</td>` : `<td class="itogo num"> </td>`;
+      } else {
+        html += `<td class="itogo"> </td>`;
+      }
+    } else if(coldef.kind==='quarter_total'){
+      const ranges = quarterReleaseRangesBefore(c);
+      for (const rk of streamRows){
+        for (const [A,B] of ranges){
+          for (let j=A-1;j<=B-1;j++){
+            const p = plan[j];
+            if(p && p.kind==='release'){
+              sum += valAt(rk, p.label);
+            }
+          }
+        }
+      }
+      html += sum>0 ? `<td class="itogo num">${sum}</td>` : `<td class="itogo num"> </td>`;
+    }
+  }
+  html += `</tr>`;
+
+  html += `</tbody></table>`;
+  target.innerHTML = html;
+}
+
+
+/* ===== Embedded ZIP (macOS local proxy) — self-contained download ===== */
+const PROXY_ZIP_B64 = "UEsDBBQAAAAIAGtRTFuBrPNalAYAAJkRAAATAAAAcHJveHktc3RhbmRhbG9uZS5qc5VY23LbNhB991dsOJkM1UikkziTjFzF4zpulakTqb5MppObKRKWGFEEDYCSFUeP7Qf0uV/XL+kuAF5E27H9kAkF7J69YPdgYd+HTPCLZUeqII2ChKfM+yo3fB8OeBgksDc4PDISsIjVBFIO7EIxkeJexDKWRiwNYybBfccjUgWeJsuWRwiH7DyPBe4VW6968GQL3AUXUwkjJhUKw5OXj434iQzGrAvDweFx7+WLly/QVsSu9W4jnmVcKJgolcGZ4DNw6NPZrm/I2o6sti7h5PAAVnYzF0l9KwuEZBBI8/FHzsSyFD2nX1KJOB2jykbIU/SfnIUeORkyKT2Wzj29tAPv8tmICbe504IuUHCIgCHvJglfJDEl4gzyDNFZMIMJl0p6sBtFvmAzPtceLXkOKWORZy3vHhwM3n/pD46Oj9CBlC3giCn3wwaAg+eS8GUnCUbeYuSJ3Gmvr3aCLK7vILQSQTj1FnESodMCz7PcZBfBLEuYF/KZs/GpZfzu86wzWnYmPIMJCyImJCwYyAnPkwiPTcEZF4tARNbX/mD45Zc/0dlh01XcT1moYp4aa1PGsk6QxHNmfpvTD3I1YamKw0BdWeci/hZUAIUABhQnTJQ/UnnGRAdrlUd0gHo5z8YCnTc/KOnmCxHHsYUTDNUKGHRWoRudhKVjNbHZOMtT7T9Ipva4kC4WfAsuUR4/PFzs6wS5zm5IhdDZQxDBk44++s7A2gLnJwfR7qZkNuU9td4yTFaktX7bP24PsXLawxP8t3u812+/3j/YP95vD4bHbwbvju6Cun+RccmuOLOqpQTZ4ZcgIhrAXqfEtGEmxyY79XSVxlSgcrlHbd+Drc3NYh1xXFK8gv4rF6M4Qgq6P/izH4NjWSdqUh3mrYhP1911Br83s5HF4fQ4EGNGqTg/EYlBJhrAzGYKdpCNepquur5P9ehnAVIuDA5RKsNSjC/8K9uIYJost72F9Gbx24b8UDohLtcVrp03CprQUCnHQw5EOKF4hJLvkeZdZ8dpIYlVW0kcMvcJsVexVgMiBiwJ09W42k7CFCgdMUqcexgeNgxAfAbuA7v+6BECUhxpMGNrHhQROy2TJ6igahoCWS1A1/zPH63CR9/HwE2g1pb/Wadtp/vRx93YU1SOBq0Er8E7RZIdeGxX1+w8rhtYbZh/gqlcpFZ8/eBlkMYq/sZsq7iWMo1lk0JkYDR8uSJM5E5wzfKHaRvmn+hyGIy+Ik9iaSli5xKi8F6HOW0RmorTnBnfDMiU0SlPPcUP+IKJvUAyt5adipy9SSBdlG41cdC7D9NPCDLfXo8WNxo1TrxcNHyYxOgv/mpD8SnLmh/iYSXxeKJsQZTC3kwTFfR6eBIlH9k4izas8Gykxe9mU24196k5rZIJwoRUnkRZBbV2rXzDEobv38HxzfHXKrnw0GZmnfpK81g4b2Mp8QoqDLm66wHPvCj4n3HhVcsY0I5VbXRCHYSVin1bbwlcrjW/9UerA16Z4eSurr1J53j3RoVrCFbzgmKtDR2exIqm9n1QX6QKKn3yiHFaVxNTsXbN+GkfhfXsENB1xaIuPLxch1qdthqHFcu+nvR6VSI8LEHFQ56YAjKt7FRklcQjFC8Ud+yo2NX/b1fIwqTHtixqNJu4qomiF2vaPKNuIDUTe+FT9xo/21qC4iNCq0sUa0aCRtQ1fRpZsRbdKpatrWc0Xm62rAaS5JqGJc2S1WjRkLlRMJ3XhWYvWhdNnN1GbmhzVYu9HGN7lGvPCrs2JW1w80zzQO+VTY4hA7xAGN2eGQqxwlaNxXCrOgxDlHejSm3OaxKmqecpFbBaZgzV5vCACibHF81ZnLIIOaeyWaM/Q4Dm3o4i/UCy9V0K/3DWIyAclbbvplSMV/fTKmY9rXX7tHcramPWK51pcOtCxEo3iE16jYuxUJ9vbrZrRiwJG8kszliD1FemoYpy8njqOvg24TiMg4sftQq6563wfPPpdbeCM9TPXG2jC3T34yd2gKR3ad2lm68rTLVDoV6/29/ffV3eZGVc5YW0ApZg6V+uuXZuUlNIWwJcFe9PycScCYyJ6MsLUUSxI73m0hCo810mivwW9hLTDvlmytWVrsm5NvWSobXbvITDG5/yYEx79HpFJqe3LZ5LaYvc4/hsTPjYPf3v37+u/jnBrd70Lfo7QHNU7T68JFBL+ut4f/8D5nE+wxPtwo26/tpIXXvK3gA61DewRb0RtDGK3w7b12ntGt65EdYk/9Tm939QSwMEFAAAAAgAa1FMWzdWWyb9AQAA4wIAABMAAABzdGFydC1wcm94eS5jb21tYW5kbVJBbhMxFN37FK9TlLaiM6FsWgXRTVhQIRHU9gLO2OkYPPZge5pWVaQWFlyAG3CBChE1SBSu4FyBk/A9SdUNm2/L/v+99//7mxv9sTL9MfcV24QP3IW8cfbisihtXXMj8Pf6K4Rtx1rmpVblB2jemrKSDhPrUPNydIJT6WpluCaIo7BC8QiVxFsrZE7gUqBDhTVorAs42D/YL1L6pMuB8jA2EGRrxC7lKkMIHJXUzaTVqKX3/EwWjHkZkEvGXh0dv8yebJcCFIVyhteSrs+ynQy9Hpqp2MlY90uZGWNqgg089JSfExuxHvaFPO+bVms8P+ztvUiaDQOs5750qklU2BLKN5pfQiiu7RmyJLh47xHv4zyF2/gz/ojzeF8gflveLD/Ry338Hb/HBd3nqwa3u8Q/y+u4iL/ifHm9i+WXdFLhHV7bWo6dnA6QIpShGZKoJHIHcYF41xV/7tBXqMubNcltkWHchmCNx1U2epPNMFWhgipp2CVvg7Jmi5qSZWUfxdPAnfzYKidFgaM137ni/1GQpeILFbDHJoqxd6PjUxr9VToHeTJyRvNdoZ8k65U5g7Yl1xiOjk8eja9CaAb9fvdVWR8GK4wZiqLI1gBDbb0kG0jew1JRN0bYKWjbGkd7gGFw+ukQwdKm2SaVXshyZWjHlZN0I8grkzpl/wBQSwMEFAAAAAgAa1FMW69kZ34IBAAA3QcAAAkAAABSRUFETUUubWSFVU1vGlcU3c+vuJI3RjFD0k0QlVWl3ViqG9xgtYsoygwwFaQDg2Zwbe/AlptKpo4UJWo2+ZC66KKqNFAThsEYKb/gvb/QX9Jz7zCALbtd2B6/9+7HO+fc89Zo26vYLn1VfFSiHd87OKT1hl0pljao6VGz1aB6M2jbrpsxDPWXPlKX+ohUqDv6REVqQLqrLtW5GuqO+qgi2VMDPqam+LlQU32qxqQm+CfG1kT35ktcMKtmiMMOskSk+mqoRqQGCB3qX/A70iekRpwRnziCfJe6i+xDJFiXKpwwVpf00Ks65rMgYxrG2hqp3xA008cIimkd/Q1wdCwtoZkY7UQqzhj3TFK/S9lz7h1Vu7q3Qfo5pyYOx0coYQPEDNU0rYPqHfwfyx2xrs71McKPEPGC7uXvZJD5JUnKDk5EOBFyhoJBRJZlle2gxp9NpKPsT/NV/qNeo+kJwwEUSOLGDDBq/9N5db0p6RoNSx1Gb8trOGXf2b9eiNdSKqVqWvIzdPoKmULwd65PF+gI/JxczYCFhUC/nW2xQMyK12jYzaoFZBnXEdOCaHQkh4EC99JfQQQXCPHZIyGc+Qwz1zus1Bpele4c0A2leN/M3bLBtzDU+1UlzUSUU1HMogdASVat3W4VcjmXRV/zgnYhfz9/35qr5gPa/shBjEMIODosCbT+MxYjI0vf7jn+YYEIZW/OlPtiz3c3eSvAXtVpud5h1rXLWbtVN/fLpr+XM03TQqod3/mhfvCfuVpyJPf/2aT5BICBKAGjZqh3oC+WxXFC5AAjxvCDmFEimILB4N1cvebYbrsmByAQTFpKcVJiCiUyo1bx6xS+t0jdFfZ52NCDlATXGOahuqCt3W+2cXP1kjWmz6DaRGGf/lRvAPNsPs4jucaKXua0fppw8Lu5/ge6lwZfoV4qRjwxJFxIVGJsX9qBU7gN7ATFB67r7bv1oM2STWcb7UBf4ggi9Qk6D2U+zkjkPBKh8CXhbQXUW1KV0HRlackelg+9vbZvV3409+tutez4ft0Jkh3nwG60XIeVDnm/kTEbLqZS8IrEfWO+tCVjkcWINKu26zXZpHhAL4STrni19WB7u/j9061iabdksUO9n9vpEs3ENMVZx4n59HGms0EyCGxL8H1MeNrF6u2jhDEwC5md8u5Jkp8xgYyeBUbFgwPRShu0SU0YU8lprz9+kvlc1LYwcJldaIUnL3ku+C34W7TIEomZb6apL5Yy0S8gqvmwX3lY0ieJweDWn8ttEG6yolblIxfqyw1Drj63klTFsAb6budhDmfZVnr6bCOxvF+T/Po4VZ88hTFjJ/udpDK/bQLNUl36VJr4QxIAN2Z2QbRMAIfrI7bLpVvuFB/tbubv5u/eaouM5L9QSwECFAMUAAAACABrUUxbgazzWpQGAACZEQAAEwAAAAAAAAAAAAAApIEAAAAAcHJveHktc3RhbmRhbG9uZS5qc1BLAQIUAxQAAAAIAGtRTFs3Vlsm/QEAAOMCAAATAAAAAAAAAAAAAADkgcUGAABzdGFydC1wcm94eS5jb21tYW5kUEsBAhQDFAAAAAgAa1FMW69kZ34IBAAA3QcAAAkAAAAAAAAAAAAAAKSB8wgAAFJFQURNRS5tZFBLBQYAAAAAAwADALkAAAAiDQAAAAA=";
+function __b64ToBlobUrl(b64, mime='application/zip'){
+  try{
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    const blob = new Blob([arr], {type: mime});
+    return URL.createObjectURL(blob);
+  }catch(e){ console.error('ZIP decode error', e); return null; }
+}
+let __proxyZipUrl = null;
+function ensureProxyZipUrl(){
+  if(typeof PROXY_ZIP_B64 === "string" && PROXY_ZIP_B64.length && !__proxyZipUrl) __proxyZipUrl = __b64ToBlobUrl(PROXY_ZIP_B64, "application/zip");
+  return __proxyZipUrl;
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btn = document.getElementById('downloadProxyZip');
+  if(btn){
+    const url = ensureProxyZipUrl();
+    if(url) btn.setAttribute('href', url);
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const link = document.createElement('a');
+      link.href = ensureProxyZipUrl();
+      link.download = 'local-cors-proxy-macos.zip';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(()=>{ URL.revokeObjectURL(link.href); link.remove(); }, 1500);
+    });
+  }
+});
+
+/* Оркестрация */
+const downloadBtn=$('downloadBtn');
+downloadBtn.addEventListener('click', ()=>{ if(!downloadBtn.__blob) return; const a=document.createElement('a'); a.href=URL.createObjectURL(downloadBtn.__blob); a.download = downloadBtn.__fname || 'Анализ_релизов.xlsx'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); });
+$('checkProxy').addEventListener('click', async ()=>{ try{ const url = proxify('https://httpbin.org/get'); const js = await (await fetch(url)).json(); setStatus('Прокси OK','ok'); log('Proxy OK: '+(js.url||url),'ok'); }catch(e){ setStatus('Прокси ошибка','err'); log('Proxy ERR: '+e.message,'err'); } });
+
+
+
+document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+  try {
+    saveCfg();
+    saveSensitive();
+    if (typeof setStatus === 'function') setStatus('Настройки сохранены','ok');
+    if (typeof log === 'function') log('Настройки сохранены в localStorage','ok');
+    if (typeof showToast === 'function') showToast('Настройки сохранены');
+  } catch(e) {
+    if (typeof setStatus === 'function') setStatus('Ошибка сохранения','err');
+    if (typeof log === 'function') log('Ошибка сохранения: '+e.message,'err');
+  }
+});
+
+$('runBtn').addEventListener('click', async ()=>{
+  try{
+    setProgress(8); $('runBtn').dataset.busy='1';
+    setStatus('Собираю…'); downloadBtn.disabled=true; downloadBtn.textContent='Готовлю Excel…';
+    const start=$('startRel').value.trim(), end=$('endRel').value.trim();
+    const releases=expandReleaseRange(start,end);
+    const useA=$('platAndroid').checked, useI=$('platIOS').checked;
+    if(!useA && !useI) throw new Error('Ни одна платформа не выбрана');
+    const platTasks=[];
+    if(useA) platTasks.push(buildCountsForPlatform('Android', releases));
+    else platTasks.push(Promise.resolve({counts:{},totalsByRelease:{},cutoffs:{}}));
+    if(useI) platTasks.push(buildCountsForPlatform('iOS', releases));
+    else platTasks.push(Promise.resolve({counts:{},totalsByRelease:{},cutoffs:{}}));
+    const [A, I] = await Promise.all(platTasks);
+    setProgress(55);
+    
+const byRel={};
+function add(map){
+  for(const rowKey in map){
+    for(const d in map[rowKey]){
+      const kd = toKey(d);
+      byRel[kd]=(byRel[kd]||0)+Number(map[rowKey][d]||0);
+    }
+  }
+}
+add(A.counts); add(I.counts);
+
+const order = (a,b)=>{
+  const pa=a.split('.').map(Number), pb=b.split('.').map(Number);
+  return pa[0]-pb[0]||pa[1]-pb[1]||pa[2]-pb[2];
+};
+const allRels = Array.from(new Set([
+  ...Object.keys(A.totalsByRelease||{}),
+  ...Object.keys(I.totalsByRelease||{})
+])).sort(order);
+
+const rows = allRels.map(rel=>{
+  const a = Number((A.totalsByRelease||{})[rel]||0);
+  const i = Number((I.totalsByRelease||{})[rel]||0);
+  return [rel, a, i, a+i];
+});
+
+const headers = ['Релиз','Android','iOS','Итого'];
+const widths = headers.map(h=>h.length);
+for(const r of rows){
+  widths[0] = Math.max(widths[0], String(r[0]).length);
+  widths[1] = Math.max(widths[1], String(r[1]).length);
+  widths[2] = Math.max(widths[2], String(r[2]).length);
+  widths[3] = Math.max(widths[3], String(r[3]).length);
+}
+function padCell(val, idx){
+  const s = String(val);
+  return idx===0 ? s.padEnd(widths[idx], ' ') : s.padStart(widths[idx], ' ');
+}
+const sep = widths.map(w=>'—'.repeat(w)).join(' ─ ');
+const lines = [
+  headers.map((h,i)=> (i===0?h.padEnd(widths[i]):h.padStart(widths[i])) ).join(' | '),
+  sep
+];
+for(const r of rows){
+  lines.push( r.map((v,i)=>padCell(v,i)).join(' | ') );
+}
+$('totalsBox').textContent = lines.join('\n');
+
+renderPlatformTable('tableAndroid', 'Android', releases.map(toKey), A.counts, A.cutoffs);
+renderPlatformTable('tableIOS', 'iOS', releases.map(toKey), I.counts, I.cutoffs);
+    const payload={ releases, and_counts:A.counts, and_totals:A.totalsByRelease, and_cutoffs:A.cutoffs, ios_counts:I.counts, ios_totals:I.totalsByRelease, ios_cutoffs:I.cutoffs };
+    await ensurePyodide(); setProgress(75);
+    const blob = await buildExcelInBrowser(payload);
+    downloadBtn.__blob=blob;
+    downloadBtn.__fname = `Анализ_релизов_по_релизам_${new Date().toISOString().replace(/[:.]/g,'-')}.xlsx`;
+    downloadBtn.textContent='Скачать Excel (.xlsx)'; downloadBtn.disabled=false;
+    setProgress(100); setStatus('Готово.','ok'); log('Готово: Excel сформирован','ok');
+    saveCfg();
+  }catch(e){
+    console.error(e);
+    setStatus('Ошибка', 'err'); log('Ошибка: '+e.message, 'err');
+    downloadBtn.textContent='Ошибка генерации'; downloadBtn.disabled=true;
+  }finally{
+    $('runBtn').dataset.busy='';
+  }
+});
+</script>
+<div id="toastBox" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+// Toast helper (safe to call anywhere)
+function showToast(msg){
+  try{
+    var t = document.getElementById('toastBox');
+    if(!t){
+      t = document.createElement('div');
+      t.id = 'toastBox';
+      t.className = 'toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2000);
+  }catch(e){
+    console.error('Toast error:', e);
+  }
+}
+</script>
+
+</body>
+</html>

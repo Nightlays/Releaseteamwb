@@ -1,0 +1,836 @@
+/* === Extracted block #1 from dashboard_run_only.html === */
+/* ---------------- Wildberries Theme (drop-in) ---------------- */
+  :root{
+    /* Базовая палитра (светлая) */
+    --bg:#faf7fc;            /* фон страницы */
+    --card:#ffffff;          /* фон карточек */
+    --text:#2a1446;          /* основной текст */
+    --muted:#8d77a6;         /* вторичный текст */
+
+    /* Бренд / акценты */
+    --wb:#cb11ab;            /* магента WB */
+    --wb-deep:#6e0bd4;       /* фирм. фиолетовый */
+    --grad:linear-gradient(135deg, var(--wb) 0%, var(--wb-deep) 100%);
+
+    /* Цвета метрик (читает JS) */
+    --c1:#7a3af9;            /* total */
+    --c2:#00c48c;            /* finished */
+    --c3:#ffb020;            /* remaining */
+    --c4:#ff5aad;            /* in_progress */
+
+    /* Контролы/бордеры */
+    --line:#efe5f7;
+    --line-strong:#e7d8f4;
+    --ink:#3a235b;
+    --btn-bg:#ffffff;
+    --btn-br:#e6d9f4;
+    --btn-hl:rgba(203,17,171,.08);
+
+    /* Семантика */
+    --ok:#12b76a;
+    --bad:#ef4444;
+
+    /* Доп. визуал */
+    --shadow-lg:0 14px 44px rgba(103,39,170,.12);
+    --shadow-md:0 10px 30px rgba(103,39,170,.10);
+    --shadow-sm:0 6px 20px rgba(103,39,170,.08);
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1000px 600px at 0% -10%, rgba(110,11,212,.05), transparent 60%) no-repeat,
+      linear-gradient(180deg,#fbf9fe 0%, #faf7fc 45%, #ffffff 100%);
+    color:var(--text);
+    font:14px/1.55 Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+
+  /* ----- Топ-бар с логотипом WB ----- */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.58));
+    backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar .inner{
+    max-width:1600px; margin:0 auto; padding:10px 20px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    font-weight:900; letter-spacing:.2px;
+  }
+  .brand .logo{
+    width:36px; height:28px; display:inline-block;
+    filter: drop-shadow(0 10px 20px rgba(203,17,171,.35));
+  }
+  .brand .title{
+    font-size:16px; color:var(--ink);
+  }
+  .topbar .actions{
+    margin-left:auto; display:flex; gap:8px;
+  }
+
+  .wrap{max-width:1600px;margin:24px auto;padding:0 20px}
+
+  /* Заголовок страницы */
+  h1{
+    margin:12px 0 14px;
+    font-weight:900; letter-spacing:.2px; font-size:28px;
+    display:flex; align-items:center; gap:12px;
+  }
+  h1::before{
+    content:"";
+    width:28px; height:28px; border-radius:10px;
+    background:var(--grad);
+    box-shadow:0 8px 24px rgba(110,11,212,.25), inset 0 0 0 1px rgba(255,255,255,.5);
+  }
+
+  /* Табы — стеклянные плашки */
+  .tabs{display:flex; gap:10px; margin:10px 0 16px}
+  .tabs button{
+    padding:10px 14px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    color:var(--ink);
+    cursor:pointer;
+    font-weight:800;
+    transition:.15s ease, transform .06s;
+    box-shadow:var(--shadow-sm);
+  }
+  .tabs button:hover{border-color:var(--line-strong); transform:translateY(-1px)}
+  .tabs button.active{
+    color:#fff; background:var(--grad); border-color:transparent;
+    box-shadow:0 10px 24px rgba(203,17,171,.28);
+  }
+
+  /* Карточки */
+  .card{
+    background:var(--card);
+    border-radius:18px;
+    border:1px solid var(--line);
+    box-shadow:var(--shadow-md);
+    padding:16px 16px 14px;
+    position:relative;
+    overflow:hidden;
+    transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .card::before{
+    content:"";
+    position:absolute; inset:0 0 auto 0; height:3px;
+    background:linear-gradient(90deg, var(--wb), var(--wb-deep));
+    opacity:.18;
+  }
+  .card:hover{ transform:translateY(-2px); box-shadow:var(--shadow-lg); border-color:var(--line-strong); }
+
+  .head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end}
+  .nums{color:var(--muted);font-variant-numeric:tabular-nums}
+
+  /* Гриды */
+  .panel{display:grid;gap:12px;grid-template-columns:repeat(12, minmax(0,1fr));align-items:end}
+  .grid{display:grid;gap:18px;margin-top:16px;grid-template-columns:repeat(4,minmax(360px,1fr))}
+  @media (max-width:1400px){ .grid{grid-template-columns:repeat(3,minmax(320px,1fr));} }
+  @media (max-width:1100px){ .grid{grid-template-columns:repeat(2,minmax(320px,1fr));} }
+  @media (max-width:700px){ .grid{grid-template-columns:1fr;} }
+
+  /* Формы */
+  .field{display:grid;grid-template-rows:auto auto;gap:8px}
+  .field label{font-size:12px;color:var(--muted)}
+  .panel input,.panel select{
+    height:44px;padding:10px 12px;border-radius:12px;
+    border:1px solid var(--line);
+    background:#fff;color:var(--ink);
+    outline:none; transition:.2s;
+    box-shadow:var(--shadow-sm);
+  }
+  .panel input::placeholder{color:#bda9d4}
+  .panel input:focus,.panel select:focus{
+    border-color:transparent;
+    box-shadow:0 0 0 4px rgba(203,17,171,.22), var(--shadow-md);
+  }
+
+  /* Кнопки */
+  .btn{
+    height:44px;padding:10px 14px;border-radius:12px;
+    border:1px solid var(--btn-br);
+    background:var(--btn-bg); color:var(--ink);
+    font-weight:900; cursor:pointer;
+    transition:transform .06s, background-color .15s, box-shadow .2s, border-color .15s, filter .15s;
+    box-shadow:var(--shadow-sm);
+  }
+  .btn:hover{background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
+  .btn:active{transform:translateY(1px) scale(.995)}
+  .btn:disabled{opacity:.55; cursor:not-allowed}
+
+  .btn.primary{
+    background:var(--grad); color:#fff; border-color:transparent;
+    box-shadow:0 12px 28px rgba(203,17,171,.30);
+  }
+  .btn.success{
+    background:linear-gradient(135deg,#12b76a,#0ea65f); color:#fff; border-color:transparent;
+    box-shadow:0 12px 28px rgba(18,183,106,.22);
+  }
+  .btn.danger{
+    background:linear-gradient(135deg,#ef4444,#db2c2c); color:#fff; border-color:transparent;
+    box-shadow:0 12px 28px rgba(239,68,68,.22);
+  }
+
+  /* Чип-кнопки */
+  .mini{
+    height:28px;padding:6px 10px;border-radius:999px;
+    border:1px solid var(--line);
+    background:#fff;color:var(--ink);
+    font-size:12px;font-weight:800; line-height:1;
+    cursor:pointer; transition:.15s;
+  }
+  .mini:hover{border-color:var(--line-strong); background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
+  .mini:active{transform:translateY(1px)}
+
+  /* Чарты */
+  .chart-wrap{
+    position:relative;height:340px;display:flex;align-items:center;justify-content:center;
+    background:conic-gradient(from 110deg at 80% -40%, rgba(203,17,171,.06), transparent 35%) no-repeat,
+               radial-gradient(800px 400px at 0% -10%, rgba(110,11,212,.06), transparent 60%) no-repeat;
+    border:1px solid var(--line);
+    border-radius:16px;
+  }
+  .chart{width:100%;height:100%}
+
+  /* KPI плитки */
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .kpi{
+    display:grid;grid-template-columns:1fr auto;gap:6px;
+    padding:8px 10px;border:1px solid var(--line);
+    border-radius:12px;background:linear-gradient(180deg, #fff, #fff) padding-box,
+                                    linear-gradient(90deg, rgba(203,17,171,.2), rgba(110,11,212,.2)) border-box;
+    font-size:12px;min-height:42px;min-width:0
+  }
+  .kpi .label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi .val{text-align:right;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* Логи */
+  .log{
+    white-space:pre-wrap;background:#fff;border-radius:12px;padding:12px;
+    color:var(--ink);max-height:300px;min-height:140px;overflow:auto;
+    border:1px solid var(--line);
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    box-shadow:var(--shadow-sm);
+  }
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:900px){ .split{grid-template-columns:1fr} }
+
+  /* Тост */
+  .toast{
+    position:fixed;right:16px;bottom:16px;
+    background:#fff;color:var(--ink);
+    border:1px solid var(--line);padding:10px 14px;border-radius:12px;
+    box-shadow:0 12px 40px rgba(110,11,212,.18);
+    opacity:0;pointer-events:none;transition:.25s;
+  }
+  .toast.show{opacity:1;transform:translateY(-6px)}
+
+  /* Срезы */
+  .snap-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-items:start}
+  .snap{
+    display:flex;align-items:center;gap:10px;
+    border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;min-width:0;
+    box-shadow:var(--shadow-sm);
+  }
+  .snap .title{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .snap .meta{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .snap .del{
+    height:28px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+    background:#fff;color:#a4167e; cursor:pointer
+  }
+  .snap .del:hover{background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
+
+  /* Прогресс */
+  .progress{
+    height:10px;background:#f5ecff;border-radius:999px;overflow:hidden;border:1px solid var(--line)
+  }
+  .progress>div{
+    height:100%;width:0;background:var(--grad); transition:width .25s ease
+  }
+
+  /* Таблицы */
+  table{border-collapse:separate;border-spacing:0;width:100%;font-variant-numeric:tabular-nums}
+  th,td{border:1px solid var(--line);padding:8px 10px;background:#fff}
+  th{
+    background:linear-gradient(180deg,#fcf8ff 0%,#fff 100%);
+    text-align:left;color:var(--ink); font-weight:900
+  }
+  td:first-child, th:first-child{border-top-left-radius:10px; border-bottom-left-radius:10px}
+  td:last-child,  th:last-child{border-top-right-radius:10px; border-bottom-right-radius:10px}
+
+  /* Пилюли / линии статуса */
+  .pill{display:inline-block;padding:3px 8px;border-radius:999px;font-weight:900}
+  .pill-ok{background:rgba(18,183,106,.12);color:#027a48;border:1px solid rgba(18,183,106,.25)}
+  .pill-bad{background:rgba(239,68,68,.12);color:#b42318;border:1px solid rgba(239,68,68,.25)}
+  .line-ok{color:#12b76a;font-weight:900}
+  .line-bad{color:#b42318;font-weight:900}
+
+  /* Фильтры блока РАН */
+  .filters{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;margin-top:10px}
+  .filters .field{grid-column:span 3}
+  .filters .field.small{grid-column:span 2}
+  @media (max-width:900px){ .filters .field{grid-column:span 6} .filters .field.small{grid-column:span 6} }
+
+  /* Ссылки/алерты */
+  .alert-row{margin:6px 0 14px 0}
+  .alert-row a{color:#7a3af9;text-decoration:none;font-weight:900}
+  .alert-row a:hover{text-decoration:underline}
+  .ok{color:var(--ok)}
+  .bad{color:var(--bad)}
+  .warn{color:var(--c3)}
+
+  /* Скроллбар (приятнее) */
+  ::-webkit-scrollbar{height:12px;width:12px}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(180deg, #dcb4ef, #f0bce8); border-radius:10px; border:3px solid #fff}
+
+  /* Readiness cards */
+  .release-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  @media (max-width:900px){ .release-row{grid-template-columns:1fr} }
+  .release-card{
+    border:1px solid var(--line); border-radius:12px; background:#fff; padding:12px;
+    box-shadow:var(--shadow-sm); display:grid; gap:10px;
+  }
+  .mini-grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+    gap:12px; align-items:stretch;
+  }
+  .mini-card{
+    border:1px solid var(--line); border-radius:12px; background:#fff;
+    box-shadow:var(--shadow-sm); padding:10px;
+    display:grid; grid-template-rows:auto 120px auto; align-items:center; text-align:center;
+  }
+  .mini-title{
+    font-weight:900; font-size:12px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .mini-title a{ color: inherit; text-decoration: none; }
+  .mini-title a:hover{ text-decoration: underline; }
+  .mini-fig{ position:relative; height:120px; }
+  .mini-fig canvas{ width:100%; height:100%; }
+  .mini-remaining{ font-size:12px; color:var(--muted); margin-top:6px; }
+  .release-title{display:flex;justify-content:space-between;align-items:center;font-weight:900}
+  .release-sub{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center}
+  .release-chip{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-weight:800;font-size:12px}
+  .release-chip strong{font-variant-numeric:tabular-nums}
+  .release-bar{height:10px;background:#f5ecff;border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+  .release-bar>div{height:100%;width:0;background:var(--grad);transition:width .25s ease}
+  .release-link{font-weight:900;color:#7a3af9;text-decoration:none}
+  .release-link:hover{text-decoration:underline}
+
+  /* Подтабы для срезов */
+  .subtabs{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px}
+  .subtabs .mini.active{ color:#fff; background:var(--grad); border-color:transparent; box-shadow:0 10px 24px rgba(203,17,171,.28); }
+
+.hidden {
+  display: none;
+}
+
+/* ================== Mobile Overrides (added by ChatGPT) ================== */
+@media (max-width: 1024px){
+  .wrap{ padding: 0 16px; }
+  .chart-wrap{ height: 300px; }
+  .kpis{ grid-template-columns: repeat(2,1fr); }
+}
+@media (max-width: 768px){
+  body{ font-size: 13px; }
+  .topbar .inner{ padding: 8px 12px; }
+  .brand .title{ font-size: 14px; max-width: 50vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tabs{ overflow:auto; }
+  .tabs button{ flex: 1 1 auto; }
+  .wrap{ padding: 0 12px; }
+  /* Panels/fields stack to one column */
+  .panel{ grid-template-columns: 1fr !important; }
+  .panel .field{ grid-column: 1 / -1 !important; }
+  /* Buttons row at the end of the panel stacks */
+  .panel > div[style*="display:flex"][style*="align-items:end"]{ flex-wrap: wrap; }
+  /* Auto-run block stacks vertically */
+  .auto{ grid-auto-flow: row !important; justify-items: start; }
+  .chart-wrap{ height: 260px; }
+  .kpis{ grid-template-columns: 1fr; }
+  .grid{ grid-template-columns: 1fr !important; }
+  .mini-grid{ grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); }
+  .release-row{ grid-template-columns: 1fr; }
+  .release-sub{ grid-template-columns: 1fr; }
+  .mini-title{ font-size: 11px; }
+  .mini-fig{ height: 100px; }
+  .log{ min-height: 120px; max-height: 220px; }
+  /* Filters on RUN tab wrap nicely */
+  .filters{ grid-template-columns: 1fr 1fr; }
+  .filters .field, .filters .field.small{ grid-column: span 2 !important; }
+  /* Tables become horizontally scrollable with better spacing */
+  table{ font-size: 12px; }
+  th, td{ padding: 6px 8px; }
+}
+@media (max-width: 480px){
+  body{ font-size: 12.5px; }
+  .brand .logo{ width: 30px; height: 24px; }
+  .brand .title{ display: none; } /* leave just the WB badge on very small screens */
+  h1{ font-size: 22px; gap: 10px; }
+  h1::before{ width: 22px; height: 22px; border-radius: 8px; }
+  .btn, .panel input, .panel select{ height: 42px; }
+  .mini{ height: 28px; }
+  .chart-wrap{ height: 220px; }
+}
+/* Improve tap experience */
+button, .btn, .mini{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+/* iOS safe-area for sticky topbar */
+.topbar{ padding-top: env(safe-area-inset-top); }
+
+
+/* === Extracted block #2 from dashboard_run_only.html === */
+/* ===== Edge-to-edge fullscreen UI (no extra FS buttons) ===== */
+html, body { height: 100%; }
+body { margin: 0; overflow: auto; }
+.topbar { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid rgba(0,0,0,.04); }
+.topbar .inner { max-width: 100%; padding-left: 20px; padding-right: 20px; }
+.wrap { max-width: 100%; padding-left: 20px; padding-right: 20px; }
+.tabs { flex-wrap: wrap; }
+.card { border-radius: 16px; }
+.panel { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.grid { grid-template-columns: repeat(4, minmax(280px, 1fr)); }
+.chart-wrap { height: 420px; }
+@media (max-width: 1400px){ .grid{ grid-template-columns: repeat(3, minmax(280px,1fr)); } }
+@media (max-width: 1100px){ .grid{ grid-template-columns: repeat(2, minmax(280px,1fr)); } }
+@media (max-width: 780px){
+  .panel{ grid-template-columns: 1fr !important; }
+  .panel .field{ grid-column: 1 / -1 !important; }
+  .grid{ grid-template-columns: 1fr !important; }
+  .chart-wrap{ height: 300px; }
+}
+/* Make charts and tables fill the viewport width nicely */
+#runChartWrap { height: 420px; }
+#runTable { font-size: 13px; }
+
+
+/* === Extracted block #3 from dashboard_run_only.html === */
+/* ===== Readability & Alignment Normalize ===== */
+:root{
+  --font-ui: Inter, "SF Pro Text", -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --fg:#1b1233; --muted:#6d5d86; --soft:#f3ebff;
+  --btn-h: 42px;               /* единая высота кнопок/инпутов */
+  --inp-pad-y: 9px;            /* вертикальный паддинг инпутов */
+  --inp-pad-x: 12px;           /* горизонтальный паддинг инпутов */
+  --radius: 12px;
+}
+html, body { font-family: var(--font-ui); color: var(--fg); }
+body, input, button, select { font-size: 14.5px; line-height: 1.35; letter-spacing: 0; }
+h1,h2,h3 { letter-spacing: -0.01em; }
+small, .muted { color: var(--muted); }
+
+/* Контролы: одинаковая высота, базовая сетка по базовой линии */
+input[type="text"], input[type="number"], input[type="search"], select {
+  height: var(--btn-h);
+  padding: var(--inp-pad-y) var(--inp-pad-x);
+  border-radius: var(--radius);
+  border: 1px solid #eadbff;
+  background: #fcfaff;
+  outline: none;
+  box-shadow: 0 2px 0 rgba(123,31,162,0.02) inset;
+}
+input::placeholder{ color: #a596c7; opacity: .9; }
+
+button, .btn {
+  height: var(--btn-h);
+  padding: 0 14px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  transform: translateZ(0);
+}
+button .icon{ margin-right: 6px; }
+
+/* Согласованные размеры всех «пилюль» кнопок в панелях */
+.panel .btn, .panel button, .tabs .btn, .tabs button,
+.card .btn, .card button {
+  min-height: var(--btn-h);
+  line-height: 1;              /* чтобы не прыгали */
+}
+
+/* Выравнивание групп кнопок и полей по baseline */
+.controls-row, .panel .row, .panel .actions, .tabs, .filters, .card .actions {
+  display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center;
+}
+/* Блоки с подписью левее — подправить вертикальный отступ */
+.label-inline { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+
+/* Читаемость: слегка увеличенный контраст */
+.card, .panel { color: var(--fg); }
+.card p, .panel p, label { font-size: 13px; color: var(--muted); }
+th { font-weight: 600; }
+table { font-size: 13.5px; }
+
+/* Улучшение кликабельности маленьких кнопок в правой части блока */
+.pill, .chip, .mini {
+  height: var(--btn-h);
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* Исправление «дрожи» из-за разных внутренних паддингов */
+.btn, button, .pill, .mini, input, select { vertical-align: middle; }
+
+/* Немного больше воздуха между большими секциями */
+.section + .section, .card + .card { margin-top: 16px; }
+
+
+/* === Extracted block #4 from dashboard_run_only.html === */
+/* Снизу не показываем декоративные разделители */
+.report, .card, .section { position: relative; }
+.report hr, .card hr, .section hr { display: none !important; }
+
+
+/* === Extracted block #5 from dashboard_run_only.html === */
+/* target the mini-launch card toolbar controls */
+  #miniLaunchCard .head .export,
+  #miniLaunchCard .head .controls,
+  .card#miniLaunchCard .head .export {
+    display: flex !important;
+    gap: 10px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  /* ensure each control does not shrink and stays readable */
+  #miniLaunchCard .head .export > *,
+  #miniLaunchCard .head .controls > * {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+  /* keep the stream dropdown visible on the right */
+  .rr-stream-dd { margin-left: 8px !important; }
+  /* small screens: allow scroll and slightly reduce gaps */
+  @media (max-width: 1000px) {
+    #miniLaunchCard .head .export { gap: 8px !important; }
+  }
+
+
+/* === Extracted block #6 from dashboard_run_only.html === */
+/* export guard removed */
+
+
+/* === Extracted block #7 from dashboard_run_only.html === */
+/* ===== Edge-to-edge fullscreen UI (no extra FS buttons) ===== */
+html, body { height: 100%; }
+body { margin: 0; overflow: auto; }
+.topbar { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid rgba(0,0,0,.04); }
+.topbar .inner { max-width: 100%; padding-left: 20px; padding-right: 20px; }
+.wrap { max-width: 100%; padding-left: 20px; padding-right: 20px; }
+.tabs { flex-wrap: wrap; }
+.card { border-radius: 16px; }
+.panel { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.grid { grid-template-columns: repeat(4, minmax(280px, 1fr)); }
+.chart-wrap { height: 420px; }
+@media (max-width: 1400px){ .grid{ grid-template-columns: repeat(3, minmax(280px,1fr)); } }
+@media (max-width: 1100px){ .grid{ grid-template-columns: repeat(2, minmax(280px,1fr)); } }
+@media (max-width: 780px){
+  .panel{ grid-template-columns: 1fr !important; }
+  .panel .field{ grid-column: 1 / -1 !important; }
+  .grid{ grid-template-columns: 1fr !important; }
+  .chart-wrap{ height: 300px; }
+}
+/* Make charts and tables fill the viewport width nicely */
+#runChartWrap { height: 420px; }
+#runTable { font-size: 13px; }
+
+
+/* === Extracted block #8 from dashboard_run_only.html === */
+/* ===== Readability & Alignment Normalize ===== */
+:root{
+  --font-ui: Inter, "SF Pro Text", -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --fg:#1b1233; --muted:#6d5d86; --soft:#f3ebff;
+  --btn-h: 42px;               /* единая высота кнопок/инпутов */
+  --inp-pad-y: 9px;            /* вертикальный паддинг инпутов */
+  --inp-pad-x: 12px;           /* горизонтальный паддинг инпутов */
+  --radius: 12px;
+}
+html, body { font-family: var(--font-ui); color: var(--fg); }
+body, input, button, select { font-size: 14.5px; line-height: 1.35; letter-spacing: 0; }
+h1,h2,h3 { letter-spacing: -0.01em; }
+small, .muted { color: var(--muted); }
+
+/* Контролы: одинаковая высота, базовая сетка по базовой линии */
+input[type="text"], input[type="number"], input[type="search"], select {
+  height: var(--btn-h);
+  padding: var(--inp-pad-y) var(--inp-pad-x);
+  border-radius: var(--radius);
+  border: 1px solid #eadbff;
+  background: #fcfaff;
+  outline: none;
+  box-shadow: 0 2px 0 rgba(123,31,162,0.02) inset;
+}
+input::placeholder{ color: #a596c7; opacity: .9; }
+
+button, .btn {
+  height: var(--btn-h);
+  padding: 0 14px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  transform: translateZ(0);
+}
+button .icon{ margin-right: 6px; }
+
+/* Согласованные размеры всех «пилюль» кнопок в панелях */
+.panel .btn, .panel button, .tabs .btn, .tabs button,
+.card .btn, .card button {
+  min-height: var(--btn-h);
+  line-height: 1;              /* чтобы не прыгали */
+}
+
+/* Выравнивание групп кнопок и полей по baseline */
+.controls-row, .panel .row, .panel .actions, .tabs, .filters, .card .actions {
+  display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center;
+}
+/* Блоки с подписью левее — подправить вертикальный отступ */
+.label-inline { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+
+/* Читаемость: слегка увеличенный контраст */
+.card, .panel { color: var(--fg); }
+.card p, .panel p, label { font-size: 13px; color: var(--muted); }
+th { font-weight: 600; }
+table { font-size: 13.5px; }
+
+/* Улучшение кликабельности маленьких кнопок в правой части блока */
+.pill, .chip, .mini {
+  height: var(--btn-h);
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* Исправление «дрожи» из-за разных внутренних паддингов */
+.btn, button, .pill, .mini, input, select { vertical-align: middle; }
+
+/* Немного больше воздуха между большими секциями */
+.section + .section, .card + .card { margin-top: 16px; }
+
+
+/* === Extracted block #9 from dashboard_run_only.html === */
+/* Снизу не показываем декоративные разделители */
+.report, .card, .section { position: relative; }
+.report hr, .card hr, .section hr { display: none !important; }
+
+
+/* === Extracted block #10 from dashboard_run_only.html === */
+/* Hide accidental code dumps that end up as plain text at the end of body */
+body .__code-dump{display:none !important;}
+/* Visual state on dashboard run button while running */
+button[data-busy="1"]{opacity:.6; pointer-events:none; filter:saturate(.7)}
+
+
+/* === Extracted block #11 from dashboard_run_only.html === */
+.pill.toggle-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .9rem;border-radius:999px;border:1px solid rgba(120,80,200,.28);background:rgba(255,255,255,.7);font-weight:600;user-select:none;cursor:pointer}
+  .pill.toggle-btn:hover{box-shadow:0 0 0 3px rgba(120,80,200,.09) inset}
+  .__code-dump{display:none !important}
+
+
+/* === Extracted block #12 from dashboard_run_only.html === */
+:root{ --rr-badge:#6b15d6; --rr-border: rgba(107,21,214,0.08); --rr-bg:#ffffff; }
+  .rr-stream-dd{position:relative;display:inline-flex;align-items:center;gap:8px;margin-left:8px;font-family:Inter,Arial,Helvetica,sans-serif}
+  .rr-dd-trigger{height:38px;padding:0 14px;border-radius:12px;border:1px solid var(--rr-border);background:var(--rr-bg);cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 6px 18px rgba(107,21,214,0.04)}
+  .rr-dd-trigger .rr-badge{background:var(--rr-badge);color:#fff;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:600}
+  .rr-dd-menu{position:absolute;top:110%;right:0;min-width:260px;max-height:360px;overflow:auto;background:var(--rr-bg);border:1px solid rgba(234,219,255,0.6);box-shadow:0 12px 40px rgba(14,0,65,0.08);border-radius:12px;padding:8px;display:none;z-index:99999}
+  .rr-dd-menu.open{display:block}
+  .rr-dd-item{padding:8px;border-radius:8px;display:flex;gap:10px;align-items:center;cursor:pointer}
+  .rr-dd-item:hover{background:#fbf7ff}
+  .rr-dd-actions{display:flex;gap:8px;justify-content:flex-end;padding-bottom:6px;border-bottom:1px solid #f0e7ff;margin-bottom:6px}
+  .rr-small-btn{height:32px;padding:0 10px;border-radius:10px;border:1px solid transparent;background:#f7f3ff;color:#3f2b6b;cursor:pointer}
+  .rr-dd-list input{accent-color:var(--rr-badge);}
+  .mini-card.hide, .miniCard.hide { display:none !important; }
+
+
+/* === Extracted block #13 from dashboard_run_only.html === */
+/* Hide accidental code dumps that end up as plain text at the end of body */
+body .__code-dump{display:none !important;}
+/* Visual state on dashboard run button while running */
+button[data-busy="1"]{opacity:.6; pointer-events:none; filter:saturate(.7)}
+
+
+/* === Extracted block #14 from dashboard_run_only.html === */
+/* Страховщик: если панель вдруг не перенеслась, скрываем её в RUN и SWAT */
+  #tabRun  #paramsPanel { display: none !important; }
+
+
+/* === Extracted block #15 from dashboard_run_only.html === */
+/* ==== Скин только для вкладки РАН-отчёт ==== */
+  #tabRun {
+    --wb-bg: #ffffff;
+    --wb-surface: #faf5ff;
+    --wb-surface2:#f7f0ff;
+    --wb-border: rgba(130, 71, 229, .15);
+    --wb-text: #2a1f44;
+    --wb-sub: #6f6791;
+    --wb-accent1: #7b2cff;
+    --wb-accent2: #ff2fb3;
+    --wb-success:#22c55e;
+    --wb-shadow: 0 8px 24px rgba(123,44,255,.08);
+  }
+
+  /* Карточка вкладки */
+  #tabRun .card, 
+  #tabRun .panel, 
+  #tabRun .box {
+    background: var(--wb-bg);
+    border: 1px solid var(--wb-border);
+    border-radius: 16px;
+    box-shadow: var(--wb-shadow);
+  }
+
+  /* Заголовки и мелкий текст */
+  #tabRun .head, #tabRun h2, #tabRun h3, #tabRun h4 {
+    color: var(--wb-text);
+  }
+  #tabRun label, #tabRun .nums { color: var(--wb-sub); }
+
+  /* Поля ввода */
+  #tabRun input[type="text"],
+  #tabRun input[type="number"],
+  #tabRun input[type="search"],
+  #tabRun select,
+  #tabRun textarea {
+    width: 100%;
+    background: #fff;
+    border: 1px solid var(--wb-border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    outline: none;
+    transition: box-shadow .15s ease, border-color .15s ease;
+    box-shadow: 0 2px 10px rgba(25, 0, 72, .03) inset;
+  }
+  #tabRun input:focus,
+  #tabRun select:focus,
+  #tabRun textarea:focus {
+    border-color: rgba(123,44,255,.35);
+    box-shadow: 0 0 0 4px rgba(123,44,255,.08);
+  }
+
+  /* Кнопки: общий стиль */
+  #tabRun .btn,
+  #tabRun button,
+  #tabRun .pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    height: 40px;
+    padding: 0 16px;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, var(--wb-accent1), var(--wb-accent2));
+    box-shadow: 0 10px 20px rgba(123,44,255,.15);
+    transition: transform .05s ease, filter .15s ease, box-shadow .15s ease, opacity .15s ease;
+    cursor: pointer;
+  }
+  #tabRun .btn:hover,
+  #tabRun button:hover { filter: brightness(1.03); }
+  #tabRun .btn:active,
+  #tabRun button:active { transform: translateY(1px); }
+  #tabRun .btn[disabled],
+  #tabRun button[disabled] { opacity:.55; cursor:not-allowed; }
+
+  /* Серые/вторичные кнопки, если встречаются */
+  #tabRun .btn--ghost { 
+    background: #fff; 
+    color: var(--wb-text); 
+    border-color: var(--wb-border);
+    box-shadow: none;
+  }
+  #tabRun .btn--ghost:hover { background: var(--wb-surface2); }
+
+  /* Верхняя панель РАН-отчёта (кнопки Построить/Экспорт …) */
+  #tabRun .actions,
+  #tabRun .toolbar,
+  #tabRun .filters {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0,1fr));
+    gap: 12px 12px;
+  }
+  #tabRun .actions > *,
+  #tabRun .toolbar > *,
+  #tabRun .filters > * { grid-column: span 3; }
+  #tabRun .filters .field[style*="span 5"] { grid-column: span 5 !important; }
+  #tabRun .filters .field.small { grid-column: span 2 !important; }
+
+  /* Прогресс-бар */
+  #tabRun .progress {
+    height: 8px;
+    border-radius: 8px;
+    background: var(--wb-surface2);
+    overflow: hidden;
+    border: 1px solid var(--wb-border);
+  }
+  #tabRun .progress > div,
+  #runProgressBar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--wb-accent1), var(--wb-accent2));
+    transition: width .25s ease;
+  }
+
+  /* Контейнер графика */
+  #tabRun .chart-wrap {
+    background: var(--wb-surface);
+    border: 1px solid var(--wb-border);
+    border-radius: 16px;
+    padding: 12px;
+  }
+
+  /* Карточка со сводными числами */
+  #tabRun .nums {
+    font-weight: 600;
+  }
+
+  /* Кнопка «Применить фильтры» в сетке фильтров */
+  #tabRun #runFiltersApply.btn { grid-column: span 2; }
+
+  /* Улучшаем адаптив (узкий экран) */
+  @media (max-width: 1200px) {
+    #tabRun .filters .field[style*="span 5"] { grid-column: span 12 !important; }
+    #tabRun .filters .field.small { grid-column: span 6 !important; }
+    #tabRun .actions > *,
+    #tabRun .toolbar > * { grid-column: span 6; }
+  }
+
+
+/* === Extracted block #16 from dashboard_run_only.html === */
+/* Button style matches app look */
+.btn-mini {
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.45rem .9rem; border-radius:14px;
+  border:1px solid rgba(120,68,255,.25);
+  background:linear-gradient(180deg,#fff, #faf7ff);
+  box-shadow:0 2px 10px rgba(120,68,255,.12);
+  font-weight:600; font-size:.92rem; color:#3b2b6b; cursor:pointer;
+}
+.btn-mini:hover{ box-shadow:0 3px 14px rgba(120,68,255,.18); transform:translateY(-1px); }
+.btn-mini:active{ transform:translateY(0); }
+
+
+/* === Extracted block #17 from dashboard_run_only.html === */
+:root{ --rr-badge:#6b15d6; --rr-border: rgba(107,21,214,0.08); --rr-bg:#ffffff; }
+  .rr-stream-dd{position:relative;display:inline-flex;align-items:center;gap:8px;margin-left:8px;font-family:Inter,Arial,Helvetica,sans-serif}
+  .rr-dd-trigger{height:38px;padding:0 14px;border-radius:12px;border:1px solid var(--rr-border);background:var(--rr-bg);cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 6px 18px rgba(107,21,214,0.04)}
+  .rr-dd-trigger .rr-badge{background:var(--rr-badge);color:#fff;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:600}
+  .rr-dd-menu{position:absolute;top:110%;right:0;min-width:260px;max-height:360px;overflow:auto;background:var(--rr-bg);border:1px solid rgba(234,219,255,0.6);box-shadow:0 12px 40px rgba(14,0,65,0.08);border-radius:12px;padding:8px;display:none;z-index:99999}
+  .rr-dd-menu.open{display:block}
+  .rr-dd-item{padding:8px;border-radius:8px;display:flex;gap:10px;align-items:center;cursor:pointer}
+  .rr-dd-item:hover{background:#fbf7ff}
+  .rr-dd-actions{display:flex;gap:8px;justify-content:flex-end;padding-bottom:6px;border-bottom:1px solid #f0e7ff;margin-bottom:6px}
+  .rr-small-btn{height:32px;padding:0 10px;border-radius:10px;border:1px solid transparent;background:#f7f3ff;color:#3f2b6b;cursor:pointer}
+  .rr-dd-list input{accent-color:var(--rr-badge);}
+  .mini-card.hide, .miniCard.hide { display:none !important; }

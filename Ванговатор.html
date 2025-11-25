@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Regress Dashboard — Бэклог и Результат</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --wb-bg:#faf5ff; --wb-bg-2:#f8f7ff;
+    --wb-primary:#9b5cff; --wb-secondary:#ff5ac8; --wb-deep:#7c3aed;
+    --green:#22c55e; --red:#f43f5e;
+    --ring: 0 10px 30px rgba(155,92,255,.25);
+    --card: 0 12px 36px rgba(31,41,55,.08);
+    --r-xl:22px;
+  }
+  body{
+    background:
+      radial-gradient(1200px 600px at 0% -10%, rgba(155,92,255,.14), transparent 60%),
+      radial-gradient(900px 580px at 100% 0%, rgba(255,90,200,.10), transparent 55%),
+      var(--wb-bg);
+    color:#0f172a;
+  }
+  .brand-badge{display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;border-radius:999px;background:linear-gradient(180deg,#fff,#f8f7ff);box-shadow:var(--card)}
+  .brand-dot{width:14px;height:14px;border-radius:999px;background:radial-gradient(55% 55% at 35% 35%, #fff 0%, #ffd6f2 30%, var(--wb-primary) 100%);box-shadow:0 0 0 6px rgba(155,92,255,.15), 0 8px 22px rgba(155,92,255,.45) inset}
+  .card{background:linear-gradient(180deg,#fff 0%, #fbfbff 100%);border-radius:var(--r-xl);box-shadow:var(--card);border:1px solid #eeeeff}
+  .input{width:100%;padding:.7rem .9rem;border-radius:14px;background:#fff;border:1px solid #ecebff;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 20px rgba(124,58,237,.06);transition:.15s}
+  .input:focus{outline:0;border-color:#d8d6ff;box-shadow:0 0 0 4px rgba(155,92,255,.12)}
+  .tabs{display:flex;gap:1rem;align-items:center}
+  .tab{border:none;background:transparent;color:#6d28d9;padding:.4rem .2rem;font-weight:700;position:relative}
+  .tab[aria-selected="true"]{color:#5b21b6}
+  .tab[aria-selected="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:2px;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));border-radius:2px}
+  .btn{border:none;border-radius:16px;padding:.65rem 1rem;font-weight:700;transition:.15s}
+  .btn-ghost{background:#f5f3ff;color:#6d28d9;border:1px solid #ede9fe}
+  .btn-soft{background:#fff;border:1px solid #ede9fe;box-shadow:0 8px 22px rgba(124,58,237,.08);color:#6d28d9}
+  .btn-grad{background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));color:#fff;box-shadow:var(--ring)}
+  .chip{display:inline-block;padding:.15rem .6rem;border-radius:999px;font-size:.75rem;color:#fff;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary))}
+  .hint{font-size:.85rem;color:#7c7f8c}
+
+  /* Table */
+  table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+  thead th{background:#f7f5ff;border-bottom:1px solid #ecebff;padding:.7rem .8rem;font-weight:700;color:#5b21b6}
+  td{border-bottom:1px dashed #eeeef8;padding:.6rem .7rem;vertical-align:top}
+  tbody tr:hover td{background:#faf9ff}
+  .wrap{white-space:normal;word-break:break-word}
+
+  /* Ширина колонки расписания */
+  #tbl th:nth-child(7), #tbl td:nth-child(7){min-width:800px}
+
+  .cell-wrap{display:block;max-width:100%}
+  .sch-box{display:block;max-width:100%;overflow-x:auto;padding-bottom:.25rem}
+  .sch-row{display:grid;grid-template-columns:150px 150px 90px 110px 110px;gap:.5rem;align-items:center;min-width:610px}
+  .sch-row .input{min-width:0;width:100%}
+  .sch-row input[type="time"]{text-align:center}
+  .sch-row .sch-people{text-align:center}
+
+  /* Подстрока-редактор */
+  .tr-schedule td{background:#faf9ff;padding:1rem 1rem 1.2rem;border-bottom:1px dashed #eeeef8}
+  .sch-panel{max-width:100%}
+  .sch-row{display:grid;grid-template-columns:200px 200px 100px 140px 140px;gap:.75rem;align-items:center}
+
+  @media (max-width: 900px){ .sch-row{grid-template-columns:1fr 1fr 100px 1fr 1fr} }
+  @media (max-width: 640px){ .sch-row{grid-template-columns:1fr 1fr} }
+  @media (max-width: 700px){
+    #tbl th:nth-child(7), #tbl td:nth-child(7){min-width:100%}
+    .sch-row{grid-template-columns:1fr 1fr;min-width:100%}
+  }
+
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .state-ok{color:#16a34a;font-weight:700}
+  .state-bad{color:#e11d48;font-weight:700}
+  .bar{height:8px;background:#eae6ff;border-radius:999px;overflow:hidden}
+  .bar>div{height:100%;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));width:0%}
+  .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.75rem 1rem;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s}
+  .toast.show{opacity:1;transform:translateY(0)}
+
+  #tbl .stream-name{width:100%;min-height:36px;max-height:160px;resize:none;overflow:hidden;white-space:normal;line-height:1.35}
+</style>
+</head>
+
+<body>
+<div class="max-w-7xl mx-auto p-6 space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center gap-3">
+    <div class="brand-badge"><span class="brand-dot"></span><strong>WB</strong></div>
+    <h1 class="text-2xl font-semibold">Regress Dashboard</h1>
+  </div>
+
+  <!-- Top cards -->
+  <section class="grid lg:grid-cols-3 gap-6">
+    <div class="card p-5 space-y-4">
+      <div class="flex items-center justify-between"><h3 class="font-semibold">Настройки для импорта</h3><span class="chip">Smoke</span></div>
+      <label class="block text-sm">Base URL
+        <input id="apiBase" class="input mt-1" placeholder="https://allure-testops.wb.ru">
+      </label>
+      <div class="grid grid-cols-3 gap-3">
+        <label class="block text-sm">Project ID
+          <input id="apiProject" class="input mt-1" placeholder="7">
+        </label>
+        <label class="block text-sm col-span-2">Версия (пример: 7.3.2)
+          <input id="apiVersion" class="input mt-1" placeholder="7.3.2">
+        </label>
+      </div>
+      <label class="block text-sm">API токен
+        <input id="apiToken" type="password" class="input mt-1" placeholder="Api-Token ... или Bearer ...">
+      </label>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btnFetchSmoke" class="btn btn-grad">Выгрузить Smoke</button>
+        <button type="button" class="btn btn-soft">Экспорт JSON</button>
+      </div>
+      <div class="bar mt-2"><div id="smokeBar"></div></div>
+      <div class="text-sm text-slate-500" id="apiStatus">—</div>
+    </div>
+
+    <div class="card p-5 space-y-4 lg:col-span-2">
+      <h3 class="font-semibold">Параметры расчёта</h3>
+      <div class="grid md:grid-cols-2 gap-3">
+        <label class="block text-sm">Начало старта
+          <input id="startAt" type="datetime-local" class="input mt-1">
+        </label>
+        <label class="block text-sm">Дедлайн
+          <input id="deadline" type="datetime-local" class="input mt-1">
+        </label>
+      </div>
+      <div class="grid md:grid-cols-3 gap-3">
+        <label class="block text-sm">Часы/чел/день
+          <input id="hoursPerPerson" type="number" step="0.25" value="4" class="input mt-1">
+        </label>
+        <label class="block text-sm">Запас (часы)
+          <input id="safetyHours" type="number" step="0.25" value="2" class="input mt-1">
+        </label>
+        <label class="block text-sm">Платформа
+          <select id="platform" class="input mt-1">
+            <option value="both">iOS + Android</option>
+            <option value="ios">только iOS</option>
+            <option value="android">только Android</option>
+          </select>
+        </label>
+      </div>
+      <details class="mt-1">
+        <summary class="cursor-pointer text-slate-700">Глобальные окна (Пн–Вс)</summary>
+        <div id="globalWindows" class="grid grid-cols-7 gap-2 mt-2"></div>
+        <p class="hint mt-2">Пустой день = без окна. По умолчанию 10:00–18:00.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- Фильтры -->
+  <section class="card p-5 space-y-3">
+    <div class="flex items-center gap-3">
+      <h3 class="font-semibold">Фильтры</h3>
+      <span class="chip">мульти-выбор</span>
+    </div>
+    <div class="flex flex-wrap items-end gap-3">
+      <div class="flex items-center gap-3 bg-white/70 border border-[#ede9fe] rounded-2xl px-3 py-2">
+        <label class="inline-flex items-center gap-2 text-sm"><input id="flt-ios" type="checkbox" class="w-4 h-4" checked> iOS</label>
+        <label class="inline-flex items-center gap-2 text-sm"><input id="flt-android" type="checkbox" class="w-4 h-4" checked> Android</label>
+        <label class="inline-flex items-center gap-2 text-sm"><input id="flt-unknown" type="checkbox" class="w-4 h-4" checked> без тега</label>
+      </div>
+
+      <div class="dropdown relative">
+        <button id="deptBtn" class="btn btn-ghost">Департаменты: <span id="deptLabel" class="ml-1">Все</span></button>
+        <div id="deptPanel" class="absolute left-0 top-full z-50 min-w-[280px] max-х-80 overflow-auto bg-white border border-[#ede9fe] rounded-2xl shadow-[var(--ring)] p-2 hidden">
+          <div class="px-2 pb-2 text-xs text-slate-500">Выберите один или несколько</div>
+          <div id="deptList" class="space-y-1 px-2 pb-2"></div>
+          <div class="border-t pt-2 px-2 flex gap-2">
+            <button id="deptAll" class="btn btn-ghost">Все</button>
+            <button id="deptClear" class="btn btn-ghost">Очистить</button>
+            <div class="ml-auto text-xs text-slate-500" id="deptCount">0 выбрано</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="btnClearFilters" class="btn btn-soft">Сбросить фильтры</button>
+    </div>
+  </section>
+
+  <!-- Табы + кнопка Рассчитать -->
+  <div class="flex items-center">
+    <nav class="tabs">
+      <button id="tabBacklog" class="tab" aria-selected="true">Раны</button>
+      <button id="tabResult" class="tab" aria-selected="false">Результат</button>
+    </nav>
+    <button id="btnRun" class="btn btn-grad ml-auto">Рассчитать</button>
+  </div>
+
+  <!-- Вкладка: Бэклог -->
+  <section id="panelBacklog" class="card p-5 space-y-3">
+    <div class="flex items-center justify-between">
+      <h3 class="font-semibold">Бэклог, средние и люди по стриму</h3>
+      <div class="flex gap-2">
+        <button id="btnPreset" class="btn btn-ghost">+ Пресет WB</button>
+        <button id="btnAddRow" class="btn btn-ghost">Добавить стрим</button>
+      </div>
+    </div>
+    <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+      <table id="tbl" class="text-sm">
+        <colgroup>
+          <col style="width:30%"><col style="width:11%"><col style="width:13%"><col style="width:11%">
+          <col style="width:15%"><col style="width:10%"><col>
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="text-left">Стрим</th>
+            <th class="text-left">Остаток кейсов</th>
+            <th class="text-left">Среднее (мин/кейс)</th>
+            <th class="text-left">Людей (по умолч.)</th>
+            <th class="text-left">Готов с</th>
+            <th class="text-left">Окна</th>
+            <th class="text-left">Расписание людей</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="hint">Дневная мощность = <b>людей × min(часы_на_человека, длина окна дня)</b>.</p>
+  </section>
+
+  <!-- Вкладка: Результат -->
+  <section id="panelResult" class="card p-5 space-y-3 hidden">
+    <div class="flex items-center justify-between">
+      <h3 class="font-semibold">Результат</h3>
+      <span id="status" class="text-slate-500">—</span>
+    </div>
+    <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+      <table id="outTable" class="text-sm">
+        <thead>
+          <tr>
+            <th>Стрим</th><th>Готов с</th><th>Треб. часы (всё)</th>
+            <th>Макс. задержка</th><th>Последний старт</th><th>Старт по плану</th>
+            <th>Смогут пройти</th><th>Останется</th><th>Комментарий</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <details class="mt-2">
+      <summary class="cursor-pointer">JSON</summary>
+      <pre id="outRaw" class="bg-[#fbfaff] text-[12px] p-3 rounded-xl overflow-auto h-[220px] mono"></pre>
+    </details>
+  </section>
+
+</div>
+
+<div id="toast" class="toast">Расчёт выполнен</div>
+
+<script>
+/* ===== utils ===== */
+const num = s => { if (s==null) return NaN; if (typeof s==='number') return s; s=String(s).trim().replace(',','.').replace(/\s+/g,''); if(!s) return NaN; return Number(s); }
+const dtLocal = s => { if(!s) return null; const d=new Date(s); return isNaN(d)?null:d; }
+const fmt = d => { if(!d) return '—'; const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}` }
+const toInput = d => { const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}` }
+const secHM = s => { s=Math.max(0,Math.floor(s)); const h=Math.floor(s/3600), m=Math.floor((s%3600)/60); return h+':'+String(m).padStart(2,'0') }
+function parseHM(str){ if(!str) return null; const m=str.match(/^(\d{1,2}):(\d{2})$/); if(!m) return null; const h=+m[1], mi=+m[2]; if(h>23||mi>59) return null; return {h,mi}; }
+function humanDelta(ms){
+  ms = Number(ms)||0; const abs = Math.abs(ms);
+  const totalMin = Math.floor(abs/60000), d=Math.floor(totalMin/1440), h=Math.floor((totalMin%1440)/60), m=totalMin%60;
+  const parts=[]; if(d) parts.push(d+'д'); if(h) parts.push(h+'ч'); if(m||(!d&&!h)) parts.push(m+'м');
+  return parts.join(' ');
+}
+
+/* Prefill */
+(function(){ const b=document.getElementById('apiBase'), p=document.getElementById('apiProject'); if(!b.value) b.value='https://allure-testops.wb.ru'; if(!p.value) p.value='7'; })();
+const tblBody=document.querySelector('#tbl tbody');
+const outBody=document.querySelector('#outTable tbody');
+const outRaw=document.getElementById('outRaw');
+const startAtI=document.getElementById('startAt');
+const deadlineI=document.getElementById('deadline');
+const hoursPerPersonI=document.getElementById('hoursPerPerson');
+const safetyHoursI=document.getElementById('safetyHours');
+
+/* Global windows */
+const DAY_NAMES=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+const globalWindows=Array(7).fill(null).map(()=>({from:'10:00',to:'18:00'}));
+(function renderGW(){
+  const el=document.getElementById('globalWindows'); el.innerHTML='';
+  for(let i=0;i<7;i++){
+    const div=document.createElement('div');
+    div.innerHTML=`
+      <label class="block text-sm text-slate-600">${DAY_NAMES[i]}</label>
+      <input data-idx="${i}" data-k="from" class="input mt-1" value="${globalWindows[i].from}">
+      <input data-idx="${i}" data-k="to" class="input mt-1" value="${globalWindows[i].to}">
+    `;
+    el.appendChild(div);
+  }
+  el.querySelectorAll('input').forEach(inp=>{
+    inp.oninput=()=>{ const i=+inp.dataset.idx,k=inp.dataset.k; globalWindows[i][k]=inp.value||null; };
+  });
+})();
+
+/* Schedule */
+function addScheduleRow(container){
+  const row=document.createElement('div'); row.className="sch-row";
+  row.innerHTML=`
+    <input type="date" class="input sch-from">
+    <input type="date" class="input sch-to">
+    <input type="text" class="input sch-people" placeholder="людей">
+    <input type="time" class="input sch-fromt" value="10:00">
+    <input type="time" class="input sch-tot" value="18:00">
+  `;
+  container.appendChild(row);
+}
+function readSchedule(container){
+  const items=[]; if(!container) return items;
+  container.querySelectorAll('.sch-row').forEach(r=>{
+    const f=r.querySelector('.sch-from')?.value;
+    const t=r.querySelector('.sch-to')?.value;
+    const p=num(r.querySelector('.sch-people')?.value||0)||0;
+    const ft=r.querySelector('.sch-fromt')?.value||'10:00';
+    const tt=r.querySelector('.sch-tot')?.value||'18:00';
+    if(!f||!t||p<=0) return;
+    items.push({from:new Date(f+"T00:00"), to:new Date(t+"T23:59"), people:p, fromt:ft, tot:tt});
+  });
+  return items;
+}
+// перенос редактора под строку и привязка списка
+function openScheduleUnderRow(mainTr, detailsEl){
+  if (mainTr.nextElementSibling && mainTr.nextElementSibling.classList.contains('tr-schedule')) return;
+  const hostCell = detailsEl.closest('td');
+  detailsEl.dataset._hostCellId = detailsEl.dataset._hostCellId || ('host_'+Math.random().toString(36).slice(2));
+  hostCell.dataset.slotId = detailsEl.dataset._hostCellId;
+
+  const tr = document.createElement('tr'); tr.className = 'tr-schedule';
+  const td = document.createElement('td'); td.colSpan = 7; tr.appendChild(td);
+  mainTr.after(tr);
+
+  const panel = document.createElement('div'); panel.className = 'sch-panel'; td.appendChild(panel);
+  panel.appendChild(detailsEl);
+
+  mainTr._scheduleList = detailsEl.querySelector('.sch-list');
+}
+function closeScheduleUnderRow(mainTr, detailsEl){
+  const hostId = detailsEl.dataset._hostCellId;
+  const hostCell = [...mainTr.children].find(td => td.dataset.slotId === hostId);
+  if (hostCell) hostCell.querySelector('.cell-wrap')?.appendChild(detailsEl);
+  if (mainTr.nextElementSibling && mainTr.nextElementSibling.classList.contains('tr-schedule')){
+    mainTr.nextElementSibling.remove();
+  }
+}
+
+/* Rows */
+function autoResizeTA(ta){ ta.style.height='auto'; ta.style.height=Math.min(200,ta.scrollHeight)+'px'; }
+function addRow(name='',left='',avg='',ppl=1,ready=''){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`
+    <td><textarea class="input stream-name wrap" rows="2"></textarea></td>
+    <td><input type="text" class="input stream-left" value="${left}" placeholder="сколько кейсов"></td>
+    <td><input type="text" class="input stream-avg" value="${avg}" placeholder="минут за кейс"></td>
+    <td><input type="text" class="input stream-people" value="${ppl}" placeholder="людей"></td>
+    <td><input type="datetime-local" class="input stream-ready" value="${ready}"></td>
+    <td>
+      <select class="input stream-window">
+        <option value="inherit" selected>наследовать</option>
+        <option value="custom">кастом</option>
+        <option value="none">без окна</option>
+      </select>
+    </td>
+    <td>
+      <div class="cell-wrap">
+        <details>
+          <summary class="cursor-pointer text-slate-700">Периоды… <span class="chip sch-count">0</span></summary>
+          <div class="sch-box mt-2 sch-list"></div>
+          <button type="button" class="btn btn-ghost mt-2 sch-add">+ период</button>
+        </details>
+      </div>
+    </td>`;
+  tblBody.appendChild(tr);
+  const ta=tr.querySelector('.stream-name'); ta.value=name||''; autoResizeTA(ta);
+  ta.addEventListener('input',()=>{ autoResizeTA(ta); buildDeptFilterFromTable(false); applyFilters(); });
+
+  const list=tr.querySelector('.sch-list');
+  const cnt=tr.querySelector('.sch-count');
+  const detailsEl = tr.querySelector('details');
+
+  detailsEl.addEventListener('toggle', () => {
+    if (detailsEl.open) openScheduleUnderRow(tr, detailsEl);
+    else closeScheduleUnderRow(tr, detailsEl);
+  });
+  tr.querySelector('.sch-add').onclick=()=>{ addScheduleRow(list); cnt.textContent=list.querySelectorAll('.sch-row').length; };
+  tr.querySelector('.stream-window').onchange=e=>{ if(e.target.value==='custom' && list.querySelectorAll('.sch-row').length===0){ addScheduleRow(list); cnt.textContent=1; } };
+
+  tr._scheduleList = list;
+}
+
+/* Prefill time + first row */
+(function(){
+  const now=new Date(); now.setMinutes(Math.floor(now.getMinutes()/10)*10,0,0);
+  startAtI.value=toInput(now);
+  const dl=new Date(now); dl.setDate(dl.getDate()+1); dl.setHours(16,0,0,0); deadlineI.value=toInput(dl);
+})();
+addRow('КТ','','10','3','');
+
+/* Filters */
+const fltIOS=document.getElementById('flt-ios');
+const fltAndroid=document.getElementById('flt-android');
+const fltUnknown=document.getElementById('flt-unknown');
+
+const deptBtn=document.getElementById('deptBtn');
+const deptPanel=document.getElementById('deptPanel');
+const deptList=document.getElementById('deptList');
+const deptLabel=document.getElementById('deptLabel');
+const deptCount=document.getElementById('deptCount');
+const selectedDepts=new Set();
+
+document.getElementById('btnClearFilters').onclick=()=>{
+  fltIOS.checked=fltAndroid.checked=fltUnknown.checked=true;
+  selectedDepts.clear(); renderDeptLabel(); applyFilters();
+};
+deptBtn.addEventListener('click',()=>deptPanel.classList.toggle('hidden'));
+document.addEventListener('click',e=>{ if(!deptPanel.contains(e.target)&&!deptBtn.contains(e.target)) deptPanel.classList.add('hidden'); });
+document.getElementById('deptAll').onclick=()=>{ selectedDepts.clear(); deptList.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false); renderDeptLabel(); applyFilters(); };
+document.getElementById('deptClear').onclick=()=>{ selectedDepts.clear(); deptList.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false); renderDeptLabel(); applyFilters(); };
+
+function detectPlatform(name){ if(/\[iOS\]/i.test(name)) return 'ios'; if(/\[Android\]/i.test(name)) return 'android'; return 'unknown'; }
+function extractDept(name){ const m=name.match(/^\s*\[([^\]]+)\]/); return m?m[1].trim():null; }
+function buildDeptFilterFromTable(redraw=true){
+  const set=new Set();
+  tblBody.querySelectorAll('tr').forEach(tr=>{
+    const n=tr.querySelector('.stream-name')?.value||''; const d=extractDept(n); if(d) set.add(d);
+  });
+  if(!redraw) return;
+  const arr=[...set].sort();
+  const html = arr.map(d=>`
+    <label class="flex items-center gap-2 text-sm py-1">
+      <input type="checkbox" value="${d}" ${selectedDepts.has(d)?'checked':''}>
+      <span>${d}</span>
+    </label>`).join('');
+  if(deptList.innerHTML!==html) deptList.innerHTML = html;
+  deptList.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.oninput=()=>{
+      if(cb.checked) selectedDepts.add(cb.value); else selectedDepts.delete(cb.value);
+      renderDeptLabel(); applyFilters();
+    };
+  });
+  renderDeptLabel();
+}
+function renderDeptLabel(){
+  if(selectedDepts.size===0){ deptLabel.textContent='Все'; deptCount.textContent='0 выбрано'; return; }
+  const arr=[...selectedDepts]; deptLabel.textContent = arr.length<=2 ? arr.join(', ') : `${arr.slice(0,2).join(', ')} +${arr.length-2}`;
+  deptCount.textContent = `${arr.length} выбрано`;
+}
+function rowMatchesFilters(name){
+  const plat=detectPlatform(name);
+  const okPlat=(plat==='ios'&&fltIOS.checked)||(plat==='android'&&fltAndroid.checked)||(plat==='unknown'&&fltUnknown.checked);
+  let okDept=true;
+  if(selectedDepts.size>0){
+    const d=extractDept(name);
+    okDept = d ? selectedDepts.has(d) : false;
+  }
+  return okPlat && okDept;
+}
+function applyFilters(){
+  tblBody.querySelectorAll('tr').forEach(tr=>{
+    if (tr.classList.contains('tr-schedule')){
+      const main = tr.previousElementSibling;
+      tr.style.display = (main && main.style.display !== 'none') ? '' : 'none';
+      return;
+    }
+    const name=tr.querySelector('.stream-name')?.value||''; tr.style.display = rowMatchesFilters(name) ? '' : 'none';
+  });
+  outBody.querySelectorAll('tr').forEach(tr=>{
+    const name=tr.getAttribute('data-name')||''; tr.style.display = rowMatchesFilters(name) ? '' : 'none';
+  });
+}
+tblBody.addEventListener('input',e=>{ if(e.target.classList.contains('stream-name')){ buildDeptFilterFromTable(false); applyFilters(); }});
+[fltIOS,fltAndroid,fltUnknown].forEach(el=>el.addEventListener('input',applyFilters));
+
+/* Capacity helpers — windows & effective capacity between dates */
+function windowsForDay(day, mode, per){
+  if(mode==='none') return [];
+  const wd=day.getDay();
+  let base=[];
+  const gw=globalWindows[wd];
+  if(gw && gw.from && gw.to){
+    const f=parseHM(gw.from), t=parseHM(gw.to);
+    if(f&&t){
+      const s=new Date(day); s.setHours(f.h,f.mi,0,0);
+      const e=new Date(day); e.setHours(t.h,t.mi,0,0);
+      if(e>s) base.push([s,e]);
+    }
+  }
+  if(mode==='custom' && per){
+    base=[]; // только кастом
+    const f=parseHM(per.fromt), t=parseHM(per.tot);
+    if(f&&t){
+      const s=new Date(day); s.setHours(f.h,f.mi,0,0);
+      const e=new Date(day); e.setHours(t.h,t.mi,0,0);
+      if(e>s) base.push([s,e]);
+    }
+  }
+  return base;
+}
+function totalWinSec(day,wins){ return wins.reduce((a,[s,e])=>a+Math.max(0,(e-s)/1000),0); }
+function perPeriod(schedule,day){ for(const it of schedule){ if(day>=it.from && day<=it.to) return it; } return null; }
+function peopleOnDay(schedule,fallback,day){ for(const it of schedule){ if(day>=it.from && day<=it.to) return it.people; } return fallback; }
+
+/* capacityBetween: учитывает окна и hpp в интервале [start, deadline] */
+function capacityBetween(start,deadline,hpp,mode,schedule,ppl){
+  if(!(start instanceof Date) || !(deadline instanceof Date)) return 0;
+  if(start>=deadline) return 0;
+  let cap=0; const cur=new Date(start);
+  while(cur<=deadline){
+    const day=new Date(cur); day.setHours(0,0,0,0);
+    const wins=windowsForDay(day,mode,perPeriod(schedule,day));
+    if(wins.length){
+      const winSec=totalWinSec(day,wins), effSec=Math.min(winSec,hpp*3600), p=peopleOnDay(schedule,ppl,day);
+      if(p>0){
+        let left=0;
+        for(const [s,e] of wins){
+          const ss=new Date(Math.max(s,start)), ee=new Date(Math.min(e,deadline));
+          if(ee>ss) left+=(ee-ss)/1000;
+        }
+        cap += p * Math.min(left, effSec);
+      }
+    }
+    day.setDate(day.getDate()+1); day.setHours(0,0,0,0);
+    cur.setTime(day.getTime());
+  }
+  return cap;
+}
+
+/* === engaged: сколько людей реально задействовано === */
+function engagedInfo(schedule, ppl, startRef, finishUntil){
+  if (!schedule || schedule.length === 0){
+    const n = Math.max(0, ppl||0);
+    return { text: `Задействовано: ${n} чел/день`, min:n, max:n };
+  }
+  const s = new Date(startRef);
+  const e = new Date(finishUntil || startRef);
+  let min = Infinity, max = 0, any = false;
+
+  const cur = new Date(s);
+  while (cur <= e){
+    const day = new Date(cur); day.setHours(0,0,0,0);
+    const pDay = Math.max(0, peopleOnDay(schedule, ppl, day));
+    if (pDay > 0){
+      any = true;
+      if (pDay < min) min = pDay;
+      if (pDay > max) max = pDay;
+    }
+    day.setDate(day.getDate()+1); day.setHours(0,0,0,0);
+    cur.setTime(day.getTime());
+  }
+
+  if (!any){
+    const n = Math.max(0, ppl||0);
+    return { text: `Задействовано: ${n} чел/день`, min:n, max:n };
+  }
+  const text = (min === max)
+    ? `Задействовано: ${min} чел/день (по расписанию)`
+    : `Задействовано: ${min}–${max} чел/день (по расписанию)`;
+  return { text, min, max };
+}
+
+/* Tabs */
+const tabBacklog=document.getElementById('tabBacklog');
+const tabResult=document.getElementById('tabResult');
+const panelBacklog=document.getElementById('panelBacklog');
+const panelResult=document.getElementById('panelResult');
+function showTab(which){
+  if(which==='backlog'){
+    panelBacklog.classList.remove('hidden'); panelResult.classList.add('hidden');
+    tabBacklog.setAttribute('aria-selected','true'); tabResult.setAttribute('aria-selected','false');
+  }else{
+    panelBacklog.classList.add('hidden'); panelResult.classList.remove('hidden');
+    tabBacklog.setAttribute('aria-selected','false'); tabResult.setAttribute('aria-selected','true');
+  }
+  applyFilters();
+}
+tabBacklog.onclick=()=>showTab('backlog');
+tabResult.onclick=()=>showTab('result');
+
+/* Import + progress */
+const apiBaseI=document.getElementById('apiBase');
+const apiProjectI=document.getElementById('apiProject');
+const apiVersionI=document.getElementById('apiVersion');
+const apiTokenI=document.getElementById('apiToken');
+const apiStatus=document.getElementById('apiStatus');
+const progBar=document.getElementById('smokeBar');
+function setProgress(p){ progBar.style.width = Math.max(0,Math.min(100,p))+'%'; }
+
+document.getElementById('btnFetchSmoke').onclick=fetchSmoke;
+const b64=s=>btoa(unescape(encodeURIComponent(s)));
+const makeSearch = (ver, kind = (typeof getSmokeKey === 'function' ? getSmokeKey() : 'Smoke')) =>
+  b64(JSON.stringify([
+    { id:'name', type:'string', value:`[${kind}]` },
+    { id:'name', type:'string', value:`Регресс ${ver}` }
+  ]));
+async function fetchJSON(url,opts={},key=null){
+  const cache=fetchJSON._c||(fetchJSON._c=new Map());
+  if(key && cache.has(key)) return cache.get(key);
+  const headers=new Headers(opts.headers||{});
+  const tk=apiTokenI.value?.trim();
+  if(tk){ if(/^Api-Token |^Bearer /i.test(tk)) headers.set('Authorization',tk); else headers.set('Authorization','Api-Token '+tk); }
+  const res=await fetch(url,{...opts,headers}); if(!res.ok) throw new Error('HTTP '+res.status);
+  const data=await res.json(); if(key) cache.set(key,data); return data;
+}
+function guessStream(n){ return n&&n.includes(' — ')?n.split(' — ').pop().trim():(n||'').trim()||'Без названия'; }
+
+async function fetchSmoke(){
+  try{
+    apiStatus.textContent='Загружаю…'; setProgress(3);
+    const base=(apiBaseI.value||'').replace(/\/+$/,''); const pid=(apiProjectI.value||'').trim(); const ver=(apiVersionI.value||'').trim();
+    if(!base||!pid||!ver){ apiStatus.textContent='Укажи Base/Project/Version'; setProgress(0); return; }
+    const pageSize=50; let page=0,total=1, launches=[];
+    let url=`${base}/api/launch?projectId=${encodeURIComponent(pid)}&preview=true&sort=createdDate,desc&size=${pageSize}&page=${page}&search=${makeSearch(ver)}`;
+    let js=await fetchJSON(url,{},`launch_${page}`); (js.content||js).forEach(x=>launches.push(x));
+    total = js.totalElements??js.total??pageSize; const pages=Math.ceil(total/pageSize);
+    setProgress(Math.min(100,(page+1)/pages*100));
+    for(page=1; page<pages; page++){
+      url=`${base}/api/launch?projectId=${encodeURIComponent(pid)}&preview=true&sort=createdDate,desc&size=${pageSize}&page=${page}&search=${makeSearch(ver)}`;
+      js=await fetchJSON(url,{},`launch_${page}`); (js.content||js).forEach(x=>launches.push(x));
+      setProgress(Math.min(100,(page+1)/pages*100));
+    }
+
+    const FIN=new Set(['PASSED','FAILED','BROKEN','SKIPPED','passed','failed','broken','skipped']);
+    const perStream=new Map();
+    let done=0;
+    for(const L of launches){
+      const id=L.id||L.launchId||L.uuid||L.launch_id; if(!id){ done++; continue; }
+      const [stat,detail]=await Promise.all([fetchJSON(`${base}/api/launch/${id}/statistic`),fetchJSON(`${base}/api/launch/${id}`)]);
+      const launchName=detail?.name||L.name||''; const stream=guessStream(launchName);
+      let total=0,fin=0; (stat||[]).forEach(s=>{const c=Number(s.count||0); total+=c; if(FIN.has(s.status)) fin+=c;});
+      const unfinished=Math.max(0,total-fin); const durationMs=Number(detail?.duration||detail?.durationMs||0);
+      const prev=perStream.get(stream)||{left:0,total:0,durationMs:0};
+      perStream.set(stream,{left:prev.left+unfinished,total:prev.total+total,durationMs:prev.durationMs+durationMs});
+      done++; setProgress( Math.min(100, (done/launches.length)*100) );
+    }
+
+    const names=[...perStream.keys()];
+    tblBody.innerHTML='';
+    names.forEach(n=>{
+      const agg=perStream.get(n)||{};
+      addRow(n, String(agg.left||0), (agg.total>0?((agg.durationMs/1000/60)/agg.total).toFixed(1):''), 1, '');
+    });
+    buildDeptFilterFromTable(); applyFilters();
+    apiStatus.textContent=`Готово: ${names.length} стримов`;
+    setProgress(100);
+    setTimeout(()=>setProgress(0),1400);
+  }catch(e){ console.error(e); apiStatus.textContent='Ошибка: '+e.message; setProgress(0); }
+}
+
+/* Buttons */
+document.getElementById('btnAddRow').onclick=()=>{ addRow('Новый стрим','','',1,''); buildDeptFilterFromTable(); applyFilters(); };
+document.getElementById('btnPreset').onclick=()=>{ ["Профиль","Карточка товара","Отзывы","Кор","AUTHN","Корзина - 1ШК","Корзина - 2ШК","WB Pay","КТ"].forEach(n=>addRow(n,'','','1','')); buildDeptFilterFromTable(); applyFilters(); };
+
+/* ===== Core calc ===== */
+document.getElementById('btnRun').onclick=()=>{
+  showTab('result');
+  document.getElementById('status').textContent='Считаю…';
+  outBody.innerHTML=''; outRaw.textContent='';
+  const startAt=dtLocal(startAtI.value), deadline=dtLocal(deadlineI.value);
+  const hpp=num(hoursPerPersonI.value||0), safetyH=Math.max(0,num(safetyHoursI.value)||0);
+  if(!startAt||!deadline){ alert('Укажи «Начало старта» и «Дедлайн».'); return; }
+  if(startAt>=deadline){ alert('Старт должен быть раньше дедлайна.'); return; }
+  if(!(hpp>0)){ alert('Укажи «Часы/чел/день».'); return; }
+
+  const results=[];
+  for(const tr of tblBody.querySelectorAll('tr')){
+    const name=tr.querySelector('.stream-name')?.value.trim(); if(!name) continue;
+    const left=Math.max(0,num(tr.querySelector('.stream-left').value||0)||0);
+    const avgMin=Math.max(0,num(tr.querySelector('.stream-avg').value||0)||0), avgSec=avgMin*60;
+    const ppl=Math.max(0,num(tr.querySelector('.stream-people').value||0)||0);
+    const winMode=tr.querySelector('.stream-window').value||'inherit';
+    const readyStr=tr.querySelector('.stream-ready').value; const ready=readyStr?dtLocal(readyStr):null;
+
+    const listEl = tr._scheduleList || tr.querySelector('.sch-list') || (tr.nextElementSibling?.classList.contains('tr-schedule') ? tr.nextElementSibling.querySelector('.sch-list') : null);
+    const schedule=readSchedule(listEl||document.createElement('div'));
+
+    const startRef=ready ? (ready>startAt?ready:startAt) : startAt;
+
+    const needSecAll=left*avgSec + safetyH*3600;
+    const capSec=capacityBetween(startRef,deadline,hpp,winMode,schedule,ppl);
+
+    /* lastOk для «макс. задержки» — через бинарный поиск по дате старта */
+    let lastOk=null;
+    if(needSecAll<=0){ lastOk=deadline; }
+    else{
+      let lo=new Date(startRef), hi=new Date(deadline);
+      for(let i=0;i<28;i++){
+        const mid=new Date(lo.getTime()+(hi.getTime()-lo.getTime())/2);
+        const cap=capacityBetween(mid,deadline,hpp,winMode,schedule,ppl);
+        if(cap>=needSecAll){ lastOk=mid; lo=mid; } else { hi=mid; }
+      }
+    }
+
+    const capAfterSafety=Math.max(0,capSec - safetyH*3600);
+    const canDo=Math.floor(capAfterSafety/(avgSec||1e9));
+    const willPass=Math.min(left,canDo);
+    const remain=Math.max(0,left-willPass);
+
+    /* НОВОЕ: точная симуляция завершения без двойного учёта вокруг дедлайна */
+    function estimateFinishAll(){
+      if(left<=0) return startRef;
+      let leftS=left*avgSec + safetyH*3600;
+      let cur=new Date(startRef);
+
+      for(let guard=0; guard<365; guard++){ // предохранитель
+        const day=new Date(cur); day.setHours(0,0,0,0);
+
+        const per   = perPeriod(schedule, day);
+        const wins  = windowsForDay(day, winMode, per);
+        const pDay  = Math.max(0, peopleOnDay(schedule, ppl, day));
+
+        if (wins.length && pDay>0){
+          let usedPerPerson = 0;
+          for(const [ws,we] of wins){
+            const ss=new Date(Math.max(ws, cur)); // старт не раньше текущего времени
+            const ee=new Date(we);
+            if (ee<=ss) continue;
+
+            const segSec = (ee-ss)/1000;
+            const remainPerPerson = Math.max(0, hpp*3600 - usedPerPerson);
+            const addPerPerson = Math.min(segSec, remainPerPerson);
+
+            if (addPerPerson>0){
+              const dayChunk = addPerPerson * pDay;
+              if(dayChunk >= leftS){
+                const needPerPerson = leftS / pDay;
+                return new Date(ss.getTime() + needPerPerson*1000);
+              }
+              leftS -= dayChunk;
+              usedPerPerson += addPerPerson;
+              if (usedPerPerson >= hpp*3600) break; // лимит на человека исчерпан
+            }
+          }
+        }
+
+        // следующий день, с 00:00
+        day.setDate(day.getDate()+1);
+        day.setHours(0,0,0,0);
+        cur = new Date(day);
+      }
+      return null;
+    }
+    const finishAll=estimateFinishAll();
+
+    // engaged: сколько людей фактически участвует на отрезке работы
+    const until = finishAll || deadline;
+    const engaged = engagedInfo(schedule, ppl, startRef, until);
+
+    results.push({ name, ready:startRef, needSecAll, willPass, remain, lastOk, finishAll, engagedText: engaged.text });
+  }
+
+  outBody.innerHTML='';
+  results.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.setAttribute('data-name',r.name);
+
+    const dl = dtLocal(deadlineI.value);
+    const finishTxt = r.finishAll ? fmt(r.finishAll) : null;
+    const lateTxt = (r.finishAll && dl) ? ` (позже дедлайна на ${humanDelta(new Date(r.finishAll)-dl)})` : '';
+    const engagedLine = r.engagedText ? `<div class="hint">${r.engagedText}</div>` : '';
+    const commentHtml =
+      r.remain>0
+        ? `<span class="state-bad">Не успеют</span>${finishTxt?`<div class="hint">Ориентировочно завершат: ${finishTxt}${lateTxt}</div>`:''}${engagedLine}`
+        : `<span class="state-ok">OK</span>${finishTxt?`<div class="hint">Ориентировочно завершат: ${finishTxt}</div>`:''}${engagedLine}`;
+
+    tr.innerHTML=`
+      <td>${r.name}</td>
+      <td>${fmt(r.ready)}</td>
+      <td>${secHM(r.needSecAll)}</td>
+      <td>${r.lastOk?fmt(r.lastOk):'—'}</td>
+      <td>${r.finishAll?fmt(r.finishAll):'—'}</td>
+      <td>${fmt(r.ready)}</td>
+      <td>${r.willPass}</td>
+      <td>${r.remain}</td>
+      <td>${commentHtml}</td>
+    `;
+    outBody.appendChild(tr);
+  });
+
+  applyFilters();
+  outRaw.textContent=JSON.stringify(results,null,2);
+  document.getElementById('status').textContent='Готово';
+  const toast=document.getElementById('toast');
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),3000);
+};
+</script>
+
+<!-- Поле ввода ключей Smoke/Selective -->
+<script>
+(function(){
+  function injectKindKeyInputs(){
+    const versionInput = document.querySelector('input[name="version"], #apiVersion, input[placeholder*="Верси"], input[placeholder*="верси"]');
+    const host = (versionInput && (versionInput.closest('.card, .controls, .toolbar, form, .panel, .row') || versionInput.parentElement)) || document.body;
+    if (!host || document.getElementById('kindKeyBox')) return;
+
+    const box = document.createElement('div');
+    box.id = 'kindKeyBox';
+    box.style.cssText = 'display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:6px;font:12px/1.4 system-ui;';
+    box.innerHTML = `
+      <label style="display:inline-flex;gap:6px;align-items:center;">
+        <span>Ключ для <b>Smoke</b>:</span>
+        <input id="smokeKey" type="text" placeholder="Smoke"
+               style="padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;min-width:140px" />
+      </label>
+      <label style="display:inline-flex;gap:6px;align-items:center;">
+        <span>Ключ для <b>Selective</b>:</span>
+        <input id="selectiveKey" type="text" placeholder="Selective"
+               style="padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;min-width:140px" />
+      </label>
+    `;
+    host && host.appendChild(box);
+
+    try{
+      const s = localStorage.getItem('rb_smoke_key');
+      if(s) document.querySelector('#smokeKey').value = s;
+      const sl = localStorage.getItem('rb_selective_key');
+      if(sl) document.querySelector('#selectiveKey').value = sl;
+    }catch(e){}
+
+    const sk = document.querySelector('#smokeKey');
+    sk && sk.addEventListener('input', ()=>{
+      try{ localStorage.setItem('rb_smoke_key', (sk.value||'').trim()); }catch(e){}
+    });
+    const slk = document.querySelector('#selectiveKey');
+    slk && slk.addEventListener('input', ()=>{
+      try{ localStorage.setItem('rb_selective_key', (slk.value||'').trim()); }catch(e){}
+    });
+  }
+  window.getSmokeKey = ()=> (document.querySelector('#smokeKey')?.value || '').trim() || 'Smoke';
+  window.getSelectiveKey = ()=> (document.querySelector('#selectiveKey')?.value || '').trim() || 'Selective';
+  document.addEventListener('DOMContentLoaded', injectKindKeyInputs);
+})();
+</script>
+
+<!-- Автосайз для названий стримов -->
+<script>
+(function(){
+  if(window.vangAutosizeInit) return;
+  window.vangAutosizeInit = true;
+
+  window.vangAutosizeStreamName = function(el){
+    if(!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  };
+
+  function initAll(){
+    document.querySelectorAll('#tbl .stream-name').forEach(window.vangAutosizeStreamName);
+  }
+
+  document.addEventListener('input', function(e){
+    if(e && e.target && e.target.matches('#tbl .stream-name')){
+      window.vangAutosizeStreamName(e.target);
+    }
+  });
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initAll);
+  }else{
+    initAll();
+  }
+})();
+</script>
+</body>
+</html>
