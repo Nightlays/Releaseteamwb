@@ -1439,7 +1439,7 @@ function DeltaLabelsPlugin() {
         // нижняя граница чёрной цифры суммы (GroupSumLabels использует offset = 10)
         const ySumBottom = Math.max(Math.round(g.top - 10), chartArea.top + 2);
 
-               // куда поставить низ капсулы — ещё выше, чтобы не было наложений с чёрной суммой
+        // куда поставить низ капсулы — ещё выше, чтобы не было наложений с чёрной суммой
         let capBottom;
         if (aboveGroup) {
           // поднять Δ ещё выше суммы: +3px к прежнему запасу
@@ -1449,15 +1449,8 @@ function DeltaLabelsPlugin() {
           capBottom = Math.max(Math.round(g.top - cfg.offset), chartArea.top + 2);
         }
 
-        // гарантируем, что капсула не вылезает выше области графика
-        let rectY = Math.round(capBottom - h);
-        const minY = chartArea.top + 4; // небольшой зазор от рамки
-        if (rectY < minY) {
-          rectY = minY;
-        }
-
-        const rect = { x: Math.round(xC - w/2), y: rectY, w, h };
-        ctx.fillStyle = 'rgba(255,255,255,.96)';
+        const rect = { x: Math.round(xC - w/2), y: Math.round(capBottom - h), w, h };
+        ctx.fillStyle='rgba(255,255,255,.96)';
         ctx.strokeStyle='rgba(0,0,0,.06)';
         ctx.lineWidth=1;
         roundRect(ctx, rect.x, rect.y, rect.w, rect.h, cfg.capsule.radius);
@@ -1648,6 +1641,13 @@ const agg = snap => {
       categoryPercentage: .6
     };
   });
+  // Адаптивный максимум по оси Y: берём максимум по всем столбцам и даём запас сверху
+  const allValues = datasets.reduce((acc, ds) => {
+    if (Array.isArray(ds.data)) acc.push(...ds.data);
+    return acc;
+  }, []);
+  const rawMax = allValues.length ? Math.max(...allValues) : 0;
+  const ySuggestedMax = rawMax > 0 ? Math.round(rawMax * 1.25) : undefined; // +25% воздуха
   const deltas = (function(){
     if(maps.length<2) return null;
     const prevMap = maps[maps.length-2];
@@ -1687,12 +1687,17 @@ const agg = snap => {
       },
       scales:{
         x:{ticks:{autoSkip:false,maxRotation:0,padding:8,font:{size:13},callback:(v,i)=> shortByIndex[i] || ''},grid:{display:false}},
-        y:{beginAtZero:true, suggestedMax: 30000000, title:{display:true,text:'Пользователи',font:{size:14,weight:'700'}},
-           ticks:{font:{size:13},callback:v=>v.toLocaleString('ru-RU')},
-           grid:{drawBorder:false}}
+        y:{
+          beginAtZero:true,
+          suggestedMax: ySuggestedMax,
+          grace: '5%',
+          title:{display:true,text:'Пользователи',font:{size:14,weight:'700'}},
+          ticks:{font:{size:13},callback:v=>v.toLocaleString('ru-RU')},
+          grid:{drawBorder:false}
+        }
       }
     },
-    plugins:[groupSumLabels, ValueLabelsPlugin(), deltaLabels]
+    plugins:[deltaLabels, ValueLabelsPlugin(), groupSumLabels]
   });
   window.addEventListener('resize', ()=>{ if(deltaChart) deltaChart.update('none'); }, { passive:true });
 
