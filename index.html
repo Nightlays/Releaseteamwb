@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Дом Питона — Shell</title>
+<link rel="stylesheet" href="dashboard_run.css" />
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -399,7 +400,6 @@
 button, .btn, .mini{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 /* iOS safe-area for sticky topbar */
 .topbar{ padding-top: env(safe-area-inset-top); }
-
 
 </style>
 
@@ -931,18 +931,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </svg>
       <div class="title">Дом питона </div>
     </div>
-
-    <!-- ✅ КНОПКА ВЫХОДА В ШАПКЕ -->
-    <div class="actions">
-      <button id="rbAuthLogout" class="btn-logout" type="button">Выйти</button>
-    </div>
-  </div>
-</div>
-<div class="wrap">
-  <h1>Дом Питона · Модули</h1>
-
-  <!-- Панель вкладок оболочки: сюда можно добавлять кнопки с data-module="file.html" -->
-  <div class="tabs rb-shell-tabs">
+    <div class="tabs rb-shell-tabs topbar-tabs">
     <button class="active" data-module="dashboard_run_module.html" data-guard="shell--dashboard-run">Дашборд + РАН-отчёт</button>
     <button data-module="Ванговатор.html"data-guard="shell--vangovator">Ванговатор</button>
     <button data-module="Создание рана.html"data-guard="shell--createrun">Создание рана</button>
@@ -953,14 +942,18 @@ document.addEventListener('DOMContentLoaded', () => {
     <button data-module="swat_only.html">SWAT-таблица</button>
     <button data-module="bi_users_calc.html">Статистика BI</button>
     -->
+    </div>
+    <div class="actions">
+      <button id="rbAuthLogout" class="btn-logout" type="button">Выйти</button>
+    </div>
   </div>
-
-  <!-- Контейнер для подгружаемых HTML-модулей -->
-  <div class="card" style="padding:0; overflow:hidden; background:#050816;">
+</div>
+  <!-- Панель вкладок оболочки: сюда можно добавлять кнопки с data-module="file.html" --><!-- Контейнер для подгружаемых HTML-модулей -->
+  <div class="card card-shell" style="padding:0; overflow:hidden; background:transparent;">
     <iframe id="rbModuleFrame"
             title="Модуль"
             src="dashboard_run_module.html"
-            style="width:100%; min-height:80vh; border:0; border-radius:16px; background:#050816;">
+            style="width:100%; min-height:80vh; border:0; display:block; background:transparent;">
     </iframe>
   </div>
 </div>
