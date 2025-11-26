@@ -882,3 +882,8 @@ button[data-busy="1"]{opacity:.6; pointer-events:none; filter:saturate(.7)}
 .card-shell::before{
   display:none !important;
 }
+/* Финальная правка центрирования табов shell */
+.topbar .topbar-tabs{
+  margin:0 auto !important;
+  justify-content:center !important;
+}
