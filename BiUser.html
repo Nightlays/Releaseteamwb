@@ -1439,7 +1439,7 @@ function DeltaLabelsPlugin() {
         // нижняя граница чёрной цифры суммы (GroupSumLabels использует offset = 10)
         const ySumBottom = Math.max(Math.round(g.top - 10), chartArea.top + 2);
 
-        // куда поставить низ капсулы — ещё выше, чтобы не было наложений с чёрной суммой
+               // куда поставить низ капсулы — ещё выше, чтобы не было наложений с чёрной суммой
         let capBottom;
         if (aboveGroup) {
           // поднять Δ ещё выше суммы: +3px к прежнему запасу
@@ -1449,8 +1449,15 @@ function DeltaLabelsPlugin() {
           capBottom = Math.max(Math.round(g.top - cfg.offset), chartArea.top + 2);
         }
 
-        const rect = { x: Math.round(xC - w/2), y: Math.round(capBottom - h), w, h };
-        ctx.fillStyle='rgba(255,255,255,.96)';
+        // гарантируем, что капсула не вылезает выше области графика
+        let rectY = Math.round(capBottom - h);
+        const minY = chartArea.top + 4; // небольшой зазор от рамки
+        if (rectY < minY) {
+          rectY = minY;
+        }
+
+        const rect = { x: Math.round(xC - w/2), y: rectY, w, h };
+        ctx.fillStyle = 'rgba(255,255,255,.96)';
         ctx.strokeStyle='rgba(0,0,0,.06)';
         ctx.lineWidth=1;
         roundRect(ctx, rect.x, rect.y, rect.w, rect.h, cfg.capsule.radius);
