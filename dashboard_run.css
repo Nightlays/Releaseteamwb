@@ -88,36 +88,6 @@
     background:var(--grad);
     box-shadow:0 8px 24px rgba(110,11,212,.25), inset 0 0 0 1px rgba(255,255,255,.5);
   }
-/* Центровка меню модулей в шапке */
-.topbar .inner{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-}
-
-.topbar-tabs{
-  flex: 0 1 auto;
-  display:flex;
-  justify-content:center;
-  margin: 0 auto;       /* самое главное */
-}
-
-.topbar-tabs button{
-  white-space:nowrap;
-}
-@media(max-width: 980px){
-  .topbar .inner{
-    flex-wrap:wrap;
-  }
-  .topbar-tabs{
-    order:3;
-    width:100%;
-    margin: 6px 0 0 0;
-    justify-content:flex-start;
-    overflow-x:auto;
-    padding-bottom:4px;
-  }
-}
 
   /* Табы — стеклянные плашки */
   .tabs{display:flex; gap:10px; margin:10px 0 16px}
@@ -864,3 +834,51 @@ button[data-busy="1"]{opacity:.6; pointer-events:none; filter:saturate(.7)}
   .rr-small-btn{height:32px;padding:0 10px;border-radius:10px;border:1px solid transparent;background:#f7f3ff;color:#3f2b6b;cursor:pointer}
   .rr-dd-list input{accent-color:var(--rr-badge);}
   .mini-card.hide, .miniCard.hide { display:none !important; }
+
+/* === Shell (Дом Питона) — верхнее меню и iframe === */
+.topbar .inner{
+  max-width:1600px;
+  margin:0 auto;
+  padding:10px 20px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+.topbar-tabs{
+  flex:0 1 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 auto;
+  gap:8px;
+}
+
+.topbar-tabs button{
+  white-space:nowrap;
+}
+
+@media (max-width: 980px){
+  .topbar .inner{
+    flex-wrap:wrap;
+    align-items:flex-start;
+  }
+  .topbar-tabs{
+    order:3;
+    width:100%;
+    margin:6px 0 0 0;
+    justify-content:flex-start;
+    overflow-x:auto;
+    padding-bottom:4px;
+  }
+}
+
+/* Обёртка для iframe-модуля без рамки */
+.card-shell{
+  border:none !important;
+  box-shadow:none !important;
+  background:transparent !important;
+}
+.card-shell::before{
+  display:none !important;
+}
