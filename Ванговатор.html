@@ -32,6 +32,12 @@
   .tab[aria-selected="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:2px;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));border-radius:2px}
   .btn{border:none;border-radius:16px;padding:.65rem 1rem;font-weight:700;transition:.15s}
   .btn-ghost{background:#f5f3ff;color:#6d28d9;border:1px solid #ede9fe}
+  .btn-del-row{
+    padding:.25rem .5rem;
+    border-radius:999px;
+    font-size:.85rem;
+    min-width:0;
+  }
   .btn-soft{background:#fff;border:1px solid #ede9fe;box-shadow:0 8px 22px rgba(124,58,237,.08);color:#6d28d9}
   .btn-grad{background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));color:#fff;box-shadow:var(--ring)}
   .chip{display:inline-block;padding:.15rem .6rem;border-radius:999px;font-size:.75rem;color:#fff;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary))}
@@ -125,7 +131,7 @@
       </div>
       <div class="grid md:grid-cols-3 gap-3">
         <label class="block text-sm">Часы/чел/день
-          <input id="hoursPerPerson" type="number" step="0.25" value="4" class="input mt-1">
+          <input id="hoursPerPerson" type="number" step="0.25" value="8" class="input mt-1">
         </label>
         <label class="block text-sm">Запас (часы)
           <input id="safetyHours" type="number" step="0.25" value="2" class="input mt-1">
@@ -141,7 +147,7 @@
       <details class="mt-1">
         <summary class="cursor-pointer text-slate-700">Глобальные окна (Пн–Вс)</summary>
         <div id="globalWindows" class="grid grid-cols-7 gap-2 mt-2"></div>
-        <p class="hint mt-2">Пустой день = без окна. По умолчанию 10:00–18:00.</p>
+        <p class="hint mt-2">Пустой день = без окна. По умолчанию 10:00–22:00.</p>
       </details>
     </div>
   </section>
@@ -198,7 +204,7 @@
       <table id="tbl" class="text-sm">
         <colgroup>
           <col style="width:30%"><col style="width:11%"><col style="width:13%"><col style="width:11%">
-          <col style="width:15%"><col style="width:10%"><col>
+          <col style="width:15%"><col style="width:10%"><col><col style="width:6%">
         </colgroup>
         <thead>
           <tr>
@@ -209,6 +215,7 @@
             <th class="text-left">Готов с</th>
             <th class="text-left">Окна</th>
             <th class="text-left">Расписание людей</th>
+            <th class="text-left"></th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -272,7 +279,7 @@ const safetyHoursI=document.getElementById('safetyHours');
 
 /* Global windows */
 const DAY_NAMES=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
-const globalWindows=Array(7).fill(null).map(()=>({from:'10:00',to:'18:00'}));
+const globalWindows=Array(7).fill(null).map(()=>({from:'10:00',to:'22:00'}));
 (function renderGW(){
   const el=document.getElementById('globalWindows'); el.innerHTML='';
   for(let i=0;i<7;i++){
@@ -322,7 +329,9 @@ function openScheduleUnderRow(mainTr, detailsEl){
   hostCell.dataset.slotId = detailsEl.dataset._hostCellId;
 
   const tr = document.createElement('tr'); tr.className = 'tr-schedule';
-  const td = document.createElement('td'); td.colSpan = 7; tr.appendChild(td);
+  const td = document.createElement('td');
+  td.colSpan = document.querySelectorAll('#tbl thead th').length || 7;
+  tr.appendChild(td);
   mainTr.after(tr);
 
   const panel = document.createElement('div'); panel.className = 'sch-panel'; td.appendChild(panel);
@@ -339,14 +348,14 @@ function closeScheduleUnderRow(mainTr, detailsEl){
   }
 }
 
-/* Rows */
+/* Rows + хард полей ввода*/
 function autoResizeTA(ta){ ta.style.height='auto'; ta.style.height=Math.min(200,ta.scrollHeight)+'px'; }
 function addRow(name='',left='',avg='',ppl=1,ready=''){
   const tr=document.createElement('tr');
   tr.innerHTML=`
     <td><textarea class="input stream-name wrap" rows="2"></textarea></td>
     <td><input type="text" class="input stream-left" value="${left}" placeholder="сколько кейсов"></td>
-    <td><input type="text" class="input stream-avg" value="${avg}" placeholder="минут за кейс"></td>
+    <td><input type="text" class="input stream-avg" value="10" placeholder="минут за кейс"></td>
     <td><input type="text" class="input stream-people" value="${ppl}" placeholder="людей"></td>
     <td><input type="datetime-local" class="input stream-ready" value="${ready}"></td>
     <td>
@@ -364,6 +373,9 @@ function addRow(name='',left='',avg='',ppl=1,ready=''){
           <button type="button" class="btn btn-ghost mt-2 sch-add">+ период</button>
         </details>
       </div>
+    </td>
+    <td class="text-right">
+      <button type="button" class="btn btn-ghost btn-del-row">✕</button>
     </td>`;
   tblBody.appendChild(tr);
   const ta=tr.querySelector('.stream-name'); ta.value=name||''; autoResizeTA(ta);
@@ -463,7 +475,24 @@ function applyFilters(){
     const name=tr.getAttribute('data-name')||''; tr.style.display = rowMatchesFilters(name) ? '' : 'none';
   });
 }
-tblBody.addEventListener('input',e=>{ if(e.target.classList.contains('stream-name')){ buildDeptFilterFromTable(false); applyFilters(); }});
+[...(() => {
+  tblBody.addEventListener('input',e=>{ if(e.target.classList.contains('stream-name')){ buildDeptFilterFromTable(false); applyFilters(); }});
+  return [];
+})()];
+
+tblBody.addEventListener('click', e => {
+  const btn = e.target.closest('.btn-del-row');
+  if (!btn) return;
+  const tr = btn.closest('tr');
+  if (!tr) return;
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains('tr-schedule')) {
+    next.remove();
+  }
+  tr.remove();
+  buildDeptFilterFromTable();
+  applyFilters();
+});
 [fltIOS,fltAndroid,fltUnknown].forEach(el=>el.addEventListener('input',applyFilters));
 
 /* Capacity helpers — windows & effective capacity between dates */
