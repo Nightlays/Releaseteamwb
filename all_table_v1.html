@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>WB All Table — графики</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Tailwind как в uwu_6 (для удобных утилит) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Все кастомные стили вынесены в style.css -->
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body class="min-h-screen">
+  <div class="max-w-6xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="brand-badge">
+        <span class="brand-dot"></span>
+        <div>
+          <div class="font-extrabold leading-tight">WB All Table</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="mt-5 grid grid-cols-1 gap-4">
+      <!-- Блок ввода параметров (отдельно от таблиц/графиков) -->
+      <section class="card p-5 space-y-3">
+        <div>
+          <h2 class="text-lg font-semibold">Параметры запуска</h2>
+          <div class="hint">Заполни параметры и нажми «Запустить сбор».</div>
+        </div>
+
+        <form class="w-full" onsubmit="return false;">
+          <div class="border border-[#ecebff] rounded-2xl bg-white p-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Версия релиза</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input class="input" id="releaseFrom" type="text" inputmode="numeric" placeholder="От, напр. 7.3.5000" />
+                  <input class="input" id="releaseTo" type="text" inputmode="numeric" placeholder="До, напр. 7.3.8000" />
+                </div>
+              </div>
+
+              <div class="md:col-span-6">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">API токен Allure</label>
+                <input class="input" id="allureToken" type="password" autocomplete="off" placeholder="Вставьте токен Allure" />
+              </div>
+
+              <div class="md:col-span-2">
+                <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
+                <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Остановить сбор</button>
+              </div>
+
+
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Deploy-lab token</label>
+                <input class="input" id="deployToken" type="password" autocomplete="off" placeholder="Вставьте Deploy-lab token" />
+              </div>
+
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">YouTrack токен</label>
+                <input class="input" id="youtrackToken" type="password" autocomplete="off" placeholder="Вставьте YouTrack токен" />
+              </div>
+            </div>
+
+            <div class="mt-3 flex items-center gap-2 flex-wrap">
+              <span class="text-xs text-slate-500">SWAT получаем</span>
+              <a
+                class="text-xs text-[#7c3aed] underline decoration-dotted hover:decoration-solid"
+                href="https://docs.google.com/document/d/1AYHrg_w_aCdiunytlDVmbmyQAxiHRr51Z0Djju4GAnE/edit?tab=t.0"
+                target="_blank" rel="noopener"
+              >отсюда</a>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- Таблицы/графики начинаются ниже -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Тест кейсы от релиза к релизу</h2>
+          </div>
+        </div>
+
+        <!-- Контейнер как у таблиц в uwu_6: скролл и рамка -->
+        <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+          <!-- Пустое состояние (без шиммера) -->
+          <div id="tcEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            Данные появятся после получения из источника
+          </div>
+
+          <div id="tcContent" class="tc-content" style="display:none;">
+            <!-- График (как концепт из all_table_v1 — копия) -->
+            <div class="chart-viewport" id="tcTrendViewport">
+              <canvas id="tcTrendChart" aria-label="Test cases chart" role="img"></canvas>
+            </div>
+
+            <!-- Таблица (скрыта) -->
+            <div id="tcTableWrap" style="display:none; overflow:auto">
+              <table id="tcTable">
+                <thead>
+                  <tr>
+                    <th class="text-left">Релиз</th>
+                    <th>Ручные</th>
+                    <th>Авто</th>
+                    <th>Всего</th>
+                    <th class="text-left">Полосы</th>
+                  </tr>
+                </thead>
+                <tbody id="tcTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Легенда (как цветовые линии графика) -->
+        <div class="flex flex-wrap items-center justify-start gap-3">
+          <div class="legend">
+            <span class="lg-item"><span class="dot dot-manual"></span>Ручные</span>
+            <span class="lg-item"><span class="dot dot-auto"></span>Авто</span>
+            <span class="lg-item"><span class="dot dot-total"></span>Всего</span>
+          </div>
+        </div>
+
+      </section>
+
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Покрытие SWAT и STREAM ХБ</h2>
+          </div>
+        </div>
+
+        <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+          <div id="covEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            Данные появятся после получения из источника
+          </div>
+
+          <div id="covContent" class="tc-content" style="display:none;">
+            <div class="chart-viewport" id="covTrendViewport">
+              <canvas id="covTrendChart" aria-label="SWAT/STREAM coverage chart" role="img"></canvas>
+            </div>
+
+            <!-- Таблица (скрыта, только для внутренней логики/отладки) -->
+            <div id="covTableWrap" style="display:none; overflow:auto">
+              <table id="covTable">
+                <thead>
+                  <tr>
+                    <th class="text-left">Релиз</th>
+                    <th>SWAT</th>
+                    <th>STREAM</th>
+                    <th>Всего</th>
+                    <th class="text-left">Покрытие</th>
+                  </tr>
+                </thead>
+                <tbody id="covTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-start gap-3">
+          <div class="legend">
+            <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
+            <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Покрытие SWAT и STREAM Selective</h2>
+          </div>
+        </div>
+
+        <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+          <div id="selEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            Данные появятся после получения из источника
+          </div>
+
+          <div id="selContent" class="tc-content" style="display:none;">
+            <div class="chart-viewport" id="selTrendViewport">
+              <canvas id="selTrendChart" aria-label="SWAT/STREAM Selective chart" role="img"></canvas>
+            </div>
+
+            <div id="selTableWrap" style="display:none; overflow:auto">
+              <table id="selTable">
+                <thead>
+                  <tr>
+                    <th class="text-left">Релиз</th>
+                    <th>SWAT</th>
+                    <th>STREAM</th>
+                    <th>Всего</th>
+                    <th class="text-left">Покрытие</th>
+                  </tr>
+                </thead>
+                <tbody id="selTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-start gap-3">
+          <div class="legend">
+            <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
+            <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
+          </div>
+        </div>
+      </section>
+
+      <script>
+        // Логика (по смыслу из uwu/"Главная"): поиск ранов по имени -> статистика -> авто/ручные.
+        // Дополнения:
+        // - берём только "мажорные" релизы (....1000, ....2000, ...)
+        // - заглушка той же высоты + простая анимация при сборе
+        // - график (3 линии: Manual/Auto/Total)
+        (function(){
+          const BASE_URL = 'https://allure-testops.wb.ru';
+          const PROJECT_ID = 7;
+          const PAGE_SIZE = 1000;
+          const KINDS = ['Smoke', 'Selective'];
+          const SWAT_LIST_URL = 'https://script.google.com/macros/s/AKfycbwJapteQxL-8LqmX88qMa2wtlD760v4rvkISWm1YP-NDguwW08ZzmEADV-0kqjg3cC3zQ/exec';
+
+          const LS_TOKEN_KEY = 'swat_uwu_token';
+          const LS_RANGE_KEY = 'swat_uwu_release_range';
+
+          const startBtn = document.getElementById('startBtn');
+          const stopBtn  = document.getElementById('stopBtn');
+
+          const inpFrom  = document.getElementById('releaseFrom');
+          const inpTo    = document.getElementById('releaseTo');
+          const inpAllureToken = document.getElementById('allureToken');
+
+          const emptyBox = document.getElementById('tcEmpty');
+          const contentWrap = document.getElementById('tcContent');
+          const tbody = document.getElementById('tcTbody');
+
+          // Coverage section
+          const covEmpty = document.getElementById('covEmpty');
+          const covContent = document.getElementById('covContent');
+          const covTbody = document.getElementById('covTbody');
+
+          // Selective coverage section
+          const selEmpty = document.getElementById('selEmpty');
+          const selContent = document.getElementById('selContent');
+          const selTbody = document.getElementById('selTbody');
+          const selCanvas = document.getElementById('selTrendChart');
+
+          const chartCanvas = document.getElementById('tcTrendChart');
+          const covCanvas = document.getElementById('covTrendChart');
+
+          let tcChart = null;
+          let covChart = null;
+          let selChart = null;
+
+          function b64Utf8(str){
+            return btoa(unescape(encodeURIComponent(str)));
+          }
+          function b64Query(filters){
+            return b64Utf8(JSON.stringify(filters));
+          }
+
+          function normalizeLogin(v){
+            if(v === null || v === undefined) return '';
+            let s = String(v).trim();
+            if(!s) return '';
+            s = s.replace(/^@+/, '');
+            s = s.split(/[\s,(]/)[0];
+            return s.trim().toLowerCase();
+          }
+
+          function authHeaders(){
+            const tok = (inpAllureToken?.value || '').trim();
+            return {
+              'Accept': 'application/json',
+              'Authorization': `Api-Token ${tok}`
+            };
+          }
+
+          function parseVersion(v){
+            const parts = (v||'').trim().split('.').map(x => x.trim());
+            if(parts.length < 3) return null;
+            const major = parts[0], minor = parts[1];
+            const majorN = Number(major);
+            const minorN = Number(minor);
+            const build  = Number(parts[2]);
+            if(!Number.isFinite(majorN) || !Number.isFinite(minorN) || !Number.isFinite(build)) return null;
+            return { major, minor, majorN, minorN, build };
+          }
+
+          function buildMajorRange(){
+            const a = parseVersion(inpFrom?.value);
+            const b = parseVersion(inpTo?.value);
+            if(!a || !b) return [];
+
+            // поддерживаем диапазоны между разными minor, но только в одном major
+            if(a.majorN !== b.majorN) return [];
+
+            const step = 1000;
+
+            // упорядочим границы по minor/build
+            const aKey = a.minorN * 10000 + a.build;
+            const bKey = b.minorN * 10000 + b.build;
+            const loV = aKey <= bKey ? a : b;
+            const hiV = aKey <= bKey ? b : a;
+
+            const out = [];
+
+            for(let m = loV.minorN; m <= hiV.minorN; m++){
+              let startBuild = 0;
+              let endBuild   = 9000;
+
+              if(m === loV.minorN) startBuild = Math.ceil(loV.build / step) * step;
+              if(m === hiV.minorN) endBuild   = Math.floor(hiV.build / step) * step;
+
+              if(startBuild > endBuild) continue;
+
+              for(let build = startBuild; build <= endBuild; build += step){
+                const buildStr = String(build).padStart(4, '0');
+                out.push(`${loV.major}.${m}.${buildStr}`);
+              }
+            }
+
+            return out;
+          }
+
+          async function httpGet(path, params, signal){
+            const url = new URL(BASE_URL + path);
+            if(params){
+              Object.entries(params).forEach(([k,v]) => {
+                if(v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
+              });
+            }
+            const r = await fetch(url.toString(), { headers: authHeaders(), signal });
+            if(!r.ok) throw new Error(`HTTP ${r.status} ${path}`);
+            return r.json();
+          }
+
+          async function fetchLaunches(version, kind, signal){
+            const terms = [`[${kind}] Регресс ${version}`];
+            if(kind === 'Smoke') terms.push(`[High/Blocker][DeployLab] Регресс ${version}`);
+            if(kind === 'Selective') terms.push(`[Selective][DeployLab] Регресс ${version}`);
+
+            const byId = new Map();
+            for(const term of terms){
+              const search = b64Query([{ id:'name', type:'string', value: term }]);
+              let page = 0;
+              while(true){
+                const data = await httpGet('/api/launch', {
+                  page, size: PAGE_SIZE, search,
+                  projectId: PROJECT_ID,
+                  preview: 'true',
+                  sort: 'createdDate,desc'
+                }, signal);
+
+                const content = (data && data.content) ? data.content : [];
+                if(!content.length) break;
+                content.forEach(it => {
+                  const id = Number(it && it.id);
+                  if(Number.isFinite(id)) byId.set(id, it);
+                });
+                if(content.length < PAGE_SIZE) break;
+                page += 1;
+              }
+            }
+            return Array.from(byId.values());
+          }
+
+          async function fetchHBLaunches(version, signal){
+            // Только High/Blocker раны (по названию). Строго только DeployLab HB run.
+            const terms = [
+              `[High/Blocker][DeployLab] Регресс ${version}`,
+            ];
+
+            const byId = new Map();
+            for(const term of terms){
+              const search = b64Query([{ id:'name', type:'string', value: term }]);
+              let page = 0;
+              while(true){
+                const data = await httpGet('/api/launch', {
+                  page, size: PAGE_SIZE, search,
+                  projectId: PROJECT_ID,
+                  preview: 'true',
+                  sort: 'createdDate,desc'
+                }, signal);
+
+                const content = (data && data.content) ? data.content : [];
+                if(!content.length) break;
+                content.forEach(it => {
+                  const id = Number(it && it.id);
+                  if(Number.isFinite(id)) byId.set(id, it);
+                });
+                if(content.length < PAGE_SIZE) break;
+                page += 1;
+              }
+            }
+            return Array.from(byId.values());
+          }
+
+          async function fetchTotalCases(launchId, signal){
+            const data = await httpGet(`/api/launch/${launchId}/statistic`, null, signal);
+            if(!Array.isArray(data)) return 0;
+            return data.reduce((acc, d) => acc + Number(d?.count || 0), 0);
+          }
+
+          async function fetchAutomatedTotalCases(launchId, signal, treeId=14){
+            const search = b64Query([{ id:'automated', type:'boolean', value: true }]);
+            const data = await httpGet('/api/testresulttree/group', {
+              launchId, treeId, search,
+              sort: 'duration,asc',
+              size: PAGE_SIZE
+            }, signal);
+            const content = (data && data.content) ? data.content : [];
+            let total = 0;
+            content.forEach(item => {
+              const stat = item?.statistic || {};
+              total += Number(stat?.total || 0);
+            });
+            return total;
+          }
+
+          async function fetchMemberStats(launchId, signal){
+            const data = await httpGet(`/api/launch/${launchId}/memberstats`, { size: 1000, page: 0 }, signal);
+            if(Array.isArray(data)) return data;
+            if(data && typeof data === 'object') return data.content || [];
+            return [];
+          }
+
+          function swatStreamAgg(memberstats, swatSet){
+            let swatTotal = 0;
+            let streamTotal = 0;
+            for(const m of (memberstats || [])){
+              if(!m || typeof m !== 'object') continue;
+              const assignee = String(m.assignee || '').trim().toLowerCase();
+              const stat = m.statistic || [];
+              let total = 0;
+              if(Array.isArray(stat)){
+                for(const s of stat){
+                  if(s && typeof s === 'object') total += Number(s.count || 0) || 0;
+                }
+              }
+              if(total <= 0) continue;
+              if(assignee && swatSet.has(assignee)) swatTotal += total;
+              else streamTotal += total;
+            }
+            return { swatTotal, streamTotal };
+          }
+
+          function saveInputs(){
+            try{ localStorage.setItem(LS_TOKEN_KEY, inpAllureToken.value || ''); }catch(e){}
+            try{
+              localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' }));
+            }catch(e){}
+          }
+
+          function restoreInputs(){
+            try{
+              const tok = localStorage.getItem(LS_TOKEN_KEY) || '';
+              if(inpAllureToken) inpAllureToken.value = tok;
+            }catch(e){}
+            try{
+              const raw = localStorage.getItem(LS_RANGE_KEY);
+              if(raw){
+                const obj = JSON.parse(raw);
+                if(inpFrom) inpFrom.value = obj?.from || '';
+                if(inpTo) inpTo.value = obj?.to || '';
+              }
+            }catch(e){}
+          }
+
+          function setEmpty(text){
+            if(!emptyBox) return;
+            emptyBox.textContent = text;
+            emptyBox.style.display = '';
+          }
+
+          function showContent(){
+            if(emptyBox) emptyBox.style.display = 'none';
+            contentWrap.style.display = '';
+          }
+
+          function showEmpty(text){
+            setEmpty(text);
+            contentWrap.style.display = 'none';
+          }
+
+          function setCovEmpty(text){
+            if(!covEmpty) return;
+            covEmpty.textContent = text;
+            covEmpty.style.display = '';
+          }
+
+          function showCovContent(){
+            if(covEmpty) covEmpty.style.display = 'none';
+            if(covContent) covContent.style.display = '';
+          }
+
+          function showCovEmpty(text){
+            setCovEmpty(text);
+            if(covContent) covContent.style.display = 'none';
+          }
+
+          function setSelEmpty(text){
+            if(!selEmpty) return;
+            selEmpty.textContent = text;
+            selEmpty.style.display = '';
+          }
+
+          function showSelContent(){
+            if(selEmpty) selEmpty.style.display = 'none';
+            if(selContent) selContent.style.display = '';
+          }
+
+          function showSelEmpty(text){
+            setSelEmpty(text);
+            if(selContent) selContent.style.display = 'none';
+          }
+
+          function setRunning(running){
+            if(running){
+              startBtn.style.display = 'none';
+              stopBtn.style.display = '';
+              window.__wbAbortController = new AbortController();
+              showEmpty('Данные появятся после получения из источника');
+              showCovEmpty('Данные появятся после получения из источника');
+              showSelEmpty('Данные появятся после получения из источника');
+            }else{
+              stopBtn.style.display = 'none';
+              startBtn.style.display = '';
+              if(window.__wbAbortController){
+                try{ window.__wbAbortController.abort(); }catch(e){}
+              }
+              window.__wbAbortController = null;
+            }
+          }
+
+          function clear(){
+            tbody.innerHTML = '';
+            if(tcChart){
+              tcChart.data.labels = [];
+              tcChart.data.datasets.forEach(d => d.data = []);
+              tcChart.update();
+            }
+
+            if(covTbody) covTbody.innerHTML = '';
+            if(covChart){
+              covChart.data.labels = [];
+              covChart.data.datasets.forEach(d => d.data = []);
+              covChart.update();
+            }
+
+            if(selTbody) selTbody.innerHTML = '';
+            if(selChart){
+              selChart.data.labels = [];
+              selChart.data.datasets.forEach(d => d.data = []);
+              selChart.update();
+            }
+          }
+          async function fetchSwatLogins(release, signal){
+            // Endpoint returns lines like: login Name Surname days
+            const url = new URL(SWAT_LIST_URL);
+            url.searchParams.set('release', release);
+            const r = await fetch(url.toString(), { signal });
+            if(!r.ok) throw new Error(`SWAT list HTTP ${r.status}`);
+            const text = await r.text();
+            const set = new Set();
+            text.split(/\r?\n/).forEach(line => {
+              const s = (line || '').trim();
+              if(!s) return;
+              const first = s.split(/\s+/)[0];
+              const norm = normalizeLogin(first);
+              if(norm) set.add(norm);
+            });
+            return set;
+          }
+
+          async function countFromLeaf(launchId, swatSet, signal){
+            let total = 0;
+            let manual = 0;
+            let auto = 0;
+            let swat = 0;
+            let stream = 0;
+
+            let page = 0;
+            while(true){
+              const data = await httpGet('/api/testresulttree/leaf', {
+                launchId,
+                sort: 'name,asc',
+                size: PAGE_SIZE,
+                page
+              }, signal);
+
+              const content = (data && data.content) ? data.content : [];
+              if(!Array.isArray(content) || content.length === 0) break;
+
+              for(const it of content){
+                // считаем как на «Главной»: по листовым строкам (test results), не по уникальным testCaseId
+                if(it?.testCaseId == null) continue;
+
+                total += 1;
+                if(it?.manual) manual += 1;
+                else auto += 1;
+
+                const tb = normalizeLogin(it?.testedBy);
+                if(tb && swatSet.has(tb)) swat += 1;
+                else stream += 1;
+              }
+
+              if(content.length < PAGE_SIZE) break;
+              page += 1;
+            }
+
+            return { total, manual, auto, swat, stream };
+          }
+
+          function ensureCoverageChart(){
+            if(!covCanvas || !window.Chart) return;
+            if(covChart){
+              covChart.data.labels = [];
+              covChart.data.datasets.forEach(d => d.data = []);
+              covChart.update();
+              return;
+            }
+
+            const cSwat   = cssVar('--cov-swat', '#22c55e');
+            const cStream = cssVar('--cov-stream', '#f43f5e');
+
+            covChart = new Chart(covCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  { label: 'SWAT',   data: [], borderColor: cSwat,   backgroundColor: cSwat,   tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'STREAM', data: [], borderColor: cStream, backgroundColor: cStream, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    itemSort: (a, b) => {
+                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      },
+                      label: (ctx) => {
+                        const i = ctx.dataIndex;
+                        const sw = Number(covChart.data.datasets[0].data[i] || 0);
+                        const st = Number(covChart.data.datasets[1].data[i] || 0);
+                        const sum = Math.max(1, sw + st);
+                        const val = Number(ctx.raw || 0);
+                        const pct = Math.round((val / sum) * 1000) / 10; // 1 знак
+                        return `${ctx.dataset.label}: ${val} | ${pct}%`;
+                      }
+                      ,footer: (items) => {
+                        const i = items?.[0]?.dataIndex;
+                        const sw = Number(covChart.data.datasets[0].data[i] || 0);
+                        const st = Number(covChart.data.datasets[1].data[i] || 0);
+                        return `Всего: ${sw + st}`;
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: {
+                    // Make first/last points reach chart edges even for 1–2 labels
+                    offset: false,
+                    bounds: 'data',
+                    ticks: { maxRotation: 0, autoSkip: true },
+                    grid: { color: 'rgba(148,163,184,.25)' }
+                  },
+                  y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,.25)' } }
+                }
+              }
+            });
+          }
+
+          function ensureSelectiveChart(){
+            if(!selCanvas || !window.Chart) return;
+            if(selChart){
+              selChart.data.labels = [];
+              selChart.data.datasets.forEach(d => d.data = []);
+              selChart.update();
+              return;
+            }
+
+            const cSwat   = cssVar('--cov-swat', '#22c55e');
+            const cStream = cssVar('--cov-stream', '#f43f5e');
+
+            selChart = new Chart(selCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  { label: 'SWAT',   data: [], borderColor: cSwat,   backgroundColor: cSwat,   tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'STREAM', data: [], borderColor: cStream, backgroundColor: cStream, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    itemSort: (a, b) => {
+                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      },
+                      label: (ctx) => {
+                        const i = ctx.dataIndex;
+                        const sw = Number(selChart.data.datasets[0].data[i] || 0);
+                        const st = Number(selChart.data.datasets[1].data[i] || 0);
+                        const sum = Math.max(1, sw + st);
+                        const val = Number(ctx.raw || 0);
+                        const pct = Math.round((val / sum) * 1000) / 10;
+                        return `${ctx.dataset.label}: ${val} | ${pct}%`;
+                      },
+                      footer: (items) => {
+                        const i = items?.[0]?.dataIndex;
+                        const sw = Number(selChart.data.datasets[0].data[i] || 0);
+                        const st = Number(selChart.data.datasets[1].data[i] || 0);
+                        return `Всего: ${sw + st}`;
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: {
+                    offset: false,
+                    bounds: 'data',
+                    ticks: { maxRotation: 0, autoSkip: true },
+                    grid: { color: 'rgba(148,163,184,.25)' }
+                  },
+                  y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,.25)' } }
+                }
+              }
+            });
+          }
+
+          function addCoveragePoint(release, swatCount, streamCount){
+            if(!covChart) return;
+            covChart.data.labels.push(release);
+            covChart.data.datasets[0].data.push(swatCount);
+            covChart.data.datasets[1].data.push(streamCount);
+            covChart.update();
+          }
+
+          function addSelectivePoint(release, swatCount, streamCount){
+            if(!selChart) return;
+            selChart.data.labels.push(release);
+            selChart.data.datasets[0].data.push(swatCount);
+            selChart.data.datasets[1].data.push(streamCount);
+            selChart.update();
+          }
+
+          function cssVar(name, fallback){
+            try{
+              const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+              return v || fallback;
+            }catch{ return fallback; }
+          }
+
+          function ensureChart(){
+            if(!chartCanvas || !window.Chart) return;
+            if(tcChart){
+              tcChart.data.labels = [];
+              tcChart.data.datasets.forEach(d => d.data = []);
+              tcChart.update();
+              return;
+            }
+
+            const cManual = cssVar('--tc-manual', '#f59e0b');
+            const cAuto   = cssVar('--tc-auto',   '#3b82f6');
+            const cTotal  = cssVar('--tc-total',  '#a855f7');
+
+            tcChart = new Chart(chartCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  { label: 'Ручные', data: [], borderColor: cManual, backgroundColor: cManual, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'Авто',   data: [], borderColor: cAuto,   backgroundColor: cAuto,   tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'Всего',  data: [], borderColor: cTotal,  backgroundColor: cTotal,  tension: 0.25, pointRadius: 3, pointHoverRadius: 5 }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    itemSort: (a, b) => {
+                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      },
+                      label: (ctx) => {
+                        const i = ctx.dataIndex;
+                        const total = Number(tcChart?.data?.datasets?.[2]?.data?.[i] || 0);
+                        const val = Number(ctx.raw || 0);
+                        let pct = 0;
+                        if(ctx.datasetIndex === 2) pct = 100;
+                        else if(total > 0) pct = Math.round((val / total) * 1000) / 10;
+                        return `${ctx.dataset.label}: ${val} | ${pct}%`;
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: { ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,.25)' } }
+                }
+              }
+            });
+          }
+
+          function addChartPoint(release, manual, auto, total){
+            if(!tcChart) return;
+            tcChart.data.labels.push(release);
+            tcChart.data.datasets[0].data.push(manual);
+            tcChart.data.datasets[1].data.push(auto);
+            tcChart.data.datasets[2].data.push(total);
+            tcChart.update();
+          }
+
+          function renderRow({release, manual, auto, total}){
+            const max = Math.max(total, 1);
+            const pctM = Math.round((manual / max) * 100);
+            const pctA = Math.round((auto / max) * 100);
+            const pctT = 100;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td class="mono text-left">${release}</td>
+              <td class="mono">${manual}</td>
+              <td class="mono">${auto}</td>
+              <td class="mono">${total}</td>
+              <td class="text-left">
+                <div class="space-y-2 min-w-[260px]">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-500 w-14">Ручные</span>
+                    <div class="bar flex-1"><div class="bar-fill bar-fill-manual" style="width:${pctM}%"></div></div>
+                    <span class="mono text-xs w-10 text-right">${manual}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-500 w-14">Авто</span>
+                    <div class="bar flex-1"><div class="bar-fill bar-fill-auto" style="width:${pctA}%"></div></div>
+                    <span class="mono text-xs w-10 text-right">${auto}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-500 w-14">Всего</span>
+                    <div class="bar flex-1"><div class="bar-fill bar-fill-total" style="width:${pctT}%"></div></div>
+                    <span class="mono text-xs w-10 text-right">${total}</span>
+                  </div>
+                </div>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          }
+
+          function renderCovRow({release, swatCount, streamCount}){
+            const sum = (Number(swatCount) || 0) + (Number(streamCount) || 0);
+            const swPct = sum ? (Math.round(((Number(swatCount)||0) / sum) * 1000) / 10) : 0;
+            const stPct = sum ? (Math.round(((Number(streamCount)||0) / sum) * 1000) / 10) : 0;
+            const tr2 = document.createElement('tr');
+            tr2.innerHTML = `
+              <td class="mono text-left">${release}</td>
+              <td class="mono">${swatCount}</td>
+              <td class="mono">${streamCount}</td>
+              <td class="mono">${sum}</td>
+              <td class="text-left"><span class="mono">SWAT ${swPct}%</span> · <span class="mono">STREAM ${stPct}%</span></td>
+            `;
+            covTbody.appendChild(tr2);
+          }
+
+          function renderSelRow({release, swatCount, streamCount}){
+            const sum = (Number(swatCount) || 0) + (Number(streamCount) || 0);
+            const swPct = sum ? (Math.round(((Number(swatCount)||0) / sum) * 1000) / 10) : 0;
+            const stPct = sum ? (Math.round(((Number(streamCount)||0) / sum) * 1000) / 10) : 0;
+            const tr2 = document.createElement('tr');
+            tr2.innerHTML = `
+              <td class="mono text-left">${release}</td>
+              <td class="mono">${swatCount}</td>
+              <td class="mono">${streamCount}</td>
+              <td class="mono">${sum}</td>
+              <td class="text-left"><span class="mono">SWAT ${swPct}%</span> · <span class="mono">STREAM ${stPct}%</span></td>
+            `;
+            selTbody.appendChild(tr2);
+          }
+
+
+          async function asyncPool(items, concurrency, iterator, signal){
+            const results = [];
+            let i = 0;
+            const workers = Array.from({length: Math.max(1, concurrency)}, async () => {
+              while(i < items.length){
+                if(signal?.aborted) return;
+                const idx = i++;
+                results[idx] = await iterator(items[idx], idx);
+              }
+            });
+            await Promise.all(workers);
+            return results;
+          }
+
+          async function run(){
+            saveInputs();
+            clear();
+
+            const tok = (inpAllureToken?.value || '').trim();
+            if(!tok){
+              showEmpty('Вставьте API токен Allure');
+              return;
+            }
+
+            const releases = buildMajorRange();
+            if(!releases.length){
+              showEmpty('Укажите корректный диапазон (например 7.4.1000 → 7.4.4000 или 7.3.6000 → 7.4.2000)');
+              return;
+            }
+
+            ensureChart();
+            ensureCoverageChart();
+            ensureSelectiveChart();
+            showContent();
+            showCovContent();
+            showSelContent();
+
+            // Мгновенная обратная связь пользователю
+            tbody.innerHTML = '<tr><td class="mono text-left" colspan="5">Сбор данных…</td></tr>';
+
+            const signal = window.__wbAbortController?.signal;
+            const LAUNCH_CONCURRENCY = 10; // «потоки» для ускорения
+
+            const swatCache = new Map();
+
+            // для сортировки таблиц по убыванию (таблицы скрыты, но логика нужна)
+            const tcRowsData = [];
+            const covRowsData = [];
+            const selRowsData = [];
+
+            let firstRow = true;
+            for(const rel of releases){
+              if(signal?.aborted) break;
+
+              // Считаем как на «Главной»: по leaf (test results)
+              let total = 0;
+              let manual = 0;
+              let auto  = 0;
+
+              let swatCount = 0;
+              let streamCount = 0;
+
+              // SWAT список для релиза (кэшируем)
+              let swatSet = swatCache.get(rel);
+              if(!swatSet){
+                swatSet = await fetchSwatLogins(rel, signal);
+                swatCache.set(rel, swatSet);
+              }
+
+              // 1) Для первой диаграммы (Manual/Auto/Total) берём все раны (Smoke/Selective)
+              const launchMapAll = new Map();
+              for(const kind of KINDS){
+                const launches = await fetchLaunches(rel, kind, signal);
+                for(const l of launches){
+                  const id = Number(l?.id);
+                  if(Number.isFinite(id)) launchMapAll.set(id, id);
+                }
+              }
+              const idsAll = Array.from(launchMapAll.keys());
+
+              // 2) Для второй диаграммы (SWAT/STREAM) берём только High/Blocker раны по названию
+              const hbLaunches = await fetchHBLaunches(rel, signal);
+              const idsHB = hbLaunches.map(l => Number(l?.id)).filter(id => Number.isFinite(id));
+
+              // 1) TOTAL/AUTO как в Python «Главная»
+              const perLaunchAll = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
+                const [t, a] = await Promise.all([
+                  fetchTotalCases(id, signal),
+                  fetchAutomatedTotalCases(id, signal)
+                ]);
+                return { t: Number(t||0), a: Number(a||0) };
+              }, signal);
+
+              for(const r of perLaunchAll){
+                if(!r) continue;
+                total += r.t;
+                auto  += r.a;
+              }
+              manual = Math.max(0, total - auto);
+
+              // 2) SWAT/STREAM ХБ через memberstats
+              const perHB = await asyncPool(idsHB, LAUNCH_CONCURRENCY, async (id) => {
+                const ms = await fetchMemberStats(id, signal);
+                return swatStreamAgg(ms, swatSet);
+              }, signal);
+
+              for(const r of perHB){
+                if(!r) continue;
+                swatCount += Number(r.swatTotal || 0);
+                streamCount += Number(r.streamTotal || 0);
+              }
+
+              // 3) SWAT/STREAM Selective через memberstats (только Selective)
+              const selLaunches = await fetchLaunches(rel, 'Selective', signal);
+              const selIds = selLaunches.map(l => Number(l?.id)).filter(id => Number.isFinite(id));
+              let selSwat = 0;
+              let selStream = 0;
+              const perSel = await asyncPool(selIds, LAUNCH_CONCURRENCY, async (id) => {
+                const ms = await fetchMemberStats(id, signal);
+                return swatStreamAgg(ms, swatSet);
+              }, signal);
+              for(const r of perSel){
+                if(!r) continue;
+                selSwat += Number(r.swatTotal || 0);
+                selStream += Number(r.streamTotal || 0);
+              }
+
+              if(firstRow){
+                tbody.innerHTML = '';
+                firstRow = false;
+              }
+              renderRow({ release: rel, manual, auto, total });
+              addChartPoint(rel, manual, auto, total);
+
+              // запоминаем для сортировки итоговой таблицы
+              tcRowsData.push({ release: rel, manual, auto, total });
+
+              // Coverage totals for this release (уже посчитаны через leaf)
+              if(covTbody){
+                renderCovRow({ release: rel, swatCount, streamCount });
+              }
+
+              covRowsData.push({ release: rel, swatCount, streamCount, total: (swatCount + streamCount) });
+              addCoveragePoint(rel, swatCount, streamCount);
+
+              if(selTbody){
+                renderSelRow({ release: rel, swatCount: selSwat, streamCount: selStream });
+              }
+
+              selRowsData.push({ release: rel, swatCount: selSwat, streamCount: selStream, total: (selSwat + selStream) });
+              addSelectivePoint(rel, selSwat, selStream);
+            }
+
+            // Перерисуем таблицы по убыванию количества (таблицы скрыты, но порядок соблюдаем)
+            if(tbody && tcRowsData.length){
+              tbody.innerHTML = '';
+              tcRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
+              tcRowsData.forEach(renderRow);
+            }
+
+            if(covTbody && covRowsData.length){
+              covTbody.innerHTML = '';
+              covRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
+              covRowsData.forEach(r => renderCovRow({ release: r.release, swatCount: r.swatCount, streamCount: r.streamCount }));
+            }
+
+            if(selTbody && selRowsData.length){
+              selTbody.innerHTML = '';
+              selRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
+              selRowsData.forEach(r => renderSelRow({ release: r.release, swatCount: r.swatCount, streamCount: r.streamCount }));
+            }
+
+            if(!tcRowsData.length){
+              showEmpty('Данные появятся после получения из источника');
+            }
+            if(!selRowsData.length){
+              showSelEmpty('Данные появятся после получения из источника');
+            }
+          }
+
+          // init: restore inputs
+          restoreInputs();
+          showEmpty('Данные появятся после получения из источника');
+
+          startBtn?.addEventListener('click', async () => {
+            try{
+              setRunning(true);
+              await run();
+            }catch(e){
+              if(!(window.__wbAbortController?.signal?.aborted)){
+                console.error(e);
+                showEmpty(`Ошибка получения данных: ${e?.message || e}`);
+              }
+            }finally{
+              if(!window.__wbAbortController?.signal?.aborted){
+                setRunning(false);
+              }
+            }
+          });
+
+          stopBtn?.addEventListener('click', () => {
+            setRunning(false);
+          });
+        })();
+      </script>
+    </main>
+  </div>
+</body>
+</html>
