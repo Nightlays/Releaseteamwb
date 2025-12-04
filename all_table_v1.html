@@ -21,7 +21,7 @@
           <div class="flex items-center gap-2">
             <div class="font-extrabold leading-tight">WB All Table</div>
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v0.0.2</span>
+              <span aria-hidden="true">🏷️</span><span>v0.1.5</span>
             </span>
           </div>
         </div>
@@ -42,8 +42,8 @@
               <div class="md:col-span-4">
                 <label class="block text-xs font-semibold text-[#111827] mb-1">Версия релиза</label>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input class="input" id="releaseFrom" type="text" inputmode="numeric" placeholder="От, напр. 7.3.5000" pattern="^\d+\.\d+\.\d{4}$" title="Формат: 7.3.5000 (последние 3 цифры — 000)" />
-                  <input class="input" id="releaseTo" type="text" inputmode="numeric" placeholder="До, напр. 7.3.8000" pattern="^\d+\.\d+\.\d{4}$" title="Формат: 7.3.8000 (последние 3 цифры — 000)" />
+                  <input class="input" id="releaseFrom" type="text" inputmode="numeric" placeholder="От, напр. 7.3.5000" />
+                  <input class="input" id="releaseTo" type="text" inputmode="numeric" placeholder="До, напр. 7.3.8000" />
                 </div>
               </div>
 
@@ -55,18 +55,17 @@
               <div class="md:col-span-2">
                 <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
                 <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Остановить сбор</button>
+                <button id="proxyBtn" type="button" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
+                  Проверить прокси
+                </button>
               </div>
-
 
               <div class="md:col-span-4">
                 <label class="block text-xs font-semibold text-[#111827] mb-1">Deploy-lab token</label>
                 <input class="input" id="deployToken" type="password" autocomplete="off" placeholder="Вставьте Deploy-lab token" />
               </div>
 
-              <div class="md:col-span-4">
-                <label class="block text-xs font-semibold text-[#111827] mb-1">YouTrack токен</label>
-                <input class="input" id="youtrackToken" type="password" autocomplete="off" placeholder="Вставьте YouTrack токен" />
-              </div>
+              <!-- YouTrack токен убран -->
             </div>
 
             <div class="mt-3 flex items-center gap-2 flex-wrap">
@@ -76,6 +75,10 @@
                 href="https://docs.google.com/document/d/1AYHrg_w_aCdiunytlDVmbmyQAxiHRr51Z0Djju4GAnE/edit?tab=t.0"
                 target="_blank" rel="noopener"
               >отсюда</a>
+            </div>
+
+            <div class="mt-1 text-xs text-slate-500">
+              Получение данных через deploy-lab идет через прокси <span class="mono">localhost:8787</span>
             </div>
           </div>
         </form>
@@ -87,48 +90,50 @@
           <div>
             <h2 class="text-lg font-semibold">Тест кейсы от релиза к релизу</h2>
           </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="tc" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
         </div>
 
-        <!-- Контейнер как у таблиц в uwu_6: скролл и рамка -->
-        <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-          <!-- Пустое состояние (без шиммера) -->
-          <div id="tcEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
-            Данные появятся после получения из источника
-          </div>
-
-          <div id="tcContent" class="tc-content" style="display:none;">
-            <!-- График (как концепт из all_table_v1 — копия) -->
-            <div class="chart-viewport" id="tcTrendViewport">
-              <canvas id="tcTrendChart" aria-label="Test cases chart" role="img"></canvas>
+        <div data-collapse-body="tc" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="tcEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+              Данные появятся после получения из источника
             </div>
 
-            <!-- Таблица (скрыта) -->
-            <div id="tcTableWrap" style="display:none; overflow:auto">
-              <table id="tcTable">
-                <thead>
-                  <tr>
-                    <th class="text-left">Релиз</th>
-                    <th>Ручные</th>
-                    <th>Авто</th>
-                    <th>Всего</th>
-                    <th class="text-left">Полосы</th>
-                  </tr>
-                </thead>
-                <tbody id="tcTbody"></tbody>
-              </table>
+            <div id="tcContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="tcTrendViewport">
+                <canvas id="tcTrendChart" aria-label="Test cases chart" role="img"></canvas>
+              </div>
+
+              <div id="tcTableWrap" style="display:none; overflow:auto">
+                <table id="tcTable">
+                  <thead>
+                    <tr>
+                      <th class="text-left">Релиз</th>
+                      <th>Ручные</th>
+                      <th>Авто</th>
+                      <th>Всего</th>
+                      <th class="text-left">Полосы</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tcTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-start gap-3">
+            <div class="legend">
+              <span class="lg-item"><span class="dot dot-manual"></span>Ручные</span>
+              <span class="lg-item"><span class="dot dot-auto"></span>Авто</span>
+              <span class="lg-item"><span class="dot dot-total"></span>Всего</span>
             </div>
           </div>
         </div>
-
-        <!-- Легенда (как цветовые линии графика) -->
-        <div class="flex flex-wrap items-center justify-start gap-3">
-          <div class="legend">
-            <span class="lg-item"><span class="dot dot-manual"></span>Ручные</span>
-            <span class="lg-item"><span class="dot dot-auto"></span>Авто</span>
-            <span class="lg-item"><span class="dot dot-total"></span>Всего</span>
-          </div>
-        </div>
-
       </section>
 
       <section class="card p-5 space-y-4">
@@ -136,40 +141,47 @@
           <div>
             <h2 class="text-lg font-semibold">Покрытие SWAT и STREAM ХБ</h2>
           </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="cov" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
         </div>
 
-        <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-          <div id="covEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
-            Данные появятся после получения из источника
-          </div>
-
-          <div id="covContent" class="tc-content" style="display:none;">
-            <div class="chart-viewport" id="covTrendViewport">
-              <canvas id="covTrendChart" aria-label="SWAT/STREAM coverage chart" role="img"></canvas>
+        <div data-collapse-body="cov" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="covEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+              Данные появятся после получения из источника
             </div>
 
-            <!-- Таблица (скрыта, только для внутренней логики/отладки) -->
-            <div id="covTableWrap" style="display:none; overflow:auto">
-              <table id="covTable">
-                <thead>
-                  <tr>
-                    <th class="text-left">Релиз</th>
-                    <th>SWAT</th>
-                    <th>STREAM</th>
-                    <th>Всего</th>
-                    <th class="text-left">Покрытие</th>
-                  </tr>
-                </thead>
-                <tbody id="covTbody"></tbody>
-              </table>
+            <div id="covContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="covTrendViewport">
+                <canvas id="covTrendChart" aria-label="SWAT/STREAM coverage chart" role="img"></canvas>
+              </div>
+
+              <div id="covTableWrap" style="display:none; overflow:auto">
+                <table id="covTable">
+                  <thead>
+                    <tr>
+                      <th class="text-left">Релиз</th>
+                      <th>SWAT</th>
+                      <th>STREAM</th>
+                      <th>Всего</th>
+                      <th class="text-left">Покрытие</th>
+                    </tr>
+                  </thead>
+                  <tbody id="covTbody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="flex flex-wrap items-center justify-start gap-3">
-          <div class="legend">
-            <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
-            <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
+          <div class="flex flex-wrap items-center justify-start gap-3">
+            <div class="legend">
+              <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
+              <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
+            </div>
           </div>
         </div>
       </section>
@@ -179,65 +191,174 @@
           <div>
             <h2 class="text-lg font-semibold">Покрытие SWAT и STREAM Selective</h2>
           </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="sel" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
         </div>
 
-        <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-          <div id="selEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
-            Данные появятся после получения из источника
-          </div>
-
-          <div id="selContent" class="tc-content" style="display:none;">
-            <div class="chart-viewport" id="selTrendViewport">
-              <canvas id="selTrendChart" aria-label="SWAT/STREAM Selective chart" role="img"></canvas>
+        <div data-collapse-body="sel" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="selEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+              Данные появятся после получения из источника
             </div>
 
-            <div id="selTableWrap" style="display:none; overflow:auto">
-              <table id="selTable">
-                <thead>
-                  <tr>
-                    <th class="text-left">Релиз</th>
-                    <th>SWAT</th>
-                    <th>STREAM</th>
-                    <th>Всего</th>
-                    <th class="text-left">Покрытие</th>
-                  </tr>
-                </thead>
-                <tbody id="selTbody"></tbody>
-              </table>
+            <div id="selContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="selTrendViewport">
+                <canvas id="selTrendChart" aria-label="SWAT/STREAM Selective chart" role="img"></canvas>
+              </div>
+
+              <div id="selTableWrap" style="display:none; overflow:auto">
+                <table id="selTable">
+                  <thead>
+                    <tr>
+                      <th class="text-left">Релиз</th>
+                      <th>SWAT</th>
+                      <th>STREAM</th>
+                      <th>Всего</th>
+                      <th class="text-left">Покрытие</th>
+                    </tr>
+                  </thead>
+                  <tbody id="selTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-start gap-3">
+            <div class="legend">
+              <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
+              <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
             </div>
           </div>
         </div>
+      </section>
 
-        <div class="flex flex-wrap items-center justify-start gap-3">
-          <div class="legend">
-            <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
-            <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Количество черепиков</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="chp" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="chp" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="chpEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="chpContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="chpTrendViewport">
+                <canvas id="chpTrendChart" aria-label="Cherepiki chart" role="img"></canvas>
+              </div>
+
+              <div id="chpTableWrap" style="display:none; overflow:auto">
+                <table id="chpTable">
+                  <thead>
+                    <tr>
+                      <th class="text-left">Релиз</th>
+                      <th>iOS</th>
+                      <th>Android</th>
+                      <th>Всего</th>
+                    </tr>
+                  </thead>
+                  <tbody id="chpTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-start gap-3">
+            <div class="legend">
+              <span class="lg-item"><span class="dot" style="background: var(--chp-ios, #0ea5e9)"></span>iOS</span>
+              <span class="lg-item"><span class="dot" style="background: var(--chp-android, #22c55e)"></span>Android</span>
+              <span class="lg-item"><span class="dot" style="background: var(--chp-total, #a855f7)"></span>Всего</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5-я таблица: среднее время -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Среднее время прохождения кейса</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="avg" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="avg" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="avgEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="avgContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="avgTrendViewport">
+                <canvas id="avgTrendChart" aria-label="Average time chart" role="img"></canvas>
+              </div>
+
+              <div id="avgTableWrap" style="display:none; overflow:auto">
+                <table id="avgTable">
+                  <thead>
+                    <tr>
+                      <th class="text-left">Релиз</th>
+                      <th>SWAT</th>
+                      <th>STREAM</th>
+                      <th>Общее</th>
+                    </tr>
+                  </thead>
+                  <tbody id="avgTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-start gap-3">
+            <div class="legend">
+              <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
+              <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
+              <span class="lg-item"><span class="dot dot-total"></span>Общее</span>
+            </div>
           </div>
         </div>
       </section>
 
       <script>
-        // Логика (по смыслу из uwu/"Главная"): поиск ранов по имени -> статистика -> авто/ручные.
-        // Дополнения:
-        // - берём только "мажорные" релизы (....1000, ....2000, ...)
-        // - заглушка той же высоты + простая анимация при сборе
-        // - график (3 линии: Manual/Auto/Total)
         (function(){
           const BASE_URL = 'https://allure-testops.wb.ru';
           const PROJECT_ID = 7;
           const PAGE_SIZE = 1000;
           const KINDS = ['Smoke', 'Selective'];
           const SWAT_LIST_URL = 'https://script.google.com/macros/s/AKfycbwJapteQxL-8LqmX88qMa2wtlD760v4rvkISWm1YP-NDguwW08ZzmEADV-0kqjg3cC3zQ/exec';
+          const PROXY_BASE = 'http://localhost:8787';
+          const LS_COLLAPSE_KEY = 'wb_all_table_collapsed';
+          const DEPLOY_ISSUES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/issues';
 
           const LS_TOKEN_KEY = 'swat_uwu_token';
           const LS_RANGE_KEY = 'swat_uwu_release_range';
 
           const startBtn = document.getElementById('startBtn');
           const stopBtn  = document.getElementById('stopBtn');
+          const proxyBtn = document.getElementById('proxyBtn');
 
           const inpFrom  = document.getElementById('releaseFrom');
           const inpTo    = document.getElementById('releaseTo');
           const inpAllureToken = document.getElementById('allureToken');
+          const inpDeployToken = document.getElementById('deployToken');
 
           const emptyBox = document.getElementById('tcEmpty');
           const contentWrap = document.getElementById('tcContent');
@@ -254,16 +375,102 @@
           const selTbody = document.getElementById('selTbody');
           const selCanvas = document.getElementById('selTrendChart');
 
+          // Cherepiki section
+          const chpEmpty = document.getElementById('chpEmpty');
+          const chpContent = document.getElementById('chpContent');
+          const chpTbody = document.getElementById('chpTbody');
+          const chpCanvas = document.getElementById('chpTrendChart');
+
+          // Average time section
+          const avgEmpty = document.getElementById('avgEmpty');
+          const avgContent = document.getElementById('avgContent');
+          const avgTbody = document.getElementById('avgTbody');
+          const avgCanvas = document.getElementById('avgTrendChart');
+
           const chartCanvas = document.getElementById('tcTrendChart');
           const covCanvas = document.getElementById('covTrendChart');
 
           let tcChart = null;
           let covChart = null;
           let selChart = null;
+          let chpChart = null;
+          let avgChart = null;
 
           // SWAT list cache: fetch exec only once (shared promise)
           let __swatSetCache = null;
           let __swatSetPromise = null;
+
+          // Plugin: delta labels above points (for selected dataset)
+          const deltaLabelsPlugin = {
+            id: 'deltaLabels',
+            afterDatasetsDraw(chart, args, pluginOptions){
+              const opts = pluginOptions || chart?.options?.plugins?.deltaLabels;
+              if(!opts) return;
+              const dsIndex = Number(opts.datasetIndex);
+              if(!Number.isFinite(dsIndex)) return;
+              const ds = chart.data?.datasets?.[dsIndex];
+              const meta = chart.getDatasetMeta(dsIndex);
+              if(!ds || !meta || !meta.data) return;
+
+              const data = Array.isArray(ds.data) ? ds.data : [];
+              if(data.length < 2) return;
+
+              const green = (opts.upColor) || '#22c55e';
+              const red   = (opts.downColor) || '#f43f5e';
+              const font  = (opts.font) || '600 11px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+
+              const fmt = (v) => {
+                try {
+                  const n = Number(v);
+                  if(!Number.isFinite(n)) return '';
+                  const sign = n > 0 ? '+' : '';
+                  return sign + Math.round(n).toLocaleString('ru-RU');
+                } catch {
+                  const sign = v > 0 ? '+' : '';
+                  return sign + String(v);
+                }
+              };
+
+              const ctx = chart.ctx;
+ctx.save();
+
+// allow drawing outside chartArea (e.g., delta labels above top points)
+ctx.beginPath();
+ctx.rect(0, 0, chart.width, chart.height);
+ctx.clip();
+
+ctx.font = font;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+
+              for(let i = 1; i < data.length; i++){
+                const cur = Number(data[i]);
+                const prev = Number(data[i-1]);
+                if(!Number.isFinite(cur) || !Number.isFinite(prev)) continue;
+                const delta = cur - prev;
+                if(!delta) continue;
+
+                const pt = meta.data[i];
+                if(!pt) continue;
+                const x = pt.x;
+                const y = pt.y;
+
+                const label = fmt(delta);
+                if(!label) continue;
+
+                ctx.fillStyle = delta > 0 ? green : red;
+                ctx.fillText(label, x, y - 12);
+              }
+
+              ctx.restore();
+            }
+          };
+
+          try{
+            if(window.Chart && typeof window.Chart.register === 'function'){
+              window.Chart.register(deltaLabelsPlugin);
+            }
+          }catch(e){}
 
           function b64Utf8(str){
             return btoa(unescape(encodeURIComponent(str)));
@@ -289,24 +496,106 @@
             };
           }
 
+          function deployHeaders(){
+            const tok = (inpDeployToken?.value || '').trim();
+            return {
+              'accept': '*/*',
+              'accept-language': 'ru,en;q=0.9',
+              'authorization-deploy-lab': `Bearer ${tok}`,
+              'origin': 'https://deploy-lab.wb.ru',
+              'referer': 'https://deploy-lab.wb.ru/',
+              'user-agent': 'Mozilla/5.0'
+            };
+          }
+
+          function showToast(msg, ok=true){
+            const el = document.getElementById('toast');
+            const inner = document.getElementById('toastInner');
+            if(!el || !inner) return;
+            inner.textContent = msg;
+            inner.className = 'px-4 py-2 rounded-2xl text-sm font-semibold ring-1 shadow ' + (ok
+              ? 'bg-white/90 ring-[#ecebff] text-slate-700'
+              : 'bg-rose-50 ring-rose-200 text-rose-700'
+            );
+            el.style.opacity = '1';
+            clearTimeout(showToast.__t);
+            showToast.__t = setTimeout(() => { el.style.opacity = '0'; }, 1800);
+          }
+
+          async function proxyGetJson(targetUrl, headers, signal){
+            const p = new URL(PROXY_BASE + '/proxy');
+            p.searchParams.set('url', targetUrl);
+            const r = await fetch(p.toString(), { headers, signal });
+            if(!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
+            return r.json();
+          }
+
+          async function fetchDeployIssueCount(prefix, release, signal){
+            const tok = (inpDeployToken?.value || '').trim();
+            if(!tok) return 0;
+            const url = DEPLOY_ISSUES_URL_TMPL
+              .replace('{prefix}', prefix)
+              .replace('{rel}', release);
+            const data = await proxyGetJson(url, deployHeaders(), signal);
+            if(!Array.isArray(data)) return 0;
+            let n = 0;
+            for(const item of data){
+              if(item && item.merged_after_cutoff === true) n += 1;
+            }
+            return n;
+          }
+
+          function setChpEmpty(text){
+            if(!chpEmpty) return;
+            chpEmpty.textContent = text;
+            chpEmpty.style.display = '';
+          }
+          function showChpContent(){
+            if(chpEmpty) chpEmpty.style.display = 'none';
+            if(chpContent) chpContent.style.display = '';
+          }
+          function showChpEmpty(text){
+            setChpEmpty(text);
+            if(chpContent) chpContent.style.display = 'none';
+          }
+
+          function setAvgEmpty(text){
+            if(!avgEmpty) return;
+            avgEmpty.textContent = text;
+            avgEmpty.style.display = '';
+          }
+          function showAvgContent(){
+            if(avgEmpty) avgEmpty.style.display = 'none';
+            if(avgContent) avgContent.style.display = '';
+          }
+          function showAvgEmpty(text){
+            setAvgEmpty(text);
+            if(avgContent) avgContent.style.display = 'none';
+          }
+
+          // Ввод свободный: X.Y.Z, где Z может быть 1..4 цифры (7 -> 7000, 73 -> 7300, 777 -> 7770)
           function parseVersion(v){
             const raw = (v||'').trim();
             const parts = raw.split('.').map(x => x.trim());
             if(parts.length < 3) return null;
 
-            const [major, minor, buildStrRaw] = parts;
-            if(!/^\d+$/.test(major) || !/^\d+$/.test(minor)) return null;
-            if(!/^\d{4}$/.test(buildStrRaw)) return null;
+            const [major, minor, buildRaw] = parts;
+            if(!/^\d+$/.test(major) || !/^\d+$/.test(minor) || !/^\d+$/.test(buildRaw)) return null;
 
             const majorN = Number(major);
             const minorN = Number(minor);
-            const build  = Number(buildStrRaw);
-            if(!Number.isFinite(majorN) || !Number.isFinite(minorN) || !Number.isFinite(build)) return null;
+            if(!Number.isFinite(majorN) || !Number.isFinite(minorN)) return null;
 
-            // Требование: только мажорные релизы (последние 3 цифры = 000)
-            if(build % 1000 !== 0) return null;
+            let buildN = Number(buildRaw);
+            if(!Number.isFinite(buildN)) return null;
 
-            return { major, minor, majorN, minorN, build, buildStrRaw };
+            const len = buildRaw.length;
+            if(len < 4){
+              buildN = buildN * Math.pow(10, 4 - len);
+            }
+
+            const buildStrNorm = String(buildN).padStart(4, '0');
+            return { major, minor, majorN, minorN, build: buildN, buildStrRaw: buildRaw, buildStrNorm };
           }
 
           function buildMajorRange(){
@@ -314,12 +603,10 @@
             const b = parseVersion(inpTo?.value);
             if(!a || !b) return [];
 
-            // поддерживаем диапазоны между разными minor, но только в одном major
             if(a.majorN !== b.majorN) return [];
 
             const step = 1000;
 
-            // упорядочим границы по minor/build
             const aKey = a.minorN * 10000 + a.build;
             const bKey = b.minorN * 10000 + b.build;
             const loV = aKey <= bKey ? a : b;
@@ -348,7 +635,7 @@
           function formatRelease(vObj){
             const m = String(vObj.majorN);
             const n = String(vObj.minorN);
-            const b = String(vObj.build).padStart(4, '0');
+            const b = (vObj.buildStrNorm ? String(vObj.buildStrNorm) : String(vObj.build).padStart(4, '0'));
             return `${m}.${n}.${b}`;
           }
 
@@ -356,24 +643,24 @@
             if(!inputEl) return null;
             const raw = (inputEl.value || '').trim();
             if(!raw){
-              inputEl.setCustomValidity('');
+              try{ inputEl.setCustomValidity(''); }catch(e){}
               return null;
             }
             const v = parseVersion(raw);
             if(!v){
-              inputEl.setCustomValidity('Формат должен быть X.Y.ZZZZ, где ZZZZ заканчивается на 000 (например 7.3.5000)');
+              try{ inputEl.setCustomValidity(''); }catch(e){}
               return null;
             }
             const norm = formatRelease(v);
             inputEl.value = norm;
-            inputEl.setCustomValidity('');
+            try{ inputEl.setCustomValidity(''); }catch(e){}
             return norm;
           }
 
           function attachReleaseMask(){
             [inpFrom, inpTo].forEach(el => {
               if(!el) return;
-              el.addEventListener('input', () => el.setCustomValidity(''));
+              el.addEventListener('input', () => { try{ el.setCustomValidity(''); }catch(e){} });
               el.addEventListener('blur', () => validateAndNormalizeReleaseInput(el));
             });
           }
@@ -421,7 +708,6 @@
           }
 
           async function fetchHBLaunches(version, signal){
-            // Только High/Blocker раны (по названию). Строго только DeployLab HB run.
             const terms = [
               `[High/Blocker][DeployLab] Регресс ${version}`,
             ];
@@ -473,38 +759,120 @@
             return total;
           }
 
+          const __memberStatsCache = new Map();
+          const __launchDurationCache = new Map();
+
           async function fetchMemberStats(launchId, signal){
+            if(__memberStatsCache.has(launchId)) return __memberStatsCache.get(launchId);
             const data = await httpGet(`/api/launch/${launchId}/memberstats`, { size: 1000, page: 0 }, signal);
-            if(Array.isArray(data)) return data;
-            if(data && typeof data === 'object') return data.content || [];
-            return [];
+            let out;
+            if(Array.isArray(data)) out = data;
+            else if(data && typeof data === 'object') out = data.content || [];
+            else out = [];
+            __memberStatsCache.set(launchId, out);
+            return out;
           }
 
-          function swatStreamAgg(memberstats, swatSet){
-            let swatTotal = 0;
-            let streamTotal = 0;
-            for(const m of (memberstats || [])){
-              if(!m || typeof m !== 'object') continue;
-              const assignee = String(m.assignee || '').trim().toLowerCase();
-              const stat = m.statistic || [];
-              let total = 0;
-              if(Array.isArray(stat)){
-                for(const s of stat){
-                  if(s && typeof s === 'object') total += Number(s.count || 0) || 0;
-                }
-              }
-              if(total <= 0) continue;
-              if(assignee && swatSet.has(assignee)) swatTotal += total;
-              else streamTotal += total;
+          async function fetchLaunchDurationMs(launchId, signal){
+            if(__launchDurationCache.has(launchId)) return __launchDurationCache.get(launchId);
+            let ms = 0;
+            try{
+              const d = await httpGet(`/api/launch/${launchId}`, null, signal);
+              ms = Number(d?.duration || d?.statistic?.duration || 0) || 0;
+            }catch(e){
+              ms = 0;
             }
-            return { swatTotal, streamTotal };
+            __launchDurationCache.set(launchId, ms);
+            return ms;
           }
+
+         function swatStreamAgg(memberstats, swatSet){
+  let swatTotal = 0;
+  let streamTotal = 0;
+  let swatDur = 0;
+  let streamDur = 0;
+  let swatExec = 0;
+  let streamExec = 0;
+
+  const pushStat = (bucket, statItem) => {
+    if(!statItem || typeof statItem !== 'object') return;
+    const c = Number(statItem.count ?? statItem.total ?? statItem.tests ?? 0) || 0;
+    const d = Number(statItem.duration ?? statItem.time ?? 0) || 0;
+
+    if(c > 0) bucket.total += c;
+    // for avg time we count only "executed" items (where we have duration)
+    if(c > 0 && d > 0) bucket.exec += c;
+    if(d > 0) bucket.dur += d;
+  };
+
+  for(const m of (memberstats || [])){
+    if(!m || typeof m !== 'object') continue;
+    const assignee = String(m.assignee || '').trim().toLowerCase();
+
+    let total = 0;
+    let exec = 0;
+    let dur = 0;
+
+    const stat = m.statistic;
+
+    // statistic can be: array of items OR object keyed by status OR a single object
+    if(Array.isArray(stat)){
+      const bucket = { total: 0, exec: 0, dur: 0 };
+      for(const s of stat) pushStat(bucket, s);
+      total = bucket.total;
+      exec  = bucket.exec;
+      dur   = bucket.dur;
+    }else if(stat && typeof stat === 'object'){
+      const bucket = { total: 0, exec: 0, dur: 0 };
+
+      // if it already looks like a stat item
+      if(('count' in stat) || ('total' in stat) || ('duration' in stat) || ('time' in stat)){
+        pushStat(bucket, stat);
+      }else{
+        // otherwise iterate nested values
+        for(const v of Object.values(stat)){
+          if(Array.isArray(v)){
+            for(const vv of v) pushStat(bucket, vv);
+          }else{
+            pushStat(bucket, v);
+          }
+        }
+      }
+
+      total = bucket.total;
+      exec  = bucket.exec;
+      dur   = bucket.dur;
+    }
+
+    // fallback: memberstats provides durationSum per assignee
+    if(!dur){
+      dur = Number(m.durationSum ?? m.duration ?? m.time ?? 0) || 0;
+    }
+
+    // if we have duration but exec is 0 (no per-status durations), assume all counted cases are executed
+    if(dur > 0 && exec === 0 && total > 0){
+      exec = total;
+    }
+
+    if(total <= 0) continue;
+
+    if(assignee && swatSet && swatSet.has(assignee)){
+      swatTotal += total;
+      swatExec  += exec;
+      swatDur   += dur;
+    }else{
+      streamTotal += total;
+      streamExec  += exec;
+      streamDur   += dur;
+    }
+  }
+
+  return { swatTotal, streamTotal, swatDur, streamDur, swatExec, streamExec };
+}
 
           function saveInputs(){
             try{ localStorage.setItem(LS_TOKEN_KEY, inpAllureToken.value || ''); }catch(e){}
-            try{
-              localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' }));
-            }catch(e){}
+            try{ localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' })); }catch(e){}
           }
 
           function restoreInputs(){
@@ -578,6 +946,8 @@
               showEmpty('Данные появятся после получения из источника');
               showCovEmpty('Данные появятся после получения из источника');
               showSelEmpty('Данные появятся после получения из источника');
+              showChpEmpty('Данные появятся после получения из источника');
+              showAvgEmpty('Данные появятся после получения из источника');
             }else{
               stopBtn.style.display = 'none';
               startBtn.style.display = '';
@@ -609,16 +979,28 @@
               selChart.data.datasets.forEach(d => d.data = []);
               selChart.update();
             }
+
+            if(chpTbody) chpTbody.innerHTML = '';
+            if(chpChart){
+              chpChart.data.labels = [];
+              chpChart.data.datasets.forEach(d => d.data = []);
+              chpChart.update();
+            }
+
+            if(avgTbody) avgTbody.innerHTML = '';
+            if(avgChart){
+              avgChart.data.labels = [];
+              avgChart.data.datasets.forEach(d => d.data = []);
+              avgChart.update();
+            }
           }
+
           async function fetchSwatLogins(release, signal){
-            // SWAT список всегда одинаковый — дергаем exec один раз и кэшируем
             if(__swatSetCache) return __swatSetCache;
             if(__swatSetPromise) return __swatSetPromise;
 
             __swatSetPromise = (async () => {
               const url = new URL(SWAT_LIST_URL);
-              // оставляем параметр release, но используем только при первом запросе
-              if(release) url.searchParams.set('release', release);
 
               const r = await fetch(url.toString(), { signal });
               if(!r.ok) throw new Error(`SWAT list HTTP ${r.status}`);
@@ -638,50 +1020,32 @@
             try{
               return await __swatSetPromise;
             }catch(e){
-              // если упало/абортнулось — разрешим повторный запрос
               __swatSetPromise = null;
               __swatSetCache = null;
               throw e;
             }
           }
 
-          async function countFromLeaf(launchId, swatSet, signal){
-            let total = 0;
-            let manual = 0;
-            let auto = 0;
-            let swat = 0;
-            let stream = 0;
+          function cssVar(name, fallback){
+            try{
+              const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+              return v || fallback;
+            }catch{ return fallback; }
+          }
 
-            let page = 0;
-            while(true){
-              const data = await httpGet('/api/testresulttree/leaf', {
-                launchId,
-                sort: 'name,asc',
-                size: PAGE_SIZE,
-                page
-              }, signal);
-
-              const content = (data && data.content) ? data.content : [];
-              if(!Array.isArray(content) || content.length === 0) break;
-
-              for(const it of content){
-                // считаем как на «Главной»: по листовым строкам (test results), не по уникальным testCaseId
-                if(it?.testCaseId == null) continue;
-
-                total += 1;
-                if(it?.manual) manual += 1;
-                else auto += 1;
-
-                const tb = normalizeLogin(it?.testedBy);
-                if(tb && swatSet.has(tb)) swat += 1;
-                else stream += 1;
-              }
-
-              if(content.length < PAGE_SIZE) break;
-              page += 1;
+          function formatMsPerCase(ms){
+            const n = Number(ms) || 0;
+            if(n <= 0) return '00:00';
+            const totalSec = Math.round(n / 1000);
+            const h = Math.floor(totalSec / 3600);
+            const m = Math.floor((totalSec % 3600) / 60);
+            const s = totalSec % 60;
+            const mm = String(m).padStart(2,'0');
+            const ss = String(s).padStart(2,'0');
+            if(h > 0){
+              return `${h}:${mm}:${ss}`;
             }
-
-            return { total, manual, auto, swat, stream };
+            return `${mm}:${ss}`;
           }
 
           function ensureCoverageChart(){
@@ -709,6 +1073,7 @@
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
+                  deltaLabels: { datasetIndex: 0 }, /* дельта для SWAT */
                   tooltip: {
                     mode: 'index',
                     intersect: false,
@@ -728,10 +1093,10 @@
                         const st = Number(covChart.data.datasets[1].data[i] || 0);
                         const sum = Math.max(1, sw + st);
                         const val = Number(ctx.raw || 0);
-                        const pct = Math.round((val / sum) * 1000) / 10; // 1 знак
+                        const pct = Math.round((val / sum) * 1000) / 10;
                         return `${ctx.dataset.label}: ${val} | ${pct}%`;
-                      }
-                      ,footer: (items) => {
+                      },
+                      footer: (items) => {
                         const i = items?.[0]?.dataIndex;
                         const sw = Number(covChart.data.datasets[0].data[i] || 0);
                         const st = Number(covChart.data.datasets[1].data[i] || 0);
@@ -743,13 +1108,12 @@
                 interaction: { mode: 'index', intersect: false },
                 scales: {
                   x: {
-                    // Make first/last points reach chart edges even for 1–2 labels
                     offset: false,
                     bounds: 'data',
                     ticks: { maxRotation: 0, autoSkip: true },
                     grid: { color: 'rgba(148,163,184,.25)' }
                   },
-                  y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,.25)' } }
+              y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
                 }
               }
             });
@@ -780,6 +1144,7 @@
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
+                  deltaLabels: { datasetIndex: 0 }, /* дельта для SWAT */
                   tooltip: {
                     mode: 'index',
                     intersect: false,
@@ -819,7 +1184,120 @@
                     ticks: { maxRotation: 0, autoSkip: true },
                     grid: { color: 'rgba(148,163,184,.25)' }
                   },
-                  y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,.25)' } }
+                  y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
+                }
+              }
+            });
+          }
+
+          function ensureChpChart(){
+            if(!chpCanvas || !window.Chart) return;
+            if(chpChart){
+              chpChart.data.labels = [];
+              chpChart.data.datasets.forEach(d => d.data = []);
+              chpChart.update();
+              return;
+            }
+            const cIos = cssVar('--chp-ios', '#0ea5e9');
+            const cAnd = cssVar('--chp-android', '#22c55e');
+            const cTot = cssVar('--chp-total', '#a855f7');
+
+            chpChart = new Chart(chpCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  { label: 'iOS', data: [], borderColor: cIos, backgroundColor: cIos, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'Android', data: [], borderColor: cAnd, backgroundColor: cAnd, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'Всего', data: [], borderColor: cTot, backgroundColor: cTot, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  deltaLabels: { datasetIndex: 2 }, /* дельта для Всего */
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    itemSort: (a, b) => {
+                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
+                }
+              }
+            });
+          }
+
+          function ensureAvgChart(){
+            if(!avgCanvas || !window.Chart) return;
+            if(avgChart){
+              avgChart.data.labels = [];
+              avgChart.data.datasets.forEach(d => d.data = []);
+              avgChart.update();
+              return;
+            }
+
+            const cSwat   = cssVar('--cov-swat', '#22c55e');
+            const cStream = cssVar('--cov-stream', '#f43f5e');
+            const cTotal  = cssVar('--tc-total', '#a855f7');
+
+            avgChart = new Chart(avgCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  { label: 'SWAT',   data: [], borderColor: cSwat,   backgroundColor: cSwat,   tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'STREAM', data: [], borderColor: cStream, backgroundColor: cStream, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'Общее',  data: [], borderColor: cTotal,  backgroundColor: cTotal,  tension: 0.25, pointRadius: 3, pointHoverRadius: 5 }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    itemSort: (a, b) => {
+                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      },
+                      label: (ctx) => {
+                        const minutes = Number(ctx.raw || 0);
+                        const ms = minutes * 60_000;
+                        return `${ctx.dataset.label}: ${formatMsPerCase(ms)}`;
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(148,163,184,.25)' },
+                    ticks: { callback: (v) => (Number(v) || 0).toFixed(1) }
+                  }
                 }
               }
             });
@@ -839,13 +1317,6 @@
             selChart.data.datasets[0].data.push(swatCount);
             selChart.data.datasets[1].data.push(streamCount);
             selChart.update();
-          }
-
-          function cssVar(name, fallback){
-            try{
-              const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-              return v || fallback;
-            }catch{ return fallback; }
           }
 
           function ensureChart(){
@@ -875,6 +1346,7 @@
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
+                  deltaLabels: { datasetIndex: 2 }, /* дельта для Всего */
                   tooltip: {
                     mode: 'index',
                     intersect: false,
@@ -903,7 +1375,7 @@
                 interaction: { mode: 'index', intersect: false },
                 scales: {
                   x: { ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
-                  y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,.25)' } }
+                  y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
                 }
               }
             });
@@ -916,6 +1388,24 @@
             tcChart.data.datasets[1].data.push(auto);
             tcChart.data.datasets[2].data.push(total);
             tcChart.update();
+          }
+
+          function addChpPoint(release, ios, android, total){
+            if(!chpChart) return;
+            chpChart.data.labels.push(release);
+            chpChart.data.datasets[0].data.push(ios);
+            chpChart.data.datasets[1].data.push(android);
+            chpChart.data.datasets[2].data.push(total);
+            chpChart.update();
+          }
+
+          function addAvgPoint(release, swatMin, streamMin, totalMin){
+            if(!avgChart) return;
+            avgChart.data.labels.push(release);
+            avgChart.data.datasets[0].data.push(swatMin);
+            avgChart.data.datasets[1].data.push(streamMin);
+            avgChart.data.datasets[2].data.push(totalMin);
+            avgChart.update();
           }
 
           function renderRow({release, manual, auto, total}){
@@ -983,6 +1473,16 @@
             selTbody.appendChild(tr2);
           }
 
+          function renderAvgRow({release, swatMs, streamMs, totalMs}){
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td class="mono text-left">${release}</td>
+              <td class="mono">${formatMsPerCase(swatMs)}</td>
+              <td class="mono">${formatMsPerCase(streamMs)}</td>
+              <td class="mono">${formatMsPerCase(totalMs)}</td>
+            `;
+            avgTbody.appendChild(tr);
+          }
 
           async function asyncPool(items, concurrency, iterator, signal){
             const results = [];
@@ -999,20 +1499,10 @@
           }
 
           async function run(){
-            // Нормализуем ввод перед сохранением
             validateAndNormalizeReleaseInput(inpFrom);
             validateAndNormalizeReleaseInput(inpTo);
             saveInputs();
             clear();
-
-            if(inpFrom && !inpFrom.checkValidity()){
-              showEmpty(inpFrom.validationMessage || 'Некорректная версия релиза (От)');
-              return;
-            }
-            if(inpTo && !inpTo.checkValidity()){
-              showEmpty(inpTo.validationMessage || 'Некорректная версия релиза (До)');
-              return;
-            }
 
             const tok = (inpAllureToken?.value || '').trim();
             if(!tok){
@@ -1022,44 +1512,46 @@
 
             const releases = buildMajorRange();
             if(!releases.length){
-              showEmpty('Укажите корректный диапазон (например 7.4.1000 → 7.4.4000 или 7.3.6000 → 7.4.2000)');
+              showEmpty('Укажите корректный диапазон (например 7.4.1000 → 7.4.4000 или 7.3.7 → 7.4.2)');
               return;
             }
 
             ensureChart();
             ensureCoverageChart();
             ensureSelectiveChart();
+            ensureChpChart();
+            ensureAvgChart();
+
             showContent();
             showCovContent();
             showSelContent();
+            showChpContent();
+            showAvgContent();
 
             const signal = window.__wbAbortController?.signal;
 
-            // SWAT список берём ОДИН раз за запуск (exec вызываем один раз)
             let swatSet;
             try{
-              // используем первую версию из диапазона как параметр для ручки
-              swatSet = await fetchSwatLogins(releases[0], signal);
+              swatSet = await fetchSwatLogins(null, signal);
             }catch(e){
               showEmpty(`Ошибка получения списка SWAT: ${e?.message || e}`);
               return;
             }
 
-            // Мгновенная обратная связь пользователю
             tbody.innerHTML = '<tr><td class="mono text-left" colspan="5">Сбор данных…</td></tr>';
 
-            const LAUNCH_CONCURRENCY = 10; // «потоки» для ускорения
+            const LAUNCH_CONCURRENCY = 10;
 
-            // для сортировки таблиц по убыванию (таблицы скрыты, но логика нужна)
             const tcRowsData = [];
             const covRowsData = [];
             const selRowsData = [];
+            const avgRowsData = [];
+            const avgGrand = { swatDur: 0, swatCnt: 0, streamDur: 0, streamCnt: 0, totalDur: 0, totalCnt: 0 };
 
             let firstRow = true;
             for(const rel of releases){
               if(signal?.aborted) break;
 
-              // Считаем как на «Главной»: по leaf (test results)
               let total = 0;
               let manual = 0;
               let auto  = 0;
@@ -1078,11 +1570,59 @@
               }
               const idsAll = Array.from(launchMapAll.keys());
 
+              // AVG TIME (SWAT/STREAM/Total): memberstats(count+duration); если duration нет — раскладываем launch.duration пропорционально count
+              let avgSwatCnt = 0, avgStreamCnt = 0;
+              let avgSwatDur = 0, avgStreamDur = 0;
+
+              const perAvg = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
+                const ms = await fetchMemberStats(id, signal);
+                const agg = swatStreamAgg(ms, swatSet);
+
+                if((agg.swatDur + agg.streamDur) <= 0){
+                  const launchDur = await fetchLaunchDurationMs(id, signal);
+                  const totalCnt = Math.max(1, (agg.swatTotal + agg.streamTotal));
+                  const swShare = (agg.swatTotal || 0) / totalCnt;
+                  const stShare = (agg.streamTotal || 0) / totalCnt;
+                  agg.swatDur = launchDur * swShare;
+                  agg.streamDur = launchDur * stShare;
+                  agg.swatExec = agg.swatTotal;
+                  agg.streamExec = agg.streamTotal;
+                }
+
+                return agg;
+              }, signal);
+
+              for(const r of perAvg){
+                if(!r) continue;
+                avgSwatCnt += Number((r.swatExec ?? r.swatTotal) || 0);
+                avgStreamCnt += Number((r.streamExec ?? r.streamTotal) || 0);
+                avgSwatDur += Number(r.swatDur || 0);
+                avgStreamDur += Number(r.streamDur || 0);
+              }
+
+              const avgTotalCnt = avgSwatCnt + avgStreamCnt;
+              const avgTotalDur = avgSwatDur + avgStreamDur;
+
+              const swatMsPerCase = avgSwatCnt ? (avgSwatDur / avgSwatCnt) : 0;
+              const streamMsPerCase = avgStreamCnt ? (avgStreamDur / avgStreamCnt) : 0;
+              const totalMsPerCase = avgTotalCnt ? (avgTotalDur / avgTotalCnt) : 0;
+
+              addAvgPoint(rel, swatMsPerCase/60000, streamMsPerCase/60000, totalMsPerCase/60000);
+
+              if(avgTbody){
+                renderAvgRow({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase });
+              }
+
+              avgRowsData.push({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase, total: totalMsPerCase });
+              avgGrand.swatDur += avgSwatDur; avgGrand.swatCnt += avgSwatCnt;
+              avgGrand.streamDur += avgStreamDur; avgGrand.streamCnt += avgStreamCnt;
+              avgGrand.totalDur += avgTotalDur; avgGrand.totalCnt += avgTotalCnt;
+
               // 2) Для второй диаграммы (SWAT/STREAM) берём только High/Blocker раны по названию
               const hbLaunches = await fetchHBLaunches(rel, signal);
               const idsHB = hbLaunches.map(l => Number(l?.id)).filter(id => Number.isFinite(id));
 
-              // 1) TOTAL/AUTO как в Python «Главная»
+              // 1) TOTAL/AUTO
               const perLaunchAll = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
                 const [t, a] = await Promise.all([
                   fetchTotalCases(id, signal),
@@ -1125,33 +1665,52 @@
                 selStream += Number(r.streamTotal || 0);
               }
 
+              // Черепики (deploy-lab) — через прокси
+              let chpIos = 0;
+              let chpAndroid = 0;
+              try{
+                [chpIos, chpAndroid] = await Promise.all([
+                  fetchDeployIssueCount('IOS', rel, signal),
+                  fetchDeployIssueCount('ANDROID', rel, signal)
+                ]);
+              }catch(e){
+                // ok: оставляем 0
+              }
+              const chpTotal = (Number(chpIos)||0) + (Number(chpAndroid)||0);
+              if(chpTbody){
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td class="mono text-left">${rel}</td>
+                  <td class="mono">${chpIos}</td>
+                  <td class="mono">${chpAndroid}</td>
+                  <td class="mono">${chpTotal}</td>
+                `;
+                chpTbody.appendChild(tr);
+              }
+              addChpPoint(rel, chpIos, chpAndroid, chpTotal);
+
               if(firstRow){
                 tbody.innerHTML = '';
                 firstRow = false;
               }
               renderRow({ release: rel, manual, auto, total });
               addChartPoint(rel, manual, auto, total);
-
-              // запоминаем для сортировки итоговой таблицы
               tcRowsData.push({ release: rel, manual, auto, total });
 
-              // Coverage totals for this release (уже посчитаны через leaf)
               if(covTbody){
                 renderCovRow({ release: rel, swatCount, streamCount });
               }
-
               covRowsData.push({ release: rel, swatCount, streamCount, total: (swatCount + streamCount) });
               addCoveragePoint(rel, swatCount, streamCount);
 
               if(selTbody){
                 renderSelRow({ release: rel, swatCount: selSwat, streamCount: selStream });
               }
-
               selRowsData.push({ release: rel, swatCount: selSwat, streamCount: selStream, total: (selSwat + selStream) });
               addSelectivePoint(rel, selSwat, selStream);
             }
 
-            // Перерисуем таблицы по убыванию количества (таблицы скрыты, но порядок соблюдаем)
+            // Таблицы (скрытые) сортируем по убыванию "итога"
             if(tbody && tcRowsData.length){
               tbody.innerHTML = '';
               tcRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
@@ -1170,12 +1729,139 @@
               selRowsData.forEach(r => renderSelRow({ release: r.release, swatCount: r.swatCount, streamCount: r.streamCount }));
             }
 
+            if(avgTbody && avgRowsData.length){
+              avgTbody.innerHTML = '';
+              avgRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
+              avgRowsData.forEach(r => renderAvgRow({ release: r.release, swatMs: r.swatMs, streamMs: r.streamMs, totalMs: r.totalMs }));
+
+              // Итоговая строка (скрыта, но пригодится)
+              const swMs = avgGrand.swatCnt ? (avgGrand.swatDur / avgGrand.swatCnt) : 0;
+              const stMs = avgGrand.streamCnt ? (avgGrand.streamDur / avgGrand.streamCnt) : 0;
+              const ttMs = avgGrand.totalCnt ? (avgGrand.totalDur / avgGrand.totalCnt) : 0;
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td class="mono text-left font-semibold">Итого</td>
+                <td class="mono font-semibold">${formatMsPerCase(swMs)}</td>
+                <td class="mono font-semibold">${formatMsPerCase(stMs)}</td>
+                <td class="mono font-semibold">${formatMsPerCase(ttMs)}</td>
+              `;
+              avgTbody.appendChild(tr);
+            }
+
             if(!tcRowsData.length){
               showEmpty('Данные появятся после получения из источника');
             }
             if(!selRowsData.length){
               showSelEmpty('Данные появятся после получения из источника');
             }
+            if(chpTbody && !chpTbody.children.length){
+              showChpEmpty('Данные появятся после получения из источника');
+            }
+            if(avgTbody && !avgTbody.children.length){
+              showAvgEmpty('Данные появятся после получения из источника');
+            }
+          }
+
+          function initCollapsers(){
+            let state = {};
+            try{ state = JSON.parse(localStorage.getItem(LS_COLLAPSE_KEY) || '{}') || {}; }catch(e){ state = {}; }
+
+            function save(){
+              try{ localStorage.setItem(LS_COLLAPSE_KEY, JSON.stringify(state)); }catch(e){}
+            }
+
+            function animateBody(body, collapse){
+              const dur = 180;
+              body.style.overflow = 'hidden';
+              body.style.transition = `height ${dur}ms ease, opacity ${dur}ms ease`;
+
+              if(collapse){
+                body.style.display = '';
+                const h = body.getBoundingClientRect().height;
+                body.style.height = h + 'px';
+                body.style.opacity = '1';
+                requestAnimationFrame(() => {
+                  body.style.height = '0px';
+                  body.style.opacity = '0';
+                });
+                const onEnd = (ev) => {
+                  if(ev.propertyName !== 'height') return;
+                  body.removeEventListener('transitionend', onEnd);
+                  body.style.display = 'none';
+                  body.style.height = '';
+                  body.style.opacity = '';
+                  body.style.overflow = '';
+                  body.style.transition = '';
+                };
+                body.addEventListener('transitionend', onEnd);
+              }else{
+                body.style.display = '';
+                const h = body.scrollHeight;
+                body.style.height = '0px';
+                body.style.opacity = '0';
+                requestAnimationFrame(() => {
+                  body.style.height = h + 'px';
+                  body.style.opacity = '1';
+                });
+                const onEnd = (ev) => {
+                  if(ev.propertyName !== 'height') return;
+                  body.removeEventListener('transitionend', onEnd);
+                  body.style.height = '';
+                  body.style.opacity = '';
+                  body.style.overflow = '';
+                  body.style.transition = '';
+                };
+                body.addEventListener('transitionend', onEnd);
+              }
+            }
+
+            function resizeChartsForKey(key){
+              try{
+                if(key === 'tc') tcChart?.resize();
+                if(key === 'cov') covChart?.resize();
+                if(key === 'sel') selChart?.resize();
+                if(key === 'chp') chpChart?.resize();
+                if(key === 'avg') avgChart?.resize();
+              }catch(e){}
+            }
+
+            const btns = document.querySelectorAll('[data-collapse-btn]');
+            btns.forEach(btn => {
+              const key = btn.getAttribute('data-collapse-btn');
+              const section = btn.closest('section');
+              if(!section) return;
+              const body = section.querySelector(`[data-collapse-body="${key}"]`);
+              if(!body) return;
+
+              const ico = btn.querySelector('[data-collapse-ico]');
+              const txt = btn.querySelector('[data-collapse-text]');
+
+              let collapsed = !!state[key];
+
+              const applyInstant = () => {
+                body.style.display = collapsed ? 'none' : '';
+                btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                if(ico) ico.textContent = collapsed ? '▸' : '▾';
+                if(txt) txt.textContent = collapsed ? 'Развернуть' : 'Свернуть';
+              };
+
+              applyInstant();
+
+              btn.addEventListener('click', () => {
+                collapsed = !collapsed;
+                state[key] = collapsed;
+                save();
+
+                btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                if(ico) ico.textContent = collapsed ? '▸' : '▾';
+                if(txt) txt.textContent = collapsed ? 'Развернуть' : 'Свернуть';
+
+                animateBody(body, collapsed);
+                if(!collapsed){
+                  requestAnimationFrame(() => requestAnimationFrame(() => resizeChartsForKey(key)));
+                }
+              });
+            });
           }
 
           // init: restore inputs
@@ -1184,6 +1870,18 @@
           validateAndNormalizeReleaseInput(inpFrom);
           validateAndNormalizeReleaseInput(inpTo);
           showEmpty('Данные появятся после получения из источника');
+          initCollapsers();
+
+          proxyBtn?.addEventListener('click', async () => {
+            try{
+              const r = await fetch(PROXY_BASE + '/health', { cache: 'no-store' });
+              const j = await r.json();
+              const ok = !!(j && j.ok === true && Number(j.port) === 8787);
+              showToast(ok ? `Прокси OK (порт ${j.port})` : 'Прокси не отвечает', ok);
+            }catch(e){
+              showToast('Прокси не отвечает', false);
+            }
+          });
 
           startBtn?.addEventListener('click', async () => {
             try{
@@ -1207,6 +1905,10 @@
         })();
       </script>
     </main>
+  </div>
+
+  <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 opacity-0 transition-opacity duration-200">
+    <div id="toastInner" class="px-4 py-2 rounded-2xl text-sm font-semibold bg-white/90 ring-1 ring-[#ecebff] text-slate-700 shadow"></div>
   </div>
 </body>
 </html>
