@@ -209,6 +209,12 @@
             <option value="remaining">Назначено</option>
             <option value="in_progress">В процессе</option>
           </select>
+          <label class="nums">Тип</label>
+          <select id="dashKind" class="mini">
+            <option value="all" selected>Все типы</option>
+            <option value="sm_sel">Smoke + Selective</option>
+            <option value="hb_only">High/Blocker</option>
+          </select>
           <button id="dashSnapSave" class="mini">Сохранить срез</button>
           <button id="dashSnapBuild" class="mini">Построить сравнение</button>
           <button id="dashSnapClear" class="mini">Очистить всё</button>
@@ -226,6 +232,7 @@
           <select id="streamKind" class="mini">
             <option value="Smoke" selected>Smoke</option>
             <option value="Selective">Selective</option>
+            <option value="High/Blocker">High/Blocker</option>
           </select>
           <label class="nums">Название стрима</label>
 <select id="streamName" class="mini">
@@ -413,6 +420,19 @@
 
   var COLORS={ total:getCSS('--c1'), finished:getCSS('--c2'), remaining_total:getCSS('--c3'), remaining:getCSS('--c3'), in_progress:getCSS('--c4') };
   var ORDER = ["[iOS][Smoke]","[iOS][Selective]","[Android][Smoke]","[Android][Selective]","[iOS][High/Blocker]","[Android][High/Blocker]"];
+
+  // --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ для фильтра по типу (dashKind) ---
+  function allowByKind(label){
+    label = String(label||'');
+    var sel = document.getElementById('dashKind');
+    var v = sel ? sel.value : 'all';
+
+    var isHB = label.indexOf('[High/Blocker]') !== -1;
+
+    if (v === 'hb_only') return isHB;
+    if (v === 'sm_sel')  return !isHB;
+    return true; // 'all' или что-то неизвестное
+  }
   var CURRENT_BASE_URL = '';
   var barAllChartRef = null;
 
@@ -772,7 +792,12 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
     if(includeSmoke) kinds.push(getSmokeKey());
     if(includeSelective) kinds.push(getSelectiveKey());
 
-    const tasks = kinds.map(kind=>{
+    // Всегда дополнительно подхватываем High/Blocker, чтобы постримовые срезы
+    // работали и для HB. Для Smoke/Selective остаётся старая логика через
+    // getSmokeKey()/getSelectiveKey().
+    const kindsAll = kinds.concat(['High/Blocker']);
+
+    const tasks = kindsAll.map(kind=>{
       const search = version ? makeSearchValue(kind,version) : undefined;
       const paramsBase = { projectId, preview:'true', sort:'createdDate,desc' };
       if (search) paramsBase.search = search;
@@ -967,7 +992,11 @@ container.appendChild(card);
     if (isSmoke && !on('fltTypeSmoke')) return false;
     if (isSel   && !on('fltTypeSelective')) return false;
     if (isHB    && !on('fltTypeHB')) return false;
-    // if label doesn't specify a known platform/type, keep it
+
+    // Дополнительный фильтр по типу срезов (Smoke/Selective/High/Blocker)
+    if (!allowByKind(label)) return false;
+
+    // если лейбл не попадает ни под один фильтр, оставляем
     return true;
   }
   var __ORDER_USED = ORDER.filter(__allowLabel);
@@ -1095,16 +1124,27 @@ function prettySnapTitle(raw){
   return neat.replace('Z','').trim();
 }
 
-// === СТАРАЯ ФУНКЦИЯ ===
 function makeSnapTitle(o){
-  var ver=o.version||'all';
-  return `[Smoke+Selective] v=${ver} ${o.timeISO}`;
-}
+  var ver = o.version || 'all';
 
-  function makeSnapTitle(o){
-    var ver=o.version||'all';
-    return `[Smoke+Selective] v=${ver} ${o.timeISO}`;
+  // смотрим, какой тип выбран в фильтре "Тип" в блоке "Сохранённые срезы"
+  var sel = document.getElementById('dashKind');
+  var v   = sel ? sel.value : 'all';
+
+  var kindLabel;
+  if (v === 'hb_only') {
+    // срез только по High/Blocker
+    kindLabel = 'High/Blocker';
+  } else if (v === 'sm_sel') {
+    // классический Smoke + Selective
+    kindLabel = 'Smoke+Selective';
+  } else {
+    // все типы сразу (Smoke, Selective, High/Blocker)
+    kindLabel = 'Smoke+Selective+HB';
   }
+
+  return `[${kindLabel}] v=${ver} ${o.timeISO}`;
+}
   function takeSnapshot(ctx){
     var st=getStore();
     var id=String(Date.now())+Math.random().toString(16).slice(2);
@@ -1117,7 +1157,8 @@ function makeSnapTitle(o){
     const silent = !!(opts && opts.silent);
 
     var metric=$('#dashMetric')?.value || 'finished';
-    var labels=ORDER;
+    var labels = ORDER.filter(function(label){ return allowByKind(label); });
+    if (!labels.length) labels = ORDER.slice();
     var chosen=[].slice.call(document.querySelectorAll('#snapListDash input[type=checkbox]:checked'))
                  .map(cb=>cb.getAttribute('data-id'));
 
@@ -1153,7 +1194,9 @@ function makeSnapTitle(o){
   }
 
   function renderDashPrevCurrent(currentAgg, metric){
-    metric=metric||'finished'; var color=COLORS[metric]||COLORS.finished; var labels=ORDER;
+    metric=metric||'finished'; var color=COLORS[metric]||COLORS.finished;
+    var labels = ORDER.filter(function(label){ return allowByKind(label); });
+    if (!labels.length) labels = ORDER.slice();
     var list=(getStore().snaps||[]); var prev=list.length>0?list[list.length-1]:null;
     var currData=labels.map(function(k){ return (currentAgg[k]&&currentAgg[k][metric])||0; });
     var prevData=labels.map(function(k){ return (prev&&prev.data&&prev.data[k]&&prev.data[k][metric])?prev.data[k][metric]:0; });
@@ -1520,11 +1563,37 @@ buildDashMultiCompare({ silent: true });
     var blob=new Blob([JSON.stringify(window.lastAgg,null,2)],{type:'application/json'});
         var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='agg.json'; a.click(); URL.revokeObjectURL(url);
   }
-  // Разбор имени лаунча: [Стрим][Платформа][Kind] ...
+// Разбор имени лаунча: ищем токены в квадратных скобках и выделяем stream / platform / kind
 function parseStreamTriple(name){
-  const m = String(name||'').match(/^\[([^\]]+)\]\[(Android|iOS)\]\[(Smoke|Selective)\]/i);
-  if(!m) return null;
-  return { stream: m[1], platform: m[2], kind: m[3] };
+  const tokens = [];
+  String(name || '').replace(/\[([^\]]+)\]/g, (_, t) => {
+    tokens.push(t);
+    return '';
+  });
+  if (!tokens.length) return null;
+
+  let stream = null;
+  let platform = null;
+  let kind = null;
+
+  tokens.forEach(t => {
+    const low = t.toLowerCase();
+    if (low === 'android' || low === 'ios') {
+      platform = t;
+      return;
+    }
+    if (low === 'smoke' || low === 'selective' || low === 'high/blocker' || low === 'high-blocker') {
+      // нормализуем High-Blocker -> High/Blocker
+      kind = (low === 'high-blocker') ? 'High/Blocker' : t;
+      return;
+    }
+    if (!stream) {
+      stream = t;
+    }
+  });
+
+  if (!stream || !platform || !kind) return null;
+  return { stream, platform, kind };
 }
 
 // Собрать уникальные названия стримов для выбранного kind (Smoke/Selective)
@@ -1589,8 +1658,12 @@ function aggForStream(kind, streamName){
   /* ====== Срезы по стриму (Smoke / Selective) ====== */
 
   function orderForKind(kind){
-    if(String(kind).toLowerCase()==='smoke') return ["[iOS][Smoke]","[Android][Smoke]"];
-    return ["[Android][Selective]","[iOS][Selective]"];
+    const k = String(kind).toLowerCase();
+    if (k === 'smoke')         return ["[iOS][Smoke]","[Android][Smoke]"];
+    if (k === 'selective')     return ["[Android][Selective]","[iOS][Selective]"];
+    if (k === 'high/blocker')  return ["[iOS][High/Blocker]","[Android][High/Blocker]"];
+    // по умолчанию вернём все три группы, если вдруг что-то странное прилетело
+    return ["[iOS][Smoke]","[Android][Smoke]","[Android][Selective]","[iOS][Selective]","[iOS][High/Blocker]","[Android][High/Blocker]"];
   }
 
   function makeStreamSnapTitle(o){
@@ -1666,6 +1739,49 @@ function renderStreamSnapList(){
       setStore(st); renderStreamSnapList();
     });
   }
+
+  // Кнопки управления срезами "По стриму"
+  var btnSave  = document.getElementById('dashStreamSnapSave');
+  var btnBuild = document.getElementById('dashStreamSnapBuild');
+  var btnClear = document.getElementById('dashStreamSnapClear');
+
+  if (btnSave) {
+    btnSave.onclick = function(){
+      // Нужны актуальные данные дашборда
+      if (!window.__mini_last || !Array.isArray(window.__mini_last.launches) || !window.__mini_last.launches.length) {
+        toast('Сначала соберите дашборд');
+        return;
+      }
+      var ctx = {
+        kind:  (document.getElementById('streamKind')?.value) || 'Smoke',
+        version: (document.getElementById('version')?.value.trim()) || '',
+        timeISO: (new Date()).toISOString()
+      };
+      takeStreamSnapshot(ctx);
+    };
+  }
+
+  if (btnBuild) {
+    btnBuild.onclick = function(){
+      buildDashMultiCompareStream({ silent:false });
+    };
+  }
+
+  if (btnClear) {
+    btnClear.onclick = function(){
+      var kind  = (document.getElementById('streamKind')?.value) || 'Smoke';
+      var streamName = (document.getElementById('streamName')?.value) || '__all__';
+      var st = getStore();
+      st.streamSnaps = (st.streamSnaps||[]).filter(function(s){
+        var sameKind = String(s.kind||'').toLowerCase() === String(kind).toLowerCase();
+        var sameStream = (streamName === '__all__') || (s.stream === streamName);
+        return !(sameKind && sameStream);
+      });
+      setStore(st);
+      renderStreamSnapList();
+      toast('Срезы по стриму удалены');
+    };
+  }
 }
 
   function buildDashMultiCompareStream(opts){
@@ -1720,7 +1836,7 @@ function autoSaveAllStreamSnaps(){
   const version = ($('#version')?.value.trim())||'';
   const timeISO = (new Date()).toISOString();
 
-  const kinds = ['Smoke','Selective'];
+  const kinds = ['Smoke','Selective','High/Blocker'];
   const newSnaps = [];
 
   kinds.forEach(kind=>{
@@ -6577,3 +6693,18 @@ const sw = document.getElementById('runSwat')?.files?.[0];
 </body>
 </html>
 <!-- FIXED: добавлена строка Процент покрытия кейсов SWAT с учетом перепрохода STREAM -->
+  // --- Обработчик изменения фильтра dashKind ---
+  var kindSel = document.getElementById('dashKind');
+  if (kindSel){
+    kindSel.addEventListener('change', function(){
+      if (window.lastAgg){
+        // пересобираем карточки и сводный барчарт по текущему агрегату
+        renderAgg(window.lastAgg, 'cards', 'barAll', document.getElementById('summaryInfo'));
+        // обновляем prev/curr для выбранной метрики
+        var mtr = (document.getElementById('dashMetric')?.value) || 'finished';
+        renderDashPrevCurrent(window.lastAgg, mtr);
+        // перестраиваем мультисравнение по сохранённым срезам в тихом режиме
+        buildDashMultiCompare({silent:true});
+      }
+    });
+  }
