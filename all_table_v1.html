@@ -21,7 +21,7 @@
           <div class="flex items-center gap-2">
             <div class="font-extrabold leading-tight">WB All Table</div>
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v0.1.5</span>
+              <span aria-hidden="true">🏷️</span><span>v0.2.5</span>
             </span>
           </div>
         </div>
@@ -64,8 +64,6 @@
                 <label class="block text-xs font-semibold text-[#111827] mb-1">Deploy-lab token</label>
                 <input class="input" id="deployToken" type="password" autocomplete="off" placeholder="Вставьте Deploy-lab token" />
               </div>
-
-              <!-- YouTrack токен убран -->
             </div>
 
             <div class="mt-3 flex items-center gap-2 flex-wrap">
@@ -84,7 +82,7 @@
         </form>
       </section>
 
-      <!-- Таблицы/графики начинаются ниже -->
+      <!-- 1) Тест кейсы -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -136,6 +134,7 @@
         </div>
       </section>
 
+      <!-- 2) SWAT/STREAM ХБ -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -186,6 +185,7 @@
         </div>
       </section>
 
+      <!-- 3) SWAT/STREAM Selective -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -236,57 +236,7 @@
         </div>
       </section>
 
-      <section class="card p-5 space-y-4">
-        <div class="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h2 class="text-lg font-semibold">Количество черепиков</h2>
-          </div>
-          <button type="button"
-            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
-            data-collapse-btn="chp" aria-expanded="true">
-            <span data-collapse-ico aria-hidden="true">▾</span>
-            <span data-collapse-text>Свернуть</span>
-          </button>
-        </div>
-
-        <div data-collapse-body="chp" class="space-y-4">
-          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-            <div id="chpEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
-              Данные появятся после получения из источника
-            </div>
-
-            <div id="chpContent" class="tc-content" style="display:none;">
-              <div class="chart-viewport" id="chpTrendViewport">
-                <canvas id="chpTrendChart" aria-label="Cherepiki chart" role="img"></canvas>
-              </div>
-
-              <div id="chpTableWrap" style="display:none; overflow:auto">
-                <table id="chpTable">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Релиз</th>
-                      <th>iOS</th>
-                      <th>Android</th>
-                      <th>Всего</th>
-                    </tr>
-                  </thead>
-                  <tbody id="chpTbody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-start gap-3">
-            <div class="legend">
-              <span class="lg-item"><span class="dot" style="background: var(--chp-ios, #0ea5e9)"></span>iOS</span>
-              <span class="lg-item"><span class="dot" style="background: var(--chp-android, #22c55e)"></span>Android</span>
-              <span class="lg-item"><span class="dot" style="background: var(--chp-total, #a855f7)"></span>Всего</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 5-я таблица: среднее время -->
+      <!-- 4) Среднее время -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -337,6 +287,110 @@
         </div>
       </section>
 
+      <!-- 5) Черепики -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Количество черепиков</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="chp" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="chp" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="chpEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="chpContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="chpTrendViewport">
+                <canvas id="chpTrendChart" aria-label="Cherepiki chart" role="img"></canvas>
+              </div>
+
+              <div id="chpTableWrap" style="display:none; overflow:auto">
+                <table id="chpTable">
+                  <thead>
+                    <tr>
+                      <th class="text-left">Релиз</th>
+                      <th>iOS</th>
+                      <th>Android</th>
+                      <th>Всего</th>
+                    </tr>
+                  </thead>
+                  <tbody id="chpTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-start gap-3">
+            <div class="legend">
+              <span class="lg-item"><span class="dot" style="background: var(--chp-ios, #0ea5e9)"></span>iOS</span>
+              <span class="lg-item"><span class="dot" style="background: var(--chp-android, #22c55e)"></span>Android</span>
+              <span class="lg-item"><span class="dot" style="background: var(--chp-total, #a855f7)"></span>Всего</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6) Время cutoff и отправки в store -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Время cutoff и отправки в store</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="cut" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="cut" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="cutEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="cutContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="cutTrendViewport">
+                <canvas id="cutTrendChart" aria-label="Cutoff & Store chart" role="img"></canvas>
+              </div>
+
+              <div id="cutTableWrap" style="display:none; overflow:auto">
+                <table id="cutTable">
+                  <thead>
+                    <tr>
+                      <th class="text-left">Релиз</th>
+                      <th>iOS Cutoff</th>
+                      <th>iOS Store</th>
+                      <th>Android Cutoff</th>
+                      <th>Android Store</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cutTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-start gap-3">
+            <div class="legend">
+              <span class="lg-item"><span class="dot dot-ios-cutoff"></span>iOS Cutoff</span>
+              <span class="lg-item"><span class="dot dot-ios-store"></span>iOS Store</span>
+              <span class="lg-item"><span class="dot dot-android-cutoff"></span>Android Cutoff</span>
+              <span class="lg-item"><span class="dot dot-android-store"></span>Android Store</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <script>
         (function(){
           const BASE_URL = 'https://allure-testops.wb.ru';
@@ -346,10 +400,14 @@
           const SWAT_LIST_URL = 'https://script.google.com/macros/s/AKfycbwJapteQxL-8LqmX88qMa2wtlD760v4rvkISWm1YP-NDguwW08ZzmEADV-0kqjg3cC3zQ/exec';
           const PROXY_BASE = 'http://localhost:8787';
           const LS_COLLAPSE_KEY = 'wb_all_table_collapsed';
+
+          const DEPLOY_BASE_URL_TMPL   = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
+          const DEPLOY_DEPLOY_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/deploy';
           const DEPLOY_ISSUES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/issues';
 
           const LS_TOKEN_KEY = 'swat_uwu_token';
           const LS_RANGE_KEY = 'swat_uwu_release_range';
+          const LS_DEPLOY_KEY = 'wb_all_table_deploy_token';
 
           const startBtn = document.getElementById('startBtn');
           const stopBtn  = document.getElementById('stopBtn');
@@ -360,32 +418,39 @@
           const inpAllureToken = document.getElementById('allureToken');
           const inpDeployToken = document.getElementById('deployToken');
 
+          // Sections: TC
           const emptyBox = document.getElementById('tcEmpty');
           const contentWrap = document.getElementById('tcContent');
           const tbody = document.getElementById('tcTbody');
 
-          // Coverage section
+          // Coverage (HB)
           const covEmpty = document.getElementById('covEmpty');
           const covContent = document.getElementById('covContent');
           const covTbody = document.getElementById('covTbody');
 
-          // Selective coverage section
+          // Coverage Selective
           const selEmpty = document.getElementById('selEmpty');
           const selContent = document.getElementById('selContent');
           const selTbody = document.getElementById('selTbody');
           const selCanvas = document.getElementById('selTrendChart');
 
-          // Cherepiki section
+          // Average time
+          const avgEmpty = document.getElementById('avgEmpty');
+          const avgContent = document.getElementById('avgContent');
+          const avgTbody = document.getElementById('avgTbody');
+          const avgCanvas = document.getElementById('avgTrendChart');
+
+          // Cherepiki
           const chpEmpty = document.getElementById('chpEmpty');
           const chpContent = document.getElementById('chpContent');
           const chpTbody = document.getElementById('chpTbody');
           const chpCanvas = document.getElementById('chpTrendChart');
 
-          // Average time section
-          const avgEmpty = document.getElementById('avgEmpty');
-          const avgContent = document.getElementById('avgContent');
-          const avgTbody = document.getElementById('avgTbody');
-          const avgCanvas = document.getElementById('avgTrendChart');
+          // Cutoff/store
+          const cutEmpty = document.getElementById('cutEmpty');
+          const cutContent = document.getElementById('cutContent');
+          const cutTbody = document.getElementById('cutTbody');
+          const cutCanvas = document.getElementById('cutTrendChart');
 
           const chartCanvas = document.getElementById('tcTrendChart');
           const covCanvas = document.getElementById('covTrendChart');
@@ -393,14 +458,15 @@
           let tcChart = null;
           let covChart = null;
           let selChart = null;
-          let chpChart = null;
           let avgChart = null;
+          let chpChart = null;
+          let cutChart = null;
 
-          // SWAT list cache: fetch exec only once (shared promise)
+          // SWAT list cache: fetch exec only once
           let __swatSetCache = null;
           let __swatSetPromise = null;
 
-          // Plugin: delta labels above points (for selected dataset)
+          // Plugin: delta labels above points
           const deltaLabelsPlugin = {
             id: 'deltaLabels',
             afterDatasetsDraw(chart, args, pluginOptions){
@@ -420,26 +486,21 @@
               const font  = (opts.font) || '600 11px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
 
               const fmt = (v) => {
-                try {
-                  const n = Number(v);
-                  if(!Number.isFinite(n)) return '';
-                  const sign = n > 0 ? '+' : '';
-                  return sign + Math.round(n).toLocaleString('ru-RU');
-                } catch {
-                  const sign = v > 0 ? '+' : '';
-                  return sign + String(v);
-                }
+                const n = Number(v);
+                if(!Number.isFinite(n)) return '';
+                const sign = n > 0 ? '+' : '';
+                return sign + Math.round(n).toLocaleString('ru-RU');
               };
 
               const ctx = chart.ctx;
-ctx.save();
+              ctx.save();
 
-// allow drawing outside chartArea (e.g., delta labels above top points)
-ctx.beginPath();
-ctx.rect(0, 0, chart.width, chart.height);
-ctx.clip();
+              // draw across full canvas (avoid clipping near top)
+              ctx.beginPath();
+              ctx.rect(0, 0, chart.width, chart.height);
+              ctx.clip();
 
-ctx.font = font;
+              ctx.font = font;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'bottom';
 
@@ -452,14 +513,12 @@ ctx.font = font;
 
                 const pt = meta.data[i];
                 if(!pt) continue;
-                const x = pt.x;
-                const y = pt.y;
 
                 const label = fmt(delta);
                 if(!label) continue;
 
                 ctx.fillStyle = delta > 0 ? green : red;
-                ctx.fillText(label, x, y - 12);
+                ctx.fillText(label, pt.x, pt.y - 12);
               }
 
               ctx.restore();
@@ -496,15 +555,13 @@ ctx.font = font;
             };
           }
 
+          // ВАЖНО: тут должны быть минимально нужные заголовки
           function deployHeaders(){
             const tok = (inpDeployToken?.value || '').trim();
             return {
               'accept': '*/*',
               'accept-language': 'ru,en;q=0.9',
-              'authorization-deploy-lab': `Bearer ${tok}`,
-              'origin': 'https://deploy-lab.wb.ru',
-              'referer': 'https://deploy-lab.wb.ru/',
-              'user-agent': 'Mozilla/5.0'
+              'authorization-deploy-lab': `Bearer ${tok}`
             };
           }
 
@@ -545,18 +602,185 @@ ctx.font = font;
             return n;
           }
 
-          function setChpEmpty(text){
-            if(!chpEmpty) return;
-            chpEmpty.textContent = text;
-            chpEmpty.style.display = '';
+          // ---- даты/время из deploy-lab (1в1 по python): cutoff_date из base, store_time = earliest note.date из deploy ----
+
+          function normalizeIsoForJS(s){
+            if(!s) return null;
+            let x = String(s).trim();
+            // trim fractional seconds to max 3 digits (JS Date is picky)
+            x = x.replace(/(\.\d{3})\d+(?=[Z+\-])/, '$1');
+            x = x.replace(/(\.\d{2})(?=[Z+\-])/, '$10');
+            x = x.replace(/(\.\d)(?=[Z+\-])/, '$100');
+            return x;
           }
-          function showChpContent(){
-            if(chpEmpty) chpEmpty.style.display = 'none';
-            if(chpContent) chpContent.style.display = '';
+
+          function parseTzOffsetMinutes(iso){
+            if(!iso) return 0;
+            const s = String(iso);
+            if(s.endsWith('Z')) return 0;
+            const m = s.match(/([+\-])(\d{2}):?(\d{2})$/);
+            if(!m) return 0;
+            const sign = m[1] === '-' ? -1 : 1;
+            const hh = Number(m[2] || 0);
+            const mm = Number(m[3] || 0);
+            return sign * (hh * 60 + mm);
           }
-          function showChpEmpty(text){
-            setChpEmpty(text);
-            if(chpContent) chpContent.style.display = 'none';
+
+          function pad2(n){ return String(n).padStart(2,'0'); }
+
+          function dayShortRuFromDow(dow){
+            // 0 вс,1 пн,2 вт,3 ср,4 чт,5 пт,6 сб
+            return ['вс','пн','вт','ср','чт','пт','сб'][dow] || '';
+          }
+
+          function toMskLocalParts(iso){
+            const norm = normalizeIsoForJS(iso);
+            if(!norm) return null;
+
+            const d = new Date(norm);
+            if(Number.isNaN(d.getTime())) return null;
+
+            const offMin = parseTzOffsetMinutes(norm);
+            const msLocal = d.getTime() + offMin * 60_000;
+            const dl = new Date(msLocal);
+
+            const dow = dl.getUTCDay(); // day in that offset zone
+            const dayShort = dayShortRuFromDow(dow);
+            const dd = pad2(dl.getUTCDate());
+            const MM = pad2(dl.getUTCMonth()+1);
+            const hh = pad2(dl.getUTCHours());
+            const mm = pad2(dl.getUTCMinutes());
+
+            return {
+              msLocal,
+              dow,
+              dayShort,
+              dateText: `${dd}.${MM}`,
+              timeText: `${hh}:${mm}`,
+              fullText: `${dayShort} ${dd}.${MM} ${hh}:${mm}`
+            };
+          }
+
+          // индекс для оси Y: порядок должен быть сверху вниз: вс, сб, пт, чт, ср, вт, пн
+          function dayIndexCustom(dow){
+            // dow: 0 вс ... 6 сб
+            // idx: 0 вс, 1 сб, 2 пт, 3 чт, 4 ср, 5 вт, 6 пн
+            return (7 - dow) % 7;
+          }
+
+          function yValueFromIso(iso){
+            const p = toMskLocalParts(iso);
+            if(!p) return null;
+            const idx = dayIndexCustom(p.dow);
+            const dl = new Date(p.msLocal);
+            const mins = dl.getUTCHours() * 60 + dl.getUTCMinutes() + (dl.getUTCSeconds() / 60);
+            return {
+              y: idx * 1440 + mins,
+              msLocal: p.msLocal,
+              label: p.fullText
+            };
+          }
+
+          function extractEarliestNoteDate(deployObj, sectionKey){
+            if(!deployObj || typeof deployObj !== 'object') return null;
+            const sec = deployObj[sectionKey];
+            if(!sec || typeof sec !== 'object') return null;
+            const notes = Array.isArray(sec.notes) ? sec.notes : [];
+            const dates = [];
+            for(const n of notes){
+              const iso = n && n.date;
+              const p = toMskLocalParts(iso);
+              if(p && Number.isFinite(p.msLocal)) dates.push(p.msLocal);
+            }
+            if(!dates.length) return null;
+            const minMs = Math.min(...dates);
+            // вернуть исходный ISO не можем, но можем вернуть msLocal + label (label восстановим из msLocal)
+            return minMs;
+          }
+
+          function labelFromMsLocal(msLocal){
+            const dl = new Date(msLocal);
+            const dow = dl.getUTCDay();
+            const dayShort = dayShortRuFromDow(dow);
+            const dd = pad2(dl.getUTCDate());
+            const MM = pad2(dl.getUTCMonth()+1);
+            const hh = pad2(dl.getUTCHours());
+            const mm = pad2(dl.getUTCMinutes());
+            return `${dayShort} ${dd}.${MM} ${hh}:${mm}`;
+          }
+
+          async function fetchDeployDates(prefix, release, signal){
+            const tok = (inpDeployToken?.value || '').trim();
+            if(!tok) return { cutoff: null, store: null };
+
+            const baseUrl = DEPLOY_BASE_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
+            const deployUrl = DEPLOY_DEPLOY_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
+
+            let cutoffIso = null;
+            let storeMsLocal = null;
+
+            try{
+              const base = await proxyGetJson(baseUrl, deployHeaders(), signal);
+              cutoffIso = base?.cutoff_date || null;
+            }catch(e){
+              cutoffIso = null;
+            }
+
+            try{
+              const dep = await proxyGetJson(deployUrl, deployHeaders(), signal);
+              if(prefix === 'ANDROID'){
+                storeMsLocal = extractEarliestNoteDate(dep, 'Google Play');
+              }else{
+                storeMsLocal = extractEarliestNoteDate(dep, 'AppStore');
+              }
+            }catch(e){
+              storeMsLocal = null;
+            }
+
+            return { cutoff: cutoffIso, storeMsLocal };
+          }
+
+          // ---- helpers: UI/empty ----
+          function setEmpty(text){
+            if(!emptyBox) return;
+            emptyBox.textContent = text;
+            emptyBox.style.display = '';
+          }
+          function showContent(){
+            if(emptyBox) emptyBox.style.display = 'none';
+            contentWrap.style.display = '';
+          }
+          function showEmpty(text){
+            setEmpty(text);
+            contentWrap.style.display = 'none';
+          }
+
+          function setCovEmpty(text){
+            if(!covEmpty) return;
+            covEmpty.textContent = text;
+            covEmpty.style.display = '';
+          }
+          function showCovContent(){
+            if(covEmpty) covEmpty.style.display = 'none';
+            if(covContent) covContent.style.display = '';
+          }
+          function showCovEmpty(text){
+            setCovEmpty(text);
+            if(covContent) covContent.style.display = 'none';
+          }
+
+          function setSelEmpty(text){
+            if(!selEmpty) return;
+            selEmpty.textContent = text;
+            selEmpty.style.display = '';
+          }
+          function showSelContent(){
+            if(selEmpty) selEmpty.style.display = 'none';
+            if(selContent) selContent.style.display = '';
+          }
+          function showSelEmpty(text){
+            setSelEmpty(text);
+            if(selContent) selContent.style.display = 'none';
           }
 
           function setAvgEmpty(text){
@@ -573,7 +797,166 @@ ctx.font = font;
             if(avgContent) avgContent.style.display = 'none';
           }
 
-          // Ввод свободный: X.Y.Z, где Z может быть 1..4 цифры (7 -> 7000, 73 -> 7300, 777 -> 7770)
+          function setChpEmpty(text){
+            if(!chpEmpty) return;
+            chpEmpty.textContent = text;
+            chpEmpty.style.display = '';
+          }
+          function showChpContent(){
+            if(chpEmpty) chpEmpty.style.display = 'none';
+            if(chpContent) chpContent.style.display = '';
+          }
+          function showChpEmpty(text){
+            setChpEmpty(text);
+            if(chpContent) chpContent.style.display = 'none';
+          }
+
+          function setCutEmpty(text){
+            if(!cutEmpty) return;
+            cutEmpty.textContent = text;
+            cutEmpty.style.display = '';
+          }
+          function showCutContent(){
+            if(cutEmpty) cutEmpty.style.display = 'none';
+            if(cutContent) cutContent.style.display = '';
+          }
+          function showCutEmpty(text){
+            setCutEmpty(text);
+            if(cutContent) cutContent.style.display = 'none';
+          }
+
+          function setRunning(running){
+            if(running){
+              startBtn.style.display = 'none';
+              stopBtn.style.display = '';
+              window.__wbAbortController = new AbortController();
+              showEmpty('Данные появятся после получения из источника');
+              showCovEmpty('Данные появятся после получения из источника');
+              showSelEmpty('Данные появятся после получения из источника');
+              showAvgEmpty('Данные появятся после получения из источника');
+              showChpEmpty('Данные появятся после получения из источника');
+              showCutEmpty('Данные появятся после получения из источника');
+            }else{
+              stopBtn.style.display = 'none';
+              startBtn.style.display = '';
+              if(window.__wbAbortController){
+                try{ window.__wbAbortController.abort(); }catch(e){}
+              }
+              window.__wbAbortController = null;
+            }
+          }
+
+          function saveInputs(){
+            try{ localStorage.setItem(LS_TOKEN_KEY, inpAllureToken.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_DEPLOY_KEY, inpDeployToken.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' })); }catch(e){}
+          }
+
+          function restoreInputs(){
+            try{
+              const tok = localStorage.getItem(LS_TOKEN_KEY) || '';
+              if(inpAllureToken) inpAllureToken.value = tok;
+            }catch(e){}
+            try{
+              const dt = localStorage.getItem(LS_DEPLOY_KEY) || '';
+              if(inpDeployToken) inpDeployToken.value = dt;
+            }catch(e){}
+            try{
+              const raw = localStorage.getItem(LS_RANGE_KEY);
+              if(raw){
+                const obj = JSON.parse(raw);
+                if(inpFrom) inpFrom.value = obj?.from || '';
+                if(inpTo) inpTo.value = obj?.to || '';
+              }
+            }catch(e){}
+          }
+
+          function clear(){
+            tbody.innerHTML = '';
+            if(tcChart){
+              tcChart.data.labels = [];
+              tcChart.data.datasets.forEach(d => d.data = []);
+              tcChart.update();
+            }
+
+            if(covTbody) covTbody.innerHTML = '';
+            if(covChart){
+              covChart.data.labels = [];
+              covChart.data.datasets.forEach(d => d.data = []);
+              covChart.update();
+            }
+
+            if(selTbody) selTbody.innerHTML = '';
+            if(selChart){
+              selChart.data.labels = [];
+              selChart.data.datasets.forEach(d => d.data = []);
+              selChart.update();
+            }
+
+            if(avgTbody) avgTbody.innerHTML = '';
+            if(avgChart){
+              avgChart.data.labels = [];
+              avgChart.data.datasets.forEach(d => d.data = []);
+              avgChart.update();
+            }
+
+            if(chpTbody) chpTbody.innerHTML = '';
+            if(chpChart){
+              chpChart.data.labels = [];
+              chpChart.data.datasets.forEach(d => d.data = []);
+              chpChart.update();
+            }
+
+            if(cutTbody) cutTbody.innerHTML = '';
+            if(cutChart){
+              cutChart.data.labels = [];
+              cutChart.data.datasets.forEach(d => {
+                d.data = [];
+                d._timeLabel = [];
+                d._timeMs = [];
+              });
+              cutChart.update();
+            }
+          }
+
+          async function fetchSwatLogins(release, signal){
+            if(__swatSetCache) return __swatSetCache;
+            if(__swatSetPromise) return __swatSetPromise;
+
+            __swatSetPromise = (async () => {
+              const url = new URL(SWAT_LIST_URL);
+              const r = await fetch(url.toString(), { signal });
+              if(!r.ok) throw new Error(`SWAT list HTTP ${r.status}`);
+              const text = await r.text();
+              const set = new Set();
+              text.split(/\r?\n/).forEach(line => {
+                const s = (line || '').trim();
+                if(!s) return;
+                const first = s.split(/\s+/)[0];
+                const norm = normalizeLogin(first);
+                if(norm) set.add(norm);
+              });
+              __swatSetCache = set;
+              return set;
+            })();
+
+            try{
+              return await __swatSetPromise;
+            }catch(e){
+              __swatSetPromise = null;
+              __swatSetCache = null;
+              throw e;
+            }
+          }
+
+          function cssVar(name, fallback){
+            try{
+              const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+              return v || fallback;
+            }catch{ return fallback; }
+          }
+
+          // ---- релизы ----
           function parseVersion(v){
             const raw = (v||'').trim();
             const parts = raw.split('.').map(x => x.trim());
@@ -598,40 +981,6 @@ ctx.font = font;
             return { major, minor, majorN, minorN, build: buildN, buildStrRaw: buildRaw, buildStrNorm };
           }
 
-          function buildMajorRange(){
-            const a = parseVersion(inpFrom?.value);
-            const b = parseVersion(inpTo?.value);
-            if(!a || !b) return [];
-
-            if(a.majorN !== b.majorN) return [];
-
-            const step = 1000;
-
-            const aKey = a.minorN * 10000 + a.build;
-            const bKey = b.minorN * 10000 + b.build;
-            const loV = aKey <= bKey ? a : b;
-            const hiV = aKey <= bKey ? b : a;
-
-            const out = [];
-
-            for(let m = loV.minorN; m <= hiV.minorN; m++){
-              let startBuild = 0;
-              let endBuild   = 9000;
-
-              if(m === loV.minorN) startBuild = Math.ceil(loV.build / step) * step;
-              if(m === hiV.minorN) endBuild   = Math.floor(hiV.build / step) * step;
-
-              if(startBuild > endBuild) continue;
-
-              for(let build = startBuild; build <= endBuild; build += step){
-                const buildStr = String(build).padStart(4, '0');
-                out.push(`${loV.major}.${m}.${buildStr}`);
-              }
-            }
-
-            return out;
-          }
-
           function formatRelease(vObj){
             const m = String(vObj.majorN);
             const n = String(vObj.minorN);
@@ -642,29 +991,52 @@ ctx.font = font;
           function validateAndNormalizeReleaseInput(inputEl){
             if(!inputEl) return null;
             const raw = (inputEl.value || '').trim();
-            if(!raw){
-              try{ inputEl.setCustomValidity(''); }catch(e){}
-              return null;
-            }
+            if(!raw) return null;
             const v = parseVersion(raw);
-            if(!v){
-              try{ inputEl.setCustomValidity(''); }catch(e){}
-              return null;
-            }
+            if(!v) return null;
             const norm = formatRelease(v);
             inputEl.value = norm;
-            try{ inputEl.setCustomValidity(''); }catch(e){}
             return norm;
           }
 
           function attachReleaseMask(){
             [inpFrom, inpTo].forEach(el => {
               if(!el) return;
-              el.addEventListener('input', () => { try{ el.setCustomValidity(''); }catch(e){} });
               el.addEventListener('blur', () => validateAndNormalizeReleaseInput(el));
             });
           }
 
+          function buildMajorRange(){
+            const a = parseVersion(inpFrom?.value);
+            const b = parseVersion(inpTo?.value);
+            if(!a || !b) return [];
+            if(a.majorN !== b.majorN) return [];
+
+            const step = 1000;
+
+            const aKey = a.minorN * 10000 + a.build;
+            const bKey = b.minorN * 10000 + b.build;
+            const loV = aKey <= bKey ? a : b;
+            const hiV = aKey <= bKey ? b : a;
+
+            const out = [];
+            for(let m = loV.minorN; m <= hiV.minorN; m++){
+              let startBuild = 0;
+              let endBuild   = 9000;
+
+              if(m === loV.minorN) startBuild = Math.ceil(loV.build / step) * step;
+              if(m === hiV.minorN) endBuild   = Math.floor(hiV.build / step) * step;
+
+              if(startBuild > endBuild) continue;
+              for(let build = startBuild; build <= endBuild; build += step){
+                const buildStr = String(build).padStart(4, '0');
+                out.push(`${loV.major}.${m}.${buildStr}`);
+              }
+            }
+            return out;
+          }
+
+          // ---- allure http ----
           async function httpGet(path, params, signal){
             const url = new URL(BASE_URL + path);
             if(params){
@@ -708,31 +1080,26 @@ ctx.font = font;
           }
 
           async function fetchHBLaunches(version, signal){
-            const terms = [
-              `[High/Blocker][DeployLab] Регресс ${version}`,
-            ];
-
+            const term = `[High/Blocker][DeployLab] Регресс ${version}`;
+            const search = b64Query([{ id:'name', type:'string', value: term }]);
             const byId = new Map();
-            for(const term of terms){
-              const search = b64Query([{ id:'name', type:'string', value: term }]);
-              let page = 0;
-              while(true){
-                const data = await httpGet('/api/launch', {
-                  page, size: PAGE_SIZE, search,
-                  projectId: PROJECT_ID,
-                  preview: 'true',
-                  sort: 'createdDate,desc'
-                }, signal);
+            let page = 0;
+            while(true){
+              const data = await httpGet('/api/launch', {
+                page, size: PAGE_SIZE, search,
+                projectId: PROJECT_ID,
+                preview: 'true',
+                sort: 'createdDate,desc'
+              }, signal);
 
-                const content = (data && data.content) ? data.content : [];
-                if(!content.length) break;
-                content.forEach(it => {
-                  const id = Number(it && it.id);
-                  if(Number.isFinite(id)) byId.set(id, it);
-                });
-                if(content.length < PAGE_SIZE) break;
-                page += 1;
-              }
+              const content = (data && data.content) ? data.content : [];
+              if(!content.length) break;
+              content.forEach(it => {
+                const id = Number(it && it.id);
+                if(Number.isFinite(id)) byId.set(id, it);
+              });
+              if(content.length < PAGE_SIZE) break;
+              page += 1;
             }
             return Array.from(byId.values());
           }
@@ -786,251 +1153,67 @@ ctx.font = font;
             return ms;
           }
 
-         function swatStreamAgg(memberstats, swatSet){
-  let swatTotal = 0;
-  let streamTotal = 0;
-  let swatDur = 0;
-  let streamDur = 0;
-  let swatExec = 0;
-  let streamExec = 0;
+          function swatStreamAgg(memberstats, swatSet){
+            let swatTotal = 0;
+            let streamTotal = 0;
+            let swatDur = 0;
+            let streamDur = 0;
 
-  const pushStat = (bucket, statItem) => {
-    if(!statItem || typeof statItem !== 'object') return;
-    const c = Number(statItem.count ?? statItem.total ?? statItem.tests ?? 0) || 0;
-    const d = Number(statItem.duration ?? statItem.time ?? 0) || 0;
+            const pushStat = (bucket, statItem) => {
+              if(!statItem || typeof statItem !== 'object') return;
+              const c = Number(statItem.count ?? statItem.total ?? statItem.tests ?? 0) || 0;
+              const d = Number(statItem.duration ?? statItem.time ?? 0) || 0;
+              if(c > 0) bucket.total += c;
+              if(d > 0) bucket.dur += d;
+            };
 
-    if(c > 0) bucket.total += c;
-    // for avg time we count only "executed" items (where we have duration)
-    if(c > 0 && d > 0) bucket.exec += c;
-    if(d > 0) bucket.dur += d;
-  };
+            for(const m of (memberstats || [])){
+              if(!m || typeof m !== 'object') continue;
+              const assignee = String(m.assignee || '').trim().toLowerCase();
 
-  for(const m of (memberstats || [])){
-    if(!m || typeof m !== 'object') continue;
-    const assignee = String(m.assignee || '').trim().toLowerCase();
+              let total = 0;
+              let dur = 0;
 
-    let total = 0;
-    let exec = 0;
-    let dur = 0;
+              const stat = m.statistic;
 
-    const stat = m.statistic;
-
-    // statistic can be: array of items OR object keyed by status OR a single object
-    if(Array.isArray(stat)){
-      const bucket = { total: 0, exec: 0, dur: 0 };
-      for(const s of stat) pushStat(bucket, s);
-      total = bucket.total;
-      exec  = bucket.exec;
-      dur   = bucket.dur;
-    }else if(stat && typeof stat === 'object'){
-      const bucket = { total: 0, exec: 0, dur: 0 };
-
-      // if it already looks like a stat item
-      if(('count' in stat) || ('total' in stat) || ('duration' in stat) || ('time' in stat)){
-        pushStat(bucket, stat);
-      }else{
-        // otherwise iterate nested values
-        for(const v of Object.values(stat)){
-          if(Array.isArray(v)){
-            for(const vv of v) pushStat(bucket, vv);
-          }else{
-            pushStat(bucket, v);
-          }
-        }
-      }
-
-      total = bucket.total;
-      exec  = bucket.exec;
-      dur   = bucket.dur;
-    }
-
-    // fallback: memberstats provides durationSum per assignee
-    if(!dur){
-      dur = Number(m.durationSum ?? m.duration ?? m.time ?? 0) || 0;
-    }
-
-    // if we have duration but exec is 0 (no per-status durations), assume all counted cases are executed
-    if(dur > 0 && exec === 0 && total > 0){
-      exec = total;
-    }
-
-    if(total <= 0) continue;
-
-    if(assignee && swatSet && swatSet.has(assignee)){
-      swatTotal += total;
-      swatExec  += exec;
-      swatDur   += dur;
-    }else{
-      streamTotal += total;
-      streamExec  += exec;
-      streamDur   += dur;
-    }
-  }
-
-  return { swatTotal, streamTotal, swatDur, streamDur, swatExec, streamExec };
-}
-
-          function saveInputs(){
-            try{ localStorage.setItem(LS_TOKEN_KEY, inpAllureToken.value || ''); }catch(e){}
-            try{ localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' })); }catch(e){}
-          }
-
-          function restoreInputs(){
-            try{
-              const tok = localStorage.getItem(LS_TOKEN_KEY) || '';
-              if(inpAllureToken) inpAllureToken.value = tok;
-            }catch(e){}
-            try{
-              const raw = localStorage.getItem(LS_RANGE_KEY);
-              if(raw){
-                const obj = JSON.parse(raw);
-                if(inpFrom) inpFrom.value = obj?.from || '';
-                if(inpTo) inpTo.value = obj?.to || '';
+              if(Array.isArray(stat)){
+                const bucket = { total: 0, dur: 0 };
+                for(const s of stat) pushStat(bucket, s);
+                total = bucket.total;
+                dur = bucket.dur;
+              }else if(stat && typeof stat === 'object'){
+                const bucket = { total: 0, dur: 0 };
+                if(('count' in stat) || ('total' in stat) || ('duration' in stat) || ('time' in stat)){
+                  pushStat(bucket, stat);
+                }else{
+                  for(const v of Object.values(stat)){
+                    if(Array.isArray(v)){
+                      for(const vv of v) pushStat(bucket, vv);
+                    }else{
+                      pushStat(bucket, v);
+                    }
+                  }
+                }
+                total = bucket.total;
+                dur = bucket.dur;
               }
-            }catch(e){}
-          }
 
-          function setEmpty(text){
-            if(!emptyBox) return;
-            emptyBox.textContent = text;
-            emptyBox.style.display = '';
-          }
-
-          function showContent(){
-            if(emptyBox) emptyBox.style.display = 'none';
-            contentWrap.style.display = '';
-          }
-
-          function showEmpty(text){
-            setEmpty(text);
-            contentWrap.style.display = 'none';
-          }
-
-          function setCovEmpty(text){
-            if(!covEmpty) return;
-            covEmpty.textContent = text;
-            covEmpty.style.display = '';
-          }
-
-          function showCovContent(){
-            if(covEmpty) covEmpty.style.display = 'none';
-            if(covContent) covContent.style.display = '';
-          }
-
-          function showCovEmpty(text){
-            setCovEmpty(text);
-            if(covContent) covContent.style.display = 'none';
-          }
-
-          function setSelEmpty(text){
-            if(!selEmpty) return;
-            selEmpty.textContent = text;
-            selEmpty.style.display = '';
-          }
-
-          function showSelContent(){
-            if(selEmpty) selEmpty.style.display = 'none';
-            if(selContent) selContent.style.display = '';
-          }
-
-          function showSelEmpty(text){
-            setSelEmpty(text);
-            if(selContent) selContent.style.display = 'none';
-          }
-
-          function setRunning(running){
-            if(running){
-              startBtn.style.display = 'none';
-              stopBtn.style.display = '';
-              window.__wbAbortController = new AbortController();
-              showEmpty('Данные появятся после получения из источника');
-              showCovEmpty('Данные появятся после получения из источника');
-              showSelEmpty('Данные появятся после получения из источника');
-              showChpEmpty('Данные появятся после получения из источника');
-              showAvgEmpty('Данные появятся после получения из источника');
-            }else{
-              stopBtn.style.display = 'none';
-              startBtn.style.display = '';
-              if(window.__wbAbortController){
-                try{ window.__wbAbortController.abort(); }catch(e){}
+              if(!dur){
+                dur = Number(m.durationSum ?? m.duration ?? m.time ?? 0) || 0;
               }
-              window.__wbAbortController = null;
-            }
-          }
 
-          function clear(){
-            tbody.innerHTML = '';
-            if(tcChart){
-              tcChart.data.labels = [];
-              tcChart.data.datasets.forEach(d => d.data = []);
-              tcChart.update();
-            }
+              if(total <= 0) continue;
 
-            if(covTbody) covTbody.innerHTML = '';
-            if(covChart){
-              covChart.data.labels = [];
-              covChart.data.datasets.forEach(d => d.data = []);
-              covChart.update();
+              if(assignee && swatSet && swatSet.has(assignee)){
+                swatTotal += total;
+                swatDur += dur;
+              }else{
+                streamTotal += total;
+                streamDur += dur;
+              }
             }
 
-            if(selTbody) selTbody.innerHTML = '';
-            if(selChart){
-              selChart.data.labels = [];
-              selChart.data.datasets.forEach(d => d.data = []);
-              selChart.update();
-            }
-
-            if(chpTbody) chpTbody.innerHTML = '';
-            if(chpChart){
-              chpChart.data.labels = [];
-              chpChart.data.datasets.forEach(d => d.data = []);
-              chpChart.update();
-            }
-
-            if(avgTbody) avgTbody.innerHTML = '';
-            if(avgChart){
-              avgChart.data.labels = [];
-              avgChart.data.datasets.forEach(d => d.data = []);
-              avgChart.update();
-            }
-          }
-
-          async function fetchSwatLogins(release, signal){
-            if(__swatSetCache) return __swatSetCache;
-            if(__swatSetPromise) return __swatSetPromise;
-
-            __swatSetPromise = (async () => {
-              const url = new URL(SWAT_LIST_URL);
-
-              const r = await fetch(url.toString(), { signal });
-              if(!r.ok) throw new Error(`SWAT list HTTP ${r.status}`);
-              const text = await r.text();
-              const set = new Set();
-              text.split(/\r?\n/).forEach(line => {
-                const s = (line || '').trim();
-                if(!s) return;
-                const first = s.split(/\s+/)[0];
-                const norm = normalizeLogin(first);
-                if(norm) set.add(norm);
-              });
-              __swatSetCache = set;
-              return set;
-            })();
-
-            try{
-              return await __swatSetPromise;
-            }catch(e){
-              __swatSetPromise = null;
-              __swatSetCache = null;
-              throw e;
-            }
-          }
-
-          function cssVar(name, fallback){
-            try{
-              const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-              return v || fallback;
-            }catch{ return fallback; }
+            return { swatTotal, streamTotal, swatDur, streamDur };
           }
 
           function formatMsPerCase(ms){
@@ -1042,10 +1225,71 @@ ctx.font = font;
             const s = totalSec % 60;
             const mm = String(m).padStart(2,'0');
             const ss = String(s).padStart(2,'0');
-            if(h > 0){
-              return `${h}:${mm}:${ss}`;
-            }
+            if(h > 0) return `${h}:${mm}:${ss}`;
             return `${mm}:${ss}`;
+          }
+
+          // ---- charts ----
+          function ensureChart(){
+            if(!chartCanvas || !window.Chart) return;
+            if(tcChart){
+              tcChart.data.labels = [];
+              tcChart.data.datasets.forEach(d => d.data = []);
+              tcChart.update();
+              return;
+            }
+
+            const cManual = cssVar('--tc-manual', '#f59e0b');
+            const cAuto   = cssVar('--tc-auto',   '#3b82f6');
+            const cTotal  = cssVar('--tc-total',  '#a855f7');
+
+            tcChart = new Chart(chartCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  { label: 'Ручные', data: [], borderColor: cManual, backgroundColor: cManual, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'Авто',   data: [], borderColor: cAuto,   backgroundColor: cAuto,   tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'Всего',  data: [], borderColor: cTotal,  backgroundColor: cTotal,  tension: 0.25, pointRadius: 3, pointHoverRadius: 5 }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  deltaLabels: { datasetIndex: 2 },
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    itemSort: (a, b) => {
+                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      },
+                      label: (ctx) => {
+                        const i = ctx.dataIndex;
+                        const total = Number(tcChart?.data?.datasets?.[2]?.data?.[i] || 0);
+                        const val = Number(ctx.raw || 0);
+                        let pct = 0;
+                        if(ctx.datasetIndex === 2) pct = 100;
+                        else if(total > 0) pct = Math.round((val / total) * 1000) / 10;
+                        return `${ctx.dataset.label}: ${val} | ${pct}%`;
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: { ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
+                }
+              }
+            });
           }
 
           function ensureCoverageChart(){
@@ -1073,7 +1317,7 @@ ctx.font = font;
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
-                  deltaLabels: { datasetIndex: 0 }, /* дельта для SWAT */
+                  deltaLabels: { datasetIndex: 0 },
                   tooltip: {
                     mode: 'index',
                     intersect: false,
@@ -1107,13 +1351,8 @@ ctx.font = font;
                 },
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                  x: {
-                    offset: false,
-                    bounds: 'data',
-                    ticks: { maxRotation: 0, autoSkip: true },
-                    grid: { color: 'rgba(148,163,184,.25)' }
-                  },
-              y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
+                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
                 }
               }
             });
@@ -1144,7 +1383,7 @@ ctx.font = font;
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
-                  deltaLabels: { datasetIndex: 0 }, /* дельта для SWAT */
+                  deltaLabels: { datasetIndex: 0 },
                   tooltip: {
                     mode: 'index',
                     intersect: false,
@@ -1172,63 +1411,6 @@ ctx.font = font;
                         const sw = Number(selChart.data.datasets[0].data[i] || 0);
                         const st = Number(selChart.data.datasets[1].data[i] || 0);
                         return `Всего: ${sw + st}`;
-                      }
-                    }
-                  }
-                },
-                interaction: { mode: 'index', intersect: false },
-                scales: {
-                  x: {
-                    offset: false,
-                    bounds: 'data',
-                    ticks: { maxRotation: 0, autoSkip: true },
-                    grid: { color: 'rgba(148,163,184,.25)' }
-                  },
-                  y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
-                }
-              }
-            });
-          }
-
-          function ensureChpChart(){
-            if(!chpCanvas || !window.Chart) return;
-            if(chpChart){
-              chpChart.data.labels = [];
-              chpChart.data.datasets.forEach(d => d.data = []);
-              chpChart.update();
-              return;
-            }
-            const cIos = cssVar('--chp-ios', '#0ea5e9');
-            const cAnd = cssVar('--chp-android', '#22c55e');
-            const cTot = cssVar('--chp-total', '#a855f7');
-
-            chpChart = new Chart(chpCanvas, {
-              type: 'line',
-              data: {
-                labels: [],
-                datasets: [
-                  { label: 'iOS', data: [], borderColor: cIos, backgroundColor: cIos, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
-                  { label: 'Android', data: [], borderColor: cAnd, backgroundColor: cAnd, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
-                  { label: 'Всего', data: [], borderColor: cTot, backgroundColor: cTot, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 }
-                ]
-              },
-              options: {
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: { display: false },
-                  deltaLabels: { datasetIndex: 2 }, /* дельта для Всего */
-                  tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    itemSort: (a, b) => {
-                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
-                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
-                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
-                    },
-                    callbacks: {
-                      title: (items) => {
-                        const lbl = items?.[0]?.label;
-                        return lbl ? `Релиз ${lbl}` : '';
                       }
                     }
                   }
@@ -1303,6 +1485,174 @@ ctx.font = font;
             });
           }
 
+          function ensureChpChart(){
+            if(!chpCanvas || !window.Chart) return;
+            if(chpChart){
+              chpChart.data.labels = [];
+              chpChart.data.datasets.forEach(d => d.data = []);
+              chpChart.update();
+              return;
+            }
+            const cIos = cssVar('--chp-ios', '#0ea5e9');
+            const cAnd = cssVar('--chp-android', '#22c55e');
+            const cTot = cssVar('--chp-total', '#a855f7');
+
+            chpChart = new Chart(chpCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  { label: 'iOS', data: [], borderColor: cIos, backgroundColor: cIos, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'Android', data: [], borderColor: cAnd, backgroundColor: cAnd, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
+                  { label: 'Всего', data: [], borderColor: cTot, backgroundColor: cTot, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  deltaLabels: { datasetIndex: 2 },
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    itemSort: (a, b) => {
+                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
+                }
+              }
+            });
+          }
+
+          function ensureCutChart(){
+            if(!cutCanvas || !window.Chart) return;
+            if(cutChart){
+              cutChart.data.labels = [];
+              cutChart.data.datasets.forEach(d => {
+                d.data = [];
+                d._timeLabel = [];
+                d._timeMs = [];
+              });
+              cutChart.update();
+              return;
+            }
+
+            const cIosCut  = cssVar('--cut-ios-cutoff', '#0ea5e9');
+            const cIosSt   = cssVar('--cut-ios-store',  '#a855f7');
+            const cAndCut  = cssVar('--cut-android-cutoff', '#22c55e');
+            const cAndSt   = cssVar('--cut-android-store',  '#f59e0b');
+
+            const dayTicks = ['вс','сб','пт','чт','ср','вт','пн'];
+
+            const makeDs = (label, color) => ({
+              label,
+              data: [],
+              borderColor: color,
+              backgroundColor: color,
+              tension: 0.25,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              spanGaps: true,
+              _timeLabel: [],
+              _timeMs: []
+            });
+
+            cutChart = new Chart(cutCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  makeDs('iOS Cutoff', cIosCut),
+                  makeDs('Android Cutoff', cAndCut),
+                  makeDs('iOS Store', cIosSt),
+                  makeDs('Android Store', cAndSt),
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    // СНАЧАЛА cutoff (раньше — выше), ПОТОМ store (раньше — выше)
+                    itemSort: (a, b) => {
+                      const la = String(a?.dataset?.label || '');
+                      const lb = String(b?.dataset?.label || '');
+                      const kindA = la.includes('Cutoff') ? 0 : 1;
+                      const kindB = lb.includes('Cutoff') ? 0 : 1;
+                      if(kindA !== kindB) return kindA - kindB;
+
+                      const dsA = cutChart.data.datasets[a.datasetIndex];
+                      const dsB = cutChart.data.datasets[b.datasetIndex];
+                      const ta = Number(dsA?._timeMs?.[a.dataIndex]);
+                      const tb = Number(dsB?._timeMs?.[b.dataIndex]);
+
+                      const aInf = Number.isFinite(ta) ? ta : Number.POSITIVE_INFINITY;
+                      const bInf = Number.isFinite(tb) ? tb : Number.POSITIVE_INFINITY;
+                      const diff = aInf - bInf;
+                      return diff || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      },
+                      label: (ctx) => {
+                        const ds = cutChart.data.datasets[ctx.datasetIndex];
+                        const txt = ds?._timeLabel?.[ctx.dataIndex] || '-';
+                        return `${ctx.dataset.label}: ${txt}`;
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: {
+                    bounds: 'data',
+                    ticks: { maxRotation: 0, autoSkip: true },
+                    grid: { color: 'rgba(148,163,184,.25)' }
+                  },
+                  y: {
+                    min: 0,
+                    max: 6 * 1440 + 1439,
+                    reverse: true,
+                    grid: { color: 'rgba(148,163,184,.25)' },
+                    ticks: {
+                      stepSize: 1440,
+                      callback: (v) => {
+                        const idx = Math.round(Number(v) / 1440);
+                        return dayTicks[idx] ?? '';
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+
+          function addChartPoint(release, manual, auto, total){
+            if(!tcChart) return;
+            tcChart.data.labels.push(release);
+            tcChart.data.datasets[0].data.push(manual);
+            tcChart.data.datasets[1].data.push(auto);
+            tcChart.data.datasets[2].data.push(total);
+            tcChart.update();
+          }
+
           function addCoveragePoint(release, swatCount, streamCount){
             if(!covChart) return;
             covChart.data.labels.push(release);
@@ -1319,75 +1669,13 @@ ctx.font = font;
             selChart.update();
           }
 
-          function ensureChart(){
-            if(!chartCanvas || !window.Chart) return;
-            if(tcChart){
-              tcChart.data.labels = [];
-              tcChart.data.datasets.forEach(d => d.data = []);
-              tcChart.update();
-              return;
-            }
-
-            const cManual = cssVar('--tc-manual', '#f59e0b');
-            const cAuto   = cssVar('--tc-auto',   '#3b82f6');
-            const cTotal  = cssVar('--tc-total',  '#a855f7');
-
-            tcChart = new Chart(chartCanvas, {
-              type: 'line',
-              data: {
-                labels: [],
-                datasets: [
-                  { label: 'Ручные', data: [], borderColor: cManual, backgroundColor: cManual, tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
-                  { label: 'Авто',   data: [], borderColor: cAuto,   backgroundColor: cAuto,   tension: 0.25, pointRadius: 3, pointHoverRadius: 5 },
-                  { label: 'Всего',  data: [], borderColor: cTotal,  backgroundColor: cTotal,  tension: 0.25, pointRadius: 3, pointHoverRadius: 5 }
-                ]
-              },
-              options: {
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: { display: false },
-                  deltaLabels: { datasetIndex: 2 }, /* дельта для Всего */
-                  tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    itemSort: (a, b) => {
-                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
-                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
-                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
-                    },
-                    callbacks: {
-                      title: (items) => {
-                        const lbl = items?.[0]?.label;
-                        return lbl ? `Релиз ${lbl}` : '';
-                      },
-                      label: (ctx) => {
-                        const i = ctx.dataIndex;
-                        const total = Number(tcChart?.data?.datasets?.[2]?.data?.[i] || 0);
-                        const val = Number(ctx.raw || 0);
-                        let pct = 0;
-                        if(ctx.datasetIndex === 2) pct = 100;
-                        else if(total > 0) pct = Math.round((val / total) * 1000) / 10;
-                        return `${ctx.dataset.label}: ${val} | ${pct}%`;
-                      }
-                    }
-                  }
-                },
-                interaction: { mode: 'index', intersect: false },
-                scales: {
-                  x: { ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
-                  y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
-                }
-              }
-            });
-          }
-
-          function addChartPoint(release, manual, auto, total){
-            if(!tcChart) return;
-            tcChart.data.labels.push(release);
-            tcChart.data.datasets[0].data.push(manual);
-            tcChart.data.datasets[1].data.push(auto);
-            tcChart.data.datasets[2].data.push(total);
-            tcChart.update();
+          function addAvgPoint(release, swatMin, streamMin, totalMin){
+            if(!avgChart) return;
+            avgChart.data.labels.push(release);
+            avgChart.data.datasets[0].data.push(swatMin);
+            avgChart.data.datasets[1].data.push(streamMin);
+            avgChart.data.datasets[2].data.push(totalMin);
+            avgChart.update();
           }
 
           function addChpPoint(release, ios, android, total){
@@ -1399,15 +1687,37 @@ ctx.font = font;
             chpChart.update();
           }
 
-          function addAvgPoint(release, swatMin, streamMin, totalMin){
-            if(!avgChart) return;
-            avgChart.data.labels.push(release);
-            avgChart.data.datasets[0].data.push(swatMin);
-            avgChart.data.datasets[1].data.push(streamMin);
-            avgChart.data.datasets[2].data.push(totalMin);
-            avgChart.update();
+          function addCutPoint(release, dsIndex, yObjOrNull){
+            if(!cutChart) return;
+            if(cutChart.data.labels.length === 0 || cutChart.data.labels[cutChart.data.labels.length - 1] !== release){
+              cutChart.data.labels.push(release);
+              // для всех датасетов синхронизируем длины (если нужно)
+              for(const ds of cutChart.data.datasets){
+                while(ds.data.length < cutChart.data.labels.length - 1){
+                  ds.data.push(null);
+                  ds._timeLabel.push('');
+                  ds._timeMs.push(null);
+                }
+              }
+            }
+            const di = cutChart.data.labels.length - 1;
+            const ds = cutChart.data.datasets[dsIndex];
+
+            // ensure arrays length
+            while(ds.data.length < di){ ds.data.push(null); ds._timeLabel.push(''); ds._timeMs.push(null); }
+
+            if(!yObjOrNull){
+              ds.data.push(null);
+              ds._timeLabel.push('');
+              ds._timeMs.push(null);
+            }else{
+              ds.data.push(yObjOrNull.y);
+              ds._timeLabel.push(yObjOrNull.label);
+              ds._timeMs.push(yObjOrNull.msLocal);
+            }
           }
 
+          // ---- таблицы (рендер) ----
           function renderRow({release, manual, auto, total}){
             const max = Math.max(total, 1);
             const pctM = Math.round((manual / max) * 100);
@@ -1484,6 +1794,19 @@ ctx.font = font;
             avgTbody.appendChild(tr);
           }
 
+          function renderCutRow({release, iosCut, iosStore, andCut, andStore}){
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td class="mono text-left">${release}</td>
+              <td class="mono">${iosCut || '-'}</td>
+              <td class="mono">${iosStore || '-'}</td>
+              <td class="mono">${andCut || '-'}</td>
+              <td class="mono">${andStore || '-'}</td>
+            `;
+            cutTbody.appendChild(tr);
+          }
+
+          // ---- concurrency ----
           async function asyncPool(items, concurrency, iterator, signal){
             const results = [];
             let i = 0;
@@ -1498,270 +1821,7 @@ ctx.font = font;
             return results;
           }
 
-          async function run(){
-            validateAndNormalizeReleaseInput(inpFrom);
-            validateAndNormalizeReleaseInput(inpTo);
-            saveInputs();
-            clear();
-
-            const tok = (inpAllureToken?.value || '').trim();
-            if(!tok){
-              showEmpty('Вставьте API токен Allure');
-              return;
-            }
-
-            const releases = buildMajorRange();
-            if(!releases.length){
-              showEmpty('Укажите корректный диапазон (например 7.4.1000 → 7.4.4000 или 7.3.7 → 7.4.2)');
-              return;
-            }
-
-            ensureChart();
-            ensureCoverageChart();
-            ensureSelectiveChart();
-            ensureChpChart();
-            ensureAvgChart();
-
-            showContent();
-            showCovContent();
-            showSelContent();
-            showChpContent();
-            showAvgContent();
-
-            const signal = window.__wbAbortController?.signal;
-
-            let swatSet;
-            try{
-              swatSet = await fetchSwatLogins(null, signal);
-            }catch(e){
-              showEmpty(`Ошибка получения списка SWAT: ${e?.message || e}`);
-              return;
-            }
-
-            tbody.innerHTML = '<tr><td class="mono text-left" colspan="5">Сбор данных…</td></tr>';
-
-            const LAUNCH_CONCURRENCY = 10;
-
-            const tcRowsData = [];
-            const covRowsData = [];
-            const selRowsData = [];
-            const avgRowsData = [];
-            const avgGrand = { swatDur: 0, swatCnt: 0, streamDur: 0, streamCnt: 0, totalDur: 0, totalCnt: 0 };
-
-            let firstRow = true;
-            for(const rel of releases){
-              if(signal?.aborted) break;
-
-              let total = 0;
-              let manual = 0;
-              let auto  = 0;
-
-              let swatCount = 0;
-              let streamCount = 0;
-
-              // 1) Для первой диаграммы (Manual/Auto/Total) берём все раны (Smoke/Selective)
-              const launchMapAll = new Map();
-              for(const kind of KINDS){
-                const launches = await fetchLaunches(rel, kind, signal);
-                for(const l of launches){
-                  const id = Number(l?.id);
-                  if(Number.isFinite(id)) launchMapAll.set(id, id);
-                }
-              }
-              const idsAll = Array.from(launchMapAll.keys());
-
-              // AVG TIME (SWAT/STREAM/Total): memberstats(count+duration); если duration нет — раскладываем launch.duration пропорционально count
-              let avgSwatCnt = 0, avgStreamCnt = 0;
-              let avgSwatDur = 0, avgStreamDur = 0;
-
-              const perAvg = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
-                const ms = await fetchMemberStats(id, signal);
-                const agg = swatStreamAgg(ms, swatSet);
-
-                if((agg.swatDur + agg.streamDur) <= 0){
-                  const launchDur = await fetchLaunchDurationMs(id, signal);
-                  const totalCnt = Math.max(1, (agg.swatTotal + agg.streamTotal));
-                  const swShare = (agg.swatTotal || 0) / totalCnt;
-                  const stShare = (agg.streamTotal || 0) / totalCnt;
-                  agg.swatDur = launchDur * swShare;
-                  agg.streamDur = launchDur * stShare;
-                  agg.swatExec = agg.swatTotal;
-                  agg.streamExec = agg.streamTotal;
-                }
-
-                return agg;
-              }, signal);
-
-              for(const r of perAvg){
-                if(!r) continue;
-                avgSwatCnt += Number((r.swatExec ?? r.swatTotal) || 0);
-                avgStreamCnt += Number((r.streamExec ?? r.streamTotal) || 0);
-                avgSwatDur += Number(r.swatDur || 0);
-                avgStreamDur += Number(r.streamDur || 0);
-              }
-
-              const avgTotalCnt = avgSwatCnt + avgStreamCnt;
-              const avgTotalDur = avgSwatDur + avgStreamDur;
-
-              const swatMsPerCase = avgSwatCnt ? (avgSwatDur / avgSwatCnt) : 0;
-              const streamMsPerCase = avgStreamCnt ? (avgStreamDur / avgStreamCnt) : 0;
-              const totalMsPerCase = avgTotalCnt ? (avgTotalDur / avgTotalCnt) : 0;
-
-              addAvgPoint(rel, swatMsPerCase/60000, streamMsPerCase/60000, totalMsPerCase/60000);
-
-              if(avgTbody){
-                renderAvgRow({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase });
-              }
-
-              avgRowsData.push({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase, total: totalMsPerCase });
-              avgGrand.swatDur += avgSwatDur; avgGrand.swatCnt += avgSwatCnt;
-              avgGrand.streamDur += avgStreamDur; avgGrand.streamCnt += avgStreamCnt;
-              avgGrand.totalDur += avgTotalDur; avgGrand.totalCnt += avgTotalCnt;
-
-              // 2) Для второй диаграммы (SWAT/STREAM) берём только High/Blocker раны по названию
-              const hbLaunches = await fetchHBLaunches(rel, signal);
-              const idsHB = hbLaunches.map(l => Number(l?.id)).filter(id => Number.isFinite(id));
-
-              // 1) TOTAL/AUTO
-              const perLaunchAll = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
-                const [t, a] = await Promise.all([
-                  fetchTotalCases(id, signal),
-                  fetchAutomatedTotalCases(id, signal)
-                ]);
-                return { t: Number(t||0), a: Number(a||0) };
-              }, signal);
-
-              for(const r of perLaunchAll){
-                if(!r) continue;
-                total += r.t;
-                auto  += r.a;
-              }
-              manual = Math.max(0, total - auto);
-
-              // 2) SWAT/STREAM ХБ через memberstats
-              const perHB = await asyncPool(idsHB, LAUNCH_CONCURRENCY, async (id) => {
-                const ms = await fetchMemberStats(id, signal);
-                return swatStreamAgg(ms, swatSet);
-              }, signal);
-
-              for(const r of perHB){
-                if(!r) continue;
-                swatCount += Number(r.swatTotal || 0);
-                streamCount += Number(r.streamTotal || 0);
-              }
-
-              // 3) SWAT/STREAM Selective через memberstats (только Selective)
-              const selLaunches = await fetchLaunches(rel, 'Selective', signal);
-              const selIds = selLaunches.map(l => Number(l?.id)).filter(id => Number.isFinite(id));
-              let selSwat = 0;
-              let selStream = 0;
-              const perSel = await asyncPool(selIds, LAUNCH_CONCURRENCY, async (id) => {
-                const ms = await fetchMemberStats(id, signal);
-                return swatStreamAgg(ms, swatSet);
-              }, signal);
-              for(const r of perSel){
-                if(!r) continue;
-                selSwat += Number(r.swatTotal || 0);
-                selStream += Number(r.streamTotal || 0);
-              }
-
-              // Черепики (deploy-lab) — через прокси
-              let chpIos = 0;
-              let chpAndroid = 0;
-              try{
-                [chpIos, chpAndroid] = await Promise.all([
-                  fetchDeployIssueCount('IOS', rel, signal),
-                  fetchDeployIssueCount('ANDROID', rel, signal)
-                ]);
-              }catch(e){
-                // ok: оставляем 0
-              }
-              const chpTotal = (Number(chpIos)||0) + (Number(chpAndroid)||0);
-              if(chpTbody){
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                  <td class="mono text-left">${rel}</td>
-                  <td class="mono">${chpIos}</td>
-                  <td class="mono">${chpAndroid}</td>
-                  <td class="mono">${chpTotal}</td>
-                `;
-                chpTbody.appendChild(tr);
-              }
-              addChpPoint(rel, chpIos, chpAndroid, chpTotal);
-
-              if(firstRow){
-                tbody.innerHTML = '';
-                firstRow = false;
-              }
-              renderRow({ release: rel, manual, auto, total });
-              addChartPoint(rel, manual, auto, total);
-              tcRowsData.push({ release: rel, manual, auto, total });
-
-              if(covTbody){
-                renderCovRow({ release: rel, swatCount, streamCount });
-              }
-              covRowsData.push({ release: rel, swatCount, streamCount, total: (swatCount + streamCount) });
-              addCoveragePoint(rel, swatCount, streamCount);
-
-              if(selTbody){
-                renderSelRow({ release: rel, swatCount: selSwat, streamCount: selStream });
-              }
-              selRowsData.push({ release: rel, swatCount: selSwat, streamCount: selStream, total: (selSwat + selStream) });
-              addSelectivePoint(rel, selSwat, selStream);
-            }
-
-            // Таблицы (скрытые) сортируем по убыванию "итога"
-            if(tbody && tcRowsData.length){
-              tbody.innerHTML = '';
-              tcRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
-              tcRowsData.forEach(renderRow);
-            }
-
-            if(covTbody && covRowsData.length){
-              covTbody.innerHTML = '';
-              covRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
-              covRowsData.forEach(r => renderCovRow({ release: r.release, swatCount: r.swatCount, streamCount: r.streamCount }));
-            }
-
-            if(selTbody && selRowsData.length){
-              selTbody.innerHTML = '';
-              selRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
-              selRowsData.forEach(r => renderSelRow({ release: r.release, swatCount: r.swatCount, streamCount: r.streamCount }));
-            }
-
-            if(avgTbody && avgRowsData.length){
-              avgTbody.innerHTML = '';
-              avgRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
-              avgRowsData.forEach(r => renderAvgRow({ release: r.release, swatMs: r.swatMs, streamMs: r.streamMs, totalMs: r.totalMs }));
-
-              // Итоговая строка (скрыта, но пригодится)
-              const swMs = avgGrand.swatCnt ? (avgGrand.swatDur / avgGrand.swatCnt) : 0;
-              const stMs = avgGrand.streamCnt ? (avgGrand.streamDur / avgGrand.streamCnt) : 0;
-              const ttMs = avgGrand.totalCnt ? (avgGrand.totalDur / avgGrand.totalCnt) : 0;
-              const tr = document.createElement('tr');
-              tr.innerHTML = `
-                <td class="mono text-left font-semibold">Итого</td>
-                <td class="mono font-semibold">${formatMsPerCase(swMs)}</td>
-                <td class="mono font-semibold">${formatMsPerCase(stMs)}</td>
-                <td class="mono font-semibold">${formatMsPerCase(ttMs)}</td>
-              `;
-              avgTbody.appendChild(tr);
-            }
-
-            if(!tcRowsData.length){
-              showEmpty('Данные появятся после получения из источника');
-            }
-            if(!selRowsData.length){
-              showSelEmpty('Данные появятся после получения из источника');
-            }
-            if(chpTbody && !chpTbody.children.length){
-              showChpEmpty('Данные появятся после получения из источника');
-            }
-            if(avgTbody && !avgTbody.children.length){
-              showAvgEmpty('Данные появятся после получения из источника');
-            }
-          }
-
+          // ---- collapsers ----
           function initCollapsers(){
             let state = {};
             try{ state = JSON.parse(localStorage.getItem(LS_COLLAPSE_KEY) || '{}') || {}; }catch(e){ state = {}; }
@@ -1820,8 +1880,9 @@ ctx.font = font;
                 if(key === 'tc') tcChart?.resize();
                 if(key === 'cov') covChart?.resize();
                 if(key === 'sel') selChart?.resize();
-                if(key === 'chp') chpChart?.resize();
                 if(key === 'avg') avgChart?.resize();
+                if(key === 'chp') chpChart?.resize();
+                if(key === 'cut') cutChart?.resize();
               }catch(e){}
             }
 
@@ -1864,12 +1925,295 @@ ctx.font = font;
             });
           }
 
-          // init: restore inputs
+          // ---- RUN ----
+          async function run(){
+            validateAndNormalizeReleaseInput(inpFrom);
+            validateAndNormalizeReleaseInput(inpTo);
+            saveInputs();
+            clear();
+
+            const tok = (inpAllureToken?.value || '').trim();
+            if(!tok){
+              showEmpty('Вставьте API токен Allure');
+              return;
+            }
+
+            const releases = buildMajorRange();
+            if(!releases.length){
+              showEmpty('Укажите корректный диапазон (например 7.4.1000 → 7.4.4000 или 7.3.7 → 7.4.2)');
+              return;
+            }
+
+            ensureChart();
+            ensureCoverageChart();
+            ensureSelectiveChart();
+            ensureAvgChart();
+            ensureChpChart();
+            ensureCutChart();
+
+            showContent();
+            showCovContent();
+            showSelContent();
+            showAvgContent();
+            showChpContent();
+            showCutContent();
+
+            const signal = window.__wbAbortController?.signal;
+
+            let swatSet;
+            try{
+              swatSet = await fetchSwatLogins(null, signal);
+            }catch(e){
+              showEmpty(`Ошибка получения списка SWAT: ${e?.message || e}`);
+              return;
+            }
+
+            tbody.innerHTML = '<tr><td class="mono text-left" colspan="5">Сбор данных…</td></tr>';
+
+            const LAUNCH_CONCURRENCY = 10;
+
+            const tcRowsData = [];
+            const covRowsData = [];
+            const selRowsData = [];
+            const avgRowsData = [];
+
+            let firstRow = true;
+
+            for(const rel of releases){
+              if(signal?.aborted) break;
+
+              let total = 0;
+              let manual = 0;
+              let auto  = 0;
+
+              // 1) Manual/Auto/Total: по Smoke+Selective
+              const launchMapAll = new Map();
+              for(const kind of KINDS){
+                const launches = await fetchLaunches(rel, kind, signal);
+                for(const l of launches){
+                  const id = Number(l?.id);
+                  if(Number.isFinite(id)) launchMapAll.set(id, id);
+                }
+              }
+              const idsAll = Array.from(launchMapAll.keys());
+
+              // AVG TIME: memberstats (counts+durations)
+              let avgSwatCnt = 0, avgStreamCnt = 0;
+              let avgSwatDur = 0, avgStreamDur = 0;
+
+              const perAvg = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
+                const ms = await fetchMemberStats(id, signal);
+                const agg = swatStreamAgg(ms, swatSet);
+
+                if((agg.swatDur + agg.streamDur) <= 0){
+                  const launchDur = await fetchLaunchDurationMs(id, signal);
+                  const totalCnt = Math.max(1, (agg.swatTotal + agg.streamTotal));
+                  const swShare = (agg.swatTotal || 0) / totalCnt;
+                  const stShare = (agg.streamTotal || 0) / totalCnt;
+                  agg.swatDur = launchDur * swShare;
+                  agg.streamDur = launchDur * stShare;
+                }
+                return agg;
+              }, signal);
+
+              for(const r of perAvg){
+                if(!r) continue;
+                avgSwatCnt += Number(r.swatTotal || 0);
+                avgStreamCnt += Number(r.streamTotal || 0);
+                avgSwatDur += Number(r.swatDur || 0);
+                avgStreamDur += Number(r.streamDur || 0);
+              }
+
+              const avgTotalCnt = avgSwatCnt + avgStreamCnt;
+              const avgTotalDur = avgSwatDur + avgStreamDur;
+
+              const swatMsPerCase = avgSwatCnt ? (avgSwatDur / avgSwatCnt) : 0;
+              const streamMsPerCase = avgStreamCnt ? (avgStreamDur / avgStreamCnt) : 0;
+              const totalMsPerCase = avgTotalCnt ? (avgTotalDur / avgTotalCnt) : 0;
+
+              addAvgPoint(rel, swatMsPerCase/60000, streamMsPerCase/60000, totalMsPerCase/60000);
+              if(avgTbody){
+                renderAvgRow({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase });
+              }
+              avgRowsData.push({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase, total: totalMsPerCase });
+
+              // 2) SWAT/STREAM ХБ: только HB лаунчи, memberstats
+              let swatCount = 0;
+              let streamCount = 0;
+
+              const hbLaunches = await fetchHBLaunches(rel, signal);
+              const idsHB = hbLaunches.map(l => Number(l?.id)).filter(id => Number.isFinite(id));
+
+              const perHB = await asyncPool(idsHB, LAUNCH_CONCURRENCY, async (id) => {
+                const ms = await fetchMemberStats(id, signal);
+                return swatStreamAgg(ms, swatSet);
+              }, signal);
+
+              for(const r of perHB){
+                if(!r) continue;
+                swatCount += Number(r.swatTotal || 0);
+                streamCount += Number(r.streamTotal || 0);
+              }
+
+              // 3) SWAT/STREAM Selective (только Selective)
+              const selLaunches = await fetchLaunches(rel, 'Selective', signal);
+              const selIds = selLaunches.map(l => Number(l?.id)).filter(id => Number.isFinite(id));
+              let selSwat = 0;
+              let selStream = 0;
+
+              const perSel = await asyncPool(selIds, LAUNCH_CONCURRENCY, async (id) => {
+                const ms = await fetchMemberStats(id, signal);
+                return swatStreamAgg(ms, swatSet);
+              }, signal);
+
+              for(const r of perSel){
+                if(!r) continue;
+                selSwat += Number(r.swatTotal || 0);
+                selStream += Number(r.streamTotal || 0);
+              }
+
+              // 1) TOTAL/AUTO
+              const perLaunchAll = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
+                const [t, a] = await Promise.all([
+                  fetchTotalCases(id, signal),
+                  fetchAutomatedTotalCases(id, signal)
+                ]);
+                return { t: Number(t||0), a: Number(a||0) };
+              }, signal);
+
+              for(const r of perLaunchAll){
+                if(!r) continue;
+                total += r.t;
+                auto  += r.a;
+              }
+              manual = Math.max(0, total - auto);
+
+              // Черепики (deploy-lab issues) — через прокси
+              let chpIos = 0;
+              let chpAndroid = 0;
+              try{
+                [chpIos, chpAndroid] = await Promise.all([
+                  fetchDeployIssueCount('IOS', rel, signal),
+                  fetchDeployIssueCount('ANDROID', rel, signal)
+                ]);
+              }catch(e){}
+              const chpTotal = (Number(chpIos)||0) + (Number(chpAndroid)||0);
+              if(chpTbody){
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td class="mono text-left">${rel}</td>
+                  <td class="mono">${chpIos}</td>
+                  <td class="mono">${chpAndroid}</td>
+                  <td class="mono">${chpTotal}</td>
+                `;
+                chpTbody.appendChild(tr);
+              }
+              addChpPoint(rel, chpIos, chpAndroid, chpTotal);
+
+              // Cutoff/Store (deploy-lab base+deploy)
+              let iosCutLbl = null, iosStoreLbl = null, andCutLbl = null, andStoreLbl = null;
+
+              try{
+                const [ios, andr] = await Promise.all([
+                  fetchDeployDates('IOS', rel, signal),
+                  fetchDeployDates('ANDROID', rel, signal),
+                ]);
+
+                const iosCut = yValueFromIso(ios.cutoff);
+                const andCut = yValueFromIso(andr.cutoff);
+
+                const iosStore = (ios.storeMsLocal ? { 
+                  y: (dayIndexCustom(new Date(ios.storeMsLocal).getUTCDay()) * 1440 + (new Date(ios.storeMsLocal).getUTCHours()*60 + new Date(ios.storeMsLocal).getUTCMinutes() + new Date(ios.storeMsLocal).getUTCSeconds()/60)),
+                  msLocal: ios.storeMsLocal,
+                  label: labelFromMsLocal(ios.storeMsLocal)
+                } : null);
+
+                const andStore = (andr.storeMsLocal ? { 
+                  y: (dayIndexCustom(new Date(andr.storeMsLocal).getUTCDay()) * 1440 + (new Date(andr.storeMsLocal).getUTCHours()*60 + new Date(andr.storeMsLocal).getUTCMinutes() + new Date(andr.storeMsLocal).getUTCSeconds()/60)),
+                  msLocal: andr.storeMsLocal,
+                  label: labelFromMsLocal(andr.storeMsLocal)
+                } : null);
+
+                addCutPoint(rel, 0, iosCut);
+                addCutPoint(rel, 1, andCut);
+                addCutPoint(rel, 2, iosStore);
+                addCutPoint(rel, 3, andStore);
+
+                iosCutLbl = iosCut?.label || null;
+                andCutLbl = andCut?.label || null;
+                iosStoreLbl = iosStore?.label || null;
+                andStoreLbl = andStore?.label || null;
+              }catch(e){
+                addCutPoint(rel, 0, null);
+                addCutPoint(rel, 1, null);
+                addCutPoint(rel, 2, null);
+                addCutPoint(rel, 3, null);
+              }
+
+              if(cutTbody){
+                renderCutRow({ release: rel, iosCut: iosCutLbl, iosStore: iosStoreLbl, andCut: andCutLbl, andStore: andStoreLbl });
+              }
+              cutChart?.update();
+
+              if(firstRow){
+                tbody.innerHTML = '';
+                firstRow = false;
+              }
+
+              renderRow({ release: rel, manual, auto, total });
+              addChartPoint(rel, manual, auto, total);
+              tcRowsData.push({ release: rel, manual, auto, total });
+
+              if(covTbody){
+                renderCovRow({ release: rel, swatCount, streamCount });
+              }
+              covRowsData.push({ release: rel, swatCount, streamCount, total: (swatCount + streamCount) });
+              addCoveragePoint(rel, swatCount, streamCount);
+
+              if(selTbody){
+                renderSelRow({ release: rel, swatCount: selSwat, streamCount: selStream });
+              }
+              selRowsData.push({ release: rel, swatCount: selSwat, streamCount: selStream, total: (selSwat + selStream) });
+              addSelectivePoint(rel, selSwat, selStream);
+            }
+
+            // сортировка скрытых таблиц (если будешь включать)
+            if(tbody && tcRowsData.length){
+              tbody.innerHTML = '';
+              tcRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
+              tcRowsData.forEach(renderRow);
+            }
+            if(covTbody && covRowsData.length){
+              covTbody.innerHTML = '';
+              covRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
+              covRowsData.forEach(r => renderCovRow({ release: r.release, swatCount: r.swatCount, streamCount: r.streamCount }));
+            }
+            if(selTbody && selRowsData.length){
+              selTbody.innerHTML = '';
+              selRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
+              selRowsData.forEach(r => renderSelRow({ release: r.release, swatCount: r.swatCount, streamCount: r.streamCount }));
+            }
+            if(avgTbody && avgRowsData.length){
+              avgTbody.innerHTML = '';
+              avgRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
+              avgRowsData.forEach(r => renderAvgRow({ release: r.release, swatMs: r.swatMs, streamMs: r.streamMs, totalMs: r.totalMs }));
+            }
+
+            if(!tcRowsData.length) showEmpty('Данные появятся после получения из источника');
+            if(!selRowsData.length) showSelEmpty('Данные появятся после получения из источника');
+          }
+
+          // init
           restoreInputs();
           attachReleaseMask();
           validateAndNormalizeReleaseInput(inpFrom);
           validateAndNormalizeReleaseInput(inpTo);
           showEmpty('Данные появятся после получения из источника');
+          showCovEmpty('Данные появятся после получения из источника');
+          showSelEmpty('Данные появятся после получения из источника');
+          showAvgEmpty('Данные появятся после получения из источника');
+          showChpEmpty('Данные появятся после получения из источника');
+          showCutEmpty('Данные появятся после получения из источника');
           initCollapsers();
 
           proxyBtn?.addEventListener('click', async () => {
