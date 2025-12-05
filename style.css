@@ -163,3 +163,12 @@
 
 .dot.dot-swat{ background: var(--cov-swat); }
 .dot.dot-stream{ background: var(--cov-stream); }
+
+/* Legend dots for cutoff/store */
+.dot-ios-cutoff{background:var(--cut-ios-cutoff,#8b5cf6)}
+.dot-ios-store{background:var(--cut-ios-store,#0ea5e9)}
+.dot-android-cutoff{background:var(--cut-android-cutoff,#22c55e)}
+.dot-android-store{background:var(--cut-android-store,#f59e0b)}
+
+/* На всякий случай, если в style.css нет базового вида точек */
+.legend .dot{width:10px;height:10px;border-radius:9999px;display:inline-block;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
