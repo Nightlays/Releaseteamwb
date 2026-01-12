@@ -49,7 +49,7 @@
     thead th{background:#f7f5ff;border-bottom:1px solid #ecebff;padding:.7rem .8rem;font-weight:700;color:#5b21b6}
     td{border-bottom:1px dashed #eeeef8;padding:.6rem .7rem;vertical-align:top}
     tbody tr:hover td{background:#faf9ff}
-    .wrap{white-space:nowrap;word-break:normal}
+    .wrap{white-space:normal;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 
     /* Чуть шире таблицы + весь текст в одну строку (ФИО/стрим не налезают на цифры) */
     #summaryTable, #detailTablePersonStreams, #detailTablePersonCases, #detailTableStream{
@@ -61,6 +61,14 @@
     #detailTableStream th, #detailTableStream td{
       white-space:nowrap; word-break:normal;
     }
+    /* Перенос стримов на 2 строки (чтобы Ч/Ч не уезжало) */
+    #summaryTable td.wrap,
+    #detailTablePersonStreams td.wrap{
+      white-space:normal;
+      word-break:break-word;
+      max-width:250px;
+    }
+
     #summaryTable th, #summaryTable td,
     #detailTablePersonStreams th, #detailTablePersonStreams td,
     #detailTablePersonCases th, #detailTablePersonCases td,
@@ -88,11 +96,17 @@
     .sort-arrows{ display:inline-flex; flex-direction:column; margin-left:4px; font-size:9px; line-height:9px; opacity:.35; vertical-align:middle; }
     .sort-arrow{ transition:.15s; }
     .sort-arrow.sort-active{ opacity:1; color:#6d28d9; }
-  </style>
+  
+    /* Убираем горизонтальные скроллы (оставляем вертикальный) */
+    .overflow-auto{ overflow-x:hidden; overflow-y:auto; }
+
+    /* На всякий случай: не даём странице уезжать по X */
+    html, body{ overflow-x:hidden; }
+</style>
 </head>
 
 <body>
-  <div class="max-w-7xl mx-auto p-6 space-y-6">
+  <div class="max-w-none mx-auto p-6 space-y-6">
     <div class="flex items-center gap-3">
       <div class="brand-badge"><span class="brand-dot"></span><strong>WB</strong></div>
       <h1 class="text-2xl font-semibold">SWAT UwU отчёт</h1>
@@ -175,7 +189,7 @@
                 <th>Пройдено кейсов</th>
                 <th>Сумма UwU</th>
                 <th>% кейсов с UwU</th>
-                <th>Ч/Ч</th>
+                <th>Дни</th>
               </tr>
             </thead>
             <tbody>
@@ -253,6 +267,7 @@
         <div class="flex items-center gap-3 text-xs">
           <button id="detailTabPersonStreams" type="button" class="btn btn-ghost px-3 py-1.5" data-selected="true">По стримам</button>
           <button id="detailTabPersonCases" type="button" class="btn btn-ghost px-3 py-1.5" data-selected="false">По тест кейсам</button>
+          <div class="ml-auto text-xs text-slate-500 whitespace-nowrap" id="detailTargetStream"></div>
         </div>
       </div>
 
@@ -284,7 +299,7 @@
   const PROJECT_ID = 7;
   const PAGE_SIZE = 1000;
   const KINDS = ['Smoke', 'Selective'];
-  const SWAT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyyUSFLjoBZQ9OBOFVwCFp3Y90hwjHpTzI3pzojn3IE2M4DRUADAZQBkk1Ic8544OuGZw/exec';
+  const SWAT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwr0XB69uSvHtUDczPUq96NEpSwmcSuwj_KbZ3ULcu-2mVG9MtMcdH409dD-X6ozVL_Ug/exec';
 
   const LS_TOKEN_KEY = 'swat_uwu_token';
   const LS_FILTER_KEY = 'swat_uwu_filters';
@@ -334,6 +349,7 @@
   const detailPersonTabs = document.getElementById('detailPersonTabs');
   const detailTabPersonStreams = document.getElementById('detailTabPersonStreams');
   const detailTabPersonCases = document.getElementById('detailTabPersonCases');
+  const detailTargetStream = document.getElementById('detailTargetStream');
   const detailPersonStreams = document.getElementById('detailPersonStreams');
   const detailPersonCases = document.getElementById('detailPersonCases');
   const detailTablePersonStreams = document.getElementById('detailTablePersonStreams');
@@ -367,7 +383,9 @@
   };
 
   let gSwatNameMap = new Map();
+  let gSwatTargetStreamMap = new Map();
 
+  let gSwatDaysMap = new Map();
   let detailContext = null; // {type:'person'|'stream', key:string}
   let detailPersonActiveTab = 'streams';
 
@@ -404,24 +422,42 @@
   function parseSwat(text) {
     const set = new Set();
     const nameMap = new Map();
+    const daysMap = new Map();
     (text || '').split(/\r?\n/).forEach(line => {
       let t = line.trim();
       if (!t) return;
       t = t.replace(/^[-•]+/, '').trim();
       if (!t) return;
+
       const parts = t.split(/\s+/);
       const loginRaw = (parts.shift() || '').replace(/^@/, '');
       const loginNorm = normalizeLogin(loginRaw);
       if (!loginNorm) return;
+
       set.add(loginNorm);
+
+      // Новый формат: login + ФИО + days(число) в конце строки
+      let days = null;
+      if (parts.length) {
+        const maybeDays = parts[parts.length - 1];
+        if (/^-?\d+$/.test(maybeDays)) {
+          days = Number(parts.pop());
+        }
+      }
+
       const displayName = parts.join(' ').trim();
       if (displayName) {
         nameMap.set(loginNorm, displayName);
       } else if (!nameMap.has(loginNorm)) {
         nameMap.set(loginNorm, loginRaw);
       }
+
+      if (days !== null && Number.isFinite(days)) {
+        daysMap.set(loginNorm, days);
+      }
     });
-    return { set, nameMap };
+    return { set, nameMap, daysMap };
+
   }
 
   function getSwatDisplayName(login) {
@@ -752,8 +788,15 @@
         va = Number(a.percent) || 0;
         vb = Number(b.percent) || 0;
       } else if (key === 'hours') {
-        va = Number(a.durMs) || 0;
-        vb = Number(b.durMs) || 0;
+        const hasDaysA = Object.prototype.hasOwnProperty.call(a || {}, 'days');
+        const hasDaysB = Object.prototype.hasOwnProperty.call(b || {}, 'days');
+        if (hasDaysA || hasDaysB) {
+          va = Number(a.days) || 0;
+          vb = Number(b.days) || 0;
+        } else {
+          va = Number(a.durMs) || 0;
+          vb = Number(b.durMs) || 0;
+        }
       } else {
         return 0;
       }
@@ -809,17 +852,19 @@
     const percent = totalCases > 0 ? (totalUwuPresent / totalCases) * 100 : 0;
     const uwuDisplay = formatUwU(totalUwU);
     const hhmm = formatHours(totalDurMs);
+    const isPeopleSummary = (mainTable && mainTable.id === 'summaryTable' && activeTab === 'people');
+    const lastCellValue = isPeopleSummary ? '—' : hhmm;
 
     container.innerHTML = `
-      <div class="overflow-auto border border-[#ecebff] rounded-xl bg-[#f9f8ff]">
-        <table data-totals-table="1" class="text-sm" style="table-layout:fixed;width:max-content;min-width:100%">
+      <div class="overflow-hidden border border-[#ecebff] rounded-xl bg-[#f9f8ff]">
+       <table data-totals-table="1" class="text-sm" style="table-layout:fixed;width:100%">
           <tbody>
             <tr>
               <td class="px-3 py-1.5 text-left whitespace-nowrap">Итого:</td>
               <td class="px-3 py-1.5 text-center whitespace-nowrap">${totalCases}</td>
               <td class="px-3 py-1.5 text-center whitespace-nowrap">${uwuDisplay}</td>
               <td class="px-3 py-1.5 text-center whitespace-nowrap">${percent.toFixed(1)}%</td>
-              <td class="px-3 py-1.5 text-center whitespace-nowrap">${hhmm}</td>
+              <td class="px-3 py-1.5 text-center whitespace-nowrap">${lastCellValue}</td>
             </tr>
           </tbody>
         </table>
@@ -901,7 +946,7 @@
           <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
         </th>
         <th data-sort-key="hours">
-          Ч/Ч
+          Дни
           <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
         </th>
       `;
@@ -940,7 +985,7 @@
       <th data-sort-key="cases">Пройдено кейсов <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
       <th data-sort-key="uwu">Сумма UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
       <th data-sort-key="percent">% кейсов с UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
-      <th data-sort-key="hours">Ч/Ч <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="hours">Дни <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
     `;
     attachSortHandlers(summaryHead, 'summary-people', renderCurrentTab);
 
@@ -956,7 +1001,8 @@
         uwuSum: agg.uwuSum,
         uwuPresent: agg.uwuPresent,
         percent,
-        durMs: agg.durTotalMs || 0
+        durMs: agg.durTotalMs || 0,
+        days: Number(gSwatDaysMap.get(login) ?? 0)
       });
     });
 
@@ -976,7 +1022,7 @@
     for (const r of sorted) {
       const percentStr = r.totalCases > 0 ? (r.percent).toFixed(1) + '%' : '0.0%';
       const displayName = getSwatDisplayName(r.login);
-      const hhmm = formatHours(r.durMs);
+      const days = Number(r.days ?? 0);
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -984,7 +1030,7 @@
         <td>${r.totalCases}</td>
         <td>${formatUwU(r.uwuSum)}</td>
         <td>${percentStr}</td>
-        <td>${hhmm}</td>
+        <td>${days}</td>
       `;
       summaryBody.appendChild(tr);
     }
@@ -1315,6 +1361,10 @@
     const name = getSwatDisplayName(login);
     detailContext = { type: 'person', key: login };
     detailTitle.textContent = `Детали по SWAT: ${name}`;
+    if (detailTargetStream) {
+      const ts = gSwatTargetStreamMap.get(normalizeLogin(login)) || '—';
+      detailTargetStream.textContent = `Целевой стрим: ${ts}`;
+    }
     if (detailExport) detailExport.textContent = 'Скачать Excel (по стримам)';
 
     if (detailPersonTabsBlock) detailPersonTabsBlock.classList.remove('hidden');
@@ -1664,14 +1714,51 @@
     uwuCache.clear();
 
     try {
-      const res = await fetch(SWAT_ENDPOINT);
+      const swUrl = new URL(SWAT_ENDPOINT);
+      swUrl.searchParams.set('release', version);
+      const res = await fetch(swUrl.toString());
       if (!res.ok) {
         throw new Error('Не удалось загрузить SWAT (HTTP ' + res.status + ')');
       }
 
-      const swText = await res.text();
-      const { set: swatSet, nameMap: swatNameMap } = parseSwat(swText);
-      gSwatNameMap = swatNameMap || new Map();
+      const swJson = await res.json();
+
+      const swatSet = new Set();
+      const swatNameMap = new Map();
+      const swatTargetStreamMap = new Map();
+      const swatDaysMap = new Map();
+
+      const swatList = (((swJson || {}).worked_SWAT || {}).login) || [];
+      if (Array.isArray(swatList)) {
+        for (const it of swatList) {
+          const loginNorm = normalizeLogin(it && it.login);
+          if (!loginNorm) continue;
+          swatSet.add(loginNorm);
+
+          const fullName = (it && it.full_name) ? String(it.full_name).trim() : '';
+          swatNameMap.set(loginNorm, fullName || String((it && it.login) || loginNorm));
+
+          const targetStream = (it && it.stream) ? String(it.stream).trim() : '';
+          if (targetStream) swatTargetStreamMap.set(loginNorm, targetStream);
+        }
+      }
+
+      const workedDays = (swJson && swJson.worked_days) ? swJson.worked_days : null;
+      if (workedDays && typeof workedDays === 'object') {
+        for (const dayObj of Object.values(workedDays)) {
+          const loginsObj = dayObj && dayObj.login;
+          if (!loginsObj || typeof loginsObj !== 'object') continue;
+          for (const k of Object.keys(loginsObj)) {
+            const loginNorm = normalizeLogin(k);
+            if (!loginNorm) continue;
+            swatDaysMap.set(loginNorm, (swatDaysMap.get(loginNorm) || 0) + 1);
+          }
+        }
+      }
+
+      gSwatNameMap = swatNameMap;
+      gSwatTargetStreamMap = swatTargetStreamMap;
+      gSwatDaysMap = swatDaysMap;
 
       if (!swatSet.size) {
         if (!confirm('SWAT-список пустой, продолжать?')) {
