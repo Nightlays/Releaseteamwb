@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Сбор ЧП v1.0.3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    :root{
+      --wb-bg:#faf5ff; --wb-bg-2:#f8f7ff;
+      --wb-primary:#9b5cff; --wb-secondary:#ff5ac8; --wb-deep:#7c3aed;
+      --green:#22c55e; --red:#f43f5e; --amber:#f59e0b;
+      --ring: 0 10px 30px rgba(155,92,255,.25);
+      --card: 0 12px 36px rgba(31,41,55,.08);
+      --r-xl:22px;
+    }
+    body{
+      background:
+        radial-gradient(1200px 600px at 0% -10%, rgba(155,92,255,.14), transparent 60%),
+        radial-gradient(900px 580px at 100% 0%, rgba(255,90,200,.10), transparent 55%),
+        var(--wb-bg);
+      color:#0f172a;
+      overflow-x:hidden;
+    }
+    .brand-badge{display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;border-radius:999px;background:linear-gradient(180deg,#fff,#f8f7ff);box-shadow:var(--card)}
+    .brand-dot{width:14px;height:14px;border-radius:999px;background:radial-gradient(55% 55% at 35% 35%, #fff 0%, #ffd6f2 30%, var(--wb-primary) 100%);box-shadow:0 0 0 6px rgba(155,92,255,.15), 0 8px 22px rgba(155,92,255,.45) inset}
+    .card{background:linear-gradient(180deg,#fff 0%, #fbfbff 100%);border-radius:var(--r-xl);box-shadow:var(--card);border:1px solid #eeeeff}
+    .input{width:100%;padding:.7rem .9rem;border-radius:14px;background:#fff;border:1px solid #ecebff;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 20px rgba(124,58,237,.06);transition:.15s}
+    .input:focus{outline:0;border-color:#d8d6ff;box-shadow:0 0 0 4px rgba(155,92,255,.12)}
+    .btn{border:none;border-radius:16px;padding:.65rem 1rem;font-weight:700;transition:.15s}
+    .btn-soft{background:#fff;border:1px solid #ede9fe;box-shadow:0 8px 22px rgba(124,58,237,.08);color:#6d28d9}
+    .btn-grad{background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));color:#fff;box-shadow:var(--ring)}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .hint{font-size:.85rem;color:#7c7f8c}
+    .bar{height:8px;background:#eae6ff;border-radius:999px;overflow:hidden}
+    .bar>div{height:100%;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));width:0%}
+
+    #status.ok{color:var(--green)}
+    #status.err{color:var(--red)}
+    #status.warn{color:var(--amber)}
+
+    .log{
+      white-space:pre-wrap;
+      background:#fff;
+      border-radius:16px;
+      padding:12px;
+      border:1px solid #ecebff;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 20px rgba(124,58,237,.06);
+      max-height:260px;
+      overflow:auto;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px;
+      line-height:1.35;
+    }
+    #logs .ok{color:var(--green)}
+    #logs .err{color:var(--red)}
+    #logs .warn{color:var(--amber)}
+
+    .platform-title{font-weight:800;color:#4c1d95;margin:10px 0 8px}
+    .table-wrap{overflow:auto;border:1px solid #ecebff;border-radius:18px;background:#fff}
+    .table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;table-layout:auto}
+    .table thead th{background:#f7f5ff;border-bottom:1px solid #ecebff;padding:.65rem .75rem;font-weight:800;color:#5b21b6;position:sticky;top:0;z-index:1;white-space:nowrap}
+    .table tbody td{border-bottom:1px dashed #eeeef8;padding:.55rem .7rem;vertical-align:top;white-space:nowrap}
+    .table tbody tr:hover td{background:#faf9ff}
+    .table td:first-child, .table th:first-child{position:sticky;left:0;background:inherit;z-index:2}
+    .qhdr{background:#f3f0ff !important;color:#4c1d95 !important;text-align:center}
+    .relhdr{text-align:center}
+    .subhdr{background:#fbfaff !important;color:#64748b !important;font-weight:600 !important}
+    .itogo-hdr{background:#f3f0ff !important}
+    .itogo{background:#fcfbff}
+    .num{text-align:right;font-variant-numeric:tabular-nums}
+
+    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.75rem 1rem;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s;z-index:50}
+    .toast.show{opacity:1;transform:translateY(0)}
+  </style>
+</head>
+
+<body>
+  <div class="max-w-none mx-auto p-6 space-y-6">
+    <div class="flex items-center gap-3">
+      <div class="brand-badge"><span class="brand-dot"></span><strong>WB</strong></div>
+      <div class="min-w-0">
+        <div class="flex items-baseline gap-2 flex-wrap">
+          <h1 class="text-2xl font-semibold">Сбор ЧП</h1>
+          <span class="text-xs text-slate-500">v1.0.3</span>
+        </div>
+      </div>
+    </div>
+
+    <section class="grid lg:grid-cols-3 gap-6 items-start">
+      <!-- Настройки -->
+      <div class="card p-5 space-y-4 lg:col-span-1">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Настройки</h3>
+          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold text-white"
+                style="background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary))">
+            Черепики
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block text-sm col-span-1">
+            Начальный релиз
+            <input id="startRel" class="input mt-1" placeholder="7.3.3000" value="7.3.3000">
+          </label>
+          <label class="block text-sm col-span-1">
+            Конечный релиз
+            <input id="endRel" class="input mt-1" placeholder="7.3.4000" value="7.3.4000">
+          </label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-1">
+            <div class="text-sm leading-5 min-h-[40px] flex items-end">
+              DeployLab токен (без «Bearer»)
+            </div>
+            <input id="dlToken" type="password" class="input mt-1" placeholder="•••••••••">
+          </div>
+          <div class="col-span-1">
+            <div class="text-sm leading-5 min-h-[40px] flex items-end">
+              YouTrack токен (без «Bearer»)
+            </div>
+            <input id="ytToken" type="password" class="input mt-1" placeholder="•••••••••">
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="runBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
+          <button id="checkProxy" type="button" class="btn btn-soft whitespace-nowrap">Проверить прокси</button>
+        </div>
+
+        <div class="bar mt-3"><div id="progressBar"></div></div>
+        <div id="status" class="text-sm text-slate-500 mt-1">Готов.</div>
+
+        <div>
+          <div class="text-xs font-semibold text-slate-500 mb-1">Логи</div>
+          <div id="logs" class="log"></div>
+        </div>
+      </div>
+
+      <!-- Результаты -->
+      <div class="card p-5 space-y-4 lg:col-span-2">
+        <div class="flex items-center gap-3">
+          <h3 class="font-semibold">Итоги</h3>
+          <div class="ml-auto flex items-center gap-2">
+            <button id="uploadDriveBtn" type="button" class="btn btn-soft text-xs px-3 py-2" disabled>Выгрузить в Google Disk</button>
+            <button id="openDriveBtn" type="button" class="btn btn-soft text-xs px-3 py-2" disabled>Открыть Google Disk</button>
+          </div>
+        </div>
+
+        <div class="border border-[#ecebff] rounded-2xl bg-white p-3">
+          <pre id="totalsBox" class="mono text-xs text-slate-700">—</pre>
+        </div>
+
+        <div id="tableAndroid" class="space-y-2"></div>
+        <div id="tableIOS" class="space-y-2"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toastBox" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ==============================
+   Сбор ЧП (Черепики) — v1.0.3
+   - логи: "Запрос deploy-lab [200 OK]" / "Запрос youtrack [200 OK]"
+   - при ошибке: лог + тело ответа
+   - "Открыть Google Disk" рядом с выгрузкой (после успешной выгрузки)
+   ============================== */
+
+const $ = (id)=>document.getElementById(id);
+
+function showToast(msg){
+  const t = $('toastBox');
+  if(!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+const logLine = (msg, cls='')=>{
+  const el = $('logs');
+  const s = document.createElement('div');
+  s.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  if(cls) s.className = cls;
+  el.appendChild(s);
+  el.scrollTop = el.scrollHeight;
+};
+
+const setStatus = (t, cls='')=>{
+  const s = $('status');
+  s.classList.remove('ok','err','warn');
+  if(cls) s.classList.add(cls);
+  s.textContent = t;
+};
+
+const setProgress = (p)=>{
+  const i = $('progressBar');
+  if(!i) return;
+  const v = Math.max(0, Math.min(100, Number(p||0)));
+  i.style.width = v + '%';
+};
+
+/* === localStorage === */
+const STORAGE_KEYS = ['chp_turtles_v1_0_3','chp_turtles_v1_0_2'];
+const STORAGE_KEY_WRITE = STORAGE_KEYS[0];
+let __saveTimer = null;
+
+function saveToStorage(){
+  try{
+    const data = {
+      startRel: $('startRel').value || '',
+      endRel: $('endRel').value || '',
+      dlToken: $('dlToken').value || '',
+      ytToken: $('ytToken').value || '',
+      savedAt: Date.now()
+    };
+    localStorage.setItem(STORAGE_KEY_WRITE, JSON.stringify(data));
+  }catch(_){}
+}
+
+function scheduleSave(){
+  clearTimeout(__saveTimer);
+  __saveTimer = setTimeout(saveToStorage, 250);
+}
+
+function loadFromStorage(){
+  try{
+    let raw = null;
+    for (const k of STORAGE_KEYS){
+      raw = localStorage.getItem(k);
+      if(raw) break;
+    }
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    if(data.startRel) $('startRel').value = data.startRel;
+    if(data.endRel) $('endRel').value = data.endRel;
+    if(typeof data.dlToken === 'string') $('dlToken').value = data.dlToken;
+    if(typeof data.ytToken === 'string') $('ytToken').value = data.ytToken;
+  }catch(_){}
+}
+
+loadFromStorage();
+['startRel','endRel','dlToken','ytToken'].forEach(id=>{
+  $(id).addEventListener('input', scheduleSave);
+  $(id).addEventListener('change', saveToStorage);
+});
+
+/* === Константы (захардкожены) === */
+const DL_BASE = 'https://deploy-lab-api.wb.ru';
+const YT_BASE = 'https://youtrack.wildberries.ru';
+const PROXY_BASE = 'http://localhost:8787';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyeF_6k6bag74Np_GdHUS17xT7AJLIsDG2gP8JfP3iNtne4MlM1O9jQ__TOl3YYI6v/exec';
+
+/* Диапазон релизов */
+function parseRelease(s){
+  const m=String(s).trim().match(/^(\d+)\.(\d+)\.(\d{1,4})$/);
+  if(!m) return null;
+  return [Number(m[1]),Number(m[2]),Number(m[3])];
+}
+function expandReleaseRange(start,end){
+  let A=parseRelease(start), B=parseRelease(end);
+  if(!A||!B) throw new Error('Неверный формат релизов. Пример: 7.3.3000');
+  const cmp=(x,y)=>x[0]-y[0]||x[1]-y[1]||x[2]-y[2];
+  if(cmp(A,B)>0){const t=A;A=B;B=t;}
+  const toStr=(t)=>`${t[0]}.${t[1]}.${String(t[2]).padStart(4,'0')}`;
+  const inc=(t)=>{
+    t=t.slice();
+    t[2]+=1000;
+    if(t[2]>=10000){
+      t[2]=0;
+      t[1]++;
+      if(t[1]>=10){t[1]=0; t[0]++;}
+    }
+    return t;
+  };
+  const out=[];
+  let cur=A;
+  for(;;){
+    out.push(toStr(cur));
+    if(cur[0]===B[0]&&cur[1]===B[1]&&cur[2]===B[2]) break;
+    cur=inc(cur);
+  }
+  return out;
+}
+const displayRelease = (rel)=>{
+  const parts=String(rel).split('.');
+  if(parts.length!==3) return String(rel);
+  const [a,b,c]=parts;
+  const n=Number(c);
+  return `${a}.${b}.${(n>=1000 ? ((n/1000)|0) : n)}`;
+};
+const toKey = (rel)=>{
+  const p=String(rel).split('.');
+  return p.length===3 ? displayRelease(rel) : String(rel);
+};
+
+/* Proxy/HTTP */
+function proxify(url){
+  const base = PROXY_BASE.replace(/\/+$/,'');
+  if(url.startsWith(base + '/')) return url;
+  return `${base}/prefix/${url}`;
+}
+function shortenBody(text, max=2000){
+  const s = String(text ?? '');
+  if(s.length <= max) return s;
+  return s.slice(0,max) + '…';
+}
+async function safeReadText(resp){
+  try{ return await resp.text(); }catch{ return ''; }
+}
+function svcName({dl, yt}){
+  if(dl) return 'deploy-lab';
+  if(yt) return 'youtrack';
+  return 'unknown';
+}
+
+async function httpJSON(url, {headers={}, method='GET', yt=false, dl=false}={}){
+  const h=new Headers(headers||{});
+  if(dl){
+    const t = $('dlToken').value.trim();
+    if(!t) throw new Error('Пустой DeployLab токен');
+    h.set('Authorization-Deploy-Lab','Bearer ' + t);
+  }
+  if(yt){
+    const t = $('ytToken').value.trim();
+    if(!t) throw new Error('Пустой YouTrack токен');
+    h.set('Authorization','Bearer ' + t);
+    h.set('Accept','application/json');
+  }
+
+  const final = proxify(url);
+  const r = await fetch(final, {method, headers:h});
+
+  const service = svcName({dl, yt});
+  if(r.ok){
+    logLine(`Запрос ${service} [${r.status} OK]`, 'ok');
+  }else{
+    logLine(`Запрос ${service} [${r.status} ${r.statusText}]`, 'err');
+    const body = await safeReadText(r);
+    if(body) logLine('Тело ответа: ' + shortenBody(body), 'err');
+    throw new Error(`${r.status} ${r.statusText}`);
+  }
+
+  const ct=(r.headers.get('content-type')||'').toLowerCase();
+  if(ct.includes('application/json')) return r.json();
+
+  const tx = await safeReadText(r);
+  try{ return JSON.parse(tx); }
+  catch{ throw new Error(`HTML вместо JSON: ${shortenBody(tx, 200)}`); }
+}
+
+/* DeployLab */
+function dlReleaseURL(platform, rel){
+  const base = DL_BASE.replace(/\/+$/,'');
+  const prefix = platform==='Android' ? 'ANDROID' : 'IOS';
+  return `${base}/releaseboss/admin_panel/release/${prefix}_${rel}`;
+}
+function dlIssuesURL(platform, rel){
+  const base = DL_BASE.replace(/\/+$/,'');
+  const prefix = platform==='Android' ? 'ANDROID' : 'IOS';
+  return `${base}/releaseboss/admin_panel/release/${prefix}_${rel}/issues`;
+}
+async function fetchReleaseCutoff(platform, rel){
+  try{
+    const data=await httpJSON(dlReleaseURL(platform, rel), {dl:true});
+    for (const [k,v] of Object.entries(data||{})){
+      if(String(k).toLowerCase().includes('cutoff')){
+        if (typeof v==='number'){
+          const ts = v>10000000000 ? v/1000 : v;
+          return new Date(ts*1000).toISOString();
+        }
+        if (typeof v==='string'){
+          const d=new Date(v);
+          if(!isNaN(d)) return d.toISOString();
+        }
+      }
+    }
+  }catch(e){
+    logLine(`[warn] cutoff ${platform} ${rel}: ${e.message}`,'warn');
+  }
+  return null;
+}
+async function fetchDeployIssueKeys(platform, rel){
+  try{
+    const list=await httpJSON(dlIssuesURL(platform, rel), {dl:true});
+    const keys=[];
+    if(Array.isArray(list)){
+      for (const it of list){
+        if (it && it.merged_after_cutoff===true){
+          const k=String(it.key||'').trim();
+          if(k) keys.push(k.toUpperCase());
+        }
+      }
+    }
+    return keys;
+  }catch(e){
+    logLine(`[err] issues ${platform} ${rel}: ${e.message}`,'err');
+    return [];
+  }
+}
+
+/* YouTrack */
+function ytIssueURL(key){
+  const base = YT_BASE.replace(/\/+$/,'');
+  const fields = ['idReadable','summary','tags(name)','fields(projectCustomField(field(name)),value(name,$type),$type)'].join(',');
+  return `${base}/api/issues/${encodeURIComponent(key)}?fields=${encodeURIComponent(fields)}&$top=-1`;
+}
+async function fetchIssueBrief(key){
+  try{
+    return await httpJSON(ytIssueURL(key), {yt:true});
+  }catch(e){
+    if(/404/.test(e.message)) return {};
+    logLine(`[err] YT ${key}: ${e.message}`,'err');
+    return {};
+  }
+}
+function pickFieldNames(issue, target){
+  const out=[];
+  const arr=issue?.fields||[];
+  for (const f of arr){
+    const fld=f?.projectCustomField?.field||{};
+    if ((fld.name||'').trim()===target){
+      const val=f.value;
+      if (Array.isArray(val)){
+        for (const v of val){ const n=v?.name; if(n) out.push(n); }
+      } else if (val && typeof val==='object'){
+        const n=val.name; if(n) out.push(n);
+      }
+    }
+  }
+  return out;
+}
+function pickFirstSubstreamField(issue){
+  const arr=issue?.fields||[];
+  for (const f of arr){
+    const name=(f?.projectCustomField?.field?.name||'').toLowerCase();
+    if (name.includes('substream')){
+      const out=[];
+      const val=f.value;
+      if (Array.isArray(val)){
+        for (const v of val){ const n=v?.name; if(n) out.push(n); }
+      } else if (val && typeof val==='object'){
+        const n=val.name; if(n) out.push(n);
+      }
+      return out;
+    }
+  }
+  return [];
+}
+function pickSubstreamDynamic(issue, streamName){
+  if (String(streamName||'').trim().toLowerCase()==='финтех'){
+    const vals=pickFieldNames(issue, 'Product Финтех');
+    return vals||[];
+  }
+  return pickFirstSubstreamField(issue);
+}
+function normalizeStream(streams){
+  if(!streams||!streams.length) return '';
+  const s=streams[0];
+  if (s.toLowerCase().includes('paygate') && s.includes('.')) return s.split('.').pop().trim();
+  return s;
+}
+
+/* Pool */
+async function withPool(items, limit, worker){
+  const ret=[];
+  let i=0, active=0;
+  let resolve;
+  const done=new Promise((res)=>{resolve=res;});
+  const push=async ()=>{
+    if(i>=items.length){ if(active===0) resolve(ret); return; }
+    const idx=i++;
+    const item=items[idx];
+    active++;
+    try{ ret[idx]=await worker(item, idx); }
+    catch{ ret[idx]=undefined; }
+    finally{ active--; push(); }
+  };
+  for (let k=0;k<Math.min(limit, items.length);k++) push();
+  return done;
+}
+
+/* Counts */
+async function computeReleaseCounts(platform, rel){
+  const cutoff = await fetchReleaseCutoff(platform, rel);
+  const keys = await fetchDeployIssueKeys(platform, rel);
+  if (!keys.length) return {row_counts:{}, total:0, cutoff};
+  const uniq=[...new Set(keys)];
+  const rows={};
+  const results = await withPool(uniq, 8, async (k)=>{
+    const issue = await fetchIssueBrief(k);
+    const stream = normalizeStream(pickFieldNames(issue,'Stream'));
+    const subs = pickSubstreamDynamic(issue, stream);
+    const sub = subs[0]||'';
+    const rowKey = sub ? `${stream} | ${sub}` : (stream||'');
+    return rowKey || null;
+  });
+  for (const rk of results){
+    if(!rk) continue;
+    rows[rk]=(rows[rk]||0)+1;
+  }
+  const total = Object.values(rows).reduce((s,v)=>s+v,0);
+  return {row_counts:rows, total, cutoff};
+}
+
+async function buildCountsForPlatform(platform, releases){
+  const counts={};
+  const totalsByRelease={};
+  const cutoffs={};
+  await Promise.all(releases.map(async rel=>{
+    try{
+      const res=await computeReleaseCounts(platform, rel);
+      const key=toKey(rel);
+      totalsByRelease[key]=Number(res.total||0);
+      cutoffs[key]=res.cutoff||null;
+      for (const [rowKey,n] of Object.entries(res.row_counts||{})){
+        counts[rowKey]=counts[rowKey]||{};
+        counts[rowKey][key]=(counts[rowKey][key]||0)+Number(n||0);
+      }
+    }catch(e){
+      logLine(`[err] compute ${platform} ${rel}: ${e.message}`,'err');
+    }
+  }));
+  return {counts, totalsByRelease, cutoffs};
+}
+
+/* ====== План колонок и рендер таблиц (без изменений) ====== */
+const RU_MONTH_ABBR = {1:"янв.",2:"фев.",3:"мар.",4:"апр.",5:"май",6:"июн.",7:"июл.",8:"авг.",9:"сен.",10:"окт.",11:"ноя.",12:"дек."};
+function monthFromIso(iso){ if(!iso) return null; const d=new Date(iso); return isNaN(d)? null : (d.getMonth()+1); }
+function quarterFromMonth(m){ if(!m) return 1; if(m<=3) return 1; if(m<=6) return 2; if(m<=9) return 3; return 4; }
+
+function buildColumnPlanJS(releases, cutoffs){
+  const plan=[], qSpans=[];
+  let currentQ=null, qStartCol=null, curMonth=null;
+  let colIdx=1;
+  const closeMonth=(qnum,mnum)=>{ if(mnum!=null) plan.push({kind:'month_total', label:`ИТОГО ${RU_MONTH_ABBR[mnum]||''}`, q:qnum, m:mnum}); };
+  const closeQuarter=(qnum)=>{ plan.push({kind:'quarter_total', label:`ИТОГО Q${qnum}`, q:qnum}); };
+
+  for (const rel of releases){
+    const iso = (cutoffs||{})[rel];
+    const mnum = monthFromIso(iso) ?? (curMonth ?? 1);
+    const qnum = quarterFromMonth(mnum);
+
+    if(currentQ===null){ currentQ=qnum; qStartCol=colIdx; curMonth=mnum; }
+    else if(qnum!==currentQ){
+      closeMonth(currentQ, curMonth); colIdx++;
+      closeQuarter(currentQ); colIdx++;
+      qSpans.push([qStartCol, colIdx-1, currentQ]);
+      currentQ=qnum; qStartCol=colIdx; curMonth=mnum;
+    }
+    if(mnum!==curMonth){ closeMonth(currentQ, curMonth); colIdx++; curMonth=mnum; }
+
+    plan.push({kind:'release', label:displayRelease(rel), rel, q:currentQ, m:curMonth}); colIdx++;
+  }
+  if(currentQ!==null){
+    closeMonth(currentQ, curMonth); colIdx++;
+    closeQuarter(currentQ); colIdx++;
+    qSpans.push([qStartCol, colIdx-1, currentQ]);
+  }
+  return {plan, qSpans};
+}
+
+function renderPlatformTable(targetId, title, releases, counts, cutoffs){
+  const {plan, qSpans} = buildColumnPlanJS(releases, cutoffs);
+  const target = document.getElementById(targetId);
+  if(!target) return;
+
+  const streamRows = Object.keys(counts||{});
+  const base = (rk)=> (rk.split(" | ")[0]||"").trim();
+  streamRows.sort((a,b)=> (base(a).toLowerCase().localeCompare(base(b).toLowerCase()) || a.toLowerCase().localeCompare(b.toLowerCase())));
+
+  let html = `<div class="platform-title">${title}</div><div class="table-wrap"><table class="table"><thead>`;
+  html += `<tr><th class="qhdr"> </th>`;
+  for (const [c1,c2,qnum] of qSpans){
+    html += `<th class="qhdr" colspan="${(c2-c1+1)}">Q${qnum}</th>`;
+  }
+  html += `</tr>`;
+
+  html += `<tr><th class="relhdr">Стрим</th>`;
+  for (const p of plan){
+    html += `<th class="${p.kind==='release' ? 'relhdr' : 'itogo-hdr'}">${p.label}</th>`;
+  }
+  html += `</tr>`;
+
+  html += `<tr><th class="subhdr"> </th>`;
+  for (let i=0;i<plan.length;i++){
+    html += (i===0) ? `<th class="subhdr">количество черепиков</th>` : `<th class="subhdr"> </th>`;
+  }
+  html += `</tr></thead><tbody>`;
+
+  const idxToKind = plan.map((p,i)=>({col:i+1, def:p}));
+
+  function findMonthRange(i){
+    let left = null;
+    for (let j=i-1; j>=0; j--){
+      const cdef = idxToKind[j].def;
+      const cur  = idxToKind[i].def;
+      if (cdef.kind==='release' && cdef.q===cur.q && cdef.m===cur.m){
+        left = left==null ? idxToKind[j].col : Math.min(left, idxToKind[j].col);
+      } else if (cdef.kind==='month_total' || cdef.kind==='quarter_total'){
+        break;
+      }
+    }
+    if(left==null) return null;
+    const right = idxToKind[i-1].col;
+    return [left, right];
+  }
+
+  function quarterReleaseRangesBefore(i){
+    const qnum = idxToKind[i].def.q;
+    const ranges=[]; let runStart=null, prev=null;
+    for (let j=0; j<i; j++){
+      const c = idxToKind[j];
+      if (c.def.q===qnum && c.def.kind==='release'){
+        if(runStart==null){ runStart=c.col; prev=c.col; }
+        else if (c.col === prev+1){ prev=c.col; }
+        else { ranges.push([runStart, prev]); runStart=c.col; prev=c.col; }
+      } else {
+        if(runStart!=null){ ranges.push([runStart, prev]); runStart=null; prev=null; }
+      }
+    }
+    if(runStart!=null) ranges.push([runStart, prev]);
+    return ranges;
+  }
+
+  function valAt(rowKey, label){
+    const row = (counts||{})[rowKey] || {};
+    return Number(row[label]||0);
+  }
+
+  for (const rk of (streamRows.length ? streamRows : [''])){
+    html += `<tr><td>${rk ? rk : '&nbsp;'}</td>`;
+    for (let c=0;c<plan.length;c++){
+      const coldef = plan[c];
+      if(coldef.kind==='release'){
+        const v=valAt(rk, coldef.label);
+        html += v>0 ? `<td class="num">${v}</td>` : `<td class="num"> </td>`;
+      } else if(coldef.kind==='month_total'){
+        const rng = findMonthRange(c);
+        if(rng){
+          const [L,R] = rng;
+          let sum=0;
+          for (let j=L-1; j<=R-1; j++){
+            const p = plan[j];
+            if(p && p.kind==='release') sum += valAt(rk, p.label);
+          }
+          html += sum>0 ? `<td class="itogo num">${sum}</td>` : `<td class="itogo num"> </td>`;
+        } else html += `<td class="itogo"> </td>`;
+      } else if(coldef.kind==='quarter_total'){
+        const ranges = quarterReleaseRangesBefore(c);
+        let sum=0;
+        for (const [A,B] of ranges){
+          for (let j=A-1;j<=B-1;j++){
+            const p = plan[j];
+            if(p && p.kind==='release') sum += valAt(rk, p.label);
+          }
+        }
+        html += sum>0 ? `<td class="itogo num">${sum}</td>` : `<td class="itogo num"> </td>`;
+      }
+    }
+    html += `</tr>`;
+  }
+
+  html += `<tr><td class="itogo-hdr" style="font-weight:800">ИТОГО</td>`;
+  for (let c=0;c<plan.length;c++){
+    const coldef = plan[c];
+    let sum=0;
+    if(coldef.kind==='release'){
+      for (const rk of streamRows) sum += valAt(rk, coldef.label);
+      html += `<td class="num">${sum}</td>`;
+    } else if(coldef.kind==='month_total'){
+      const rng = findMonthRange(c);
+      if(rng){
+        const [L,R] = rng;
+        for (const rk of streamRows){
+          for (let j=L-1; j<=R-1; j++){
+            const p = plan[j];
+            if(p && p.kind==='release') sum += valAt(rk, p.label);
+          }
+        }
+        html += sum>0 ? `<td class="itogo num">${sum}</td>` : `<td class="itogo num"> </td>`;
+      } else html += `<td class="itogo"> </td>`;
+    } else if(coldef.kind==='quarter_total'){
+      const ranges = quarterReleaseRangesBefore(c);
+      for (const rk of streamRows){
+        for (const [A,B] of ranges){
+          for (let j=A-1;j<=B-1;j++){
+            const p = plan[j];
+            if(p && p.kind==='release') sum += valAt(rk, p.label);
+          }
+        }
+      }
+      html += sum>0 ? `<td class="itogo num">${sum}</td>` : `<td class="itogo num"> </td>`;
+    }
+  }
+  html += `</tr></tbody></table></div></div>`;
+  target.innerHTML = html;
+}
+
+/* ====== Google Disk upload ====== */
+let __lastSheetUrl = null;
+
+function setDriveLink(url){
+  __lastSheetUrl = url || null;
+  const btn = $('openDriveBtn');
+  if(!btn) return;
+  btn.disabled = !__lastSheetUrl;
+}
+
+async function uploadToGoogleDisk(){
+  const btn = $('uploadDriveBtn');
+  const payload = window.__chp_drive_payload;
+  if(!payload){ showToast('Сначала запустите сбор'); return; }
+
+  setDriveLink(null);
+
+  const prevText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Выгружаю…';
+
+  try{
+    setStatus('Выгружаю в Google Disk…');
+    setProgress(85);
+
+    const url = proxify(APPS_SCRIPT_URL);
+    const body = JSON.stringify({ payload });
+
+    const r = await fetch(url, { method:'POST', body });
+    const txt = await r.text();
+    let js=null; try{ js=JSON.parse(txt); }catch{}
+
+    if(!r.ok){
+      logLine(`Запрос google-disk [${r.status} ${r.statusText}]`, 'err');
+      if(txt) logLine('Тело ответа: ' + shortenBody(txt), 'err');
+      throw new Error((js && js.error) ? js.error : (r.status + ' ' + r.statusText));
+    }
+    if(!js || js.ok !== true){
+      logLine(`Запрос google-disk [INVALID RESPONSE]`, 'err');
+      if(txt) logLine('Тело ответа: ' + shortenBody(txt), 'err');
+      throw new Error((js && js.error) ? js.error : 'Пустой/невалидный ответ Apps Script');
+    }
+
+    logLine(`Запрос google-disk [${r.status} OK]`, 'ok');
+
+    const link = js.sheetUrl || js.spreadsheetUrl || null;
+    setDriveLink(link);
+
+    setStatus('Выгружено в Google Disk','ok');
+    showToast('Выгружено в Google Disk');
+  }catch(e){
+    setStatus('Ошибка выгрузки','err');
+    logLine(`Google Disk ERR: ${e.message||e}`, 'err');
+    showToast('Ошибка выгрузки');
+  }finally{
+    btn.textContent = prevText;
+    btn.disabled = false;
+    setProgress(100);
+  }
+}
+
+/* ====== Events ====== */
+$('uploadDriveBtn').addEventListener('click', uploadToGoogleDisk);
+
+$('openDriveBtn').addEventListener('click', ()=>{
+  if(__lastSheetUrl) window.open(__lastSheetUrl, '_blank');
+});
+
+$('checkProxy').addEventListener('click', async ()=>{
+  try{
+    setStatus('Проверяю прокси…');
+    const base = PROXY_BASE.replace(/\/+$/,'');
+    const r = await fetch(base + '/health');
+    const js = await r.json();
+
+    if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
+    if(js && js.ok === true && Number(js.port) === 8787){
+      setStatus('Прокси OK','ok');
+      logLine(`Прокси OK`, 'ok');
+      showToast('Прокси OK');
+    }else{
+      throw new Error('Неожиданный ответ /health: ' + JSON.stringify(js));
+    }
+  }catch(e){
+    setStatus('Прокси ошибка','err');
+    logLine('Proxy ERR: ' + (e.message||e), 'err');
+    showToast('Прокси ошибка');
+  }
+});
+
+$('runBtn').addEventListener('click', async ()=>{
+  const runBtn = $('runBtn');
+  const uploadDriveBtn = $('uploadDriveBtn');
+
+  try{
+    saveToStorage();
+    setDriveLink(null);
+
+    setProgress(8);
+    runBtn.disabled = true;
+    uploadDriveBtn.disabled = true;
+    uploadDriveBtn.textContent = 'Выгрузить в Google Disk';
+    window.__chp_drive_payload = null;
+
+    setStatus('Собираю…');
+
+    const start=$('startRel').value.trim();
+    const end=$('endRel').value.trim();
+    const releases=expandReleaseRange(start,end);
+
+    const [A, I] = await Promise.all([
+      buildCountsForPlatform('Android', releases),
+      buildCountsForPlatform('iOS', releases),
+    ]);
+
+    setProgress(55);
+
+    const order = (a,b)=>{
+      const pa=a.split('.').map(Number), pb=b.split('.').map(Number);
+      return pa[0]-pb[0]||pa[1]-pb[1]||pa[2]-pb[2];
+    };
+    const allRels = Array.from(new Set([
+      ...Object.keys(A.totalsByRelease||{}),
+      ...Object.keys(I.totalsByRelease||{})
+    ])).sort(order);
+
+    const rows = allRels.map(rel=>{
+      const a = Number((A.totalsByRelease||{})[rel]||0);
+      const i = Number((I.totalsByRelease||{})[rel]||0);
+      return [rel, a, i, a+i];
+    });
+
+    const headers = ['Релиз','Android','iOS','Итого'];
+    const widths = headers.map(h=>h.length);
+    for(const r of rows){
+      widths[0] = Math.max(widths[0], String(r[0]).length);
+      widths[1] = Math.max(widths[1], String(r[1]).length);
+      widths[2] = Math.max(widths[2], String(r[2]).length);
+      widths[3] = Math.max(widths[3], String(r[3]).length);
+    }
+    function padCell(val, idx){
+      const s = String(val);
+      return idx===0 ? s.padEnd(widths[idx], ' ') : s.padStart(widths[idx], ' ');
+    }
+    const sep = widths.map(w=>'—'.repeat(w)).join(' ─ ');
+    const lines = [
+      headers.map((h,i)=> (i===0?h.padEnd(widths[i]):h.padStart(widths[i])) ).join(' | '),
+      sep
+    ];
+    for(const r of rows){
+      lines.push( r.map((v,i)=>padCell(v,i)).join(' | ') );
+    }
+    $('totalsBox').textContent = lines.join('\n');
+
+    const relKeys = releases.map(toKey);
+    renderPlatformTable('tableAndroid', 'Android', relKeys, A.counts, A.cutoffs);
+    renderPlatformTable('tableIOS', 'iOS', relKeys, I.counts, I.cutoffs);
+
+    window.__chp_drive_payload = {
+      releases: relKeys,
+      and_counts: A.counts,
+      and_totals: A.totalsByRelease,
+      and_cutoffs: A.cutoffs,
+      ios_counts: I.counts,
+      ios_totals: I.totalsByRelease,
+      ios_cutoffs: I.cutoffs
+    };
+    uploadDriveBtn.disabled = false;
+
+    setProgress(100);
+    setStatus('Готово.','ok');
+    logLine('Готово', 'ok');
+    showToast('Готово');
+  }catch(e){
+    setStatus('Ошибка', 'err');
+    logLine('Ошибка: ' + (e.message||e), 'err');
+    uploadDriveBtn.disabled = true;
+    showToast('Ошибка');
+  }finally{
+    runBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
