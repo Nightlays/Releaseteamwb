@@ -21,7 +21,7 @@
           <div class="flex items-center gap-2">
             <div class="font-extrabold leading-tight">WB All Table</div>
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v0.2.5</span>
+              <span aria-hidden="true">🏷️</span><span>v0.2.9</span>
             </span>
           </div>
         </div>
@@ -397,7 +397,7 @@
           const PROJECT_ID = 7;
           const PAGE_SIZE = 1000;
           const KINDS = ['Smoke', 'Selective'];
-          const SWAT_LIST_URL = 'https://script.google.com/macros/s/AKfycbwJapteQxL-8LqmX88qMa2wtlD760v4rvkISWm1YP-NDguwW08ZzmEADV-0kqjg3cC3zQ/exec';
+          const SWAT_LIST_URL = 'https://script.google.com/macros/s/AKfycbzLmb5ATmHOip7REPsl_iSLH2GuEHui0W_czyrPgW_8G1Wl-RY8CiM2UeAdqQQEwoNx-Q/exec';
           const PROXY_BASE = 'http://localhost:8787';
           const LS_COLLAPSE_KEY = 'wb_all_table_collapsed';
 
@@ -462,9 +462,9 @@
           let chpChart = null;
           let cutChart = null;
 
-          // SWAT list cache: fetch exec only once
-          let __swatSetCache = null;
-          let __swatSetPromise = null;
+          // SWAT list cache: fetch exec per release (cache by release)
+          const __swatCache = new Map();
+          const __swatPromiseCache = new Map();
 
           // Plugin: delta labels above points
           const deltaLabelsPlugin = {
@@ -587,6 +587,39 @@
             return r.json();
           }
 
+          async function fetchLastCherepik(prefix, release, signal){
+            const tok = (inpDeployToken?.value || '').trim();
+            if(!tok) return null;
+
+            const url = `https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/${prefix}_${release}/notification_history`;
+            try {
+              const headers = {
+                'authorization-deploy-lab': `Bearer ${tok}`,
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+              };
+              const response = await proxyGetJson(url, headers, signal);
+              if (!Array.isArray(response?.logs)) return null;
+
+              // Берём самый НОВЫЙ лог (максимальная date) среди сообщений с "Новый черипик"
+              let maxMsLocal = null;
+              for (const log of response.logs) {
+                if (log?.message && String(log.message).includes('Новый черипик')) {
+                  const dateStr = log.date;
+                  const p = toMskLocalParts(dateStr);
+                  if (p && Number.isFinite(p.msLocal)) {
+                    if (maxMsLocal === null || p.msLocal > maxMsLocal) maxMsLocal = p.msLocal;
+                  }
+                }
+              }
+
+              if (maxMsLocal === null) return null;
+              return labelFromMsLocal(maxMsLocal);
+            } catch (e) {
+              console.error('Error fetching last cherepik:', e);
+              return null;
+            }
+          }
+
           async function fetchDeployIssueCount(prefix, release, signal){
             const tok = (inpDeployToken?.value || '').trim();
             if(!tok) return 0;
@@ -680,6 +713,21 @@
               label: p.fullText
             };
           }
+
+          function yValueFromMsLocal(msLocal){
+            const ms = Number(msLocal);
+            if(!Number.isFinite(ms)) return null;
+            const dl = new Date(ms);
+            if(Number.isNaN(dl.getTime())) return null;
+            const idx = dayIndexCustom(dl.getUTCDay());
+            const mins = dl.getUTCHours() * 60 + dl.getUTCMinutes() + (dl.getUTCSeconds() / 60);
+            return {
+              y: idx * 1440 + mins,
+              msLocal: ms,
+              label: labelFromMsLocal(ms)
+            };
+          }
+
 
           function extractEarliestNoteDate(deployObj, sectionKey){
             if(!deployObj || typeof deployObj !== 'object') return null;
@@ -883,6 +931,7 @@
             if(covChart){
               covChart.data.labels = [];
               covChart.data.datasets.forEach(d => d.data = []);
+              covChart._swatPeople = [];
               covChart.update();
             }
 
@@ -890,6 +939,7 @@
             if(selChart){
               selChart.data.labels = [];
               selChart.data.datasets.forEach(d => d.data = []);
+              selChart._swatPeople = [];
               selChart.update();
             }
 
@@ -914,37 +964,49 @@
                 d.data = [];
                 d._timeLabel = [];
                 d._timeMs = [];
+                d._lastChpLabel = [];
               });
               cutChart.update();
             }
           }
 
           async function fetchSwatLogins(release, signal){
-            if(__swatSetCache) return __swatSetCache;
-            if(__swatSetPromise) return __swatSetPromise;
+            const rel = String(release || '').trim();
+            if(!rel) return { set: new Set(), total: 0 };
 
-            __swatSetPromise = (async () => {
+            if(__swatCache.has(rel)) return __swatCache.get(rel);
+            if(__swatPromiseCache.has(rel)) return __swatPromiseCache.get(rel);
+
+            const p = (async () => {
               const url = new URL(SWAT_LIST_URL);
+              url.searchParams.set('release', rel);
+
               const r = await fetch(url.toString(), { signal });
               if(!r.ok) throw new Error(`SWAT list HTTP ${r.status}`);
-              const text = await r.text();
+
+              const data = await r.json();
+              const logins = Array.isArray(data?.worked_SWAT?.login) ? data.worked_SWAT.login : [];
+              const declaredTotal = Number(data?.worked_SWAT?.total || 0) || 0;
+
               const set = new Set();
-              text.split(/\r?\n/).forEach(line => {
-                const s = (line || '').trim();
-                if(!s) return;
-                const first = s.split(/\s+/)[0];
-                const norm = normalizeLogin(first);
+              for(const l of logins){
+                const norm = normalizeLogin(l);
                 if(norm) set.add(norm);
-              });
-              __swatSetCache = set;
-              return set;
+              }
+
+              const out = { set, total: declaredTotal || set.size };
+              __swatCache.set(rel, out);
+              __swatPromiseCache.delete(rel);
+              return out;
             })();
 
+            __swatPromiseCache.set(rel, p);
+
             try{
-              return await __swatSetPromise;
+              return await p;
             }catch(e){
-              __swatSetPromise = null;
-              __swatSetCache = null;
+              __swatPromiseCache.delete(rel);
+              __swatCache.delete(rel);
               throw e;
             }
           }
@@ -1229,6 +1291,67 @@
             return `${mm}:${ss}`;
           }
 
+          function ruPlural(n, one, few, many){
+            const num = Math.abs(Number(n) || 0);
+            const n100 = num % 100;
+            const n10 = num % 10;
+            if(n100 >= 11 && n100 <= 19) return many;
+            if(n10 === 1) return one;
+            if(n10 >= 2 && n10 <= 4) return few;
+            return many;
+          }
+
+          function memberTotalCount(m){
+            if(!m || typeof m !== 'object') return 0;
+
+            const pushStat = (bucket, statItem) => {
+              if(!statItem || typeof statItem !== 'object') return;
+              const c = Number(statItem.count ?? statItem.total ?? statItem.tests ?? 0) || 0;
+              if(c > 0) bucket.total += c;
+            };
+
+            let total = 0;
+            const stat = m.statistic;
+
+            if(Array.isArray(stat)){
+              const bucket = { total: 0 };
+              for(const s of stat) pushStat(bucket, s);
+              total = bucket.total;
+            }else if(stat && typeof stat === 'object'){
+              const bucket = { total: 0 };
+              if(('count' in stat) || ('total' in stat) || ('tests' in stat)){
+                pushStat(bucket, stat);
+              }else{
+                for(const v of Object.values(stat)){
+                  if(Array.isArray(v)){
+                    for(const vv of v) pushStat(bucket, vv);
+                  }else{
+                    pushStat(bucket, v);
+                  }
+                }
+              }
+              total = bucket.total;
+            }
+
+            if(!total){
+              total = Number(m.total ?? m.count ?? 0) || 0;
+            }
+            return total;
+          }
+
+          function extractSwatAssignees(memberstats, swatSet){
+            const set = new Set();
+            for(const m of (memberstats || [])){
+              if(!m || typeof m !== 'object') continue;
+              const assignee = String(m.assignee || '').trim().toLowerCase();
+              if(!assignee) continue;
+              if(!swatSet || !swatSet.has(assignee)) continue;
+              const total = memberTotalCount(m);
+              if(total > 0) set.add(assignee);
+            }
+            return set;
+          }
+
           // ---- charts ----
           function ensureChart(){
             if(!chartCanvas || !window.Chart) return;
@@ -1297,6 +1420,7 @@
             if(covChart){
               covChart.data.labels = [];
               covChart.data.datasets.forEach(d => d.data = []);
+              covChart._swatPeople = [];
               covChart.update();
               return;
             }
@@ -1338,6 +1462,12 @@
                         const sum = Math.max(1, sw + st);
                         const val = Number(ctx.raw || 0);
                         const pct = Math.round((val / sum) * 1000) / 10;
+
+                        if(String(ctx.dataset?.label || '') === 'SWAT'){
+                          const ppl = Number(covChart._swatPeople?.[i] || 0);
+                          const word = ruPlural(ppl, 'сотрудник', 'сотрудника', 'сотрудников');
+                          return `${ctx.dataset.label}: ${val} | ${pct}% | ${ppl} ${word}`;
+                        }
                         return `${ctx.dataset.label}: ${val} | ${pct}%`;
                       },
                       footer: (items) => {
@@ -1363,6 +1493,7 @@
             if(selChart){
               selChart.data.labels = [];
               selChart.data.datasets.forEach(d => d.data = []);
+              selChart._swatPeople = [];
               selChart.update();
               return;
             }
@@ -1404,6 +1535,12 @@
                         const sum = Math.max(1, sw + st);
                         const val = Number(ctx.raw || 0);
                         const pct = Math.round((val / sum) * 1000) / 10;
+
+                        if(String(ctx.dataset?.label || '') === 'SWAT'){
+                          const ppl = Number(selChart._swatPeople?.[i] || 0);
+                          const word = ruPlural(ppl, 'сотрудник', 'сотрудника', 'сотрудников');
+                          return `${ctx.dataset.label}: ${val} | ${pct}% | ${ppl} ${word}`;
+                        }
                         return `${ctx.dataset.label}: ${val} | ${pct}%`;
                       },
                       footer: (items) => {
@@ -1545,6 +1682,7 @@
                 d.data = [];
                 d._timeLabel = [];
                 d._timeMs = [];
+                d._lastChpLabel = [];
               });
               cutChart.update();
               return;
@@ -1567,7 +1705,8 @@
               pointHoverRadius: 5,
               spanGaps: true,
               _timeLabel: [],
-              _timeMs: []
+              _timeMs: [],
+              _lastChpLabel: []
             });
 
             cutChart = new Chart(cutCanvas, {
@@ -1613,7 +1752,11 @@
                       },
                       label: (ctx) => {
                         const ds = cutChart.data.datasets[ctx.datasetIndex];
-                        const txt = ds?._timeLabel?.[ctx.dataIndex] || '-';
+                        let txt = ds?._timeLabel?.[ctx.dataIndex] || '-';
+                        const last = ds?._lastChpLabel?.[ctx.dataIndex] || '';
+                        if(last && String(ctx.dataset?.label || '').includes('Store')){
+                          txt += ` | Последний ЧП ${last}`;
+                        }
                         return `${ctx.dataset.label}: ${txt}`;
                       }
                     }
@@ -1653,19 +1796,23 @@
             tcChart.update();
           }
 
-          function addCoveragePoint(release, swatCount, streamCount){
+          function addCoveragePoint(release, swatCount, streamCount, swatPeopleCount){
             if(!covChart) return;
             covChart.data.labels.push(release);
             covChart.data.datasets[0].data.push(swatCount);
             covChart.data.datasets[1].data.push(streamCount);
+            if(!Array.isArray(covChart._swatPeople)) covChart._swatPeople = [];
+            covChart._swatPeople.push(Number(swatPeopleCount) || 0);
             covChart.update();
           }
 
-          function addSelectivePoint(release, swatCount, streamCount){
+          function addSelectivePoint(release, swatCount, streamCount, swatPeopleCount){
             if(!selChart) return;
             selChart.data.labels.push(release);
             selChart.data.datasets[0].data.push(swatCount);
             selChart.data.datasets[1].data.push(streamCount);
+            if(!Array.isArray(selChart._swatPeople)) selChart._swatPeople = [];
+            selChart._swatPeople.push(Number(swatPeopleCount) || 0);
             selChart.update();
           }
 
@@ -1697,6 +1844,7 @@
                   ds.data.push(null);
                   ds._timeLabel.push('');
                   ds._timeMs.push(null);
+                  ds._lastChpLabel.push('');
                 }
               }
             }
@@ -1704,16 +1852,19 @@
             const ds = cutChart.data.datasets[dsIndex];
 
             // ensure arrays length
-            while(ds.data.length < di){ ds.data.push(null); ds._timeLabel.push(''); ds._timeMs.push(null); }
+            while(ds.data.length < di){ ds.data.push(null); ds._timeLabel.push(''); ds._timeMs.push(null);
+                  ds._lastChpLabel.push(''); }
 
             if(!yObjOrNull){
               ds.data.push(null);
               ds._timeLabel.push('');
               ds._timeMs.push(null);
+                  ds._lastChpLabel.push('');
             }else{
               ds.data.push(yObjOrNull.y);
               ds._timeLabel.push(yObjOrNull.label);
               ds._timeMs.push(yObjOrNull.msLocal);
+              ds._lastChpLabel.push(yObjOrNull.lastChp || '');
             }
           }
 
@@ -1799,9 +1950,9 @@
             tr.innerHTML = `
               <td class="mono text-left">${release}</td>
               <td class="mono">${iosCut || '-'}</td>
-              <td class="mono">${iosStore || '-'}</td>
+              <td class="mono">${iosStore || ''}</td>
               <td class="mono">${andCut || '-'}</td>
-              <td class="mono">${andStore || '-'}</td>
+              <td class="mono">${andStore || ''}</td>
             `;
             cutTbody.appendChild(tr);
           }
@@ -1960,14 +2111,6 @@
 
             const signal = window.__wbAbortController?.signal;
 
-            let swatSet;
-            try{
-              swatSet = await fetchSwatLogins(null, signal);
-            }catch(e){
-              showEmpty(`Ошибка получения списка SWAT: ${e?.message || e}`);
-              return;
-            }
-
             tbody.innerHTML = '<tr><td class="mono text-left" colspan="5">Сбор данных…</td></tr>';
 
             const LAUNCH_CONCURRENCY = 10;
@@ -1981,6 +2124,16 @@
 
             for(const rel of releases){
               if(signal?.aborted) break;
+
+              let swatInfo;
+              try{
+                swatInfo = await fetchSwatLogins(rel, signal);
+              }catch(e){
+                showEmpty(`Ошибка получения списка SWAT для релиза ${rel}: ${e?.message || e}`);
+                return;
+              }
+              const swatSet = swatInfo.set;
+              const swatPeopleDeclared = Number(swatInfo.total || 0) || 0;
 
               let total = 0;
               let manual = 0;
@@ -2046,14 +2199,24 @@
 
               const perHB = await asyncPool(idsHB, LAUNCH_CONCURRENCY, async (id) => {
                 const ms = await fetchMemberStats(id, signal);
-                return swatStreamAgg(ms, swatSet);
+                const agg = swatStreamAgg(ms, swatSet);
+                const ppl = extractSwatAssignees(ms, swatSet);
+                return { agg, ppl: Array.from(ppl) };
               }, signal);
 
+              const swatPeopleSetHB = new Set();
               for(const r of perHB){
                 if(!r) continue;
-                swatCount += Number(r.swatTotal || 0);
-                streamCount += Number(r.streamTotal || 0);
+                const agg = r.agg || r;
+                swatCount += Number(agg.swatTotal || 0);
+                streamCount += Number(agg.streamTotal || 0);
+                if(Array.isArray(r.ppl)){
+                  for(const a of r.ppl){
+                    if(a) swatPeopleSetHB.add(String(a));
+                  }
+                }
               }
+              const swatPeopleHB = swatPeopleDeclared;
 
               // 3) SWAT/STREAM Selective (только Selective)
               const selLaunches = await fetchLaunches(rel, 'Selective', signal);
@@ -2063,14 +2226,24 @@
 
               const perSel = await asyncPool(selIds, LAUNCH_CONCURRENCY, async (id) => {
                 const ms = await fetchMemberStats(id, signal);
-                return swatStreamAgg(ms, swatSet);
+                const agg = swatStreamAgg(ms, swatSet);
+                const ppl = extractSwatAssignees(ms, swatSet);
+                return { agg, ppl: Array.from(ppl) };
               }, signal);
 
+              const swatPeopleSetSel = new Set();
               for(const r of perSel){
                 if(!r) continue;
-                selSwat += Number(r.swatTotal || 0);
-                selStream += Number(r.streamTotal || 0);
+                const agg = r.agg || r;
+                selSwat += Number(agg.swatTotal || 0);
+                selStream += Number(agg.streamTotal || 0);
+                if(Array.isArray(r.ppl)){
+                  for(const a of r.ppl){
+                    if(a) swatPeopleSetSel.add(String(a));
+                  }
+                }
               }
+              const swatPeopleSel = swatPeopleDeclared;
 
               // 1) TOTAL/AUTO
               const perLaunchAll = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
@@ -2114,25 +2287,21 @@
               let iosCutLbl = null, iosStoreLbl = null, andCutLbl = null, andStoreLbl = null;
 
               try{
-                const [ios, andr] = await Promise.all([
+                const [ios, andr, lastChpIos, lastChpAndr] = await Promise.all([
                   fetchDeployDates('IOS', rel, signal),
                   fetchDeployDates('ANDROID', rel, signal),
+                  fetchLastCherepik('IOS', rel, signal),
+                  fetchLastCherepik('ANDROID', rel, signal),
                 ]);
 
                 const iosCut = yValueFromIso(ios.cutoff);
                 const andCut = yValueFromIso(andr.cutoff);
 
-                const iosStore = (ios.storeMsLocal ? { 
-                  y: (dayIndexCustom(new Date(ios.storeMsLocal).getUTCDay()) * 1440 + (new Date(ios.storeMsLocal).getUTCHours()*60 + new Date(ios.storeMsLocal).getUTCMinutes() + new Date(ios.storeMsLocal).getUTCSeconds()/60)),
-                  msLocal: ios.storeMsLocal,
-                  label: labelFromMsLocal(ios.storeMsLocal)
-                } : null);
+                const iosStore = yValueFromMsLocal(ios.storeMsLocal);
+                if(iosStore) iosStore.lastChp = lastChpIos || '';
 
-                const andStore = (andr.storeMsLocal ? { 
-                  y: (dayIndexCustom(new Date(andr.storeMsLocal).getUTCDay()) * 1440 + (new Date(andr.storeMsLocal).getUTCHours()*60 + new Date(andr.storeMsLocal).getUTCMinutes() + new Date(andr.storeMsLocal).getUTCSeconds()/60)),
-                  msLocal: andr.storeMsLocal,
-                  label: labelFromMsLocal(andr.storeMsLocal)
-                } : null);
+                const andStore = yValueFromMsLocal(andr.storeMsLocal);
+                if(andStore) andStore.lastChp = lastChpAndr || '';
 
                 addCutPoint(rel, 0, iosCut);
                 addCutPoint(rel, 1, andCut);
@@ -2168,13 +2337,13 @@
                 renderCovRow({ release: rel, swatCount, streamCount });
               }
               covRowsData.push({ release: rel, swatCount, streamCount, total: (swatCount + streamCount) });
-              addCoveragePoint(rel, swatCount, streamCount);
+              addCoveragePoint(rel, swatCount, streamCount, swatPeopleHB);
 
               if(selTbody){
                 renderSelRow({ release: rel, swatCount: selSwat, streamCount: selStream });
               }
               selRowsData.push({ release: rel, swatCount: selSwat, streamCount: selStream, total: (selSwat + selStream) });
-              addSelectivePoint(rel, selSwat, selStream);
+              addSelectivePoint(rel, selSwat, selStream, swatPeopleSel);
             }
 
             // сортировка скрытых таблиц (если будешь включать)
