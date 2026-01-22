@@ -8,6 +8,8 @@
   <!-- Tailwind как в uwu_6 (для удобных утилит) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
   <!-- Все кастомные стили вынесены в style.css -->
   <link rel="stylesheet" href="./style.css" />
@@ -23,6 +25,10 @@
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
               <span aria-hidden="true">🏷️</span><span>v0.2.9</span>
             </span>
+            <button id="exportPdfBtn"
+              class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
+              📄 Экспорт PDF
+            </button>
           </div>
         </div>
       </div>
@@ -417,6 +423,52 @@
           const inpTo    = document.getElementById('releaseTo');
           const inpAllureToken = document.getElementById('allureToken');
           const inpDeployToken = document.getElementById('deployToken');
+
+          document.getElementById('exportPdfBtn')
+            ?.addEventListener('click', exportAllChartsToPDF);
+        // Экспорт всей карточки графика целиком (заголовок + расшифровка + график) в PDF
+        async function exportAllChartsToPDF(){
+          if (!window.jspdf || !window.html2canvas) return;
+
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF('p', 'mm', 'a4');
+
+          const pageW = pdf.internal.pageSize.getWidth();
+          const pageH = pdf.internal.pageSize.getHeight();
+          const margin = 10;
+          let y = margin;
+
+          // Берём именно карточки графиков целиком
+          const cards = Array.from(document.querySelectorAll('section.card'))
+            .filter(card => card.querySelector('canvas'));
+
+          for (const card of cards) {
+            const rect = card.getBoundingClientRect();
+            const scale = 2;
+
+            // Рендер DOM карточки в canvas
+            const canvas = await html2canvas(card, {
+              backgroundColor: '#ffffff',
+              scale: scale,
+              useCORS: true
+            });
+
+            const img = canvas.toDataURL('image/png');
+
+            const imgW = pageW - margin * 2;
+            const imgH = imgW * (rect.height / rect.width);
+
+            if (y + imgH > pageH - margin) {
+              pdf.addPage();
+              y = margin;
+            }
+
+            pdf.addImage(img, 'PNG', margin, y, imgW, imgH);
+            y += imgH + 10;
+          }
+
+          pdf.save('WB_All_Charts.pdf');
+        }
 
           // Sections: TC
           const emptyBox = document.getElementById('tcEmpty');
