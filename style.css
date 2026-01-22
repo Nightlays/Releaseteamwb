@@ -172,3 +172,278 @@
 
 /* На всякий случай, если в style.css нет базового вида точек */
 .legend .dot{width:10px;height:10px;border-radius:9999px;display:inline-block;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
+
+/* ===== SWAT Dashboard (добавка, без изменения текущих стилей) ===== */
+
+/* table helpers */
+table th, table td { position: relative; }
+
+.cell-ellipsis{
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100%;
+  display: block;
+}
+
+/* wrappers: без вертикального скролла внутри таблиц */
+.swat-table-scroll{
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* layout for tables (вместо inline style) */
+.swat-emp-table{ min-width: 1750px; }
+.swat-fixed-table{ width: 100%; table-layout: fixed; }
+
+/* resizable columns */
+.th-wrap{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height: 32px;
+}
+.th-title{ flex:1 1 auto; min-width:0; }
+.col-resize-handle{
+  position:absolute;
+  top:0; right:-3px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  user-select:none;
+  z-index: 5;
+}
+.col-resize-handle::after{
+  content:"";
+  position:absolute;
+  top:8px; bottom:8px;
+  left:50%;
+  transform:translateX(-50%);
+  width:2px;
+  border-radius:999px;
+  background: rgba(109, 40, 217, .20);
+}
+.col-resizing * { cursor: col-resize !important; user-select:none !important; }
+
+/* sorting visuals */
+th.sortable{ cursor: pointer; user-select:none; }
+th.sortable:hover{ background: rgba(255,255,255,0.55); }
+.sort-ind{
+  font-size: 12px;
+  opacity: .75;
+  margin-left: 6px;
+}
+
+/* sticky name column + right boundary */
+th.sticky-name, td.sticky-name{
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(4px);
+  box-shadow: 10px 0 16px -18px rgba(15,23,42,0.65);
+}
+thead th.sticky-name{ z-index: 30; }
+th.sticky-name::after, td.sticky-name::after{
+  content:"";
+  position:absolute;
+  top:-1px;
+  bottom:-1px;
+  right:-1px;
+  width:1px;
+  background: #ecebff; /* как разделительная линия у колонок */
+  pointer-events:none;
+  z-index: 40;
+}
+
+/* day cells: фиксируем фон, чтобы hover строки не перекрашивал */
+td.day-cell.day-worked{ background: rgba(110,231,183,0.60) !important; }
+td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !important; }
+tbody tr:hover td.day-cell.day-worked{ background: rgba(110,231,183,0.60) !important; }
+tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !important; }
+
+/* click-to-open modal for "Проходил" */
+.swat-path-cell{ cursor: pointer; }
+.swat-path-cell:hover{ background: rgba(250,249,255,0.65); }
+
+/* toast (центр снизу) */
+.swat-toast{
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s;
+  z-index: 60;
+}
+.swat-toast.swat-toast-show{ opacity: 1; }
+
+/* modal */
+.swat-modal-overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+}
+.swat-modal{
+  position: relative;
+  width: min(860px, calc(100vw - 32px));
+  max-height: min(80vh, 740px);
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #ecebff;
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(15,23,42,.25);
+  padding: 14px 14px 16px;
+}
+.swat-modal-head{ padding-right: 40px; }
+.swat-modal-title{
+  font-weight: 800;
+  color: #111827;
+  font-size: 16px;
+  line-height: 1.2;
+}
+.swat-modal-sub{
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.swat-modal-body{
+  margin-top: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  color: #111827;
+  background: #faf9ff;
+  border: 1px solid #ecebff;
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.swat-modal-close{
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #f7f5ff;
+  border: 1px solid #ecebff;
+  color: #4c1d95;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.swat-modal-close:hover{ background: #f3efff; }
+
+/* ===== SWAT Dashboard: popover вместо модалки (добавка) ===== */
+
+.swat-popover{
+  position: fixed;
+  z-index: 90;
+  width: min(560px, calc(100vw - 16px));
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #ecebff;
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(15,23,42,.22);
+  padding: 10px 12px 12px;
+}
+
+.swat-popover-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.swat-popover-title{
+  font-weight: 800;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.swat-popover-sub{
+  margin-top: 2px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.swat-popover-actions{
+  display:flex;
+  align-items:center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.swat-popover-btn{
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #f7f5ff;
+  border: 1px solid #ecebff;
+  color: #4c1d95;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.swat-popover-btn:hover{ background: #f3efff; }
+
+.swat-popover-body{
+  margin-top: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  color: #111827;
+  background: #faf9ff;
+  border: 1px solid #ecebff;
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+/* вертикальные разделители колонок только в таблице типов задач */
+.types-table th,
+.types-table td{
+   border-right: 1px solid rgba(120, 120, 160, 0.25);
+}
+
+.types-table th:last-child,
+.types-table td:last-child{
+  border-right: none;
+}
+
+.types-table th:first-child,
+.types-table td:first-child{
+  padding-right: 1.05rem; /* чуть больше отступ от разделительной линии */
+  min-width: 120px;       /* чтобы релиз точно влез */
+}
+
+/* types-table: все линии на ~40% толще и темнее */
+.types-table thead th{
+  border-bottom: 1.4px solid rgba(120,120,160,.35);
+}
+
+.types-table th,
+.types-table td{
+  border-right: 1.4px solid rgba(120,120,160,.35);
+}
+
+.types-table td{
+  border-bottom: 1.4px dashed rgba(120,120,160,.31);
+}
+
+.types-table th:last-child,
+.types-table td:last-child{
+  border-right: none;
+}

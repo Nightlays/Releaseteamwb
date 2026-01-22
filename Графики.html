@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body class="min-h-screen">
-  <div class="max-w-6xl mx-auto px-4 py-6">
+   <div class="max-w-screen-2xl mx-auto px-4 py-6">
     <header class="flex items-center justify-between gap-3 flex-wrap">
       <div class="brand-badge">
         <span class="brand-dot"></span>
@@ -23,7 +23,7 @@
           <div class="flex items-center gap-2">
             <div class="font-extrabold leading-tight">WB All Table</div>
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v0.2.9</span>
+              <span aria-hidden="true">🏷️</span><span>v0.2.11</span>
             </span>
             <button id="exportPdfBtn"
               class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
@@ -397,6 +397,87 @@
         </div>
       </section>
 
+<!-- 7) Типы задач релиза iOS -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Типы задач релиза iOS</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="iosTypes" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="iosTypes" class="space-y-3">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl bg-white">
+            <div id="iosTypesEmpty" class="p-6 text-slate-500" style="min-height:520px">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="iosTypesContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="iosTypesTrendViewport">
+                <canvas id="iosTypesTrendChart" aria-label="iOS types chart" role="img"></canvas>
+              </div>
+
+              <div class="legend px-4 pb-3" id="iosTypesLegend"></div>
+
+              <div id="iosTypesTableWrap" style="overflow:auto" class="px-4 pb-4">
+                <table id="iosTypesTable" class="types-table">
+                  <thead>
+                    <tr id="iosTypesTheadRow"></tr>
+                  </thead>
+                  <tbody id="iosTypesTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+<!-- 8) Типы задач релиза Android -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Типы задач релиза Android</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="andTypes" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="andTypes" class="space-y-3">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl bg-white">
+            <div id="andTypesEmpty" class="p-6 text-slate-500" style="min-height:520px">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="andTypesContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="andTypesTrendViewport">
+                <canvas id="andTypesTrendChart" aria-label="Android types chart" role="img"></canvas>
+              </div>
+
+              <div class="legend px-4 pb-3" id="andTypesLegend"></div>
+
+              <div id="andTypesTableWrap" style="overflow:auto" class="px-4 pb-4">
+                <table id="andTypesTable" class="types-table">
+                  <thead>
+                    <tr id="andTypesTheadRow"></tr>
+                  </thead>
+                  <tbody id="andTypesTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
       <script>
         (function(){
           const BASE_URL = 'https://allure-testops.wb.ru';
@@ -504,6 +585,21 @@
           const cutTbody = document.getElementById('cutTbody');
           const cutCanvas = document.getElementById('cutTrendChart');
 
+          // Types (Deploy-lab issues) — iOS/Android
+          const iosTypesEmpty = document.getElementById('iosTypesEmpty');
+          const iosTypesContent = document.getElementById('iosTypesContent');
+          const iosTypesTheadRow = document.getElementById('iosTypesTheadRow');
+          const iosTypesTbody = document.getElementById('iosTypesTbody');
+          const iosTypesLegend = document.getElementById('iosTypesLegend');
+          const iosTypesCanvas = document.getElementById('iosTypesTrendChart');
+
+          const andTypesEmpty = document.getElementById('andTypesEmpty');
+          const andTypesContent = document.getElementById('andTypesContent');
+          const andTypesTheadRow = document.getElementById('andTypesTheadRow');
+          const andTypesTbody = document.getElementById('andTypesTbody');
+          const andTypesLegend = document.getElementById('andTypesLegend');
+          const andTypesCanvas = document.getElementById('andTypesTrendChart');
+
           const chartCanvas = document.getElementById('tcTrendChart');
           const covCanvas = document.getElementById('covTrendChart');
 
@@ -513,6 +609,8 @@
           let avgChart = null;
           let chpChart = null;
           let cutChart = null;
+          let iosTypesChart = null;
+          let andTypesChart = null;
 
           // SWAT list cache: fetch exec per release (cache by release)
           const __swatCache = new Map();
@@ -686,6 +784,201 @@
             }
             return n;
           }
+
+          async function fetchDeployIssuesList(prefix, release, signal){
+            const tok = (inpDeployToken?.value || '').trim();
+            if(!tok) return [];
+
+            const url = DEPLOY_ISSUES_URL_TMPL
+              .replace('{prefix}', prefix)
+              .replace('{rel}', release);
+
+            const data = await proxyGetJson(url, deployHeaders(), signal);
+            if(Array.isArray(data)) return data;
+            if(Array.isArray(data?.data)) return data.data;
+            if(Array.isArray(data?.content)) return data.content;
+            return [];
+          }
+
+          function normalizeIssueType(x){
+            const t = String(x || '').trim();
+            return t || 'Unknown';
+          }
+
+          function aggregateIssuesByType(items){
+            const counts = Object.create(null);
+            const details = Object.create(null);
+            const typeSet = new Set();
+
+            for(const it of (items || [])){
+              if(!it) continue;
+              const type = normalizeIssueType(it.type);
+              typeSet.add(type);
+              counts[type] = (counts[type] || 0) + 1;
+
+              if(!details[type]) details[type] = [];
+              details[type].push({
+                key: it.key || '',
+                summary: it.summary || '',
+                status: it.status || '',
+                stream: it.stream || '',
+                merged_after_cutoff: it.merged_after_cutoff === true
+              });
+            }
+
+            for(const t of Object.keys(details)){
+              details[t].sort((a,b) => String(a.key || '').localeCompare(String(b.key || '')));
+            }
+
+            return { counts, details, typeSet };
+          }
+
+          const TYPES_CANON_ORDER = [
+            'Task','Bug','Release','Epic','Defect','Analytics','User Story','Testing','Documentation','Test automation','Feature','Tech Dept'
+          ];
+
+          function sortTypesByCanon(typeSet){
+            const types = Array.from(typeSet || []);
+            const canon = [];
+            const rest = [];
+            for(const t of types){
+              if(TYPES_CANON_ORDER.includes(t)) canon.push(t);
+              else rest.push(t);
+            }
+            canon.sort((a,b) => TYPES_CANON_ORDER.indexOf(a) - TYPES_CANON_ORDER.indexOf(b));
+            rest.sort((a,b) => a.localeCompare(b));
+            return [...canon, ...rest];
+          }
+
+          function colorForTypeLabel(label){
+            const s = String(label || '');
+            let h = 0;
+            for(let i=0;i<s.length;i++){
+              h = (h*31 + s.charCodeAt(i)) >>> 0;
+            }
+            const hue = h % 360;
+            return `hsl(${hue}, 65%, 45%)`;
+          }
+
+          function renderDynamicLegend(container, chart){
+            if(!container) return;
+            container.innerHTML = '';
+            if(!chart?.data?.datasets?.length) return;
+
+            for(const ds of chart.data.datasets){
+              const item = document.createElement('span');
+              item.className = 'lg-item';
+
+              const dot = document.createElement('span');
+              dot.className = 'dot';
+              dot.style.background = ds.borderColor || ds.backgroundColor || '#999';
+
+              const txt = document.createElement('span');
+              txt.textContent = ds.label || '';
+
+              item.appendChild(dot);
+              item.appendChild(txt);
+              container.appendChild(item);
+            }
+          }
+
+          function renderTypesTable(theadRowEl, tbodyEl, typeList, rows){
+            if(!theadRowEl || !tbodyEl) return;
+
+            theadRowEl.innerHTML = '';
+            const th0 = document.createElement('th');
+            th0.className = 'text-left';
+            th0.textContent = 'Релиз';
+            theadRowEl.appendChild(th0);
+
+            for(const t of typeList){
+              const th = document.createElement('th');
+              th.className = 'text-center';
+              th.textContent = t;
+              theadRowEl.appendChild(th);
+            }
+
+            tbodyEl.innerHTML = '';
+            for(const row of rows){
+              const tr = document.createElement('tr');
+
+              const td0 = document.createElement('td');
+              td0.className = 'mono text-left';
+              td0.textContent = row.release;
+              tr.appendChild(td0);
+
+              for(const t of typeList){
+                const td = document.createElement('td');
+                td.className = 'mono text-center';
+                td.textContent = String((row.counts && row.counts[t]) ? row.counts[t] : 0);
+                tr.appendChild(td);
+              }
+
+              tbodyEl.appendChild(tr);
+            }
+          }
+
+          function buildOrUpdateTypesChart(existingChart, canvas, legendEl, typeList, labels, rows){
+            if(!canvas) return existingChart;
+
+            const datasetsRaw = typeList.map((t)=>({
+              label: t,
+              data: rows.map(r => (r.counts && r.counts[t]) ? r.counts[t] : 0),
+              borderColor: colorForTypeLabel(t),
+              backgroundColor: colorForTypeLabel(t),
+              tension: 0.25,
+              borderWidth: 2,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              spanGaps: true
+            }));
+
+            const datasets = datasetsRaw.filter(ds => ds.data.some(v => (Number(v)||0) !== 0));
+
+            if(!datasets.length){
+              if(existingChart){
+                try{ existingChart.destroy(); }catch(e){}
+              }
+              if(legendEl) legendEl.innerHTML = '';
+              return null;
+            }
+
+            if(!existingChart){
+              existingChart = new Chart(canvas, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  interaction: { mode: 'nearest', intersect: false },
+                  scales: {
+                    x: { ticks: { maxRotation: 0, autoSkip: true }, grid: { display: false } },
+                    y: { beginAtZero: true, ticks: { precision: 0 } }
+                  },
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      mode: 'index',
+                      intersect: false,
+                      callbacks: {
+                        afterLabel: () => ''
+                      }
+                    }
+                  }
+                }
+              });
+            }else{
+              existingChart.data.labels = labels;
+              existingChart.data.datasets = datasets;
+              existingChart.update();
+            }
+
+            existingChart._typeDetails = rows.map(r => r.details || {});
+            renderDynamicLegend(legendEl, existingChart);
+            try{ existingChart.resize(); }catch(e){}
+            return existingChart;
+          }
+
 
           // ---- даты/время из deploy-lab (1в1 по python): cutoff_date из base, store_time = earliest note.date из deploy ----
 
@@ -925,6 +1218,36 @@
             if(cutContent) cutContent.style.display = 'none';
           }
 
+
+
+          function setIosTypesEmpty(text){
+            if(!iosTypesEmpty) return;
+            iosTypesEmpty.textContent = text;
+            iosTypesEmpty.style.display = '';
+          }
+          function showIosTypesContent(){
+            if(iosTypesEmpty) iosTypesEmpty.style.display = 'none';
+            if(iosTypesContent) iosTypesContent.style.display = '';
+          }
+          function showIosTypesEmpty(text){
+            setIosTypesEmpty(text);
+            if(iosTypesContent) iosTypesContent.style.display = 'none';
+          }
+
+          function setAndTypesEmpty(text){
+            if(!andTypesEmpty) return;
+            andTypesEmpty.textContent = text;
+            andTypesEmpty.style.display = '';
+          }
+          function showAndTypesContent(){
+            if(andTypesEmpty) andTypesEmpty.style.display = 'none';
+            if(andTypesContent) andTypesContent.style.display = '';
+          }
+          function showAndTypesEmpty(text){
+            setAndTypesEmpty(text);
+            if(andTypesContent) andTypesContent.style.display = 'none';
+          }
+
           function setRunning(running){
             if(running){
               startBtn.style.display = 'none';
@@ -936,6 +1259,8 @@
               showAvgEmpty('Данные появятся после получения из источника');
               showChpEmpty('Данные появятся после получения из источника');
               showCutEmpty('Данные появятся после получения из источника');
+              showIosTypesEmpty('Данные появятся после получения из источника');
+              showAndTypesEmpty('Данные появятся после получения из источника');
             }else{
               stopBtn.style.display = 'none';
               startBtn.style.display = '';
@@ -2086,6 +2411,8 @@
                 if(key === 'avg') avgChart?.resize();
                 if(key === 'chp') chpChart?.resize();
                 if(key === 'cut') cutChart?.resize();
+                if(key === 'iosTypes') iosTypesChart?.resize();
+                if(key === 'andTypes') andTypesChart?.resize();
               }catch(e){}
             }
 
@@ -2160,6 +2487,8 @@
             showAvgContent();
             showChpContent();
             showCutContent();
+            showIosTypesContent();
+            showAndTypesContent();
 
             const signal = window.__wbAbortController?.signal;
 
@@ -2398,6 +2727,69 @@
               addSelectivePoint(rel, selSwat, selStream, swatPeopleSel);
             }
 
+            // Типы задач (Deploy-lab issues): iOS + Android
+            const deployTok = (inpDeployToken?.value || '').trim();
+            if(!deployTok){
+              showIosTypesEmpty('Вставьте токен Deploy-lab');
+              showAndTypesEmpty('Вставьте токен Deploy-lab');
+            }else{
+              const iosRows = [];
+              const andRows = [];
+              const iosSet = new Set();
+              const andSet = new Set();
+
+              for(const rel of releases){
+                if(signal?.aborted) break;
+
+                let iosIssues = [];
+                let andIssues = [];
+                try{
+                  [iosIssues, andIssues] = await Promise.all([
+                    fetchDeployIssuesList('IOS', rel, signal),
+                    fetchDeployIssuesList('ANDROID', rel, signal),
+                  ]);
+                }catch(e){}
+
+                const a1 = aggregateIssuesByType(iosIssues);
+                const a2 = aggregateIssuesByType(andIssues);
+
+                a1.typeSet.forEach(t => iosSet.add(t));
+                a2.typeSet.forEach(t => andSet.add(t));
+
+                iosRows.push({ release: rel, counts: a1.counts, details: a1.details });
+                andRows.push({ release: rel, counts: a2.counts, details: a2.details });
+              }
+
+              const iosTypes = sortTypesByCanon(iosSet);
+              const andTypes = sortTypesByCanon(andSet);
+
+              if(!iosTypes.length){
+                showIosTypesEmpty('Нет данных по типам задач (iOS) в Deploy-lab');
+                if(iosTypesLegend) iosTypesLegend.innerHTML = '';
+                if(iosTypesTbody) iosTypesTbody.innerHTML = '';
+                if(iosTypesTheadRow) iosTypesTheadRow.innerHTML = '';
+                if(iosTypesChart){ try{ iosTypesChart.destroy(); }catch(e){} iosTypesChart = null; }
+              }else{
+                showIosTypesContent();
+                renderTypesTable(iosTypesTheadRow, iosTypesTbody, iosTypes, iosRows);
+                iosTypesChart = buildOrUpdateTypesChart(iosTypesChart, iosTypesCanvas, iosTypesLegend, iosTypes, releases, iosRows);
+              }
+
+              if(!andTypes.length){
+                showAndTypesEmpty('Нет данных по типам задач (Android) в Deploy-lab');
+                if(andTypesLegend) andTypesLegend.innerHTML = '';
+                if(andTypesTbody) andTypesTbody.innerHTML = '';
+                if(andTypesTheadRow) andTypesTheadRow.innerHTML = '';
+                if(andTypesChart){ try{ andTypesChart.destroy(); }catch(e){} andTypesChart = null; }
+              }else{
+                showAndTypesContent();
+                renderTypesTable(andTypesTheadRow, andTypesTbody, andTypes, andRows);
+                andTypesChart = buildOrUpdateTypesChart(andTypesChart, andTypesCanvas, andTypesLegend, andTypes, releases, andRows);
+              }
+            }
+
+
+
             // сортировка скрытых таблиц (если будешь включать)
             if(tbody && tcRowsData.length){
               tbody.innerHTML = '';
@@ -2435,6 +2827,8 @@
           showAvgEmpty('Данные появятся после получения из источника');
           showChpEmpty('Данные появятся после получения из источника');
           showCutEmpty('Данные появятся после получения из источника');
+          showIosTypesEmpty('Данные появятся после получения из источника');
+          showAndTypesEmpty('Данные появятся после получения из источника');
           initCollapsers();
 
           proxyBtn?.addEventListener('click', async () => {
