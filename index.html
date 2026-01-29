@@ -90,6 +90,23 @@
   .topbar .actions{
     margin-left:auto; display:flex; gap:8px;
   }
+  .nav-toggle{
+    display:none;
+    align-items:center;
+    justify-content:center;
+    width:40px;
+    height:40px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--ink);
+    cursor:pointer;
+    box-shadow:var(--shadow-sm);
+    font-size:18px;
+    line-height:1;
+  }
+  .nav-toggle:hover{ border-color:var(--line-strong); }
+  .nav-toggle:active{ transform:translateY(1px); }
 
   .wrap{max-width:1600px;margin:24px auto;padding:0 20px}
 
@@ -123,6 +140,49 @@
   .tabs button.active{
     color:#fff; background:var(--grad); border-color:transparent;
     box-shadow:0 10px 24px rgba(203,17,171,.28);
+  }
+
+  /* Mobile header menu */
+  @media (max-width: 900px){
+    .topbar .inner{ position:relative; gap:10px; }
+    .nav-toggle{ display:inline-flex; margin-left:auto; }
+    .topbar .actions{ margin-left:0; }
+    .topbar-tabs{
+      position:absolute;
+      top:calc(100% + 6px);
+      left:0;
+      right:0;
+      background:rgba(255,255,255,.98);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:10px;
+      box-shadow:var(--shadow-lg);
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:8px;
+      max-height: calc(100vh - 84px);
+      overflow:auto;
+      opacity:0;
+      pointer-events:none;
+      transform:translateY(-8px);
+      transition:opacity .2s ease, transform .2s ease;
+      z-index:40;
+    }
+    body.nav-open .topbar-tabs{
+      opacity:1;
+      pointer-events:auto;
+      transform:translateY(0);
+    }
+    body.nav-open::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      background:rgba(20,0,33,.35);
+      backdrop-filter: blur(2px);
+      z-index:25;
+    }
+    .tabs{ margin:0; }
+    .tabs button{ width:100%; justify-content:flex-start; }
   }
 
   /* Карточки */
@@ -356,13 +416,13 @@
   .chart-wrap{ height: 300px; }
   .kpis{ grid-template-columns: repeat(2,1fr); }
 }
-@media (max-width: 768px){
-  body{ font-size: 13px; }
-  .topbar .inner{ padding: 8px 12px; }
-  .brand .title{ font-size: 14px; max-width: 50vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tabs{ overflow:auto; }
-  .tabs button{ flex: 1 1 auto; }
-  .wrap{ padding: 0 12px; }
+  @media (max-width: 768px){
+    body{ font-size: 13px; }
+    .topbar .inner{ padding: 8px 12px; }
+    .brand .title{ font-size: 14px; max-width: 50vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tabs:not(.topbar-tabs){ overflow:auto; }
+    .tabs:not(.topbar-tabs) button{ flex: 1 1 auto; }
+    .wrap{ padding: 0 12px; }
   /* Panels/fields stack to one column */
   .panel{ grid-template-columns: 1fr !important; }
   .panel .field{ grid-column: 1 / -1 !important; }
@@ -931,6 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </svg>
       <div class="title">Дом питона </div>
     </div>
+    <button class="nav-toggle" aria-label="Открыть меню">☰</button>
     <div class="tabs rb-shell-tabs topbar-tabs">
     <button class="active" data-module="dashboard_run_module.html" data-guard="shell--dashboard-run">Дашборд + РАН-отчёт</button>
     <button data-module="Ванговатор.html"data-guard="shell--vangovator">Ванговатор</button>
@@ -971,6 +1032,28 @@ document.addEventListener('DOMContentLoaded', () => {
     .map(b => b.getAttribute('data-guard'))
     .filter(Boolean);
 
+  const navToggle = document.querySelector('.nav-toggle');
+
+  const closeNav = () => {
+    document.body.classList.remove('nav-open');
+    if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+  };
+  const openNav = () => {
+    document.body.classList.add('nav-open');
+    if (navToggle) navToggle.setAttribute('aria-expanded', 'true');
+  };
+
+  if (navToggle) {
+    navToggle.setAttribute('aria-expanded', 'false');
+    navToggle.addEventListener('click', () => {
+      if (document.body.classList.contains('nav-open')) {
+        closeNav();
+      } else {
+        openNav();
+      }
+    });
+  }
+
   function activateButton(btn) {
     // визульное состояние
     buttons.forEach(b => b.classList.remove('active'));
@@ -990,6 +1073,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (guard) {
       document.body.classList.add(guard);
     }
+    closeNav();
   }
 
   buttons.forEach(btn => {
@@ -1001,6 +1085,19 @@ document.addEventListener('DOMContentLoaded', () => {
   if (initiallyActive) {
     activateButton(initiallyActive);
   }
+
+  // Close menu on outside click and escape
+  document.addEventListener('click', (e) => {
+    if (!document.body.classList.contains('nav-open')) return;
+    if (e.target.closest('.topbar')) return;
+    closeNav();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeNav();
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 900) closeNav();
+  });
 });
 </script>
 
