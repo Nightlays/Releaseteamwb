@@ -25,7 +25,7 @@
 
 
 <div class="wrap">
-  <h1>Остаток кейсов на регресс v.3.1</h1>
+  <h1>Остаток кейсов на регресс v.3.2</h1>
 
  <div class="tabs">
   <button id="tabDashBtn" class="active">Дашборд</button>
@@ -364,6 +364,7 @@
 
   // Кеш GET-запросов
   const GET_CACHE = new Map();
+  const UWU_CACHE = new Map();
   function cacheKey(url, params, headers){
     const qs=params?new URLSearchParams(params).toString():'';
     return url + (qs?('?'+qs):'') + '|' + (headers?.Authorization||'');
@@ -372,6 +373,7 @@
   // Пул промисов
   async function pMap(arr, mapper, {concurrency=8, onProgress}={}){
     return new Promise((resolve,reject)=>{
+      if(!arr || arr.length===0){ resolve([]); return; }
       let i=0, done=0, out=new Array(arr.length), active=0, stopped=false;
       const next=()=>{
         if(stopped) return;
@@ -765,6 +767,167 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
     return uniq.size;
   }
 
+  async function fetchLeafItems(baseUrl, id, headers){
+    const urlLeaf = baseUrl + '/api/testresulttree/leaf';
+    const size = 1000;
+    let page = 0;
+    let out = [];
+    while (true){
+      const params = { launchId:id, sort:'name,asc', size, page };
+      const data = await fetchJson(urlLeaf, params, headers).catch(()=>null);
+      const content = (data && data.content) || [];
+      if (!content.length) break;
+      out = out.concat(content);
+      if (content.length < size) break;
+      page += 1;
+    }
+    return out;
+  }
+
+  function parseUwUNumber(raw){
+    if (raw == null) return 0;
+    const s = String(raw).trim();
+    if (!s || s === '0') return 0;
+    const num = parseFloat(s.replace(',', '.'));
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  async function getUwUInfo(baseUrl, tcid, headers){
+    if (UWU_CACHE.has(tcid)) return UWU_CACHE.get(tcid);
+    let uwuNum = 0;
+    let platformVal = null;
+    try{
+      const data = await fetchJson(baseUrl + '/api/testcase/' + tcid + '/overview', null, headers);
+      const fields = (data && data.customFields) || [];
+      for (let i = 0; i < fields.length; i++){
+        const cf = fields[i] || {};
+        const cfInfo = cf.customField || {};
+        const cfName = String(cfInfo.name || '').trim();
+
+        if (cfName === 'UwU') {
+          let v = cf.name;
+          if (!v) {
+            const vals = cf.values || [];
+            if (vals.length && vals[0]) v = vals[0].name;
+          }
+          uwuNum = parseUwUNumber(v);
+        } else if (cfName === 'Platform') {
+          let p = cf.name;
+          if (!p) {
+            const vals = cf.values || [];
+            if (vals.length && vals[0]) p = vals[0].name;
+          }
+          if (p) platformVal = String(p);
+        }
+      }
+    }catch(e){
+      uwuNum = 0;
+      platformVal = null;
+    }
+    const result = { uwuNum, platform: platformVal };
+    UWU_CACHE.set(tcid, result);
+    return result;
+  }
+
+  function getUwuStatsFromAgg(uwuAgg, label){
+    const a = (uwuAgg && uwuAgg[label]) || {};
+    let sumDone = null;
+    let sumLeft = null;
+    let sumTotal = null;
+
+    if (a.uwu && typeof a.uwu === 'object'){
+      sumDone = a.uwu.sumDone ?? a.uwu.done ?? a.uwu.sum_done;
+      sumLeft = a.uwu.sumLeft ?? a.uwu.left ?? a.uwu.sum_left;
+      sumTotal = a.uwu.sum ?? a.uwu.uwuSum ?? a.uwu.totalUwu;
+    } else {
+      sumDone = a.sum_done ?? a.sumDone ?? a.done;
+      sumLeft = a.sum_left ?? a.sumLeft ?? a.left;
+      sumTotal = a.sum ?? a.uwu_sum ?? a.uwuSum;
+    }
+
+    if (sumDone == null && sumLeft == null && sumTotal == null) return null;
+    const done = Number(sumDone) || 0;
+    const left = Number(sumLeft) || 0;
+    const total = sumTotal == null ? (done + left) : Number(sumTotal) || (done + left);
+    return { done, left, total };
+  }
+
+  function makeUwuDonut(canvasId, doneSum, leftSum){
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const maker = function(){
+      fitHiDPICanvas(canvas);
+      const ctx = makeCtx(canvas);
+      if (window.__charts[canvasId]?.chart){
+        try{ window.__charts[canvasId].chart.destroy(); }catch(e){}
+      }
+
+      const done = Math.max(0, Number(doneSum) || 0);
+      const left = Math.max(0, Number(leftSum) || 0);
+      const total = Math.max(0, done + left);
+      const data = total > 0 ? [done, left] : [0, 1];
+      const donePct = total > 0 ? (done / total * 100) : 0;
+      const leftPct = total > 0 ? (left / total * 100) : 0;
+
+      const centerPlugin = {
+        id: 'uwuCenterPct',
+        afterDraw(ch){
+          const {ctx, chartArea:{left,right,top,bottom}} = ch;
+          const x = (left + right) / 2;
+          const y = (top + bottom) / 2;
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const baseSize = Math.max(14, Math.min(ch.width, ch.height) * 0.18);
+          ctx.fillStyle = getCSS('--ink') || getCSS('--text') || '#2a1446';
+          ctx.font = '700 ' + Math.round(baseSize) + 'px ' + Chart.defaults.font.family;
+          ctx.fillText(donePct.toFixed(1) + '%', x, y - baseSize*0.03);
+          ctx.fillStyle = getCSS('--muted') || '#8d77a6';
+          ctx.font = '600 ' + Math.round(baseSize*0.37) + 'px ' + Chart.defaults.font.family;
+          ctx.fillText('осталось ' + leftPct.toFixed(1) + '%', x, y + baseSize*0.75);
+          ctx.restore();
+        }
+      };
+
+      const chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Пройдено','Осталось'],
+          datasets: [{
+            data,
+            backgroundColor: [COLORS.finished, hexA(COLORS.remaining_total, .6)],
+            borderColor:'#fff',
+            borderWidth:2,
+            spacing:3
+          }]
+        },
+        options: {
+          maintainAspectRatio:false,
+          animation:false,
+          cutout:'70%',
+          plugins:{
+            legend:{ position:'bottom', labels:{ padding:10, boxWidth:10, boxHeight:10 } },
+            tooltip:{
+              callbacks:{
+                label: (ct)=>{
+                  const ds = (ct.dataset.data||[]).map(Number);
+                  const total = ds.reduce((s,v)=>s+v,0) || 1;
+                  const val = Number(ct.raw||0);
+                  const pct = (val/total*100).toFixed(1);
+                  return `${ct.label}: ${val.toLocaleString('ru-RU')} (${pct}%)`;
+                }
+              }
+            }
+          }
+        },
+        plugins:[centerPlugin]
+      });
+      window.__charts[canvasId] = { chart, maker };
+    };
+    maker();
+  }
+
   /* ===== агрегирование/подсчёты ===== */
   function normalizeStatus(raw){
     if (raw == null) return 'in_progress';
@@ -864,30 +1027,119 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
     return {agg, perLaunchFinished, perLaunchTotal};
   }
 
-  function renderAgg(agg, cardsId, barId, summaryEl){
+  function normalizePlatformName(p){
+    const s = String(p || '').toLowerCase();
+    if (!s) return null;
+    if (s.includes('android')) return 'Android';
+    if (s.includes('ios')) return 'iOS';
+    return null;
+  }
+
+  function extractKindFromLaunchName(name){
+    const s = String(name || '');
+    if (/\[Smoke\]/i.test(s)) return 'Smoke';
+    if (/\[Selective\]/i.test(s)) return 'Selective';
+    if (/\[High\/Blocker\]/i.test(s)) return 'High/Blocker';
+    return null;
+  }
+
+  const STREAM_CONCURRENCY = 20;
+  async function buildUwUAgg(launches, baseUrl, headers, logger, elog){
+    var uwuAgg = {};
+    for(var oi=0;oi<ORDER.length;oi++){
+      uwuAgg[ORDER[oi]] = { sum:0, sum_done:0, sum_left:0 };
+    }
+
+    const totalSteps = launches.length;
+    let doneSteps = 0;
+
+    await pMap(launches, async (it)=>{
+      try{
+        const kind = extractKindFromLaunchName(it.name || '');
+        const launchPlatform = normalizePlatformName(it.name || '');
+        if (!kind || kind === 'Selective') return;
+        if (!launchPlatform) return;
+        const leafItems = await fetchLeafItems(baseUrl, it.id, headers);
+
+        await pMap(leafItems, async (leaf)=>{
+          const tcid = Number(leaf?.testCaseId);
+          if (!Number.isFinite(tcid)) return;
+          const info = await getUwUInfo(baseUrl, tcid, headers);
+          const platform = launchPlatform;
+          const key = `[${platform}][${kind}]`;
+          if (!uwuAgg[key]) return;
+          const uwuNum = Number(info.uwuNum || 0);
+          const st = normalizeStatus(leaf && leaf.status);
+          uwuAgg[key].sum += uwuNum;
+          if (COMPLETED.has(st)) uwuAgg[key].sum_done += uwuNum;
+          else uwuAgg[key].sum_left += uwuNum;
+        }, {concurrency: STREAM_CONCURRENCY});
+      }catch(e){ if(elog) elog('[uwu '+it.id+'] '+(e.message||e)); }
+
+      doneSteps++;
+      if(logger && doneSteps%2===0) logger('[uwu] launches '+doneSteps+' / '+totalSteps);
+    }, {concurrency: 4});
+
+    return uwuAgg;
+  }
+
+  function renderAgg(agg, cardsId, barId, summaryEl, uwuAgg){
     var container=document.getElementById(cardsId);
     container.innerHTML='';
     var grand=0;
     for(var oi=0;oi<ORDER.length;oi++){
       var label=ORDER[oi];
+      if (label.indexOf('[Smoke]') !== -1) continue;
       var a=agg[label]||{total:0,finished:0,remaining_total:0,remaining:0,in_progress:0};
       grand+=a.total;
       var canId='dn_'+cardsId+'_'+oi;
-      var card=document.createElement('div');
-card.className='card';
-card.innerHTML='' +
-  '<div class="head"><div>'+label+'</div><div class="export"><div class="nums">Всего: <b>'+(a.total||0).toLocaleString('ru-RU')+'</b></div></div></div>'+
-  '<div class="chart-wrap"><canvas id="'+canId+'" class="chart"></canvas></div>'+
-  '<div class="kpis">'+
-    '<div class="kpi"><span class="label">Пройдено</span><span class="val">'+(a.finished||0).toLocaleString('ru-RU')+'</span></div>'+
-    '<div class="kpi"><span class="label">Осталось</span><span class="val">'+(a.remaining_total||0).toLocaleString('ru-RU')+'</span></div>'+
-  '</div>';
-container.appendChild(card);
+      var uwuCanId='uwu_'+cardsId+'_'+oi;
+      var uwuMetaId='uwu_meta_'+cardsId+'_'+oi;
+      var uwuDoneId='uwu_done_'+cardsId+'_'+oi;
+      var uwuLeftId='uwu_left_'+cardsId+'_'+oi;
+      var isSelective = label.indexOf('[Selective]') !== -1;
+      var regCard=document.createElement('div');
+      regCard.className='card';
+      regCard.innerHTML=
+        '<div class="head"><div>'+label+'</div><div class="export"><div class="nums">Всего: <b>'+(a.total||0).toLocaleString('ru-RU')+'</b></div></div></div>'+
+        '<div class="chart-wrap"><canvas id="'+canId+'" class="chart"></canvas></div>'+
+        '<div class="kpis">'+
+          '<div class="kpi"><span class="label">Пройдено</span><span class="val">'+(a.finished||0).toLocaleString('ru-RU')+'</span></div>'+
+          '<div class="kpi"><span class="label">Осталось</span><span class="val">'+(a.remaining_total||0).toLocaleString('ru-RU')+'</span></div>'+
+        '</div>';
+      container.appendChild(regCard);
+
+      if (!isSelective){
+        var uwuCard=document.createElement('div');
+        uwuCard.className='card';
+        uwuCard.innerHTML=
+          '<div class="head"><div id="'+uwuMetaId+'">'+label+' UwU: —</div></div>'+
+          '<div class="chart-wrap"><canvas id="'+uwuCanId+'" class="chart"></canvas></div>'+
+          '<div class="kpis">'+
+            '<div class="kpi"><span class="label">Пройдено</span><span class="val" id="'+uwuDoneId+'">—</span></div>'+
+            '<div class="kpi"><span class="label">Осталось</span><span class="val" id="'+uwuLeftId+'">—</span></div>'+
+          '</div>';
+        container.appendChild(uwuCard);
+      }
 (function(canId,a){
   // передаём только 2 числа: пройдено и осталось
   var maker=makeDonut(document.getElementById(canId), [a.finished, a.remaining_total]);
   requestAnimationFrame(function(){ maker(); });
 })(canId, a);
+      (function(uwuCanId, uwuMetaId, uwuDoneId, uwuLeftId, label, regStats){
+        if (label.indexOf('[Selective]') !== -1) return;
+        var metaEl = document.getElementById(uwuMetaId);
+        var doneEl = document.getElementById(uwuDoneId);
+        var leftEl = document.getElementById(uwuLeftId);
+        var uwuStats = getUwuStatsFromAgg(uwuAgg, label);
+        var sum = Number(uwuStats && uwuStats.total || 0);
+        var done = Number(uwuStats && uwuStats.done || 0);
+        var left = Number(uwuStats && uwuStats.left || 0);
+        if (metaEl) metaEl.textContent = label + ' UwU: ' + (sum ? sum.toLocaleString('ru-RU') : '0');
+        if (doneEl) doneEl.textContent = done.toLocaleString('ru-RU');
+        if (leftEl) leftEl.textContent = left.toLocaleString('ru-RU');
+        makeUwuDonut(uwuCanId, done, left);
+      })(uwuCanId, uwuMetaId, uwuDoneId, uwuLeftId, label, a);
     }
     if(summaryEl) summaryEl.textContent='Всего групп: '+ORDER.length+', всего кейсов: '+grand.toLocaleString('ru-RU');
 
@@ -1375,6 +1627,7 @@ function makeSnapTitle(o){
   /* ===== основной запуск дашборда ===== */
   async function runDashboard(){
     try{ GET_CACHE.clear(); }catch(_){}
+    try{ UWU_CACHE.clear(); }catch(_){}
     var logEl=$('#log'); if(logEl) logEl.textContent='';
     $('#logInfo') && ($('#logInfo').textContent='—');
     $('#summaryInfo') && ($('#summaryInfo').textContent='—');
@@ -1410,6 +1663,7 @@ function makeSnapTitle(o){
       buildMiniLaunchCharts(launches, perLaunchFinished, perLaunchTotal, readMiniOpts());
 
       window.lastAgg=agg;
+      window.lastUwuAgg=null;
 
       // NEW: авто-сохранение постримовых снепшотов на основе текущей выборки лаунчей
 autoSaveAllStreamSnaps();
@@ -1438,7 +1692,7 @@ if(document.getElementById('snapStreamSection')?.style.display !== 'none'){
 
       renderAlerts();
 
-      renderAgg(agg, 'cards', 'barAll', $('#summaryInfo'));
+      renderAgg(agg, 'cards', 'barAll', $('#summaryInfo'), null);
       var mtr=($('#dashMetric')?.value)||'finished';
       renderDashPrevCurrent(agg, mtr);
 
@@ -1448,6 +1702,16 @@ if(document.getElementById('snapStreamSection')?.style.display !== 'none'){
 buildDashMultiCompare({ silent: true });
 
       await buildReleaseSection(baseUrl, projectId, version, headers);
+
+      appendLogLine('Считаю UwU по платформам…');
+      buildUwUAgg(launches, baseUrl, headers, logDash, function(e){ appendLogLine('[uwu] '+e); })
+        .then(function(uwuAgg){
+          window.lastUwuAgg = uwuAgg;
+          renderAgg(window.lastAgg, 'cards', 'barAll', $('#summaryInfo'), window.lastUwuAgg);
+        })
+        .catch(function(e){
+          appendLogLine('[uwu] ошибка: ' + (e.message||e));
+        });
 
       const t1=now();
       appendLogLine('Готово за '+Math.round(t1-t0)+' мс');
@@ -1915,7 +2179,7 @@ function renderDashPrevCurrentStream(currentAggAll, metric){
   $('#dashMetric')?.addEventListener('change', ()=>{ if(window.lastAgg) renderDashPrevCurrent(window.lastAgg, $('#dashMetric')?.value||'finished'); });
   $('#dashKind')?.addEventListener('change', ()=>{
     if (window.lastAgg){
-      renderAgg(window.lastAgg, 'cards', 'barAll', document.getElementById('summaryInfo'));
+      renderAgg(window.lastAgg, 'cards', 'barAll', document.getElementById('summaryInfo'), window.lastUwuAgg || null);
       var mtr = (document.getElementById('dashMetric')?.value) || 'finished';
       renderDashPrevCurrent(window.lastAgg, mtr);
       buildDashMultiCompare({silent:true});
@@ -2320,16 +2584,14 @@ setAutoState(false);
 
     // RUN
     run.addEventListener('click', function(){
-      // start session; UI lock
+      // start session; UI lock (defer to avoid blocking other handlers)
       try{ beginAbortSession(); }catch(_){}
-      run.disabled = true;
-      run.classList.add('is-busy');
-      // When page code finishes (or error), re-enable. We can't hook internal,
-      // so we re-enable on first microtask after settled promise queue.
       setTimeout(()=>{
+        run.disabled = true;
+        run.classList.add('is-busy');
         // the page code should re-enable itself; as a fallback re-enable after 30s
         setTimeout(()=>{ run.disabled=false; run.classList.remove('is-busy'); }, 30000);
-      },0);
+      }, 0);
     }, {capture:true});
 
     // STOP
@@ -2471,7 +2733,7 @@ setAutoState(false);
         el.addEventListener('change', function(){
           try{
             if (typeof window.renderAgg === 'function' && window.__lastAgg){
-              window.renderAgg(window.__lastAgg, 'cards', 'barAll', document.getElementById('summaryInfo'));
+              window.renderAgg(window.__lastAgg, 'cards', 'barAll', document.getElementById('summaryInfo'), window.lastUwuAgg || null);
             } else {
               applyVisibilityFilter();
               updateSummaryFromFilters();
@@ -2537,6 +2799,9 @@ setAutoState(false);
     if(bu)  setIfEmpty(baseUrlInput, bu);
     if(pid) setIfEmpty(projectIdInput, pid);
   } catch(e){}
+  // Defaults if nothing saved
+  setIfEmpty(baseUrlInput, 'https://allure-testops.wb.ru');
+  setIfEmpty(projectIdInput, '7');
 
   function saveSettings(){
     try{
