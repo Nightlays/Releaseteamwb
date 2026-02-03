@@ -447,3 +447,272 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
 .types-table td:last-child{
   border-right: none;
 }
+:root{
+      --wb-bg:#faf5ff; --wb-bg-2:#f8f7ff;
+      --wb-primary:#9b5cff; --wb-secondary:#ff5ac8; --wb-deep:#7c3aed;
+      --green:#22c55e; --red:#f43f5e;
+      --ring: 0 10px 30px rgba(155,92,255,.25);
+      --card: 0 12px 36px rgba(31,41,55,.08);
+      --r-xl:22px;
+    }
+    body{
+      background:
+        radial-gradient(1200px 600px at 0% -10%, rgba(155,92,255,.14), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(255,90,200,.10), transparent 55%),
+        var(--wb-bg);
+      color:#111827;
+      font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    /* widen overall layout to fit wide tables */
+    .max-w-screen-2xl{max-width:1800px}
+    .card{background:#fff;border:1px solid #efe5f4;border-radius:var(--r-xl);box-shadow:var(--card)}
+    .brand-badge{display:flex;align-items:center;gap:.55rem;background:#fff;border:1px solid #efe5f4;padding:.55rem .7rem;border-radius:999px;box-shadow:0 8px 20px rgba(155,92,255,.12)}
+    .brand-dot{width:10px;height:10px;border-radius:99px;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));box-shadow:0 0 0 4px rgba(155,92,255,.14)}
+    .chip{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .55rem;border-radius:999px;background:#f7f5ff;border:1px solid #ecebff;color:#5b21b6;font-size:.75rem}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:14px;padding:.55rem .9rem;border:1px solid transparent;transition:.15s;user-select:none}
+    .btn:active{transform:translateY(1px)}
+    .btn-soft{background:#f7f5ff;border-color:#e9e2ff;color:#4c1d95}
+    .btn-soft:hover{background:#f3efff}
+    .btn-ghost{background:transparent;border-color:#ecebff;color:#4c1d95}
+    .btn-ghost:hover{background:#f7f5ff}
+    .btn-grad{color:#fff;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));box-shadow:var(--ring)}
+    .btn-grad:hover{filter:saturate(1.05);transform:translateY(-1px)}
+    .btn-circle{width:34px;height:34px;padding:0;border-radius:999px;background:#f7f5ff;border:1px solid #ecebff;color:#4c1d95}
+    .btn-circle:hover{background:#f3efff}
+    .tabs{display:inline-flex;border:1px solid #ecebff;background:#faf9ff;border-radius:999px;overflow:hidden}
+    .tab{padding:.35rem .7rem;font-size:.85rem;color:#4c1d95;border-right:1px solid #ecebff}
+    .tab:last-child{border-right:none}
+    .tab[aria-selected="true"]{background:linear-gradient(90deg,rgba(155,92,255,.14),rgba(255,90,200,.10));font-weight:700}
+    .input{width:100%;border:1px solid #e9e2ff;border-radius:14px;padding:.55rem .7rem;background:#fff;outline:none}
+    .input:focus{border-color:#c4b5fd;box-shadow:0 0 0 4px rgba(155,92,255,.12)}
+    .hint{font-size:.85rem;color:#7c7f8c}
+    table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+    thead th{background:#f7f5ff;border-bottom:1px solid #dcd3f7;padding:.7rem .8rem;font-weight:700;color:#5b21b6}
+    td{border-bottom:1px solid #e0d8f6;padding:.6rem .7rem;vertical-align:top}
+    th, td{border-right:1px solid #e0d8f6}
+    th:last-child, td:last-child{border-right:none}
+    tbody tr:hover td{background:#faf9ff}
+
+    /* Avg table: separators + centered values under headers */
+    #avgTable thead th,
+    #avgTable td{
+      border-bottom:1px solid #ecebff;
+      border-right:1px solid #ecebff;
+    }
+    #avgTable thead th:last-child,
+    #avgTable td:last-child{ border-right:none; }
+    #avgTable th:first-child,
+    #avgTable td:first-child{ text-align:left; }
+    #avgTable th:not(:first-child),
+    #avgTable td:not(:first-child){ text-align:center; }
+
+    #chpTable th:first-child,
+    #chpTable td:first-child{ text-align:left; }
+    #chpTable th:not(:first-child),
+    #chpTable td:not(:first-child){ text-align:center; }
+
+    #cutTable th:first-child,
+    #cutTable td:first-child{ text-align:left; }
+    #cutTable th:not(:first-child),
+    #cutTable td:not(:first-child){ text-align:center; }
+
+    #covTable th:first-child,
+    #covTable td:first-child{ text-align:left; }
+    #covTable th:not(:first-child),
+    #covTable td:not(:first-child){ text-align:center; }
+
+    #selTable th:first-child,
+    #selTable td:first-child{ text-align:left; }
+    #selTable th:not(:first-child),
+    #selTable td:not(:first-child){ text-align:center; }
+    .wrap{white-space:normal;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .bar{height:8px;background:#eae6ff;border-radius:999px;overflow:hidden}
+    .bar>div{height:100%;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));width:0%}
+    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.75rem 1rem;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,25);opacity:0;transform:translateY(8px);transition:.25s;z-index:50}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .overlay{position:fixed;inset:0;background:rgba(15,23,42,45);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:40}
+.popover{
+      position:fixed; background:#111827; color:#e5e7eb; border-radius:12px; padding:.5rem .7rem;
+      max-width:320px; font-size:.85rem; box-shadow:0 16px 40px rgba(0,0,0,25); z-index:60;
+    }
+    .popover:after{content:''; position:absolute; width:10px; height:10px; background:#111827; transform:rotate(45deg); top:-5px; left:22px}
+    .popover .pop-hdr{font-weight:700; margin:4px 0 2px; color:#c7d2fe}
+    .popover .pop-row{display:flex; justify-content:space-between; gap:10px; font-size:.82rem; margin:2px 0}
+    .popover .pop-name{opacity:.95}
+    .popover .pop-val{font-weight:700; color:#fff}
+    .sort-arrows{ display:inline-flex; gap:3px; margin-left:6px; vertical-align:middle; }
+    .sort-arrow{ font-size:10px; line-height:1; opacity:.30; }
+    .sort-active{ opacity:1; color:#7c3aed; }
+
+    /* Убираем горизонтальные скроллы (оставляем вертикальный) */
+    .overflow-auto{ overflow-x:hidden; overflow-y:auto; }
+
+    /* На всякий случай: не даём странице уезжать по X */
+    html, body{ overflow-x:hidden; }
+
+/* Types table: stream breakdown */
+.types-table{table-layout:auto}
+.types-table td{word-break:break-word}
+.types-table th,
+.types-table td{padding:.5rem .5rem}
+.types-table .stream-cell{display:flex;flex-direction:column;gap:6px}
+.types-table .stream-line{display:flex;flex-wrap:wrap;gap:6px;line-height:1.2}
+.types-table .stream-name{font-weight:700;color:#4c1d95}
+.types-table .stream-issues{color:#1f2937}
+@media (max-width:1200px){
+  .types-table td{font-size:12px}
+}
+@media (max-width:900px){
+  .types-table td{font-size:11px}
+}
+
+/* Types table: grid lines for rows/columns */
+.types-table{border-collapse:collapse}
+.types-table th,
+.types-table td{border:1px solid #e5e7eb}
+.types-table thead th{background:#f7f5ff}
+
+/* ===== Mobile adjustments ===== */
+@media (max-width: 768px){
+  .max-w-screen-2xl{max-width:100%}
+  .card{padding:16px !important}
+  .brand-badge{width:100%;justify-content:space-between}
+  header.flex{flex-direction:column;align-items:flex-start}
+  .btn, .input{border-radius:12px}
+  .input{font-size:14px}
+  .hint{font-size:.8rem}
+  table{table-layout:auto}
+  thead th, td{font-size:12px; padding:.5rem .55rem}
+  .legend{gap:.6rem}
+  .chart-viewport{padding:10px}
+  .chart-viewport canvas{height:240px}
+  .overflow-auto{overflow-x:auto}
+}
+
+@media (max-width: 480px){
+  body{font-size:14px}
+  .card{padding:14px !important}
+  .btn{padding:.45rem .7rem; font-size:.8rem}
+  .tabs{width:100%}
+  .tab{flex:1; text-align:center}
+  thead th, td{font-size:11px; padding:.45rem .5rem}
+  .chart-viewport canvas{height:210px}
+  .legend{font-size:.75rem}
+}
+
+/* ===== Добавлено для all_table_v1 (график вместо таблицы, стиль контейнера как в uwu_6) ===== */
+.chart-viewport{
+  position:relative;
+  background:#fff;
+  padding:14px;
+  overflow:hidden;
+}
+.chart-viewport canvas{
+  display:block;
+  width:100%;
+  height:320px; /* визуальная высота, даже без данных */
+}
+@media (min-width: 769px){
+  .chart-viewport canvas{height:320px}
+}
+.chart-overlay{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:14px;
+  color:#64748b;
+  background:linear-gradient(180deg, rgba(255,255,255,.25), rgba(255,255,255,.88));
+  pointer-events:none;
+}
+
+/* легенда как в all_table_v1 - копия, но в палитре uwu */
+.legend{ display:flex; gap:.9rem; align-items:center; flex-wrap:wrap; }
+.legend .lg-item{ display:inline-flex; align-items:center; gap:.4rem; font-size:.85rem; color:#4b5563; }
+.legend .dot{ width:10px; height:10px; border-radius:999px; display:inline-block; }
+.legend .dot-android{ background:var(--wb-primary); box-shadow:0 0 0 4px rgba(155,92,255,.12); }
+.legend .dot-ios{ background:var(--wb-secondary); box-shadow:0 0 0 4px rgba(255,90,200,.12); }
+
+/* danger button (для "Остановить сбор") */
+.btn-danger{
+  color:#fff;
+  background:linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95));
+  box-shadow:0 10px 30px rgba(244,63,94,.20);
+}
+.btn-danger:hover{filter:saturate(1.05);transform:translateY(-1px)}
+
+
+/* ===== TestCases chart/table (manual/auto/total) ===== */
+:root{
+  --tc-manual:#f59e0b; /* ярко-оранжевый */
+  --tc-auto:#06b6d4;   /* бирюзовый */
+  --tc-total:#a855f7;  /* фиолетовый */
+}
+
+#tcTrendViewport{height:340px;}
+@media (max-width:720px){
+  #tcTrendViewport{height:300px;}
+}
+
+/* Заглушка той же высоты + анимация при сборе */
+.tc-placeholder{
+  min-height:520px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:14px;
+  padding:16px;
+  background:linear-gradient(180deg,#ffffff,#fbfaff);
+}
+.tc-skeleton{display:grid;gap:10px;}
+.tc-skel-line{
+  height:14px;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(124,58,237,.08), rgba(124,58,237,.18), rgba(124,58,237,.08));
+  background-size:200% 100%;
+}
+.tc-placeholder.is-loading .tc-skel-line{
+  animation:tcShimmer 1.15s linear infinite;
+}
+@keyframes tcShimmer{
+  0%{background-position:0% 0;}
+  100%{background-position:-200% 0;}
+}
+.tc-ph-text{
+  font-size:12px;
+  color:#64748b;
+  text-align:center;
+}
+
+/* Легенда */
+.dot.dot-manual{background:var(--tc-manual); border:1px solid rgba(0,0,0,.08);}
+.dot.dot-auto{background:var(--tc-auto); border:1px solid rgba(0,0,0,.08);}
+.dot.dot-total{background:var(--tc-total); border:1px solid rgba(0,0,0,.08);}
+
+/* Полосы в таблице */
+.bar-fill{height:100%;border-radius:999px;}
+.bar-fill-manual{background:var(--tc-manual);}
+.bar-fill-auto{background:var(--tc-auto);}
+.bar-fill-total{background:var(--tc-total);}
+
+
+/* Coverage chart colors (SWAT/STREAM) */
+:root{
+  --cov-swat:#22c55e;
+  --cov-stream:#f43f5e;
+}
+
+.dot.dot-swat{ background: var(--cov-swat); }
+.dot.dot-stream{ background: var(--cov-stream); }
+
+/* Legend dots for cutoff/store */
+.dot-ios-cutoff{background:var(--cut-ios-cutoff,#8b5cf6)}
+.dot-ios-store{background:var(--cut-ios-store,#0ea5e9)}
+.dot-android-cutoff{background:var(--cut-android-cutoff,#22c55e)}
+.dot-android-store{background:var(--cut-android-store,#f59e0b)}
+
+/* На всякий случай, если в style.css нет базового вида точек */
+.legend .dot{width:10px;height:10px;border-radius:9999px;display:inline-block;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
