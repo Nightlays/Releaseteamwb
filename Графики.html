@@ -94,12 +94,20 @@
           <div>
             <h2 class="text-lg font-semibold">Тест кейсы от релиза к релизу</h2>
           </div>
-          <button type="button"
-            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
-            data-collapse-btn="tc" aria-expanded="true">
-            <span data-collapse-ico aria-hidden="true">▾</span>
-            <span data-collapse-text>Свернуть</span>
-          </button>
+          <div class="flex items-center gap-2">
+            <button type="button"
+              class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+              data-toggle="tcChart" aria-expanded="true">
+              <span aria-hidden="true">▾</span>
+              <span>График</span>
+            </button>
+            <button type="button"
+              class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+              data-collapse-btn="tc" aria-expanded="true">
+              <span data-collapse-ico aria-hidden="true">▾</span>
+              <span data-collapse-text>Свернуть</span>
+            </button>
+          </div>
         </div>
 
         <div data-collapse-body="tc" class="space-y-4">
@@ -109,11 +117,42 @@
             </div>
 
             <div id="tcContent" class="tc-content" style="display:none;">
-              <div class="chart-viewport" id="tcTrendViewport">
+              <div class="chart-viewport" id="tcTrendViewport" data-toggle-body="tcChart">
                 <canvas id="tcTrendChart" aria-label="Test cases chart" role="img"></canvas>
               </div>
 
+              <div id="tcStreamDeltaWrap" class="px-4 pb-4 pt-2" style="overflow:auto">
+                <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                  <div class="text-xs font-semibold text-slate-600">Прирост/отток по стримам (Manual/AT)</div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                    <select id="tcReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+                    <button type="button"
+                      class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+                      data-collapse-btn="tcStreamDelta" aria-expanded="true">
+                      <span data-collapse-ico aria-hidden="true">▾</span>
+                      <span data-collapse-text>Свернуть</span>
+                    </button>
+                  </div>
+                </div>
+                <table id="tcStreamDeltaTable" data-collapse-body="tcStreamDelta">
+                  <thead>
+                    <tr>
+                      <th class="text-left">Релиз</th>
+                      <th class="text-left">Stream</th>
+                      <th>Manual Δ</th>
+                      <th>AT Δ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tcStreamDeltaTbody"></tbody>
+                </table>
+              </div>
+
               <div id="tcTableWrap" style="display:none; overflow:auto">
+                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
+                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                  <select id="tcTableReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+                </div>
                 <table id="tcTable">
                   <thead>
                     <tr>
@@ -166,11 +205,16 @@
               </div>
 
               <div id="covTableWrap" style="display:none; overflow:auto">
+                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
+                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                  <select id="covReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+                </div>
                 <table id="covTable">
                   <thead>
                     <tr>
-                      <th class="text-left">Релиз</th>
+                      <th class="text-left">Номер релиза</th>
                       <th>SWAT</th>
+                      <th>SWAT (сотр.)</th>
                       <th>STREAM</th>
                       <th>Всего</th>
                       <th class="text-left">Покрытие</th>
@@ -217,11 +261,16 @@
               </div>
 
               <div id="selTableWrap" style="display:none; overflow:auto">
+                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
+                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                  <select id="selReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+                </div>
                 <table id="selTable">
                   <thead>
                     <tr>
-                      <th class="text-left">Релиз</th>
+                      <th class="text-left">Номер релиза</th>
                       <th>SWAT</th>
+                      <th>SWAT (сотр.)</th>
                       <th>STREAM</th>
                       <th>Всего</th>
                       <th class="text-left">Покрытие</th>
@@ -268,10 +317,14 @@
               </div>
 
               <div id="avgTableWrap" style="display:none; overflow:auto">
+                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
+                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                  <select id="avgReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+                </div>
                 <table id="avgTable">
                   <thead>
                     <tr>
-                      <th class="text-left">Релиз</th>
+                      <th class="text-left">Номер релиза</th>
                       <th>SWAT</th>
                       <th>STREAM</th>
                       <th>Общее</th>
@@ -319,10 +372,14 @@
               </div>
 
               <div id="chpTableWrap" style="display:none; overflow:auto">
+                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
+                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                  <select id="chpReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+                </div>
                 <table id="chpTable">
                   <thead>
                     <tr>
-                      <th class="text-left">Релиз</th>
+                      <th class="text-left">Номер релиза</th>
                       <th>iOS</th>
                       <th>Android</th>
                       <th>Всего</th>
@@ -370,10 +427,14 @@
               </div>
 
               <div id="cutTableWrap" style="display:none; overflow:auto">
+                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
+                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                  <select id="cutReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+                </div>
                 <table id="cutTable">
                   <thead>
                     <tr>
-                      <th class="text-left">Релиз</th>
+                      <th class="text-left">Номер релиза</th>
                       <th>iOS Cutoff</th>
                       <th>iOS Store</th>
                       <th>Android Cutoff</th>
@@ -424,8 +485,12 @@
 
               <div class="legend px-4 pb-3" id="iosTypesLegend"></div>
 
-              <div id="iosTypesTableWrap" style="overflow:auto" class="px-4 pb-4">
-                <table id="iosTypesTable" class="types-table">
+            <div id="iosTypesTableWrap" style="overflow:auto" class="px-4 pb-4">
+              <div class="flex items-center gap-2 flex-wrap pt-2 pb-2">
+                <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                <select id="iosTypesReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              </div>
+              <table id="iosTypesTable" class="types-table">
                   <thead>
                     <tr id="iosTypesTheadRow"></tr>
                   </thead>
@@ -464,8 +529,12 @@
 
               <div class="legend px-4 pb-3" id="andTypesLegend"></div>
 
-              <div id="andTypesTableWrap" style="overflow:auto" class="px-4 pb-4">
-                <table id="andTypesTable" class="types-table">
+            <div id="andTypesTableWrap" style="overflow:auto" class="px-4 pb-4">
+              <div class="flex items-center gap-2 flex-wrap pt-2 pb-2">
+                <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                <select id="andTypesReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              </div>
+              <table id="andTypesTable" class="types-table">
                   <thead>
                     <tr id="andTypesTheadRow"></tr>
                   </thead>
@@ -524,22 +593,47 @@
             .filter(card => card.querySelector('canvas'));
 
           for (const card of cards) {
-            const rect = card.getBoundingClientRect();
             const scale = 2;
+            const scrollables = Array.from(card.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
+            const restore = [];
+            for(const el of scrollables){
+              restore.push({
+                el,
+                overflow: el.style.overflow,
+                overflowX: el.style.overflowX,
+                overflowY: el.style.overflowY,
+                height: el.style.height,
+                maxHeight: el.style.maxHeight
+              });
+              el.style.overflow = 'visible';
+              el.style.overflowX = 'visible';
+              el.style.overflowY = 'visible';
+              el.style.height = el.scrollHeight + 'px';
+              el.style.maxHeight = 'none';
+            }
 
             // Рендер DOM карточки в canvas
             const canvas = await html2canvas(card, {
               backgroundColor: '#ffffff',
               scale: scale,
-              useCORS: true
+              useCORS: true,
+              scrollY: -window.scrollY
             });
+
+            for(const r of restore){
+              r.el.style.overflow = r.overflow;
+              r.el.style.overflowX = r.overflowX;
+              r.el.style.overflowY = r.overflowY;
+              r.el.style.height = r.height;
+              r.el.style.maxHeight = r.maxHeight;
+            }
 
             const img = canvas.toDataURL('image/png');
 
             const imgW = pageW - margin * 2;
-            const imgH = imgW * (rect.height / rect.width);
+            const imgH = imgW * (canvas.height / canvas.width);
 
-            if (y + imgH > pageH - margin) {
+            if (y + imgH > pageH - margin && y !== margin) {
               pdf.addPage();
               y = margin;
             }
@@ -555,34 +649,46 @@
           const emptyBox = document.getElementById('tcEmpty');
           const contentWrap = document.getElementById('tcContent');
           const tbody = document.getElementById('tcTbody');
+          const tcStreamDeltaTbody = document.getElementById('tcStreamDeltaTbody');
+          const tcTableReleaseFilter = document.getElementById('tcTableReleaseFilter');
 
           // Coverage (HB)
           const covEmpty = document.getElementById('covEmpty');
           const covContent = document.getElementById('covContent');
           const covTbody = document.getElementById('covTbody');
+          const covTableWrap = document.getElementById('covTableWrap');
+          const covReleaseFilter = document.getElementById('covReleaseFilter');
 
           // Coverage Selective
           const selEmpty = document.getElementById('selEmpty');
           const selContent = document.getElementById('selContent');
           const selTbody = document.getElementById('selTbody');
+          const selTableWrap = document.getElementById('selTableWrap');
+          const selReleaseFilter = document.getElementById('selReleaseFilter');
           const selCanvas = document.getElementById('selTrendChart');
 
           // Average time
           const avgEmpty = document.getElementById('avgEmpty');
           const avgContent = document.getElementById('avgContent');
           const avgTbody = document.getElementById('avgTbody');
+          const avgTableWrap = document.getElementById('avgTableWrap');
+          const avgReleaseFilter = document.getElementById('avgReleaseFilter');
           const avgCanvas = document.getElementById('avgTrendChart');
 
           // Cherepiki
           const chpEmpty = document.getElementById('chpEmpty');
           const chpContent = document.getElementById('chpContent');
           const chpTbody = document.getElementById('chpTbody');
+          const chpTableWrap = document.getElementById('chpTableWrap');
+          const chpReleaseFilter = document.getElementById('chpReleaseFilter');
           const chpCanvas = document.getElementById('chpTrendChart');
 
           // Cutoff/store
           const cutEmpty = document.getElementById('cutEmpty');
           const cutContent = document.getElementById('cutContent');
           const cutTbody = document.getElementById('cutTbody');
+          const cutTableWrap = document.getElementById('cutTableWrap');
+          const cutReleaseFilter = document.getElementById('cutReleaseFilter');
           const cutCanvas = document.getElementById('cutTrendChart');
 
           // Types (Deploy-lab issues) — iOS/Android
@@ -592,6 +698,7 @@
           const iosTypesTbody = document.getElementById('iosTypesTbody');
           const iosTypesLegend = document.getElementById('iosTypesLegend');
           const iosTypesCanvas = document.getElementById('iosTypesTrendChart');
+          const iosTypesReleaseFilter = document.getElementById('iosTypesReleaseFilter');
 
           const andTypesEmpty = document.getElementById('andTypesEmpty');
           const andTypesContent = document.getElementById('andTypesContent');
@@ -599,9 +706,11 @@
           const andTypesTbody = document.getElementById('andTypesTbody');
           const andTypesLegend = document.getElementById('andTypesLegend');
           const andTypesCanvas = document.getElementById('andTypesTrendChart');
+          const andTypesReleaseFilter = document.getElementById('andTypesReleaseFilter');
 
           const chartCanvas = document.getElementById('tcTrendChart');
           const covCanvas = document.getElementById('covTrendChart');
+          const tcReleaseFilter = document.getElementById('tcReleaseFilter');
 
           let tcChart = null;
           let covChart = null;
@@ -675,9 +784,38 @@
             }
           };
 
+          const valueLabelsPlugin = {
+            id: 'valueLabels',
+            afterDatasetsDraw(chart, args, pluginOptions){
+              const opts = pluginOptions || chart?.options?.plugins?.valueLabels;
+              if(!opts || !opts.datasets) return;
+              const ctx = chart.ctx;
+              ctx.save();
+              ctx.font = (opts.font) || '600 11px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              for(const dsIndex of opts.datasets){
+                const ds = chart.data?.datasets?.[dsIndex];
+                const meta = chart.getDatasetMeta(dsIndex);
+                if(!ds || !meta || !meta.data) continue;
+                const data = Array.isArray(ds.data) ? ds.data : [];
+                for(let i=0;i<data.length;i++){
+                  const v = Number(data[i]);
+                  if(!Number.isFinite(v)) continue;
+                  const pt = meta.data[i];
+                  if(!pt) continue;
+                  ctx.fillStyle = ds.borderColor || '#111';
+                  ctx.fillText(Math.round(v).toLocaleString('ru-RU'), pt.x, pt.y - 12);
+                }
+              }
+              ctx.restore();
+            }
+          };
+
           try{
             if(window.Chart && typeof window.Chart.register === 'function'){
               window.Chart.register(deltaLabelsPlugin);
+              window.Chart.register(valueLabelsPlugin);
             }
           }catch(e){}
 
@@ -729,12 +867,32 @@
             showToast.__t = setTimeout(() => { el.style.opacity = '0'; }, 1800);
           }
 
+          async function fetchWithRetry(fetcher, { maxTries = 5, baseDelay = 200 } = {}){
+            let lastErr;
+            for(let i=0;i<maxTries;i++){
+              try{
+                return await fetcher();
+              }catch(e){
+                lastErr = e;
+                if(i < maxTries - 1){
+                  const jitter = Math.floor(Math.random() * 120);
+                  const waitMs = baseDelay * Math.pow(2, i) + jitter;
+                  await new Promise(res => setTimeout(res, waitMs));
+                  continue;
+                }
+              }
+            }
+            throw lastErr;
+          }
+
           async function proxyGetJson(targetUrl, headers, signal){
             const p = new URL(PROXY_BASE + '/proxy');
             p.searchParams.set('url', targetUrl);
-            const r = await fetch(p.toString(), { headers, signal });
-            if(!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
-            return r.json();
+            return fetchWithRetry(async () => {
+              const r = await fetch(p.toString(), { headers, signal });
+              if(!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
+              return r.json();
+            });
           }
 
           async function fetchLastCherepik(prefix, release, signal){
@@ -882,6 +1040,162 @@
             }
           }
 
+          function normalizeStreamLabel(x){
+            const s = String(x || '').trim();
+            return s || 'Без стрима';
+          }
+
+          function isExternalStreamLabel(label){
+            const s = String(label || '').trim().toLowerCase();
+            if(!s) return false;
+            const norm = s
+              .replace(/[ё]/g, 'е')
+              .replace(/[_\-]+/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+
+            const external = [
+              'финтех',
+              'банк',
+              'payments',
+              'платежи',
+              'travel',
+              'тревел',
+              'wb club',
+              'вб клуб'
+            ];
+            return external.some(x => norm === x || norm.includes(x));
+          }
+
+          function groupIssuesByStream(items){
+            const map = new Map();
+            for(const it of (items || [])){
+              if(!it) continue;
+              const stream = normalizeStreamLabel(it.stream);
+              map.set(stream, (map.get(stream) || 0) + 1);
+            }
+            return Array.from(map.entries()).sort((a,b) => a[0].localeCompare(b[0]));
+          }
+
+          function countIssuesByStreamGroup(items){
+            let internal = 0;
+            let external = 0;
+            for(const it of (items || [])){
+              if(!it) continue;
+              const stream = normalizeStreamLabel(it.stream);
+              if(isExternalStreamLabel(stream)) external += 1;
+              else internal += 1;
+            }
+            return { internal, external };
+          }
+
+          let __streamPopover = null;
+          function ensureStreamPopover(){
+            if(__streamPopover) return __streamPopover;
+            const el = document.createElement('div');
+            el.className = 'popover';
+            el.style.display = 'none';
+            document.body.appendChild(el);
+            __streamPopover = el;
+            return el;
+          }
+
+          function hideStreamPopover(){
+            if(__streamPopover) __streamPopover.style.display = 'none';
+          }
+
+          function showStreamPopover(anchor, items){
+            const groups = groupIssuesByStream(items);
+            if(!groups.length) return;
+
+            const internal = [];
+            const external = [];
+            for(const [name, count] of groups){
+              const entry = { name, count };
+              if(isExternalStreamLabel(name)) external.push(entry);
+              else internal.push(entry);
+            }
+
+            const pop = ensureStreamPopover();
+            pop.innerHTML = '';
+
+            const addBlock = (title, list) => {
+              const hdr = document.createElement('div');
+              hdr.className = 'pop-hdr';
+              hdr.textContent = title;
+              pop.appendChild(hdr);
+              if(!list.length){
+                const empty = document.createElement('div');
+                empty.className = 'pop-row';
+                empty.textContent = '—';
+                pop.appendChild(empty);
+                return;
+              }
+              for(const it of list){
+                const row = document.createElement('div');
+                row.className = 'pop-row';
+                const name = document.createElement('span');
+                name.className = 'pop-name';
+                name.textContent = it.name;
+                const val = document.createElement('span');
+                val.className = 'pop-val';
+                val.textContent = String(it.count);
+                row.appendChild(name);
+                row.appendChild(val);
+                pop.appendChild(row);
+              }
+            };
+
+            addBlock('Внутренние', internal);
+            addBlock('Внешние', external);
+
+            const r = anchor.getBoundingClientRect();
+            pop.style.display = 'block';
+            pop.style.left = Math.max(12, r.left) + 'px';
+            pop.style.top = (r.bottom + 8 + window.scrollY) + 'px';
+          }
+
+          function renderIssuesByStream(td, items){
+            td.innerHTML = '';
+            const { internal, external } = countIssuesByStreamGroup(items);
+            if((internal + external) === 0){
+              td.textContent = '—';
+              return;
+            }
+
+            const wrap = document.createElement('div');
+            wrap.className = 'stream-cell';
+
+            const lineIn = document.createElement('div');
+            lineIn.className = 'stream-line';
+            const nameIn = document.createElement('span');
+            nameIn.className = 'stream-name';
+            nameIn.textContent = 'Внутр.:';
+            const valIn = document.createElement('span');
+            valIn.className = 'stream-issues';
+            valIn.textContent = String(internal);
+            lineIn.appendChild(nameIn);
+            lineIn.appendChild(valIn);
+
+            const lineOut = document.createElement('div');
+            lineOut.className = 'stream-line';
+            const nameOut = document.createElement('span');
+            nameOut.className = 'stream-name';
+            nameOut.textContent = 'Внешние:';
+            const valOut = document.createElement('span');
+            valOut.className = 'stream-issues';
+            valOut.textContent = String(external);
+            lineOut.appendChild(nameOut);
+            lineOut.appendChild(valOut);
+
+            wrap.appendChild(lineIn);
+            wrap.appendChild(lineOut);
+            td.appendChild(wrap);
+
+            td.onmouseenter = () => showStreamPopover(td, items);
+            td.onmouseleave = hideStreamPopover;
+          }
+
           function renderTypesTable(theadRowEl, tbodyEl, typeList, rows){
             if(!theadRowEl || !tbodyEl) return;
 
@@ -901,6 +1215,7 @@
             tbodyEl.innerHTML = '';
             for(const row of rows){
               const tr = document.createElement('tr');
+              tr.dataset.release = row.release;
 
               const td0 = document.createElement('td');
               td0.className = 'mono text-left';
@@ -909,8 +1224,8 @@
 
               for(const t of typeList){
                 const td = document.createElement('td');
-                td.className = 'mono text-center';
-                td.textContent = String((row.counts && row.counts[t]) ? row.counts[t] : 0);
+                td.className = 'mono text-left';
+                renderIssuesByStream(td, row.details ? row.details[t] : []);
                 tr.appendChild(td);
               }
 
@@ -1160,6 +1475,7 @@
           function showCovEmpty(text){
             setCovEmpty(text);
             if(covContent) covContent.style.display = 'none';
+            if(covTableWrap) covTableWrap.style.display = 'none';
           }
 
           function setSelEmpty(text){
@@ -1174,6 +1490,7 @@
           function showSelEmpty(text){
             setSelEmpty(text);
             if(selContent) selContent.style.display = 'none';
+            if(selTableWrap) selTableWrap.style.display = 'none';
           }
 
           function setAvgEmpty(text){
@@ -1188,6 +1505,7 @@
           function showAvgEmpty(text){
             setAvgEmpty(text);
             if(avgContent) avgContent.style.display = 'none';
+            if(avgTableWrap) avgTableWrap.style.display = 'none';
           }
 
           function setChpEmpty(text){
@@ -1202,6 +1520,7 @@
           function showChpEmpty(text){
             setChpEmpty(text);
             if(chpContent) chpContent.style.display = 'none';
+            if(chpTableWrap) chpTableWrap.style.display = 'none';
           }
 
           function setCutEmpty(text){
@@ -1216,6 +1535,7 @@
           function showCutEmpty(text){
             setCutEmpty(text);
             if(cutContent) cutContent.style.display = 'none';
+            if(cutTableWrap) cutTableWrap.style.display = 'none';
           }
 
 
@@ -1298,6 +1618,7 @@
 
           function clear(){
             tbody.innerHTML = '';
+            if(tcStreamDeltaTbody) tcStreamDeltaTbody.innerHTML = '';
             if(tcChart){
               tcChart.data.labels = [];
               tcChart.data.datasets.forEach(d => d.data = []);
@@ -1305,6 +1626,7 @@
             }
 
             if(covTbody) covTbody.innerHTML = '';
+            if(covTableWrap) covTableWrap.style.display = 'none';
             if(covChart){
               covChart.data.labels = [];
               covChart.data.datasets.forEach(d => d.data = []);
@@ -1313,6 +1635,7 @@
             }
 
             if(selTbody) selTbody.innerHTML = '';
+            if(selTableWrap) selTableWrap.style.display = 'none';
             if(selChart){
               selChart.data.labels = [];
               selChart.data.datasets.forEach(d => d.data = []);
@@ -1321,6 +1644,7 @@
             }
 
             if(avgTbody) avgTbody.innerHTML = '';
+            if(avgTableWrap) avgTableWrap.style.display = 'none';
             if(avgChart){
               avgChart.data.labels = [];
               avgChart.data.datasets.forEach(d => d.data = []);
@@ -1328,6 +1652,7 @@
             }
 
             if(chpTbody) chpTbody.innerHTML = '';
+            if(chpTableWrap) chpTableWrap.style.display = 'none';
             if(chpChart){
               chpChart.data.labels = [];
               chpChart.data.datasets.forEach(d => d.data = []);
@@ -1335,6 +1660,7 @@
             }
 
             if(cutTbody) cutTbody.innerHTML = '';
+            if(cutTableWrap) cutTableWrap.style.display = 'none';
             if(cutChart){
               cutChart.data.labels = [];
               cutChart.data.datasets.forEach(d => {
@@ -1475,7 +1801,37 @@
             return out;
           }
 
+          function compareReleaseAsc(a, b){
+            const pa = String(a || '').split('.').map(n => parseInt(n, 10) || 0);
+            const pb = String(b || '').split('.').map(n => parseInt(n, 10) || 0);
+            const len = Math.max(pa.length, pb.length);
+            for(let i=0;i<len;i++){
+              const da = pa[i] || 0;
+              const db = pb[i] || 0;
+              if(da !== db) return da - db;
+            }
+            return 0;
+          }
+
           // ---- allure http ----
+          const NET_CONCURRENCY = 1000;
+          let __netActive = 0;
+          const __netQueue = [];
+
+          async function withNetLimit(fn){
+            if(__netActive >= NET_CONCURRENCY){
+              await new Promise(res => __netQueue.push(res));
+            }
+            __netActive += 1;
+            try{
+              return await fn();
+            }finally{
+              __netActive -= 1;
+              const next = __netQueue.shift();
+              if(next) next();
+            }
+          }
+
           async function httpGet(path, params, signal){
             const url = new URL(BASE_URL + path);
             if(params){
@@ -1483,9 +1839,11 @@
                 if(v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
               });
             }
-            const r = await fetch(url.toString(), { headers: authHeaders(), signal });
-            if(!r.ok) throw new Error(`HTTP ${r.status} ${path}`);
-            return r.json();
+            return fetchWithRetry(async () => {
+              const r = await withNetLimit(() => fetch(url.toString(), { headers: authHeaders(), signal }));
+              if(!r.ok) throw new Error(`HTTP ${r.status} ${path}`);
+              return r.json();
+            });
           }
 
           async function fetchLaunches(version, kind, signal){
@@ -1563,6 +1921,319 @@
               total += Number(stat?.total || 0);
             });
             return total;
+          }
+
+          const LEAF_PAGE_SIZE = 2000;
+          const __cfvCache = new Map();
+          const __testResultCoreCache = new Map();
+          const __testCaseOverviewCache = new Map();
+          const __tcStreamCache = new Map();
+          const LS_TC_STREAM_KEY = 'wb_tc_stream_cache_v1';
+          let __tcStreamCacheLoaded = false;
+
+          function isStreamFieldName(name){
+            const s = String(name || '').toLowerCase();
+            return s.includes('stream') || s.includes('стрим');
+          }
+
+          async function fetchTestResultCfv(resultId, signal){
+            if(__cfvCache.has(resultId)) return __cfvCache.get(resultId);
+            const data = await httpGet(`/api/testresult/${resultId}/cfv`, { v2: true, projectId: PROJECT_ID }, signal);
+            __cfvCache.set(resultId, data);
+            return data;
+          }
+
+          async function fetchTestResultCore(resultId, signal){
+            if(__testResultCoreCache.has(resultId)) return __testResultCoreCache.get(resultId);
+            const data = await httpGet(`/api/testresult/${resultId}`, null, signal);
+            __testResultCoreCache.set(resultId, data);
+            return data;
+          }
+
+          async function fetchTestCaseOverview(testCaseId, signal){
+            const key = String(testCaseId);
+            if(__testCaseOverviewCache.has(key)) return __testCaseOverviewCache.get(key);
+            const data = await httpGet(`/api/testcase/${key}/overview`, null, signal);
+            __testCaseOverviewCache.set(key, data);
+            return data;
+          }
+
+          function loadTcStreamCache(){
+            if(__tcStreamCacheLoaded) return;
+            __tcStreamCacheLoaded = true;
+            try{
+              const raw = localStorage.getItem(LS_TC_STREAM_KEY);
+              if(!raw) return;
+              const obj = JSON.parse(raw);
+              if(!obj || typeof obj !== 'object') return;
+              for(const [k,v] of Object.entries(obj)){
+                if(k && v) __tcStreamCache.set(String(k), String(v));
+              }
+            }catch(e){}
+          }
+
+          function persistTcStreamCache(){
+            try{
+              const obj = Object.create(null);
+              for(const [k,v] of __tcStreamCache.entries()){
+                obj[k] = v;
+              }
+              localStorage.setItem(LS_TC_STREAM_KEY, JSON.stringify(obj));
+            }catch(e){}
+          }
+
+          function extractStreamFromCfv(cfvList){
+            const list = Array.isArray(cfvList) ? cfvList : [];
+            for(const item of list){
+              const cfName = item?.customField?.name;
+              if(!isStreamFieldName(cfName)) continue;
+              const values = item?.values;
+              if(Array.isArray(values)){
+                for(const v of values){
+                  const name = (typeof v === 'string') ? v : v?.name;
+                  if(name) return String(name).trim();
+                }
+              }else if(values && typeof values === 'object' && values.name){
+                return String(values.name).trim();
+              }else if(typeof values === 'string'){
+                return values.trim();
+              }
+            }
+            return 'Без стрима';
+          }
+
+          function extractStreamFromOverview(overview){
+            const list = Array.isArray(overview?.customFields) ? overview.customFields : [];
+            for(const item of list){
+              const cfName = item?.customField?.name;
+              if(!isStreamFieldName(cfName)) continue;
+              let v = item?.name;
+              if(!v){
+                const vals = item?.values;
+                if(Array.isArray(vals) && vals.length){
+                  const first = vals[0];
+                  v = (typeof first === 'string') ? first : first?.name;
+                }
+              }
+              if(v) return String(v).trim();
+            }
+            return 'Без стрима';
+          }
+
+          function getLeafResultId(leaf){
+            const id = leaf?.testResultId ?? leaf?.resultId ?? leaf?.result?.id ?? leaf?.id;
+            return (id == null) ? null : String(id);
+          }
+
+          function getLeafTestCaseId(leaf){
+            const id = leaf?.testCaseId ?? leaf?.testCase?.id ?? leaf?.testCase?.testCaseId;
+            return (id == null) ? null : String(id);
+          }
+
+          async function collectStreamCountsByLaunch(launchId, allMap, autoMap, signal){
+            loadTcStreamCache();
+            let page = 0;
+            while(true){
+              const data = await httpGet('/api/testresulttree/leaf', {
+                launchId,
+                sort: 'duration,asc',
+                size: LEAF_PAGE_SIZE,
+                page
+              }, signal);
+              const content = (data && data.content) ? data.content : [];
+              if(!content.length) break;
+
+              for(const leaf of content){
+                const resultId = getLeafResultId(leaf);
+                let stream = 'Без стрима';
+                let testCaseId = getLeafTestCaseId(leaf);
+                try{
+                  if(testCaseId == null && resultId){
+                    const core = await fetchTestResultCore(resultId, signal);
+                    testCaseId = core?.testCaseId ?? null;
+                  }
+                }catch(e){}
+
+                if(testCaseId != null && __tcStreamCache.has(testCaseId)){
+                  stream = __tcStreamCache.get(testCaseId);
+                }else if(testCaseId != null){
+                  try{
+                    const overview = await fetchTestCaseOverview(testCaseId, signal);
+                    stream = extractStreamFromOverview(overview);
+                  }catch(e){
+                    stream = 'Без стрима';
+                  }
+                  __tcStreamCache.set(testCaseId, stream);
+                }
+                allMap.set(stream, (allMap.get(stream) || 0) + 1);
+              }
+
+              if(content.length < LEAF_PAGE_SIZE) break;
+              page += 1;
+            }
+
+            const search = b64Query([{ id:'automated', type:'boolean', value: true }]);
+            page = 0;
+            while(true){
+              const data = await httpGet('/api/testresulttree/leaf', {
+                launchId,
+                sort: 'duration,asc',
+                size: LEAF_PAGE_SIZE,
+                page,
+                search
+              }, signal);
+              const content = (data && data.content) ? data.content : [];
+              if(!content.length) break;
+
+              for(const leaf of content){
+                const resultId = getLeafResultId(leaf);
+                let stream = 'Без стрима';
+                let testCaseId = getLeafTestCaseId(leaf);
+                try{
+                  if(testCaseId == null && resultId){
+                    const core = await fetchTestResultCore(resultId, signal);
+                    testCaseId = core?.testCaseId ?? null;
+                  }
+                }catch(e){}
+
+                if(testCaseId != null && __tcStreamCache.has(testCaseId)){
+                  stream = __tcStreamCache.get(testCaseId);
+                }else if(testCaseId != null){
+                  try{
+                    const overview = await fetchTestCaseOverview(testCaseId, signal);
+                    stream = extractStreamFromOverview(overview);
+                  }catch(e){
+                    stream = 'Без стрима';
+                  }
+                  __tcStreamCache.set(testCaseId, stream);
+                }
+                autoMap.set(stream, (autoMap.get(stream) || 0) + 1);
+              }
+
+              if(content.length < LEAF_PAGE_SIZE) break;
+              page += 1;
+            }
+            persistTcStreamCache();
+          }
+
+          function buildCountsByStream(allMap, autoMap){
+            const out = new Map();
+            const streams = new Set([...allMap.keys(), ...autoMap.keys()]);
+            for(const s of streams){
+              const allCnt = Number(allMap.get(s) || 0);
+              const autoCnt = Number(autoMap.get(s) || 0);
+              let manualCnt = allCnt - autoCnt;
+              if(manualCnt < 0) manualCnt = 0;
+              out.set(s, { manual: manualCnt, auto: autoCnt });
+            }
+            return out;
+          }
+
+          function mergeMapOfCounts(target, src){
+            for(const [k, v] of src.entries()){
+              target.set(k, (target.get(k) || 0) + Number(v || 0));
+            }
+          }
+
+          function renderTcStreamDeltaTable(rows){
+            if(!tcStreamDeltaTbody) return;
+            tcStreamDeltaTbody.innerHTML = '';
+            if(!rows.length){
+              const tr = document.createElement('tr');
+              tr.innerHTML = `<td class="mono text-left" colspan="4">Нет изменений по стримам</td>`;
+              tcStreamDeltaTbody.appendChild(tr);
+              return;
+            }
+            for(const r of rows){
+              const tr = document.createElement('tr');
+              const m = Number(r.manualDelta || 0);
+              const a = Number(r.autoDelta || 0);
+              tr.innerHTML = `
+                <td class="mono text-left">${r.release}</td>
+                <td class="mono text-left">${r.stream}</td>
+                <td class="mono text-center ${m>0?'text-emerald-600':(m<0?'text-rose-600':'text-slate-600')}">${m>0?'+':''}${m}</td>
+                <td class="mono text-center ${a>0?'text-emerald-600':(a<0?'text-rose-600':'text-slate-600')}">${a>0?'+':''}${a}</td>
+              `;
+              tr.dataset.release = r.release;
+              tcStreamDeltaTbody.appendChild(tr);
+            }
+          }
+
+          function populateReleaseSelect(sel, releases){
+            if(!sel) return;
+            sel.style.display = '';
+            sel.innerHTML = '';
+            if(!releases || !releases.length){
+              const opt = document.createElement('option');
+              opt.value = '';
+              opt.textContent = 'Нет релизов';
+              opt.disabled = true;
+              opt.selected = true;
+              sel.appendChild(opt);
+              sel.disabled = true;
+              return;
+            }
+            for(const rel of releases){
+              const opt = document.createElement('option');
+              opt.value = rel;
+              opt.textContent = rel;
+              opt.selected = true;
+              sel.appendChild(opt);
+            }
+            sel.disabled = false;
+          }
+
+          function populateAllReleaseFilters(releases){
+            const list = Array.isArray(releases) ? releases : [];
+            [
+              tcReleaseFilter,
+              tcTableReleaseFilter,
+              covReleaseFilter,
+              selReleaseFilter,
+              avgReleaseFilter,
+              chpReleaseFilter,
+              cutReleaseFilter,
+              iosTypesReleaseFilter,
+              andTypesReleaseFilter
+            ].forEach(sel => populateReleaseSelect(sel, list));
+          }
+
+          function getSelectedReleasesFromSelect(sel){
+            if(!sel) return null;
+            const selected = Array.from(sel.options).filter(o => o.selected).map(o => o.value);
+            return selected.length ? new Set(selected) : null;
+          }
+
+          function applyTbodyReleaseFilter(sel, tbodyEl){
+            if(!tbodyEl) return;
+            const selected = getSelectedReleasesFromSelect(sel);
+            Array.from(tbodyEl.children).forEach(tr => {
+              const rel = tr.dataset.release;
+              const show = !selected || !rel || selected.has(rel);
+              tr.style.display = show ? '' : 'none';
+            });
+          }
+
+          function applyReleaseFilter(tcRowsAll, deltaRowsAll){
+            const selected = getSelectedReleasesFromSelect(tcReleaseFilter);
+            const deltas = selected ? deltaRowsAll.filter(r => selected.has(r.release)) : deltaRowsAll.slice();
+            renderTcStreamDeltaTable(deltas);
+          }
+
+          function applyAllReleaseFilters(){
+            if(window.__tcRowsAll && window.__tcDeltaRowsAll){
+              applyReleaseFilter(window.__tcRowsAll, window.__tcDeltaRowsAll);
+            }else{
+              applyTbodyReleaseFilter(tcReleaseFilter, tcStreamDeltaTbody);
+            }
+            applyTbodyReleaseFilter(tcTableReleaseFilter, tbody);
+            applyTbodyReleaseFilter(covReleaseFilter, covTbody);
+            applyTbodyReleaseFilter(selReleaseFilter, selTbody);
+            applyTbodyReleaseFilter(avgReleaseFilter, avgTbody);
+            applyTbodyReleaseFilter(chpReleaseFilter, chpTbody);
+            applyTbodyReleaseFilter(cutReleaseFilter, cutTbody);
+            applyTbodyReleaseFilter(iosTypesReleaseFilter, iosTypesTbody);
+            applyTbodyReleaseFilter(andTypesReleaseFilter, andTypesTbody);
           }
 
           const __memberStatsCache = new Map();
@@ -1758,6 +2429,7 @@
                 plugins: {
                   legend: { display: false },
                   deltaLabels: { datasetIndex: 2 },
+                  valueLabels: { datasets: [0, 1] },
                   tooltip: {
                     mode: 'index',
                     intersect: false,
@@ -2253,6 +2925,7 @@
             const pctT = 100;
 
             const tr = document.createElement('tr');
+            tr.dataset.release = release;
             tr.innerHTML = `
               <td class="mono text-left">${release}</td>
               <td class="mono">${manual}</td>
@@ -2281,14 +2954,16 @@
             tbody.appendChild(tr);
           }
 
-          function renderCovRow({release, swatCount, streamCount}){
+          function renderCovRow({release, swatCount, swatPeople, streamCount}){
             const sum = (Number(swatCount) || 0) + (Number(streamCount) || 0);
             const swPct = sum ? (Math.round(((Number(swatCount)||0) / sum) * 1000) / 10) : 0;
             const stPct = sum ? (Math.round(((Number(streamCount)||0) / sum) * 1000) / 10) : 0;
             const tr2 = document.createElement('tr');
+            tr2.dataset.release = release;
             tr2.innerHTML = `
               <td class="mono text-left">${release}</td>
               <td class="mono">${swatCount}</td>
+              <td class="mono">${Number(swatPeople || 0)}</td>
               <td class="mono">${streamCount}</td>
               <td class="mono">${sum}</td>
               <td class="text-left"><span class="mono">SWAT ${swPct}%</span> · <span class="mono">STREAM ${stPct}%</span></td>
@@ -2296,14 +2971,16 @@
             covTbody.appendChild(tr2);
           }
 
-          function renderSelRow({release, swatCount, streamCount}){
+          function renderSelRow({release, swatCount, swatPeople, streamCount}){
             const sum = (Number(swatCount) || 0) + (Number(streamCount) || 0);
             const swPct = sum ? (Math.round(((Number(swatCount)||0) / sum) * 1000) / 10) : 0;
             const stPct = sum ? (Math.round(((Number(streamCount)||0) / sum) * 1000) / 10) : 0;
             const tr2 = document.createElement('tr');
+            tr2.dataset.release = release;
             tr2.innerHTML = `
               <td class="mono text-left">${release}</td>
               <td class="mono">${swatCount}</td>
+              <td class="mono">${Number(swatPeople || 0)}</td>
               <td class="mono">${streamCount}</td>
               <td class="mono">${sum}</td>
               <td class="text-left"><span class="mono">SWAT ${swPct}%</span> · <span class="mono">STREAM ${stPct}%</span></td>
@@ -2313,6 +2990,7 @@
 
           function renderAvgRow({release, swatMs, streamMs, totalMs}){
             const tr = document.createElement('tr');
+            tr.dataset.release = release;
             tr.innerHTML = `
               <td class="mono text-left">${release}</td>
               <td class="mono">${formatMsPerCase(swatMs)}</td>
@@ -2324,6 +3002,7 @@
 
           function renderCutRow({release, iosCut, iosStore, andCut, andStore}){
             const tr = document.createElement('tr');
+            tr.dataset.release = release;
             tr.innerHTML = `
               <td class="mono text-left">${release}</td>
               <td class="mono">${iosCut || '-'}</td>
@@ -2455,6 +3134,22 @@
             });
           }
 
+          function initToggles(){
+            document.querySelectorAll('[data-toggle]').forEach(btn => {
+              const key = btn.getAttribute('data-toggle');
+              const body = document.querySelector(`[data-toggle-body="${key}"]`);
+              if(!body) return;
+              btn.addEventListener('click', () => {
+                const isHidden = body.style.display === 'none';
+                body.style.display = isHidden ? '' : 'none';
+                btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+                const ico = btn.querySelector('span[aria-hidden="true"]');
+                if(ico) ico.textContent = isHidden ? '▾' : '▸';
+                try{ tcChart?.resize(); }catch(e){}
+              });
+            });
+          }
+
           // ---- RUN ----
           async function run(){
             validateAndNormalizeReleaseInput(inpFrom);
@@ -2473,6 +3168,7 @@
               showEmpty('Укажите корректный диапазон (например 7.4.1000 → 7.4.4000 или 7.3.7 → 7.4.2)');
               return;
             }
+            populateAllReleaseFilters(releases);
 
             ensureChart();
             ensureCoverageChart();
@@ -2494,12 +3190,15 @@
 
             tbody.innerHTML = '<tr><td class="mono text-left" colspan="5">Сбор данных…</td></tr>';
 
-            const LAUNCH_CONCURRENCY = 10;
+            const LAUNCH_CONCURRENCY = 1000;
+            const STREAM_CONCURRENCY = 40;
 
             const tcRowsData = [];
             const covRowsData = [];
             const selRowsData = [];
             const avgRowsData = [];
+            const tcStreamByRelease = [];
+            let tcStreamDeltaRowsAll = [];
 
             let firstRow = true;
 
@@ -2642,6 +3341,26 @@
               }
               manual = Math.max(0, total - auto);
 
+              // Stream deltas for Manual/AT (by customField.values.name)
+              if(idsAll.length){
+                const allMap = new Map();
+                const autoMap = new Map();
+                const perStream = await asyncPool(idsAll, STREAM_CONCURRENCY, async (id) => {
+                  const mAll = new Map();
+                  const mAuto = new Map();
+                  await collectStreamCountsByLaunch(id, mAll, mAuto, signal);
+                  return { all: mAll, auto: mAuto };
+                }, signal);
+                for(const r of perStream){
+                  if(!r) continue;
+                  mergeMapOfCounts(allMap, r.all || new Map());
+                  mergeMapOfCounts(autoMap, r.auto || new Map());
+                }
+                tcStreamByRelease.push({ release: rel, counts: buildCountsByStream(allMap, autoMap) });
+              }else{
+                tcStreamByRelease.push({ release: rel, counts: new Map() });
+              }
+
               // Черепики (deploy-lab issues) — через прокси
               let chpIos = 0;
               let chpAndroid = 0;
@@ -2654,6 +3373,7 @@
               const chpTotal = (Number(chpIos)||0) + (Number(chpAndroid)||0);
               if(chpTbody){
                 const tr = document.createElement('tr');
+                tr.dataset.release = rel;
                 tr.innerHTML = `
                   <td class="mono text-left">${rel}</td>
                   <td class="mono">${chpIos}</td>
@@ -2715,17 +3435,43 @@
               tcRowsData.push({ release: rel, manual, auto, total });
 
               if(covTbody){
-                renderCovRow({ release: rel, swatCount, streamCount });
+                renderCovRow({ release: rel, swatCount, swatPeople: swatPeopleHB, streamCount });
               }
-              covRowsData.push({ release: rel, swatCount, streamCount, total: (swatCount + streamCount) });
+              covRowsData.push({ release: rel, swatCount, swatPeople: swatPeopleHB, streamCount, total: (swatCount + streamCount) });
               addCoveragePoint(rel, swatCount, streamCount, swatPeopleHB);
 
               if(selTbody){
-                renderSelRow({ release: rel, swatCount: selSwat, streamCount: selStream });
+                renderSelRow({ release: rel, swatCount: selSwat, swatPeople: swatPeopleSel, streamCount: selStream });
               }
-              selRowsData.push({ release: rel, swatCount: selSwat, streamCount: selStream, total: (selSwat + selStream) });
+              selRowsData.push({ release: rel, swatCount: selSwat, swatPeople: swatPeopleSel, streamCount: selStream, total: (selSwat + selStream) });
               addSelectivePoint(rel, selSwat, selStream, swatPeopleSel);
             }
+
+            if(tcStreamByRelease.length){
+              const deltaRows = [];
+              for(let i=1;i<tcStreamByRelease.length;i++){
+                const prev = tcStreamByRelease[i-1];
+                const curr = tcStreamByRelease[i];
+                const streams = new Set([
+                  ...Array.from(prev.counts.keys()),
+                  ...Array.from(curr.counts.keys())
+                ]);
+                for(const s of streams){
+                  const p = prev.counts.get(s) || { manual: 0, auto: 0 };
+                  const c = curr.counts.get(s) || { manual: 0, auto: 0 };
+                  const md = Number(c.manual||0) - Number(p.manual||0);
+                  const ad = Number(c.auto||0) - Number(p.auto||0);
+                  if(md === 0 && ad === 0) continue;
+                  deltaRows.push({ release: curr.release, stream: s, manualDelta: md, autoDelta: ad });
+                }
+              }
+              tcStreamDeltaRowsAll = deltaRows.slice();
+            }
+
+            window.__tcRowsAll = tcRowsData.slice();
+            window.__tcDeltaRowsAll = tcStreamDeltaRowsAll.slice();
+            populateAllReleaseFilters(releases);
+            applyAllReleaseFilters();
 
             // Типы задач (Deploy-lab issues): iOS + Android
             const deployTok = (inpDeployToken?.value || '').trim();
@@ -2798,19 +3544,29 @@
             }
             if(covTbody && covRowsData.length){
               covTbody.innerHTML = '';
-              covRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
-              covRowsData.forEach(r => renderCovRow({ release: r.release, swatCount: r.swatCount, streamCount: r.streamCount }));
+              covRowsData.sort((a,b) => compareReleaseAsc(a.release, b.release));
+              covRowsData.forEach(r => renderCovRow({ release: r.release, swatCount: r.swatCount, swatPeople: r.swatPeople, streamCount: r.streamCount }));
+              if(covTableWrap) covTableWrap.style.display = '';
             }
             if(selTbody && selRowsData.length){
               selTbody.innerHTML = '';
-              selRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
-              selRowsData.forEach(r => renderSelRow({ release: r.release, swatCount: r.swatCount, streamCount: r.streamCount }));
+              selRowsData.sort((a,b) => compareReleaseAsc(a.release, b.release));
+              selRowsData.forEach(r => renderSelRow({ release: r.release, swatCount: r.swatCount, swatPeople: r.swatPeople, streamCount: r.streamCount }));
+              if(selTableWrap) selTableWrap.style.display = '';
             }
             if(avgTbody && avgRowsData.length){
               avgTbody.innerHTML = '';
-              avgRowsData.sort((a,b) => (Number(b.total)||0) - (Number(a.total)||0));
+              avgRowsData.sort((a,b) => compareReleaseAsc(a.release, b.release));
               avgRowsData.forEach(r => renderAvgRow({ release: r.release, swatMs: r.swatMs, streamMs: r.streamMs, totalMs: r.totalMs }));
+              if(avgTableWrap) avgTableWrap.style.display = '';
             }
+            if(chpTableWrap && chpTbody && chpTbody.children.length){
+              chpTableWrap.style.display = '';
+            }
+            if(cutTableWrap && cutTbody && cutTbody.children.length){
+              cutTableWrap.style.display = '';
+            }
+            applyAllReleaseFilters();
 
             if(!tcRowsData.length) showEmpty('Данные появятся после получения из источника');
             if(!selRowsData.length) showSelEmpty('Данные появятся после получения из источника');
@@ -2830,6 +3586,20 @@
           showIosTypesEmpty('Данные появятся после получения из источника');
           showAndTypesEmpty('Данные появятся после получения из источника');
           initCollapsers();
+          initToggles();
+
+          [
+            tcReleaseFilter,
+            tcTableReleaseFilter,
+            covReleaseFilter,
+            selReleaseFilter,
+            avgReleaseFilter,
+            chpReleaseFilter,
+            cutReleaseFilter,
+            iosTypesReleaseFilter,
+            andTypesReleaseFilter
+          ].forEach(sel => sel?.addEventListener('change', applyAllReleaseFilters));
+          initToggles();
 
           proxyBtn?.addEventListener('click', async () => {
             try{
