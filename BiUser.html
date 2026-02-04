@@ -341,6 +341,7 @@
       <table id="growthTbl">
         <thead>
         <tr>
+          <th>Платформа</th>
           <th>Версия</th>
           <th>Срез-1</th>
           <th>Срез-2</th>
@@ -1735,17 +1736,18 @@ function exportSummaryCsv(){
   downloadCsv(rows, 'bi_summary_top20.csv');
 }
 function exportGrowthCsv(){
-  const rows=[["version","slice_1","slice_2","slice_3","slice_4","delta","delta_pct"]];
+  const rows=[["platform","version","slice_1","slice_2","slice_3","slice_4","delta","delta_pct"]];
   document.querySelectorAll('#growthTbl tbody tr').forEach(tr=>{
     const tds = tr.querySelectorAll('td');
     rows.push([
       tds[0]?.textContent || '',
-      (tds[1]?.textContent || '').replace(/\s/g,''),
+      tds[1]?.textContent || '',
       (tds[2]?.textContent || '').replace(/\s/g,''),
       (tds[3]?.textContent || '').replace(/\s/g,''),
       (tds[4]?.textContent || '').replace(/\s/g,''),
       (tds[5]?.textContent || '').replace(/\s/g,''),
-      (tds[6]?.textContent || '').replace(/\s/g,'')
+      (tds[6]?.textContent || '').replace(/\s/g,''),
+      (tds[7]?.textContent || '').replace(/\s/g,'')
     ]);
   });
   downloadCsv(rows, 'bi_growth_top4.csv');
@@ -1861,6 +1863,27 @@ function getTopReleasesFromSummaryNormalized(limit=4){
     .slice(0,limit)
     .map(([k])=>k);
 }
+function getTopReleasesByPlatformFromSummaryNormalized(limit=4){
+  const rows = Array.isArray(filteredRows) ? filteredRows : [];
+  const acc = { ios: new Map(), android: new Map() };
+  for(const r of rows){
+    const p = String(r.platform || '').toLowerCase();
+    if(!(p in acc)) continue;
+    const key = normalizeReleaseName(r.release);
+    if(!/^\d+(?:\.\d+){2,3}(?:-[\w.\-]+)?$/.test(key)) continue;
+    if(isDummyNine(key)) continue;
+    const m = acc[p];
+    m.set(key, (m.get(key)||0) + Number(r.users||0));
+  }
+  const out = {};
+  Object.entries(acc).forEach(([p, m]) => {
+    out[p] = [...m.entries()]
+      .sort((a,b)=> b[1]-a[1] || -cmpSemver(a[0],b[0]))
+      .slice(0,limit)
+      .map(([k])=>k);
+  });
+  return out;
+}
 function renderGrowthFromSummary(){
   const body = growthTblBody;
   const kpis = growthKpis;
@@ -1886,24 +1909,41 @@ const mapsAND   = snaps.map(s => aggregateSnapByReleasesNormalized(s, new Set(['
   const latestAND = mapsAND.at(-1) || new Map();
   const prevAND   = mapsAND.length>1 ? mapsAND[mapsAND.length-2] : new Map();
 
-  let names = getTopReleasesFromSummaryNormalized(4);
-  if (!names.length) names = [...latest.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k])=>k);
-
+  const topByPlat = getTopReleasesByPlatformFromSummaryNormalized(4);
   const getVal = (map, key) => Number((map && map.get(key)) || 0);
-  const rows = names.map(key=>{
-    const t  = getVal(maps[maps.length-1], key);
-    const t1 = getVal(maps[maps.length-2], key);
-    const t2 = getVal(maps[maps.length-3], key);
-    const t3 = getVal(maps[maps.length-4], key);
-    const d  = t - t1;
-    const dp = (t1>0) ? (d/t1*100) : (t>0 ? 100 : null);
-    return { key, t, t1, t2, t3, d, dp };
-  }).sort((a,b)=> b.t - a.t);
+  const platFilter = String(sumPlat.value || 'all').toLowerCase();
+  const platOrder = platFilter === 'all' ? ['ios','android'] : [platFilter];
 
-  for (const r of rows){
+  const rows = [];
+  platOrder.forEach(p=>{
+    const mapsP = p === 'ios' ? mapsIOS : (p === 'android' ? mapsAND : maps);
+    const latestP = mapsP.at(-1) || new Map();
+    let names = (topByPlat[p] && topByPlat[p].length) ? topByPlat[p] : [];
+    if (!names.length){
+      names = [...latestP.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k])=>k);
+    }
+    names.forEach(key=>{
+      const t  = getVal(mapsP[mapsP.length-1], key);
+      const t1 = getVal(mapsP[mapsP.length-2], key);
+      const t2 = getVal(mapsP[mapsP.length-3], key);
+      const t3 = getVal(mapsP[mapsP.length-4], key);
+      const d  = t - t1;
+      const dp = (t1>0) ? (d/t1*100) : (t>0 ? 100 : null);
+      rows.push({ plat: p, key, t, t1, t2, t3, d, dp });
+    });
+  });
+
+  // Сортируем внутри платформ по текущему значению
+  const rowsSorted = rows.sort((a,b)=>{
+    if (a.plat !== b.plat) return a.plat.localeCompare(b.plat, 'ru');
+    return b.t - a.t;
+  });
+
+  for (const r of rowsSorted){
     const cls = r.d>0 ? 'delta-pos' : (r.d<0 ? 'delta-neg' : '');
     const tr = document.createElement('tr');
     tr.innerHTML = `
+      <td>${r.plat === 'ios' ? 'iOS' : (r.plat === 'android' ? 'Android' : esc(r.plat))}</td>
       <td>${esc(r.key)}</td>
       <td>${num(r.t)}</td>
       <td>${num(r.t1)}</td>
