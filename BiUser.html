@@ -3,195 +3,49 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css" />
   <title>WB BI Users v3 — UI (фикс меток, редизайн настроек)</title>
-  <style>
-    :root{
-      --wb:#6f1d7a;--wb2:#872b94;--bg:#f7f2fb;--card:#fff;--ink:#1c1020;--muted:#5b5160;--bd:#e8dff0;
-      --ok:#2e7d32;--bad:#c62828;--shadow:0 10px 30px rgba(20,0,30,.08)
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--ink);background:linear-gradient(180deg,var(--bg),#fff)}
-    header{background:var(--wb);color:#fff;padding:16px 20px}
-    header h1{margin:0;font-size:22px}
-    header p{margin:6px 0 0;opacity:.92;font-size:14px}
-
-    main{max-width:1280px;margin:20px auto;padding:0 16px 32px}
-
-    .card{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:14px;margin-top:14px;border:1px solid #efe5f4}
-
-    /* ===== Настройки: компоновка по макету ===== */
-    .settings{
-      display:grid;grid-template-columns:1fr 1fr;gap:12px
-    }
-    .settings .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-    .settings .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    @media (max-width:980px){
-      .settings{grid-template-columns:1fr}
-      .settings .row,.settings .row2{grid-template-columns:1fr}
-    }
-    label{display:block;font-size:13px;font-weight:700;letter-spacing:.01em;color:#4b4054;margin:6px 0 6px}
-    input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:10px;background:#fff;font-size:14px}
-    textarea{min-height:84px}
-    .muted{color:var(--muted);font-size:13px}
-    .inline{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .pill{border-radius:999px;padding:6px 10px;background:#fff;border:1px dashed rgba(111,29,122,.28);font-size:12px}
-    .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(111,29,122,.12);color:#4a0f54;padding:6px 10px;border-radius:999px;font-weight:800;font-size:13px}
-
-    button{background:var(--wb);color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
-    button:hover{background:var(--wb2)}
-    .btn-sm{font-size:12px;padding:6px 10px;border:1px solid rgba(111,29,122,.28);background:#fff;color:#4a0f54;cursor:pointer;border-radius:8px}
-    .ghost{background:#fff;border:1px solid rgba(111,29,122,.28);color:var(--wb)}
-
-    /* Выпадашки */
-    .dropdown{position:relative;background:#fff;border:1px solid var(--bd);border-radius:10px;cursor:pointer;font-size:14px}
-    .dropdown-selected{padding:10px 10px}
-    .dropdown.open .dropdown-selected{border-bottom-left-radius:0;border-bottom-right-radius:0}
-    .dropdown-list{position:absolute;z-index:100;top:100%;left:0;right:0;background:#fff;border:1px solid var(--bd);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;box-shadow:0 10px 18px rgba(20,0,30,.12);display:none;flex-direction:column;gap:8px;padding:10px;animation:pop .14s ease}
-    .dropdown.open .dropdown-list{display:flex}
-    @keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-    .dropdown-list label{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      color:#3a2d47;
-      padding:4px 6px;
-      border-radius:8px;
-    }
-    .dropdown-list label:hover{background:#faf7fd}
-    .dropdown-list input[type=checkbox],
-    .dropdown-list input[type=radio]{
-      margin-left:12px;
-      flex-shrink:0;
-    }
-    .dropdown-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
-
-    .proxy-toggle{display:flex;flex-direction:column;align-items:center;margin-left:2px}
-    .proxy-toggle-label{font-size:11px;line-height:1;color:var(--muted);margin-bottom:2px}
-    .proxy-toggle input{margin:0}
-    .dropdown--slim{border:1px solid var(--bd)}
-    .dropdown--slim .dropdown-selected{padding:8px 10px;font-size:13px}
-
-    /* Графики */
-    .charts{display:grid;grid-template-columns:1fr;gap:16px}
-    .chart-wrap{background:#fff;border:1px solid #efe5f4;border-radius:14px;padding:12px;overflow:hidden}
-    .chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-    .chart-head .title{font-weight:800;color:#4a0f54;font-size:16px}
-    .hint{font-size:13px;color:var(--muted)}
-    .chart-viewport{height:460px}
-    #trendViewport{height:340px}
-    .chart-viewport canvas{width:100% !important;height:100% !important;display:block}
-    @media (max-width:720px){ .chart-viewport{height:380px} #trendViewport{height:300px}}
-
-    .chart-notes{margin-top:10px;padding:10px 12px;border:1px dashed var(--bd);border-radius:12px;background:#faf7fd}
-    .chart-notes .legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;font-size:14px;color:#3a2d47}
-    .chart-notes .legend .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
-    .chart-notes .legend .up .dot{background:var(--ok);border:1px solid #1b5e20}
-    .chart-notes .legend .down .dot{background:var(--bad);border:1px solid #8e0000}
-    .chart-notes .meta{margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:#4a0f54}
-    .chart-notes .meta .pill{background:#efe7f3;border-radius:999px;padding:4px 8px}
-
-    /* Таблицы и KPI */
-    table{width:100%;border-collapse:collapse;font-size:14px}
-    th,td{padding:10px 8px;border-bottom:1px solid #eee;text-align:left}
-    th{background:#faf7fd;user-select:none;cursor:default}
-    .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
-    .kpi{background:#fff;border:1px solid #efe5f4;border-radius:10px;padding:10px 12px;min-width:160px}
-    .kpi .muted{font-size:12px}
-    .delta-pos{color:var(--ok);font-weight:700}
-    .delta-neg{color:var(--bad);font-weight:700}
-
-    pre{
-      background:#0f0f10;
-      color:#e9e9ea;
-      border-radius:10px;
-      padding:12px;
-      white-space:pre-wrap;       /* переносим длинные строки */
-      word-break:break-word;      /* ломаем очень длинные токены */
-      max-height:420px;
-      overflow-x:auto;            /* явный горизонтальный скролл при необходимости */
-      overflow-y:auto;
-      font-size:13px;
-      max-width:100%;
-      width:100%;
-      box-sizing:border-box;
-    }
-    .logbox{
-      position:relative;
-      width:100%;
-      max-width:100%;
-      overflow-x:auto;
-      overflow-y:auto;
-      background:#0f0f10;
-      border-radius:10px;
-      box-sizing:border-box;
-    }
-    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-
-    /* === Шапка настроек === */
-    .settings-grid{ display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.2fr; gap:12px 14px; align-items:end; }
-    @media (max-width: 1200px){ .settings-grid{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 780px){ .settings-grid{ grid-template-columns: 1fr; } }
-    .form-field label{ display:block; font-size:13px; font-weight:700; color:#4b4054; margin:0 0 6px; }
-    .form-ctl{ width:100%; height:40px; padding:8px 12px; border:1px solid var(--bd); border-radius:10px; background:#fff; font-size:14px; }
-    .form-ctl[readonly]{ background:#faf7fd }
-    .switch-line{ display:flex; gap:10px; align-items:center; }
-    .badges-line{ display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; }
-    .actions-line{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-    .dropdown.form-ctl{ padding:0; display:flex; align-items:center; min-height:40px; }
-    .dropdown-selected{ width:100%; padding:8px 12px; }
-    .dropdown-list{ max-height:260px; overflow:auto; }
-
-    /* Компактный дропдаун для списка релизов */
-    #releasesDropdown {
-      max-width: 520px;
-    }
-    #releasesDropdown .dropdown-list {
-      max-height: 300px;
-      padding: 6px 8px;
-    }
-    #releasesDropdown .toolbar {
-      margin-bottom: 4px;
-    }
-    #releasesDropdown .release-item {
-      padding: 2px 6px;
-      gap: 3px;
-    }
-    #releasesDropdown .release-name {
-      font-size: 12px;
-      line-height: 1.1;
-    }
-    #releasesDropdown .release-sub {
-      font-size: 10px;
-      line-height: 1.1;
-      margin-top: 0;
-    }
-
-    .settings-foot{ display:grid; grid-template-columns: 1fr auto auto auto; gap:12px; align-items:center; margin-top:8px; }
-    @media (max-width: 780px){ .settings-foot{ grid-template-columns: 1fr; } }
-  </style>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
-<body>
-<header>
-  <h1>Пользвателя по версиям</h1>
-  <p>Для запуска нужен локальный прокси, для скачивания нажать кнопку <code>Скачать локальный прокси (macOS)</code>, распаковать и запустить через <code>start-proxy.command</code>. Появится ошибка запуска - в терминале ввести xattr -d com.apple.quarantine + перетащить файл, потом chmod +x + перетащить файл и потом запустить из папки</p>
-</header>
+<body class="min-h-screen bi-user">
+  <div class="app-shell max-w-6xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="brand-badge">
+        <span class="brand-dot"></span>
+        <div>
+          <div class="flex items-center gap-2">
+            <div class="font-extrabold leading-tight">WB BI Users</div>
+            <span class="chip">v3</span>
+          </div>
+          <div class="hint">Пользователи по версиям</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <a href="local-cors-proxy-macos.zip" class="btn btn-soft" download>Скачать локальный прокси (macOS)</a>
+        <button id="exportPdfBtn" type="button" class="btn btn-soft">Экспорт PDF</button>
+      </div>
+    </header>
 
-<main>
+<main class="mt-5 grid grid-cols-1 gap-4">
   <!-- ===== Настройки (редизайн) ===== -->
-  <section class="card">
+  <section class="card p-5 space-y-4">
   <div class="settings-grid">
     <div class="form-field">
       <label>Proxy Base</label>
-      <input id="proxyBase" class="form-ctl" value="http://localhost:8787/"/>
+      <input id="proxyBase" class="form-ctl input" value="http://localhost:8787/"/>
       <div class="muted">Поддержка <b>?url=</b> и <b>/prefix/</b>.</div>
     </div>
 
     <div class="form-field">
       <label>Режим</label>
       <div class="switch-line" style="gap:12px">
-        <select id="proxyMode" class="form-ctl" style="flex:1 1 auto">
+        <select id="proxyMode" class="form-ctl input" style="flex:1 1 auto">
           <option value="query" selected>?url=</option>
           <option value="prefix">/prefix/</option>
         </select>
@@ -210,7 +64,7 @@
 
     <div class="form-field">
       <label>Платформы</label>
-      <div class="dropdown form-ctl" id="platformDropdown">
+      <div class="dropdown form-ctl input" id="platformDropdown">
         <div class="dropdown-selected" id="platformSelectedText">iOS, Android</div>
         <div class="dropdown-list">
           <label>
@@ -231,7 +85,7 @@
 
     <div class="form-field">
       <label>Интервал (WB)</label>
-      <div class="dropdown form-ctl" id="intervalDropdown">
+      <div class="dropdown form-ctl input" id="intervalDropdown">
         <div class="dropdown-selected" id="intervalSelectedText">last_2_days</div>
         <div class="dropdown-list">
           <label>
@@ -260,21 +114,25 @@
 
     <div class="form-field">
       <label>Снэпшоты: от</label>
-      <input type="datetime-local" id="snapFrom" class="form-ctl"/>
+      <input type="datetime-local" id="snapFrom" class="form-ctl input"/>
     </div>
 
     <div class="form-field">
       <label>Снэпшоты: до</label>
-      <input type="datetime-local" id="snapTo" class="form-ctl"/>
+      <div class="inline snap-range">
+        <input type="datetime-local" id="snapTo" class="form-ctl input" style="flex:1 1 auto"/>
+        <button type="button" id="btnApplySnapDates" class="btn-sm ghost" style="white-space:nowrap">Применить</button>
+      </div>
     </div>
 
     <div class="form-field" style="grid-column: span 2">
-      <label>Выбрать снэпшоты (до 4)</label>
-      <div class="dropdown form-ctl dropdown--slim" id="snapshotsDropdown">
+      <label>Выбрать снэпшоты (до 20)</label>
+      <div class="dropdown form-ctl dropdown--slim input" id="snapshotsDropdown">
         <div class="dropdown-selected" id="snapshotsSelectedText">Последние 4</div>
         <div class="dropdown-list">
           <div class="toolbar" style="justify-content:space-between">
             <button type="button" class="btn-sm" id="snapPickLast4">Последние 4</button>
+            <button type="button" class="btn-sm" id="snapPickLast20">Последние 20</button>
             <button type="button" class="btn-sm" id="snapUncheckAll">Сброс</button>
           </div>
           <div class="snapshots-list" id="snapshotsList" style="max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:6px;padding:6px"></div>
@@ -285,7 +143,7 @@
 
     <div class="form-field" style="grid-column: 1 / -1">
       <label>Cookie WB BI (в одну строку)</label>
-      <textarea id="cookieInput" class="form-ctl" style="height:80px" placeholder="wbx-validation-key=851d9f8d-c840-487d-afda-5eb3ba9c4504; _ym_uid=1750866811332929169; _ym_d=1750866811; _ga=GA1.1.665364734.1752585353; _ga_NM1B0HQXGM=GS2.1.s1753849272$o2$g0$t1753849272$j60$l0$h0; _wbauid=4822661931756460966; BIWBToken=7F+a7PAMgcLwZ/qMPJO5DWOT46gdM+zEuw9jGoSLOYVeEJCCwNoOxAo4gHiwqA=="></textarea>
+      <textarea id="cookieInput" class="form-ctl input" style="height:80px" placeholder="wbx-validation-key=851d9f8d-c840-487d-afda-5eb3ba9c4504; _ym_uid=1750866811332929169; _ym_d=1750866811; _ga=GA1.1.665364734.1752585353; _ga_NM1B0HQXGM=GS2.1.s1753849272$o2$g0$t1753849272$j60$l0$h0; _wbauid=4822661931756460966; BIWBToken=7F+a7PAMgcLwZ/qMPJO5DWOT46gdM+zEuw9jGoSLOYVeEJCCwNoOxAo4gHiwqA=="></textarea>
       <div class="muted">Уйдёт в <code>X-Proxy-Cookie</code> и проксируется как <code>Cookie</code>.</div>
     </div>
   </div>
@@ -299,14 +157,14 @@
     </div>
 
     <a href="local-cors-proxy-macos.zip" class="btn-sm" download>Скачать локальный прокси (macOS)</a>
-    <button id="btnSaveSettings" class="ghost">Сохранить настройки</button>
-    <button id="btnExportCsv" class="ghost">Экспорт CSV (эта таблица)</button>
-    <button id="btnRunAll">Запустить полный поток</button>
+    <button id="btnSaveSettings" class="btn btn-ghost">Сохранить настройки</button>
+    <button id="btnExportCsv" class="btn btn-ghost">Экспорт CSV (сводная топ-20)</button>
+    <button class="btn btn-grad" id="btnRunAll">Запустить полный поток</button>
   </div>
 </section>
 
   <!-- ===== Графики ===== -->
-  <section class="card" id="chartsCard">
+  <section class="card p-5 space-y-4" id="chartsCard">
     <div class="row" style="display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:end">
       <div>
         <label>Релизы</label>
@@ -315,7 +173,7 @@
           <div class="dropdown-list">
             <div class="toolbar" style="justify-content:space-between;gap:8px;align-items:center">
               <button type="button" class="btn-sm" id="relSelectAll">Все</button>
-              <input id="relSearch" class="form-ctl" placeholder="Поиск релиза…" 
+              <input id="relSearch" class="form-ctl input" placeholder="Поиск релиза…" 
                      style="height:24px;max-width:260px;padding:6px 6px"/>
               <button type="button" class="btn-sm" id="relClear">Сброс</button>
             </div>
@@ -325,10 +183,10 @@
           </div>
         </div>
 
-        <div class="inline" style="margin-top:8px;gap:16px">
-          <label class="inline"><input type="radio" name="viewMode" value="full" checked> Полный</label>
-          <label class="inline"><input type="radio" name="viewMode" value="top8"> Топ-8 актуальных</label>
-          <label class="inline"><input type="radio" name="viewMode" value="selected"> Только выбранные</label>
+        <div class="check-row" style="margin-top:8px;gap:16px">
+          <label><input type="radio" name="viewMode" value="full" checked> Полный</label>
+          <label><input type="radio" name="viewMode" value="top8"> Топ-8 актуальных</label>
+          <label><input type="radio" name="viewMode" value="selected"> Только выбранные</label>
         </div>
       </div>
 
@@ -360,9 +218,9 @@
           <div class="hint">Фильтр по платформам не перезапрашивает данные</div>
         </div>
 
-        <div class="inline" style="gap:16px;margin:6px 0 2px">
-          <label class="inline"><input type="checkbox" id="chkIOS" checked> iOS</label>
-          <label class="inline"><input type="checkbox" id="chkAndroid" checked> Android</label>
+        <div class="check-row" style="gap:16px;margin:6px 0 2px">
+          <label><input type="checkbox" id="chkIOS" checked> iOS</label>
+          <label><input type="checkbox" id="chkAndroid" checked> Android</label>
         </div>
 
         <div class="chart-viewport"><canvas id="deltaChart"></canvas></div>
@@ -387,7 +245,7 @@
   </section>
 
   <!-- ===== Ответ и логи ===== -->
-  <section class="card">
+  <section class="card p-5 space-y-4">
     <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div>
         <label>Ответ (последний шаг)</label>
@@ -401,10 +259,13 @@
   </section>
 
   <!-- ===== Сводная таблица ===== -->
-  <section class="card" id="summaryCard">
-    <div class="inline" style="justify-content:space-between">
+  <section class="card p-5 space-y-4" id="summaryCard">
+    <div class="inline" style="justify-content:space-between;align-items:center">
       <div class="muted">Сводная таблица по релизам (агрегация как в скрипте)</div>
-      <div class="muted">Кеш: <code>wb_local_cache</code> (<span id="cacheCount">0</span>)</div>
+      <div class="inline" style="gap:8px;align-items:center">
+        <button class="btn-sm" id="btnExportSummaryCsv">Экспорт CSV (топ-20)</button>
+        <div class="muted">Кеш: <code>wb_local_cache</code> (<span id="cacheCount">0</span>)</div>
+      </div>
     </div>
 
     <div class="row" style="display:grid;grid-template-columns:280px 1fr;gap:14px;margin-top:10px">
@@ -430,10 +291,8 @@
         </div>
         <div class="group">
           <label>Строк на странице</label>
-          <select id="sumPageSize">
-            <option value="10" selected>10</option>
-            <option value="20">20</option>
-            <option value="30">30</option>
+          <select id="sumPageSize" disabled>
+            <option value="20" selected>20</option>
           </select>
         </div>
         <div class="muted" style="font-size:12px">Можно кликать по заголовку «Пользователи» для переключения.</div>
@@ -463,7 +322,7 @@
   </section>
 
   <!-- ===== Аналитика версий (Δ-таблица) ===== -->
-  <section class="card" id="growthCard">
+  <section class="card p-5 space-y-4" id="growthCard">
     <div class="inline" style="justify-content:space-between;align-items:center">
       <div class="muted">
         Аналитика версий: прирост/убывание по <b>топ-4 версиям по пользователям</b>
@@ -471,6 +330,7 @@
       </div>
       <div class="toolbar">
         <button class="btn-sm" id="btnGrowthRecalc">Пересчитать</button>
+        <button class="btn-sm" id="btnExportGrowthCsv">Экспорт CSV (аналитика)</button>
         <span class="badge">Снепшоты: <span id="growthSnapsMeta">—</span></span>
       </div>
     </div>
@@ -495,14 +355,16 @@
     </div>
   </section>
 
+</main>
+  </div>
 <script>
 /* ---------- Утилиты ---------- */
-const BASE='https://bi.wb.ru', DATASOURCE_ID=11386, DBCONN_ID=4;
+const BASE='https://bi.wb.ru', API_QUEUE=BASE + '/bi/v2/queue', API_QUEUE_V1=BASE + '/bi/queue', API_CACHE='https://bi.wb.ru/cache-puller/api/v1/cache', DATASOURCE_ID=11386, DBCONN_ID=4;
 const $=id=>document.getElementById(id);
 const proxyBase=$('proxyBase'), proxyMode=$('proxyMode'), useProxy=$('useProxy');
 const btnRunAll=$('btnRunAll'), respEl=$('response'), logsEl=$('logs'), statusEl=$('status');
 const jwtBadge=$('jwtBadge'), cacheCount=$('cacheCount'), healthPill=$('healthPill');
-const btnExportCsv=$('btnExportCsv'); const btnSaveSettings=$('btnSaveSettings'); const tblBody=document.querySelector('#tbl tbody');
+const btnExportCsv=$('btnExportCsv'); const btnExportSummaryCsv=$('btnExportSummaryCsv'); const btnExportGrowthCsv=$('btnExportGrowthCsv'); const btnSaveSettings=$('btnSaveSettings'); const tblBody=document.querySelector('#tbl tbody');
 
 const platformDropdown=$('platformDropdown'), intervalDropdown=$('intervalDropdown');
 const platformSelectedText=$('platformSelectedText'), intervalSelectedText=$('intervalSelectedText');
@@ -522,7 +384,7 @@ const sumPlat=$('sumPlat'), sumRel=$('sumRel');
 const sumSortAsc=$('sumSortAsc'), sumSortDesc=$('sumSortDesc'), thUsers=$('thUsers');
 const sumPageSizeEl=$('sumPageSize'), sumPrev=$('sumPrev'), sumNext=$('sumNext'), sumPageNo=$('sumPageNo'), sumPageAll=$('sumPageAll');
 
-let summaryRaw=[]; let summarySort='desc'; let page=1, pageSize=10; let filteredRows=[];
+let summaryRaw=[]; let summarySort='desc'; let page=1, pageSize=20; let filteredRows=[];
 const ts=()=>new Date().toLocaleTimeString();
 const log = (m) => {
   const prefix = (logsEl.textContent === '—' ? '' : logsEl.textContent + '\n');
@@ -542,6 +404,10 @@ const num=n=>new Intl.NumberFormat('ru-RU').format(n);
 const cookieHeader=()=>{ const el=document.getElementById('cookieInput'); return el?el.value.trim():''; };
 
 const SETTINGS_KEY = 'bi_users_calc_settings_v1';
+const SNAP_LIMIT = 20;
+const SNAP_DEFAULT = 4;
+const CHART_SNAP_MAX = 4;
+const SUMMARY_TOP_LIMIT = 20;
 
 function collectSettings(){
   return {
@@ -961,7 +827,8 @@ function buildSnapshotsDropdown(){
     .map(s => ({ time: s.time, records: Array.isArray(s.records) ? s.records : [] }))
     .sort((a,b) => new Date(b.time) - new Date(a.time));
 
-  list.innerHTML = items.map((s,idx) => {
+  const viewItems = items.slice(0, SNAP_LIMIT);
+  list.innerHTML = viewItems.map((s,idx) => {
     const id  = 'snap_'+idx;
     const lbl = new Date(s.time).toLocaleString('ru-RU');
     const size= s.records.length;
@@ -979,20 +846,21 @@ function getSelectedSnapshotTimes(){
 }
 function refreshSnapshotsCaption(){
   const selected = getSelectedSnapshotTimes().length;
-  snapshotsSelectedText.textContent = selected ? `Выбрано: ${selected}` : 'Последние 4';
+  snapshotsSelectedText.textContent = selected ? `Выбрано: ${selected}` : `Последние ${SNAP_DEFAULT}`;
 }
 const btns = {
-  snapPickLast4: ()=>{ const nodes = snapshotsList.querySelectorAll('input[type=checkbox]'); nodes.forEach(cb=>cb.checked=false); [...nodes].slice(0,4).forEach(cb=>cb.checked=true); },
+  snapPickLast4: ()=>{ const nodes = snapshotsList.querySelectorAll('input[type=checkbox]'); nodes.forEach(cb=>cb.checked=false); [...nodes].slice(0,SNAP_DEFAULT).forEach(cb=>cb.checked=true); },
+  snapPickLast20: ()=>{ const nodes = snapshotsList.querySelectorAll('input[type=checkbox]'); nodes.forEach(cb=>cb.checked=false); [...nodes].slice(0,SNAP_LIMIT).forEach(cb=>cb.checked=true); },
   snapUncheckAll: ()=>{ snapshotsList.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false); },
   btnSnapApply: ()=>{},
   btnSnapClear: ()=>{ snapFrom.value=''; snapTo.value=''; buildSnapshotsDropdown(); }
 };
-['snapPickLast4','snapUncheckAll','btnSnapApply','btnSnapClear'].forEach(id=>{
+['snapPickLast4','snapPickLast20','snapUncheckAll','btnSnapApply','btnSnapClear'].forEach(id=>{
   const el=$(id); if(el) el.addEventListener('click',()=>{ btns[id](); refreshSnapshotsCaption(); updateSnapshotBadges(); buildReleasesDropdown(); drawCharts(); renderGrowth(); renderViewFromHistory(); });
 });
 snapshotsList?.addEventListener('change', e=>{
   const checked = snapshotsList.querySelectorAll('input[type=checkbox]:checked');
-  if(checked.length>4){ e.target.checked=false; return; }
+  if(checked.length>SNAP_LIMIT){ e.target.checked=false; return; }
   refreshSnapshotsCaption(); updateSnapshotBadges(); buildReleasesDropdown(); drawCharts(); renderGrowth(); renderViewFromHistory();
 });
 
@@ -1062,15 +930,19 @@ function applySummaryFiltersSort(){
   if(plat!=='all') rows = rows.filter(r=>r.platform===plat);
   if(mask) rows = rows.filter(r=> String(r.release).toLowerCase().includes(mask));
 
-  rows.sort((a,b)=> summarySort==='asc' ? (a.users-b.users) : (b.users-a.users));
+  // База: берём топ-20 по пользователям
+  rows.sort((a,b)=> (b.users-a.users));
+  rows = rows.slice(0, SUMMARY_TOP_LIMIT);
+  // Переупорядочим внутри топ-20, если пользователь выбрал asc
+  if (summarySort === 'asc') rows.sort((a,b)=> a.users-b.users);
   filteredRows = rows;
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
-  if(page>totalPages) page = totalPages;
-  const start=(page-1)*pageSize, end=start+pageSize;
-  renderTablePage(filteredRows.slice(start,end));
-  sumPageNo.textContent=String(page);
-  sumPageAll.textContent=String(totalPages);
+  renderTablePage(filteredRows);
+  page = 1;
+  sumPageNo.textContent='1';
+  sumPageAll.textContent='1';
+  if (sumPrev) sumPrev.disabled = true;
+  if (sumNext) sumNext.disabled = true;
 }
 sumPlat.addEventListener('change', ()=>{ page=1; applySummaryFiltersSort(); });
 sumRel.addEventListener('input', ()=>{ page=1; applySummaryFiltersSort(); });
@@ -1082,14 +954,25 @@ sumPrev.addEventListener('click', ()=>{ if(page>1){ page--; applySummaryFiltersS
 sumNext.addEventListener('click', ()=>{ const totalPages = Math.max(1, Math.ceil((filteredRows.length||0)/pageSize)); if(page<totalPages){ page++; applySummaryFiltersSort(); }});
 
 /* ---------- Queue ---------- */
+const RU_FIL_OPTIONS = [
+  'and 1=1',
+  "/* Узбекистан*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'uz'",
+  "/* Казахстан*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'kz'",
+  "/* Беларусь*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'by'",
+  "/*Армения*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'am'",
+  "/*Киргизия*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'kg'",
+  "/*Грузия*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'ge'",
+  "and has(custom_params. string_value",
+  "'ru') = 1"
+];
 function bodyStartQueue(p){
   return {
     onlyCache:false,dashboardId:0,metaOnly:false,widgetId:0,withLimitation:false,dataSourceId:DATASOURCE_ID,
     queryParams:[
-      {id:'interval',live:true,value:{start:getIntervalValue()}},
-      {id:'platform',live:false,value:[{label:p,value:p}]},
-      {id:'ru_fil',live:false,value:[{label:'and 1=1',value:'and 1=1'}]},
-      {id:'Версии',live:false,value:"'All'"}
+      {id:19683,key:'interval',live:true,order:0,position:'atop',selectConfig:{cascadeColumns:[],columnAdditional:null,isCascade:false,isMultiselect:false,optionsArray:[]},serializationMethodId:'unquoted',typeId:'dateTimeRange',value:{start:getIntervalValue()}},
+      {id:34007,key:'platform',live:false,order:1,position:'atop',selectConfig:{isMultiselect:true,optionsArray:['iOS','Android'],optionsTypeId:'manual'},serializationMethodId:'singleQuoted',typeId:'select',value:[{label:p,value:p}]},
+      {id:37333,key:'ru_fil',live:false,order:2,position:'atop',selectConfig:{isMultiselect:false,optionsArray:RU_FIL_OPTIONS,optionsTypeId:'manual'},serializationMethodId:'unquoted',typeId:'select',value:[{label:'and 1=1',value:'and 1=1'}]},
+      {id:48021,key:'Версии',live:false,order:3,position:'atop',selectConfig:{cascadeColumns:[],columnAdditional:null,isCascade:false,isMultiselect:false,optionsArray:[]},serializationMethodId:'unquoted',typeId:'string',value:"'All'"}
     ]
   };
 }
@@ -1121,7 +1004,7 @@ async function runForPlatform(p){
   const b1=JSON.stringify(bodyStartQueue(p));
   let r1;
   for(let attempt=1; attempt<=3; attempt++){
-    r1=await http('POST', `${BASE}/bi/queue/datasource/${DATASOURCE_ID}`, h1, b1);
+    r1=await http('POST', `${API_QUEUE}/datasource/${DATASOURCE_ID}`, h1, b1);
     if(r1.ok) break;
     log(`[${p}] queue POST ${r1.status}, попытка ${attempt}/3`); await sleep(800);
   }
@@ -1137,7 +1020,7 @@ async function runForPlatform(p){
 
   const MAX_WAIT_MS=1800_000, POLL_MS=5000; const t0=Date.now();
   while(true){
-    let rs; for(let a=1;a<=3;a++){ try{ rs=await http('GET', `${BASE}/bi/queue/dbconn/${DBCONN_ID}/request/${encodeURIComponent(requestId)}/status`, hs); break; }catch(e){ if(a===3) throw e; await sleep(800);} }
+    let rs; for(let a=1;a<=3;a++){ try{ rs=await http('GET', `${API_QUEUE_V1}/dbconn/${DBCONN_ID}/request/${encodeURIComponent(requestId)}/status`, hs); break; }catch(e){ if(a===3) throw e; await sleep(800);} }
     if(!rs.ok){ await sleep(POLL_MS); continue; }
     const obj=rs.json||{}; const st=String((obj.data&&obj.data.status)||obj.status||'').toUpperCase();
     if(['RESOLVED','DONE','SUCCESS','READY','CACHE_READY'].includes(st)) break;
@@ -1146,7 +1029,7 @@ async function runForPlatform(p){
     await sleep(POLL_MS);
   }
 
-  const rr=await http('GET', `${BASE}/bi/cache/result/request/${encodeURIComponent(requestId)}?onlyCache=false`, hs);
+  const rr=await http('GET', `${API_CACHE}/result/request/${encodeURIComponent(requestId)}?onlyCache=false`, hs);
   respEl.textContent='HTTP '+rr.status+'\n\n'+pretty(rr.text);
   if(!rr.ok) throw new Error('['+p+'] Шаг 3 ошибка '+rr.status);
 
@@ -1196,13 +1079,22 @@ function chosenSnaps(){
     const set = new Set(chosenTimes);
     snaps = filtered.filter(s => set.has(s.time));
     snaps.sort((a,b)=> new Date(a.time) - new Date(b.time));
-    snaps = snaps.slice(-4);
+    snaps = snaps.slice(-SNAP_LIMIT);
   } else {
-    snaps = filtered.slice(-4);
+    snaps = filtered.slice(-SNAP_DEFAULT);
   }
   // ✅ оставляем только валидные снапшоты
   return snaps.filter(s => s && Array.isArray(s.records) && s.records.length >= 0);
 }
+const btnApplySnapDates = document.getElementById('btnApplySnapDates');
+if (btnApplySnapDates) btnApplySnapDates.addEventListener('click', () => {
+  buildSnapshotsDropdown();
+  updateSnapshotBadges();
+  buildReleasesDropdown();
+  drawCharts();
+  renderGrowth();
+  renderViewFromHistory();
+});
 
 function updateSnapshotBadges(){
   const snaps = chosenSnaps();
@@ -1600,7 +1492,7 @@ function drawCharts(){
   log(`[charts] snaps=${hist.length}, recs(t)=${(hist.at(-1)?.records||[]).length}`);
   const plats = getChartPlatforms();
   if(!hist.length){ if(deltaChart) deltaChart.destroy(); if(trendChart) trendChart.destroy(); return; }
-  const last4 = hist;
+  const last4 = hist.slice(-CHART_SNAP_MAX);
   const metaDates = last4.map(s=>new Date(s.time).toLocaleString('ru-RU'));
 const agg = snap => {
   const m = new Map();
@@ -1671,6 +1563,7 @@ const agg = snap => {
       devicePixelRatio: Math.min(window.devicePixelRatio||1,3),
       layout:{ padding:{ top:48, bottom:40 } },
       plugins:{
+        title:{ display:true, text:'Пользователи по релизам', align:'start', padding:{bottom:8}, font:{ size:16, weight:'700' } },
         legend:{position:'bottom', labels:{font:{size:14}}},
         tooltip:{
           mode:'index',intersect:false,
@@ -1721,41 +1614,46 @@ const chk = { ios: (document.getElementById('chkIOS')?.checked) === true,
 const showIOS = chk.ios && platSetGlobal.has('ios');
 const showAndroid = chk.android && platSetGlobal.has('android');
 
-// «Итого» — сумма только по активным линиям (если обе активны, то iOS+Android)
-const totalSeries = trendAll.labels.map((_, i) =>
-  (showIOS ? (trendAll.ios[i]  || 0) : 0) +
-  (showAndroid ? (trendAll.andr[i] || 0) : 0)
-);
+// «Итого» — всегда сумма iOS + Android
+const totalSeries = trendAll.total.slice();
 
-// Δ к предыдущей точке для «Итого»
-const lineDeltas = totalSeries.map((v, i) => i === 0 ? 0 : (v - totalSeries[i - 1]));
-
-// Плагин для подписей над точками линии «Итого» (смещение ~3–4px)
-function LineDeltaLabelsPlugin(){
+// Плагин для подписей над точками (iOS/Android/Итого)
+function LineValueLabelsPlugin(){
   return {
-    id: 'lineDeltaLabels',
+    id: 'lineValueLabels',
     afterDatasetsDraw(chart){
-      const deltas = chart.options?.plugins?.lineDeltaLabels?.deltas;
-      if(!Array.isArray(deltas) || !deltas.length) return;
-      // Берем последнюю dataset (Итого)
-      const meta = chart.getDatasetMeta(chart.data.datasets.length - 1);
-      if(!meta || !meta.data) return;
       const { ctx, chartArea } = chart;
-      ctx.save();
-      ctx.font = '600 12px Inter, system-ui, -apple-system, Segoe UI, Roboto';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      for(let i=0;i<meta.data.length;i++){
-        const el = meta.data[i];
-        const d = Number(deltas[i]||0);
-        if(!el || !Number.isFinite(d) || d === 0) continue;
-        const x = Math.round(el.x);
-        const y = Math.max(Math.round(el.y) - 4, chartArea.top + 4); // поднять на 3–4px
-        ctx.fillStyle = d > 0 ? '#2e7d32' : '#c62828';
-        const label = (d>0?'+':'−') + Math.abs(d).toLocaleString('ru-RU');
-        ctx.fillText(label, x, y);
-      }
-      ctx.restore();
+      const fmt = (v)=>{
+        const n = Number(v||0);
+        const abs = Math.abs(n);
+        if (abs >= 1e9) return (n/1e9).toFixed(1).replace(/\.0$/,'') + 'B';
+        if (abs >= 1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'') + 'M';
+        if (abs >= 1e3) return (n/1e3).toFixed(1).replace(/\.0$/,'') + 'k';
+        return String(n);
+      };
+      chart.data.datasets.forEach((ds, di) => {
+        if (!chart.isDatasetVisible(di)) return;
+        const meta = chart.getDatasetMeta(di);
+        if(!meta || !meta.data) return;
+        const labelKey = String(ds.label || '').toLowerCase();
+        let offset = 8;
+        if (labelKey.includes('android')) offset = 18;
+        if (labelKey.includes('итого')) offset = 30;
+        ctx.save();
+        ctx.font = '700 14px Manrope, system-ui, -apple-system, Segoe UI, Roboto';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = ds.borderColor || '#111827';
+        for(let i=0;i<meta.data.length;i++){
+          const el = meta.data[i];
+          const v = ds.data?.[i];
+          if(!el || v == null) continue;
+          const x = Math.round(el.x);
+          const y = Math.max(Math.round(el.y) - offset, chartArea.top + 6);
+          ctx.fillText(fmt(v), x, y);
+        }
+        ctx.restore();
+      });
     }
   };
 }
@@ -1763,7 +1661,7 @@ function LineDeltaLabelsPlugin(){
 const trendDatasets = [];
 if (showIOS)      trendDatasets.push({ label: 'iOS',     data: trendAll.ios,  borderColor: '#a64bf4', backgroundColor: 'rgba(166,75,244,0.15)', tension: 0.3, pointRadius: 3 });
 if (showAndroid)  trendDatasets.push({ label: 'Android', data: trendAll.andr, borderColor: '#4bb543', backgroundColor: 'rgba(75,181,67,0.15)',  tension: 0.3, pointRadius: 3 });
-// Всегда показываем «Итого» как итог по активным линиям
+// Всегда показываем «Итого» как сумму iOS + Android
 trendDatasets.push({ label: 'Итого', data: totalSeries, borderColor: '#4287f5', backgroundColor: 'rgba(66,135,245,0.15)', tension: 0.3, borderWidth: 2, pointRadius: 4 });
 
 const yMaxTrend = Math.max(
@@ -1780,19 +1678,33 @@ trendChart = new Chart(document.getElementById('trendChart'),{
     responsive:true, animation:false, maintainAspectRatio:false,
     devicePixelRatio: Math.min(window.devicePixelRatio||1,3),
     plugins:{
-      legend:{ position:'bottom', labels:{ font:{ size:14 } } },
-      lineDeltaLabels:{ deltas: lineDeltas }
+      title:{ display:true, text:'Тренд суммарных пользователей по платформам', align:'start', padding:{bottom:8}, font:{ size:16, weight:'700' } },
+      legend:{ position:'bottom', labels:{ font:{ size:12 } } }
     },
+    layout:{ padding:{ top: 28, bottom: 34 } },
     scales:{
-      x:{ ticks:{ autoSkip:false, maxRotation:0, padding:8, font:{size:13} }, grid:{display:false} },
+      x:{
+        ticks:{
+          autoSkip:false,
+          maxRotation:0,
+          padding:6,
+          font:{size:10},
+          callback:(v,i)=>{
+            const lbl = trendAll.labels[i] || '';
+            const parts = String(lbl).split(', ');
+            return parts.length>1 ? parts : lbl;
+          }
+        },
+        grid:{display:false}
+      },
       y:{ beginAtZero:true,
           suggestedMax: Math.ceil((yMaxTrend || 0) * 1.08),
           title:{ display:true, text:'Пользователи', font:{ size:14, weight:'700' } },
-          ticks:{ font:{size:13}, callback:v => v.toLocaleString('ru-RU') },
+          ticks:{ font:{size:12}, callback:v => v.toLocaleString('ru-RU') },
           grid:{ drawBorder:false } }
     }
   },
-  plugins:[ LineDeltaLabelsPlugin() ]
+  plugins:[ LineValueLabelsPlugin() ]
 });
 }
 
@@ -1802,17 +1714,45 @@ function renderViewFromHistory(){
   const hist=chosenSnaps(); if(!hist.length) return;
   renderView(hist[hist.length-1].records);
 }
-function exportCSV(){
-  const rows=[["platform","release","users","share"]];
-  document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
-    const tds=tr.querySelectorAll('td');
-    rows.push([tds[0].textContent,tds[1].textContent,tds[2].textContent.replace(/\s/g,''),tds[3].textContent]);
-  });
-  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}), url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='bi_users_by_version.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+function downloadCsv(rows, filename){
+  const csv = rows.map(r=>r.map(v=>'"'+String(v ?? '').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
-if(btnExportCsv) btnExportCsv.addEventListener('click', exportCSV);
+function exportSummaryCsv(){
+  const rows=[["platform","release","users","share"]];
+  const src = Array.isArray(filteredRows) ? filteredRows : [];
+  src.forEach(r=>{
+    rows.push([r.platform, r.release, String(Math.round(Number(r.users||0))), r.share==null?'':Number(r.share).toFixed(2)]);
+  });
+  downloadCsv(rows, 'bi_summary_top20.csv');
+}
+function exportGrowthCsv(){
+  const rows=[["version","slice_1","slice_2","slice_3","slice_4","delta","delta_pct"]];
+  document.querySelectorAll('#growthTbl tbody tr').forEach(tr=>{
+    const tds = tr.querySelectorAll('td');
+    rows.push([
+      tds[0]?.textContent || '',
+      (tds[1]?.textContent || '').replace(/\s/g,''),
+      (tds[2]?.textContent || '').replace(/\s/g,''),
+      (tds[3]?.textContent || '').replace(/\s/g,''),
+      (tds[4]?.textContent || '').replace(/\s/g,''),
+      (tds[5]?.textContent || '').replace(/\s/g,''),
+      (tds[6]?.textContent || '').replace(/\s/g,'')
+    ]);
+  });
+  downloadCsv(rows, 'bi_growth_top4.csv');
+}
+if(btnExportCsv) btnExportCsv.addEventListener('click', exportSummaryCsv);
+if(btnExportSummaryCsv) btnExportSummaryCsv.addEventListener('click', exportSummaryCsv);
+if(btnExportGrowthCsv) btnExportGrowthCsv.addEventListener('click', exportGrowthCsv);
 if(btnSaveSettings) btnSaveSettings.addEventListener('click', saveSettings);
 
 // Загрузка сохранённых настроек при старте
@@ -2038,6 +1978,115 @@ function renderGrowth(){ renderGrowthFromSummary(); }
     }
   });
 });
+
+
+/* ---------- PDF Export (charts) ---------- */
+async function exportChartsPdf(){
+  const btn = $('exportPdfBtn');
+  if (!window.jspdf || !window.jspdf.jsPDF){
+    alert('PDF библиотеки не загрузились.');
+    return;
+  }
+  const originalText = btn ? btn.textContent : '';
+  if (btn){ btn.textContent = 'Готовим PDF...'; btn.disabled = true; }
+  try{
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: false });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const maxW = pdfW - margin*2;
+    let pageIndex = 0;
+
+    const charts = [
+      document.getElementById('deltaChart'),
+      document.getElementById('trendChart')
+    ].filter(Boolean);
+    if (!charts.length){
+      alert('Не найдено ни одного графика для экспорта.');
+      return;
+    }
+
+    const toImgData = (canvas, scale=2) => {
+      const tmp = document.createElement('canvas');
+      tmp.width = Math.max(1, Math.round(canvas.width * scale));
+      tmp.height = Math.max(1, Math.round(canvas.height * scale));
+      const ctx = tmp.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,tmp.width,tmp.height);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.drawImage(canvas, 0, 0);
+      return {
+        ratio: tmp.height / tmp.width,
+        data: tmp.toDataURL('image/jpeg', 0.98)
+      };
+    };
+    const addImagePage = (img) => {
+      if (pageIndex > 0) pdf.addPage();
+      pdf.setFillColor(255,255,255);
+      pdf.rect(0,0,pdfW,pdfH,'F');
+      const imgW = maxW;
+      const imgH = img.ratio * imgW;
+      const y = Math.max(margin, (pdfH - imgH) / 2);
+      pdf.addImage(img.data, 'JPEG', margin, y, imgW, imgH, undefined, 'FAST');
+      pageIndex += 1;
+    };
+
+    charts.forEach((canvas) => {
+      addImagePage(toImgData(canvas, 2));
+    });
+
+    // --- Summary & Analytics as PDF pages ---
+    if (window.html2canvas){
+      document.body.classList.add('pdf-export');
+      try{ await (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()); }catch{}
+
+      const makeSheet = (title, metaText, nodes=[]) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdf-sheet';
+        wrap.innerHTML = `<div class="pdf-title">${esc(title)}</div>` +
+          (metaText ? `<div class="pdf-meta">${esc(metaText)}</div>` : '');
+        nodes.forEach(n => { if (n) wrap.appendChild(n); });
+        wrap.style.position = 'fixed';
+        wrap.style.left = '-10000px';
+        wrap.style.top = '0';
+        document.body.appendChild(wrap);
+        return wrap;
+      };
+      const waitFrame = () => new Promise(r=>requestAnimationFrame(()=>r()));
+
+      // Summary sheet (top-20)
+      const tbl = document.getElementById('tbl');
+      const tblClone = tbl ? tbl.cloneNode(true) : null;
+      const summaryMeta = `Платформа: ${sumPlat.value}; Фильтр: ${sumRel.value || '—'}; Топ: ${SUMMARY_TOP_LIMIT}`;
+      const summarySheet = makeSheet('Сводная таблица по релизам (топ-20)', summaryMeta, [tblClone]);
+      await waitFrame();
+      const sumCanvas = await html2canvas(summarySheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+      addImagePage(toImgData(sumCanvas, 1));
+      summarySheet.remove();
+
+      // Growth sheet (top-4)
+      const kpis = document.getElementById('growthKpis');
+      const kpisClone = kpis ? kpis.cloneNode(true) : null;
+      const gtbl = document.getElementById('growthTbl');
+      const gtblClone = gtbl ? gtbl.cloneNode(true) : null;
+      const growthMeta = `Снепшоты: ${growthSnapsMeta?.textContent || '—'}`;
+      const growthSheet = makeSheet('Аналитика версий: прирост/убывание (топ-4)', growthMeta, [kpisClone, gtblClone]);
+      await waitFrame();
+      const growthCanvas = await html2canvas(growthSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+      addImagePage(toImgData(growthCanvas, 1));
+      growthSheet.remove();
+    }
+
+    const stamp = new Date().toISOString().slice(0,10);
+    pdf.save(`wb-bi-users-full-${stamp}.pdf`);
+  } finally {
+    document.body.classList.remove('pdf-export');
+    if (btn){ btn.textContent = originalText || 'Экспорт PDF'; btn.disabled = false; }
+  }
+}
+const exportPdfBtn = $('exportPdfBtn');
+if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportChartsPdf);
 
 /* ---------- Init ---------- */
 setJwtState(); pingProxy();
