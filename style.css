@@ -165,8 +165,8 @@
 .dot.dot-stream{ background: var(--cov-stream); }
 
 /* Legend dots for cutoff/store */
-.dot-ios-cutoff{background:var(--cut-ios-cutoff,#8b5cf6)}
-.dot-ios-store{background:var(--cut-ios-store,#0ea5e9)}
+.dot-ios-cutoff{background:var(--cut-ios-cutoff,#1d4ed8)}
+.dot-ios-store{background:var(--cut-ios-store,#7c3aed)}
 .dot-android-cutoff{background:var(--cut-android-cutoff,#22c55e)}
 .dot-android-store{background:var(--cut-android-store,#f59e0b)}
 
@@ -721,8 +721,8 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
 .dot.dot-stream{ background: var(--cov-stream); }
 
 /* Legend dots for cutoff/store */
-.dot-ios-cutoff{background:var(--cut-ios-cutoff,#8b5cf6)}
-.dot-ios-store{background:var(--cut-ios-store,#0ea5e9)}
+.dot-ios-cutoff{background:var(--cut-ios-cutoff,#1d4ed8)}
+.dot-ios-store{background:var(--cut-ios-store,#7c3aed)}
 .dot-android-cutoff{background:var(--cut-android-cutoff,#22c55e)}
 .dot-android-store{background:var(--cut-android-store,#f59e0b)}
 
