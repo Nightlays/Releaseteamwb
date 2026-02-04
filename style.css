@@ -516,6 +516,18 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
     #cutTable th:not(:first-child),
     #cutTable td:not(:first-child){ text-align:center; }
 
+    .cut-cell.cut-on{color:var(--green);font-weight:700}
+    .cut-cell.cut-late{color:var(--red);font-weight:700}
+
+    .cutoff-legend{color:#4b5563}
+    .cutoff-dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
+    .cutoff-on{background:var(--green);box-shadow:0 0 0 4px rgba(34,197,94,.12)}
+    .cutoff-late{background:var(--red);box-shadow:0 0 0 4px rgba(244,63,94,.12)}
+    .cut-time.cut-on,
+    .cut-note.cut-on{color:var(--green);font-weight:700}
+    .cut-time.cut-late,
+    .cut-note.cut-late{color:var(--red);font-weight:700}
+
     #covTable th:first-child,
     #covTable td:first-child{ text-align:left; }
     #covTable th:not(:first-child),
