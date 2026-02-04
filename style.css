@@ -1345,3 +1345,31 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
       "cookie";
   }
 }
+
+/* focus edge for start/stop collection buttons */
+#startBtn:focus,
+#startBtn:focus-visible,
+#stopBtn:focus,
+#stopBtn:focus-visible{
+  outline:none;
+  border-color: rgba(17,24,39,.25);
+}
+#startBtn:hover{
+  background: linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+}
+#stopBtn:hover{
+  background: linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95));
+}
+#btnExportEmp:hover{
+  background: linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+}
+#startBtn:focus,
+#startBtn:focus-visible{
+  background: linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+  box-shadow: var(--ring), inset 0 0 0 2px rgba(17,24,39,.22);
+}
+#stopBtn:focus,
+#stopBtn:focus-visible{
+  background: linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95));
+  box-shadow: 0 10px 30px rgba(244,63,94,.20), inset 0 0 0 2px rgba(17,24,39,.22);
+}
