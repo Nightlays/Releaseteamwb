@@ -23,7 +23,7 @@
           <div class="flex items-center gap-2">
             <div class="font-extrabold leading-tight">WB All Table</div>
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v0.2.11</span>
+              <span aria-hidden="true">🏷️</span><span>v0.2.15</span>
             </span>
             <button id="exportPdfBtn"
               class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
@@ -431,6 +431,10 @@
                   <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
                   <select id="cutReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
                 </div>
+                <div class="cutoff-legend px-4 pt-1 text-xs text-slate-600 flex items-center gap-3 flex-wrap">
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>14:00-14:05 — старт вовремя</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>после 14:05 — старт позже</span>
+                </div>
                 <table id="cutTable">
                   <thead>
                     <tr>
@@ -812,10 +816,97 @@
             }
           };
 
+          const cutTimeLabelsPlugin = {
+            id: 'cutTimeLabels',
+            afterDatasetsDraw(chart, args, pluginOptions){
+              const opts = pluginOptions || chart?.options?.plugins?.cutTimeLabels;
+              if(!opts) return;
+              const targetMin = Number(opts.targetMinutes);
+              const windowMin = Number(opts.windowMinutes);
+              if(!Number.isFinite(targetMin) || !Number.isFinite(windowMin)) return;
+
+              const green = (opts.onColor) || '#22c55e';
+              const red   = (opts.lateColor) || '#f43f5e';
+              const font  = (opts.font) || '600 10px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+
+              const ctx = chart.ctx;
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(0, 0, chart.width, chart.height);
+              ctx.clip();
+              ctx.font = font;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+
+              const datasets = chart.data?.datasets || [];
+              for(let di = 0; di < datasets.length; di++){
+                const ds = datasets[di];
+                const label = String(ds?.label || '');
+                if(!label.includes('Cutoff')) continue;
+                const meta = chart.getDatasetMeta(di);
+                if(!meta || !meta.data) continue;
+                for(let i = 0; i < meta.data.length; i++){
+                  const pt = meta.data[i];
+                  if(!pt || pt.skip) continue;
+                  const timeText = ds?._timeLabel?.[i] || '';
+                  const m = String(timeText).match(/(\d{2}):(\d{2})$/);
+                  if(!m) continue;
+                  const minutes = Number(m[1]) * 60 + Number(m[2]);
+                  const onTime = minutes >= targetMin && minutes <= (targetMin + windowMin);
+                  const text = m[0];
+                  const padX = 6;
+                  const padY = 3;
+                  const metrics = ctx.measureText(text);
+                  const textW = metrics.width;
+                  const textH = 10;
+                  const offsetY = (di % 2 === 0) ? -18 : -32;
+                  const x = pt.x;
+                  const y = pt.y + offsetY;
+
+                  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                  ctx.strokeStyle = 'rgba(148,163,184,0.35)';
+                  ctx.lineWidth = 1;
+                  const boxX = x - textW / 2 - padX;
+                  const boxY = y - textH - padY * 2;
+                  const boxW = textW + padX * 2;
+                  const boxH = textH + padY * 2;
+                  const r = 6;
+                  ctx.beginPath();
+                  ctx.moveTo(boxX + r, boxY);
+                  ctx.lineTo(boxX + boxW - r, boxY);
+                  ctx.quadraticCurveTo(boxX + boxW, boxY, boxX + boxW, boxY + r);
+                  ctx.lineTo(boxX + boxW, boxY + boxH - r);
+                  ctx.quadraticCurveTo(boxX + boxW, boxY + boxH, boxX + boxW - r, boxY + boxH);
+                  ctx.lineTo(boxX + r, boxY + boxH);
+                  ctx.quadraticCurveTo(boxX, boxY + boxH, boxX, boxY + boxH - r);
+                  ctx.lineTo(boxX, boxY + r);
+                  ctx.quadraticCurveTo(boxX, boxY, boxX + r, boxY);
+                  ctx.closePath();
+                  ctx.fill();
+                  ctx.stroke();
+
+                  // leader line from point to label
+                  ctx.beginPath();
+                  ctx.strokeStyle = 'rgba(148,163,184,0.6)';
+                  ctx.lineWidth = 1;
+                  ctx.moveTo(pt.x, pt.y - 2);
+                  ctx.lineTo(x, y - textH - padY * 2 + 1);
+                  ctx.stroke();
+
+                  ctx.fillStyle = onTime ? green : red;
+                  ctx.fillText(text, x, y - padY);
+                }
+              }
+
+              ctx.restore();
+            }
+          };
+
           try{
             if(window.Chart && typeof window.Chart.register === 'function'){
               window.Chart.register(deltaLabelsPlugin);
               window.Chart.register(valueLabelsPlugin);
+              window.Chart.register(cutTimeLabelsPlugin);
             }
           }catch(e){}
 
@@ -1383,6 +1474,31 @@
             const mins = dl.getUTCHours() * 60 + dl.getUTCMinutes() + (dl.getUTCSeconds() / 60);
             return {
               y: idx * 1440 + mins,
+              msLocal: ms,
+              label: labelFromMsLocal(ms)
+            };
+          }
+
+          function yValueFromIsoCut(iso){
+            const p = toMskLocalParts(iso);
+            if(!p) return null;
+            const dl = new Date(p.msLocal);
+            const mins = dl.getUTCHours() * 60 + dl.getUTCMinutes();
+            return {
+              y: mins,
+              msLocal: p.msLocal,
+              label: p.fullText
+            };
+          }
+
+          function yValueFromMsLocalCut(msLocal){
+            const ms = Number(msLocal);
+            if(!Number.isFinite(ms)) return null;
+            const dl = new Date(ms);
+            if(Number.isNaN(dl.getTime())) return null;
+            const mins = dl.getUTCHours() * 60 + dl.getUTCMinutes();
+            return {
+              y: mins,
               msLocal: ms,
               label: labelFromMsLocal(ms)
             };
@@ -2173,6 +2289,10 @@
               sel.disabled = true;
               return;
             }
+            const optAll = document.createElement('option');
+            optAll.value = '__all__';
+            optAll.textContent = 'выбрать все / снять все';
+            sel.appendChild(optAll);
             for(const rel of releases){
               const opt = document.createElement('option');
               opt.value = rel;
@@ -2181,6 +2301,7 @@
               sel.appendChild(opt);
             }
             sel.disabled = false;
+            updateSelectAllState(sel);
           }
 
           function populateAllReleaseFilters(releases){
@@ -2198,10 +2319,49 @@
             ].forEach(sel => populateReleaseSelect(sel, list));
           }
 
+          function getSelectAllOption(sel){
+            if(!sel) return null;
+            return Array.from(sel.options).find(o => o.value === '__all__') || null;
+          }
+
+          function getRealOptions(sel){
+            if(!sel) return [];
+            return Array.from(sel.options).filter(o => !o.disabled && o.value !== '__all__');
+          }
+
+          function updateSelectAllState(sel){
+            const optAll = getSelectAllOption(sel);
+            if(!optAll) return;
+            const opts = getRealOptions(sel);
+            const allSelected = opts.length ? opts.every(o => o.selected) : false;
+            optAll.selected = allSelected;
+          }
+
+          function attachSelectAllToggle(sel){
+            if(!sel || sel.dataset.selectAllInit === '1') return;
+            sel.dataset.selectAllInit = '1';
+            sel.addEventListener('change', () => {
+              const optAll = getSelectAllOption(sel);
+              if(!optAll) return;
+              const opts = getRealOptions(sel);
+              if(!opts.length) return;
+              const allSelected = opts.every(o => o.selected);
+              if(optAll.selected && !allSelected){
+                opts.forEach(o => { o.selected = true; });
+              }else if(!optAll.selected && allSelected){
+                opts.forEach(o => { o.selected = false; });
+              }
+              updateSelectAllState(sel);
+            });
+            updateSelectAllState(sel);
+          }
+
           function getSelectedReleasesFromSelect(sel){
             if(!sel) return null;
-            const selected = Array.from(sel.options).filter(o => o.selected).map(o => o.value);
-            return selected.length ? new Set(selected) : null;
+            const opts = getRealOptions(sel);
+            if(!opts.length) return null;
+            const selected = opts.filter(o => o.selected).map(o => o.value);
+            return selected.length ? new Set(selected) : new Set();
           }
 
           function applyTbodyReleaseFilter(sel, tbodyEl){
@@ -2209,14 +2369,14 @@
             const selected = getSelectedReleasesFromSelect(sel);
             Array.from(tbodyEl.children).forEach(tr => {
               const rel = tr.dataset.release;
-              const show = !selected || !rel || selected.has(rel);
+              const show = !selected ? true : (selected.size ? (selected.has(rel) || !rel) : false);
               tr.style.display = show ? '' : 'none';
             });
           }
 
           function applyReleaseFilter(tcRowsAll, deltaRowsAll){
             const selected = getSelectedReleasesFromSelect(tcReleaseFilter);
-            const deltas = selected ? deltaRowsAll.filter(r => selected.has(r.release)) : deltaRowsAll.slice();
+            const deltas = !selected ? deltaRowsAll.slice() : (selected.size ? deltaRowsAll.filter(r => selected.has(r.release)) : []);
             renderTcStreamDeltaTable(deltas);
           }
 
@@ -2737,12 +2897,10 @@
               return;
             }
 
-            const cIosCut  = cssVar('--cut-ios-cutoff', '#0ea5e9');
-            const cIosSt   = cssVar('--cut-ios-store',  '#a855f7');
+            const cIosCut  = cssVar('--cut-ios-cutoff', '#1d4ed8');
+            const cIosSt   = cssVar('--cut-ios-store',  '#7c3aed');
             const cAndCut  = cssVar('--cut-android-cutoff', '#22c55e');
             const cAndSt   = cssVar('--cut-android-store',  '#f59e0b');
-
-            const dayTicks = ['вс','сб','пт','чт','ср','вт','пн'];
 
             const makeDs = (label, color) => ({
               label,
@@ -2773,6 +2931,12 @@
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
+                  cutTimeLabels: {
+                    targetMinutes: CUT_TARGET_MINUTES.ios,
+                    windowMinutes: CUT_TARGET_WINDOW_MIN,
+                    onColor: cssVar('--green', '#22c55e'),
+                    lateColor: cssVar('--red', '#f43f5e')
+                  },
                   tooltip: {
                     mode: 'index',
                     intersect: false,
@@ -2819,15 +2983,17 @@
                     grid: { color: 'rgba(148,163,184,.25)' }
                   },
                   y: {
-                    min: 0,
-                    max: 6 * 1440 + 1439,
-                    reverse: true,
+                    min: 12 * 60,
+                    max: 22 * 60,
+                    reverse: false,
                     grid: { color: 'rgba(148,163,184,.25)' },
                     ticks: {
-                      stepSize: 1440,
+                      stepSize: 120,
                       callback: (v) => {
-                        const idx = Math.round(Number(v) / 1440);
-                        return dayTicks[idx] ?? '';
+                        const vv = Math.round(Number(v) || 0);
+                        const hh = Math.floor(vv / 60);
+                        const mm = vv % 60;
+                        return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
                       }
                     }
                   }
@@ -3000,14 +3166,54 @@
             avgTbody.appendChild(tr);
           }
 
+          const CUT_TARGET_MINUTES = {
+            ios: 14 * 60,
+            android: 14 * 60
+          };
+          const CUT_TARGET_WINDOW_MIN = 5;
+
+          function parseLabelTimeMinutes(label){
+            if(!label) return null;
+            const m = String(label).match(/(\d{2}):(\d{2})$/);
+            if(!m) return null;
+            return Number(m[1]) * 60 + Number(m[2]);
+          }
+
+          function formatCutLabel(label, targetMinutes){
+            if(!label) return { html: '-', status: null };
+            const raw = String(label);
+            const timeMatch = raw.match(/(\d{2}:\d{2})$/);
+            if(!timeMatch) return { html: raw, status: null };
+            const timeText = timeMatch[1];
+            const baseText = raw.replace(/\s\d{2}:\d{2}$/, '');
+            const minutes = parseLabelTimeMinutes(raw);
+            let status = null;
+            let note = '';
+            if(Number.isFinite(minutes)){
+              if(minutes >= targetMinutes && minutes <= targetMinutes + CUT_TARGET_WINDOW_MIN){
+                status = 'cut-on';
+                note = ' (старт вовремя)';
+              }else{
+                status = 'cut-late';
+                note = ' (старт позже)';
+              }
+            }
+            const timeHtml = status ? `<span class="cut-time ${status}">${timeText}</span>` : `<span class="cut-time">${timeText}</span>`;
+            const noteHtml = status ? `<span class="cut-note ${status}">${note}</span>` : '';
+            const lead = baseText ? `${baseText} ` : '';
+            return { html: `${lead}${timeHtml}${noteHtml}`, status };
+          }
+
           function renderCutRow({release, iosCut, iosStore, andCut, andStore}){
             const tr = document.createElement('tr');
+            const iosFmt = formatCutLabel(iosCut, CUT_TARGET_MINUTES.ios);
+            const andFmt = formatCutLabel(andCut, CUT_TARGET_MINUTES.android);
             tr.dataset.release = release;
             tr.innerHTML = `
               <td class="mono text-left">${release}</td>
-              <td class="mono">${iosCut || '-'}</td>
+              <td class="mono cut-cell ${iosFmt.status || ''}">${iosFmt.html}</td>
               <td class="mono">${iosStore || ''}</td>
-              <td class="mono">${andCut || '-'}</td>
+              <td class="mono cut-cell ${andFmt.status || ''}">${andFmt.html}</td>
               <td class="mono">${andStore || ''}</td>
             `;
             cutTbody.appendChild(tr);
@@ -3395,13 +3601,13 @@
                   fetchLastCherepik('ANDROID', rel, signal),
                 ]);
 
-                const iosCut = yValueFromIso(ios.cutoff);
-                const andCut = yValueFromIso(andr.cutoff);
+                const iosCut = yValueFromIsoCut(ios.cutoff);
+                const andCut = yValueFromIsoCut(andr.cutoff);
 
-                const iosStore = yValueFromMsLocal(ios.storeMsLocal);
+                const iosStore = yValueFromMsLocalCut(ios.storeMsLocal);
                 if(iosStore) iosStore.lastChp = lastChpIos || '';
 
-                const andStore = yValueFromMsLocal(andr.storeMsLocal);
+                const andStore = yValueFromMsLocalCut(andr.storeMsLocal);
                 if(andStore) andStore.lastChp = lastChpAndr || '';
 
                 addCutPoint(rel, 0, iosCut);
@@ -3598,7 +3804,11 @@
             cutReleaseFilter,
             iosTypesReleaseFilter,
             andTypesReleaseFilter
-          ].forEach(sel => sel?.addEventListener('change', applyAllReleaseFilters));
+          ].forEach(sel => {
+            if(!sel) return;
+            attachSelectAllToggle(sel);
+            sel.addEventListener('change', applyAllReleaseFilters);
+          });
           initToggles();
 
           proxyBtn?.addEventListener('click', async () => {
