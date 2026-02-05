@@ -2,6 +2,7 @@
       --wb-bg:#faf5ff; --wb-bg-2:#f8f7ff;
       --wb-primary:#9b5cff; --wb-secondary:#ff5ac8; --wb-deep:#7c3aed;
       --green:#22c55e; --red:#f43f5e;
+      --chp-prod:#22c55e; --chp-vlet:#f59e0b; --chp-bug:#ef4444; --chp-crash:#3b82f6;
       --ring: 0 10px 30px rgba(155,92,255,.25);
       --card: 0 12px 36px rgba(31,41,55,.08);
       --r-xl:22px;
@@ -24,16 +25,36 @@
     .btn-soft:hover{background:#f3efff}
     .btn-ghost{background:transparent;border-color:#ecebff;color:#4c1d95}
     .btn-ghost:hover{background:#f7f5ff}
-    .btn-grad{color:#fff;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));box-shadow:var(--ring)}
-    .btn-grad:hover{filter:saturate(1.05);transform:translateY(-1px)}
+.btn-grad{color:#fff;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));box-shadow:var(--ring)}
+.btn-grad:hover{filter:saturate(1.05);transform:translateY(-1px)}
+.btn-grad,
+.btn-grad:hover,
+.btn-grad:focus{
+  color:#fff;
+  text-shadow:0 1px 2px rgba(31,41,55,.35);
+}
     .btn-circle{width:34px;height:34px;padding:0;border-radius:999px;background:#f7f5ff;border:1px solid #ecebff;color:#4c1d95}
     .btn-circle:hover{background:#f3efff}
     .tabs{display:inline-flex;border:1px solid #ecebff;background:#faf9ff;border-radius:999px;overflow:hidden}
     .tab{padding:.35rem .7rem;font-size:.85rem;color:#4c1d95;border-right:1px solid #ecebff}
     .tab:last-child{border-right:none}
     .tab[aria-selected="true"]{background:linear-gradient(90deg,rgba(155,92,255,.14),rgba(255,90,200,.10));font-weight:700}
-    .input{width:100%;border:1px solid #e9e2ff;border-radius:14px;padding:.55rem .7rem;background:#fff;outline:none}
-    .input:focus{border-color:#c4b5fd;box-shadow:0 0 0 4px rgba(155,92,255,.12)}
+.input{width:100%;border:1px solid #e9e2ff;border-radius:14px;padding:.55rem .7rem;background:#fff;outline:none}
+.input:focus{border-color:#c4b5fd;box-shadow:0 0 0 4px rgba(155,92,255,.12)}
+.input::placeholder,
+textarea::placeholder,
+input::placeholder{
+  color: rgba(76,29,149,.55);
+  opacity: 1;
+}
+.input:hover::placeholder,
+textarea:hover::placeholder,
+input:hover::placeholder,
+.input:focus::placeholder,
+textarea:focus::placeholder,
+input:focus::placeholder{
+  color: rgba(76,29,149,.65);
+}
     .hint{font-size:.85rem;color:#7c7f8c}
     table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
     thead th{background:#f7f5ff;border-bottom:1px solid #ecebff;padding:.7rem .8rem;font-weight:700;color:#5b21b6}
@@ -510,6 +531,10 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
     #chpTable td:first-child{ text-align:left; }
     #chpTable th:not(:first-child),
     #chpTable td:not(:first-child){ text-align:center; }
+    #chpTypesTable th:first-child,
+    #chpTypesTable td:first-child{ text-align:left; }
+    #chpTypesTable th:not(:first-child),
+    #chpTypesTable td:not(:first-child){ text-align:center; }
 
     #cutTable th:first-child,
     #cutTable td:first-child{ text-align:left; }
@@ -1025,6 +1050,20 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
   border:1px solid var(--line);
   background: rgba(255,255,255,.95);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+}
+.bi-user .input::placeholder,
+.bi-user .form-ctl::placeholder,
+.bi-user textarea::placeholder{
+  color: rgba(76,29,149,.55);
+  opacity: 1;
+}
+.bi-user .input:hover::placeholder,
+.bi-user .form-ctl:hover::placeholder,
+.bi-user textarea:hover::placeholder,
+.bi-user .input:focus::placeholder,
+.bi-user .form-ctl:focus::placeholder,
+.bi-user textarea:focus::placeholder{
+  color: rgba(76,29,149,.65);
 }
 .bi-user .input:focus,
 .bi-user .form-ctl:focus{
