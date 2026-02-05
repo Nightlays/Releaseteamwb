@@ -1375,6 +1375,7 @@
 
         const perUser = {};
         const perUserRetries = {};
+        let swatTotalNoRetry = 0;
 
         const globalStreamAgg = {};
         function ensureGlobal(stream){
@@ -1414,8 +1415,6 @@
           if(plat === 'Android') perUserRetries[login][stream].Android += cnt;
         }
 
-        let totalCasesAllAssignees = 0;
-
         await mapLimit(launches, 6, async (L, idx) => {
           if(signal?.aborted) throw new DOMException('Aborted','AbortError');
 
@@ -1437,29 +1436,30 @@
             const totalCases = memberTotalCount(m);
             const durMs = toInt(m?.durationSum);
             const retried = toInt(m?.retriedCount);
-
-            totalCasesAllAssignees += totalCases;
+            const totalCasesWithRetries = totalCases + retried;
 
             if(plat === 'iOS' || plat === 'Android'){
               const g = ensureGlobal(stream);
-              g[plat].total += totalCases;
+              g[plat].total += totalCasesWithRetries;
             }
 
             if(!swatSet.has(assignee)) continue;
+
+            if(totalCases > 0) swatTotalNoRetry += totalCases;
 
             const u = ensureUser(assignee);
             const st = ensureStream(u, stream);
 
             if(plat === 'iOS'){
-              u.iosCases += totalCases;
+              u.iosCases += totalCasesWithRetries;
               u.iosDurMs += durMs;
-              st.iosCases += totalCases;
+              st.iosCases += totalCasesWithRetries;
               st.iosDurMs += durMs;
               if(retried) addRetry(assignee, stream, 'iOS', retried);
             }else if(plat === 'Android'){
-              u.androidCases += totalCases;
+              u.androidCases += totalCasesWithRetries;
               u.androidDurMs += durMs;
-              st.androidCases += totalCases;
+              st.androidCases += totalCasesWithRetries;
               st.androidDurMs += durMs;
               if(retried) addRetry(assignee, stream, 'Android', retried);
             }
@@ -1495,6 +1495,7 @@
           for(const it of items){
             const testedBy = String(it?.testedBy || '').trim().toLowerCase();
             if(!testedBy || !swatSet.has(testedBy)) continue;
+
             const tcid = toInt(it?.testCaseId);
             if(!tcid) continue;
             leafPairs.push({ login: testedBy, tcid });
@@ -1768,7 +1769,7 @@
 
         chipSwat.textContent = String(swatEntries.length || 0);
         chipLaunches.textContent = String(launches.length || 0);
-        chipTotalCases.textContent = String(totalCasesAllAssignees || 0);
+        chipTotalCases.textContent = String(swatTotalNoRetry || 0);
         chipAvg.textContent = overallAvgMMSS || '—';
 
         renderEmployeeTable();
