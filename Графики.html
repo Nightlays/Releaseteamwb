@@ -706,9 +706,11 @@
           const pageW = pdf.internal.pageSize.getWidth();
           const pageH = pdf.internal.pageSize.getHeight();
           const margin = 10;
+          const contentH = pageH - margin * 2;
           let y = margin;
 
           const restoreTooltips = disableChartTooltips();
+          document.body.classList.add('pdf-export');
           try{
             // Берём именно карточки графиков целиком
             const cards = Array.from(document.querySelectorAll('section.card'))
@@ -716,6 +718,23 @@
 
             for (const card of cards) {
               const scale = 2;
+              const cardRestore = {
+                overflow: card.style.overflow,
+                width: card.style.width,
+                height: card.style.height,
+                maxHeight: card.style.maxHeight,
+                maxWidth: card.style.maxWidth
+              };
+              card.style.overflow = 'visible';
+              card.style.maxHeight = 'none';
+              card.style.maxWidth = 'none';
+
+              const viewports = Array.from(card.querySelectorAll('.chart-viewport'));
+              const viewportRestore = viewports.map(el => ({ el, overflow: el.style.overflow }));
+              for(const v of viewports){
+                v.style.overflow = 'visible';
+              }
+
               const scrollables = Array.from(card.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
               const restore = [];
               for(const el of scrollables){
@@ -734,12 +753,18 @@
                 el.style.maxHeight = 'none';
               }
 
+              card.style.width = card.scrollWidth + 'px';
+              card.style.height = card.scrollHeight + 'px';
+
               // Рендер DOM карточки в canvas
               const canvas = await html2canvas(card, {
                 backgroundColor: '#ffffff',
                 scale: scale,
                 useCORS: true,
-                scrollY: -window.scrollY
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, card.scrollWidth),
+                windowHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, card.scrollHeight)
               });
 
               for(const r of restore){
@@ -749,22 +774,54 @@
                 r.el.style.height = r.height;
                 r.el.style.maxHeight = r.maxHeight;
               }
-
-              const img = canvas.toDataURL('image/png');
+              for(const v of viewportRestore){
+                v.el.style.overflow = v.overflow;
+              }
+              card.style.overflow = cardRestore.overflow;
+              card.style.width = cardRestore.width;
+              card.style.height = cardRestore.height;
+              card.style.maxHeight = cardRestore.maxHeight;
+              card.style.maxWidth = cardRestore.maxWidth;
 
               const imgW = pageW - margin * 2;
               const imgH = imgW * (canvas.height / canvas.width);
 
-              if (y + imgH > pageH - margin && y !== margin) {
-                pdf.addPage();
+              if (imgH <= contentH) {
+                if (y + imgH > pageH - margin && y !== margin) {
+                  pdf.addPage();
+                  y = margin;
+                }
+                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, imgW, imgH);
+                y += imgH + 10;
+              } else {
+                if (y !== margin) {
+                  pdf.addPage();
+                  y = margin;
+                }
+                const pxPerMm = canvas.width / imgW;
+                const pagePx = Math.floor(contentH * pxPerMm);
+                let sy = 0;
+                while (sy < canvas.height) {
+                  const sliceH = Math.min(pagePx, canvas.height - sy);
+                  const slice = document.createElement('canvas');
+                  slice.width = canvas.width;
+                  slice.height = sliceH;
+                  const sctx = slice.getContext('2d');
+                  sctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+
+                  const sliceH_mm = sliceH / pxPerMm;
+                  pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceH_mm);
+                  sy += sliceH;
+                  if (sy < canvas.height) {
+                    pdf.addPage();
+                  }
+                }
                 y = margin;
               }
-
-              pdf.addImage(img, 'PNG', margin, y, imgW, imgH);
-              y += imgH + 10;
             }
           }finally{
             restoreTooltips();
+            document.body.classList.remove('pdf-export');
           }
 
           pdf.save('WB_All_Charts.pdf');
