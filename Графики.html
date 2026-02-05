@@ -70,6 +70,14 @@
                 <label class="block text-xs font-semibold text-[#111827] mb-1">Deploy-lab token</label>
                 <input class="input" id="deployToken" type="password" autocomplete="off" placeholder="Вставьте Deploy-lab token" />
               </div>
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">YouTrack base</label>
+                <input class="input" id="ytBase" type="text" value="https://youtrack.wildberries.ru" placeholder="https://youtrack.example.com" />
+              </div>
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">YouTrack token</label>
+                <input class="input" id="ytToken" type="password" autocomplete="off" placeholder="Вставьте YouTrack token" />
+              </div>
             </div>
 
             <div class="mt-3 flex items-center gap-2 flex-wrap">
@@ -401,6 +409,86 @@
         </div>
       </section>
 
+      <!-- 5.1) Типы ЧП -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Типы ЧП</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="chpTypes" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="chpTypes" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="chpTypesEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="chpTypesContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="chpTypesTrendViewport">
+                <canvas id="chpTypesTrendChart" aria-label="Cherepiki types chart" role="img"></canvas>
+              </div>
+
+              <div class="px-4 pt-2">
+                <button id="chpTypesPlatformsBtn" type="button"
+                  class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white">
+                  <span id="chpTypesPlatformsIco" aria-hidden="true">▸</span>
+                  <span id="chpTypesPlatformsText">Показать графики по платформам</span>
+                </button>
+              </div>
+
+              <div id="chpTypesPlatforms" class="px-4 pb-2" style="display:none;">
+                <div class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div class="border border-[#ecebff] rounded-2xl bg-white/70">
+                    <div class="px-4 pt-3 text-xs font-semibold text-slate-600">iOS</div>
+                    <div class="chart-viewport" style="min-height:380px">
+                      <canvas id="chpTypesIosChart" aria-label="Cherepiki types iOS chart" role="img"></canvas>
+                    </div>
+                  </div>
+                  <div class="border border-[#ecebff] rounded-2xl bg-white/70">
+                    <div class="px-4 pt-3 text-xs font-semibold text-slate-600">Android</div>
+                    <div class="chart-viewport" style="min-height:380px">
+                      <canvas id="chpTypesAndChart" aria-label="Cherepiki types Android chart" role="img"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="chpTypesTableWrap" style="display:none; overflow:auto">
+                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
+                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
+                  <select id="chpTypesReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+                </div>
+                <table id="chpTypesTable" class="types-table">
+                  <thead>
+                    <tr>
+                      <th class="text-left">Номер релиза</th>
+                      <th>Аналитика</th>
+                      <th>Влет</th>
+                      <th>Баг</th>
+                      <th>Краш</th>
+                    </tr>
+                  </thead>
+                  <tbody id="chpTypesTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="legend px-4 pb-1">
+            <span class="lg-item"><span class="dot" style="background: var(--chp-prod, #22c55e)"></span>Аналитика</span>
+            <span class="lg-item"><span class="dot" style="background: var(--chp-vlet, #f59e0b)"></span>Влет</span>
+            <span class="lg-item"><span class="dot" style="background: var(--chp-bug, #ef4444)"></span>Баг</span>
+            <span class="lg-item"><span class="dot" style="background: var(--chp-crash, #3b82f6)"></span>Краш</span>
+          </div>
+        </div>
+      </section>
+
       <!-- 6) Время cutoff и отправки в store -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -568,6 +656,8 @@
           const LS_TOKEN_KEY = 'swat_uwu_token';
           const LS_RANGE_KEY = 'swat_uwu_release_range';
           const LS_DEPLOY_KEY = 'wb_all_table_deploy_token';
+          const LS_YT_TOKEN_KEY = 'wb_all_table_yt_token';
+          const LS_YT_BASE_KEY = 'wb_all_table_yt_base';
 
           const startBtn = document.getElementById('startBtn');
           const stopBtn  = document.getElementById('stopBtn');
@@ -577,10 +667,36 @@
           const inpTo    = document.getElementById('releaseTo');
           const inpAllureToken = document.getElementById('allureToken');
           const inpDeployToken = document.getElementById('deployToken');
+          const inpYtBase = document.getElementById('ytBase');
+          const inpYtToken = document.getElementById('ytToken');
 
           document.getElementById('exportPdfBtn')
             ?.addEventListener('click', exportAllChartsToPDF);
         // Экспорт всей карточки графика целиком (заголовок + расшифровка + график) в PDF
+        function disableChartTooltips(){
+          const list = [
+            tcChart, covChart, selChart, avgChart, chpChart, chpTypesChart, chpTypesIosChart, chpTypesAndChart,
+            cutChart, iosTypesChart, andTypesChart
+          ].filter(Boolean);
+          const stash = [];
+          for(const ch of list){
+            const plugins = ch.options?.plugins || (ch.options.plugins = {});
+            const tooltip = plugins.tooltip || (plugins.tooltip = {});
+            const hadEnabled = Object.prototype.hasOwnProperty.call(tooltip, 'enabled');
+            stash.push({ ch, tooltip, hadEnabled, enabled: tooltip.enabled });
+            tooltip.enabled = false;
+            try{ ch.tooltip?.setActiveElements([], {x: 0, y: 0}); }catch(e){}
+            try{ ch.update('none'); }catch(e){}
+          }
+          return () => {
+            for(const s of stash){
+              if(s.hadEnabled) s.tooltip.enabled = s.enabled;
+              else delete s.tooltip.enabled;
+              try{ s.ch.update('none'); }catch(e){}
+            }
+          };
+        }
+
         async function exportAllChartsToPDF(){
           if (!window.jspdf || !window.html2canvas) return;
 
@@ -592,58 +708,63 @@
           const margin = 10;
           let y = margin;
 
-          // Берём именно карточки графиков целиком
-          const cards = Array.from(document.querySelectorAll('section.card'))
-            .filter(card => card.querySelector('canvas'));
+          const restoreTooltips = disableChartTooltips();
+          try{
+            // Берём именно карточки графиков целиком
+            const cards = Array.from(document.querySelectorAll('section.card'))
+              .filter(card => card.querySelector('canvas'));
 
-          for (const card of cards) {
-            const scale = 2;
-            const scrollables = Array.from(card.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
-            const restore = [];
-            for(const el of scrollables){
-              restore.push({
-                el,
-                overflow: el.style.overflow,
-                overflowX: el.style.overflowX,
-                overflowY: el.style.overflowY,
-                height: el.style.height,
-                maxHeight: el.style.maxHeight
+            for (const card of cards) {
+              const scale = 2;
+              const scrollables = Array.from(card.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
+              const restore = [];
+              for(const el of scrollables){
+                restore.push({
+                  el,
+                  overflow: el.style.overflow,
+                  overflowX: el.style.overflowX,
+                  overflowY: el.style.overflowY,
+                  height: el.style.height,
+                  maxHeight: el.style.maxHeight
+                });
+                el.style.overflow = 'visible';
+                el.style.overflowX = 'visible';
+                el.style.overflowY = 'visible';
+                el.style.height = el.scrollHeight + 'px';
+                el.style.maxHeight = 'none';
+              }
+
+              // Рендер DOM карточки в canvas
+              const canvas = await html2canvas(card, {
+                backgroundColor: '#ffffff',
+                scale: scale,
+                useCORS: true,
+                scrollY: -window.scrollY
               });
-              el.style.overflow = 'visible';
-              el.style.overflowX = 'visible';
-              el.style.overflowY = 'visible';
-              el.style.height = el.scrollHeight + 'px';
-              el.style.maxHeight = 'none';
+
+              for(const r of restore){
+                r.el.style.overflow = r.overflow;
+                r.el.style.overflowX = r.overflowX;
+                r.el.style.overflowY = r.overflowY;
+                r.el.style.height = r.height;
+                r.el.style.maxHeight = r.maxHeight;
+              }
+
+              const img = canvas.toDataURL('image/png');
+
+              const imgW = pageW - margin * 2;
+              const imgH = imgW * (canvas.height / canvas.width);
+
+              if (y + imgH > pageH - margin && y !== margin) {
+                pdf.addPage();
+                y = margin;
+              }
+
+              pdf.addImage(img, 'PNG', margin, y, imgW, imgH);
+              y += imgH + 10;
             }
-
-            // Рендер DOM карточки в canvas
-            const canvas = await html2canvas(card, {
-              backgroundColor: '#ffffff',
-              scale: scale,
-              useCORS: true,
-              scrollY: -window.scrollY
-            });
-
-            for(const r of restore){
-              r.el.style.overflow = r.overflow;
-              r.el.style.overflowX = r.overflowX;
-              r.el.style.overflowY = r.overflowY;
-              r.el.style.height = r.height;
-              r.el.style.maxHeight = r.maxHeight;
-            }
-
-            const img = canvas.toDataURL('image/png');
-
-            const imgW = pageW - margin * 2;
-            const imgH = imgW * (canvas.height / canvas.width);
-
-            if (y + imgH > pageH - margin && y !== margin) {
-              pdf.addPage();
-              y = margin;
-            }
-
-            pdf.addImage(img, 'PNG', margin, y, imgW, imgH);
-            y += imgH + 10;
+          }finally{
+            restoreTooltips();
           }
 
           pdf.save('WB_All_Charts.pdf');
@@ -686,6 +807,18 @@
           const chpTableWrap = document.getElementById('chpTableWrap');
           const chpReleaseFilter = document.getElementById('chpReleaseFilter');
           const chpCanvas = document.getElementById('chpTrendChart');
+          const chpTypesEmpty = document.getElementById('chpTypesEmpty');
+          const chpTypesContent = document.getElementById('chpTypesContent');
+          const chpTypesTbody = document.getElementById('chpTypesTbody');
+          const chpTypesTableWrap = document.getElementById('chpTypesTableWrap');
+          const chpTypesReleaseFilter = document.getElementById('chpTypesReleaseFilter');
+          const chpTypesCanvas = document.getElementById('chpTypesTrendChart');
+          const chpTypesPlatformsWrap = document.getElementById('chpTypesPlatforms');
+          const chpTypesPlatformsBtn = document.getElementById('chpTypesPlatformsBtn');
+          const chpTypesPlatformsIco = document.getElementById('chpTypesPlatformsIco');
+          const chpTypesPlatformsText = document.getElementById('chpTypesPlatformsText');
+          const chpTypesIosCanvas = document.getElementById('chpTypesIosChart');
+          const chpTypesAndCanvas = document.getElementById('chpTypesAndChart');
 
           // Cutoff/store
           const cutEmpty = document.getElementById('cutEmpty');
@@ -721,6 +854,9 @@
           let selChart = null;
           let avgChart = null;
           let chpChart = null;
+          let chpTypesChart = null;
+          let chpTypesIosChart = null;
+          let chpTypesAndChart = null;
           let cutChart = null;
           let iosTypesChart = null;
           let andTypesChart = null;
@@ -728,6 +864,8 @@
           // SWAT list cache: fetch exec per release (cache by release)
           const __swatCache = new Map();
           const __swatPromiseCache = new Map();
+          const __ytIssueCache = new Map();
+          const __ytIssuePromiseCache = new Map();
 
           // Plugin: delta labels above points
           const deltaLabelsPlugin = {
@@ -1049,8 +1187,120 @@
             return [];
           }
 
+          function youtrackHeaders(){
+            const tok = (inpYtToken?.value || '').trim();
+            if(!tok) return null;
+            return {
+              'Authorization': `Bearer ${tok}`,
+              'Accept': 'application/json'
+            };
+          }
+
+          function ytIssueURL(key){
+            const baseRaw = (inpYtBase?.value || 'https://youtrack.wildberries.ru').trim();
+            const base = baseRaw.replace(/\/+$/,'');
+            const fields = [
+              'idReadable',
+              'summary',
+              'tags(name)',
+              'fields(projectCustomField(field(name)),value(name,$type),$type)'
+            ].join(',');
+            return `${base}/api/issues/${encodeURIComponent(key)}?fields=${encodeURIComponent(fields)}&$top=-1`;
+          }
+
+          function pickFieldNames(issue, target){
+            const out = [];
+            const arr = issue?.fields || [];
+            for(const f of arr){
+              const fld = f?.projectCustomField?.field || {};
+              if(String(fld.name || '').trim() === target){
+                const val = f.value;
+                if(Array.isArray(val)){
+                  for(const v of val){
+                    const n = v?.name;
+                    if(n) out.push(n);
+                  }
+                }else if(val && typeof val === 'object'){
+                  const n = val.name;
+                  if(n) out.push(n);
+                }
+              }
+            }
+            return out;
+          }
+
+          function extractYtTypeValues(issue){
+            const out = [];
+            for(const name of ['Type', 'Тип']){
+              const vals = pickFieldNames(issue, name);
+              if(vals && vals.length) out.push(...vals);
+            }
+            return out;
+          }
+
+          async function fetchYtIssueMeta(key, signal){
+            const k = String(key || '').trim().toUpperCase();
+            if(!k) return { tags: [], typeValues: [] };
+            const headers = youtrackHeaders();
+            if(!headers) return { tags: [], typeValues: [] };
+            if(__ytIssueCache.has(k)) return __ytIssueCache.get(k);
+            if(__ytIssuePromiseCache.has(k)) return await __ytIssuePromiseCache.get(k);
+            const p = (async () => {
+              try{
+                const data = await proxyGetJson(ytIssueURL(k), headers, signal);
+                const tags = Array.isArray(data?.tags)
+                  ? data.tags.map(t => t?.name).filter(Boolean)
+                  : [];
+                const typeValues = extractYtTypeValues(data);
+                const payload = { tags, typeValues };
+                __ytIssueCache.set(k, payload);
+                return payload;
+              }catch(e){
+                const payload = { tags: [], typeValues: [] };
+                __ytIssueCache.set(k, payload);
+                return payload;
+              }finally{
+                __ytIssuePromiseCache.delete(k);
+              }
+            })();
+            __ytIssuePromiseCache.set(k, p);
+            return await p;
+          }
+
+          function extractTypeFromValue(val){
+            if(!val) return '';
+            if(typeof val === 'string') return val;
+            if(typeof val === 'number') return String(val);
+            if(typeof val === 'object'){
+              if(typeof val.name === 'string') return val.name;
+              if(typeof val.value === 'string') return val.value;
+              if(typeof val.label === 'string') return val.label;
+            }
+            return '';
+          }
+
+          function extractIssueTypeLabel(issue){
+            if(!issue || typeof issue !== 'object') return '';
+            const candidates = [
+              issue.type,
+              issue.typeName,
+              issue.issueType,
+              issue.issue_type,
+              issue.fields?.type,
+              issue.fields?.Type,
+              issue.fields?.issueType,
+              issue.fields?.issue_type
+            ];
+            for(const c of candidates){
+              const v = extractTypeFromValue(c);
+              if(v) return v;
+            }
+            return '';
+          }
+
           function normalizeIssueType(x){
-            const t = String(x || '').trim();
+            const raw = (typeof x === 'string' || typeof x === 'number') ? x : extractIssueTypeLabel(x);
+            const t = String(raw || '').trim();
             return t || 'Unknown';
           }
 
@@ -1061,7 +1311,7 @@
 
             for(const it of (items || [])){
               if(!it) continue;
-              const type = normalizeIssueType(it.type);
+              const type = normalizeIssueType(it);
               typeSet.add(type);
               counts[type] = (counts[type] || 0) + 1;
 
@@ -1097,6 +1347,125 @@
             canon.sort((a,b) => TYPES_CANON_ORDER.indexOf(a) - TYPES_CANON_ORDER.indexOf(b));
             rest.sort((a,b) => a.localeCompare(b));
             return [...canon, ...rest];
+          }
+
+          function normalizeName(x){
+            return String(x || '').trim().toLowerCase().replace(/ё/g,'е');
+          }
+          function buildNormSet(list){
+            const s = new Set();
+            for(const it of (list || [])){
+              const n = normalizeName(it);
+              if(n) s.add(n);
+            }
+            return s;
+          }
+          function buildNormList(list){
+            const out = [];
+            for(const it of (list || [])){
+              const n = normalizeName(it);
+              if(n) out.push(n);
+            }
+            return out;
+          }
+          function typeInSet(typeName, wantedSet){
+            if(!wantedSet || !wantedSet.size) return false;
+            return wantedSet.has(normalizeName(typeName));
+          }
+          function hasTagFromSet(tags, wantedSet){
+            if(!wantedSet || !wantedSet.size) return false;
+            for(const t of (tags || [])){
+              if(wantedSet.has(normalizeName(t))) return true;
+            }
+            return false;
+          }
+          function textHasAny(text, needles){
+            if(!text || !needles || !needles.length) return false;
+            for(const n of needles){
+              if(n && text.includes(n)) return true;
+            }
+            return false;
+          }
+
+          const CHPTYPES_CONFIG = {
+            product: {
+              label: 'Аналитика',
+              typeSet: buildNormSet(['Аналитика','Analytics','Analitics']),
+              titleKeys: buildNormList(['analytics','analitics','аналитика','аналитикой'])
+            },
+            vlet: {
+              label: 'Влет',
+              tagSet: buildNormSet(['Влет','Влёт','ВЛЁТ','Vlet']),
+              titleKeys: buildNormList(['влет','влёт','vlet'])
+            },
+            bug: {
+              label: 'Баг',
+              typeSet: buildNormSet(['Баг','Bug']),
+              titleKeys: buildNormList(['баг','bug','ошибк','дефект'])
+            },
+            crash: {
+              label: 'Краш',
+              tagSet: buildNormSet(['Краш','Crash']),
+              titleKeys: buildNormList(['краш','crash'])
+            }
+          };
+          const CHPTYPES_ORDER = ['product','vlet','bug','crash'];
+
+          function emptyChpTypesCounts(){
+            return { product: 0, vlet: 0, bug: 0, crash: 0 };
+          }
+          function computeChpTypesCounts(issues, metaByKey){
+            const counts = emptyChpTypesCounts();
+            for(const it of (issues || [])){
+              if(!it) continue;
+              const type = extractIssueTypeLabel(it) || it.type;
+              const summary = normalizeName([
+                it.summary,
+                it.name,
+                it.title,
+                it.subject
+              ].filter(Boolean).join(' '));
+              const key = String(it.key || '').trim().toUpperCase();
+              const meta = key ? (metaByKey.get(key) || { tags: [], typeValues: [] }) : { tags: [], typeValues: [] };
+              const ytTypeVals = Array.isArray(meta.typeValues) ? meta.typeValues : [];
+              const ytTypeMatch = ytTypeVals.some(v => typeInSet(v, CHPTYPES_CONFIG.product.typeSet) || textHasAny(normalizeName(v), CHPTYPES_CONFIG.product.titleKeys));
+              const typeNorm = normalizeName(type || '');
+
+              if(typeInSet(type, CHPTYPES_CONFIG.product.typeSet) || textHasAny(typeNorm, CHPTYPES_CONFIG.product.titleKeys) || textHasAny(summary, CHPTYPES_CONFIG.product.titleKeys) || ytTypeMatch){
+                counts.product += 1;
+              }
+              if(typeInSet(type, CHPTYPES_CONFIG.bug.typeSet) || textHasAny(typeNorm, CHPTYPES_CONFIG.bug.titleKeys) || textHasAny(summary, CHPTYPES_CONFIG.bug.titleKeys)){
+                counts.bug += 1;
+              }
+              const tags = Array.isArray(meta.tags) ? meta.tags : [];
+              if(hasTagFromSet(tags, CHPTYPES_CONFIG.crash.tagSet) || textHasAny(summary, CHPTYPES_CONFIG.crash.titleKeys)){
+                counts.crash += 1;
+              }
+            }
+            return counts;
+          }
+
+          function uniqueIssuesByKey(list){
+            const map = new Map();
+            for(const it of (list || [])){
+              if(!it) continue;
+              const k = String(it?.key || '').trim().toUpperCase();
+              if(!k || map.has(k)) continue;
+              map.set(k, it);
+            }
+            return Array.from(map.values());
+          }
+
+          function computeVletCount(issues, metaByKey){
+            let n = 0;
+            for(const it of (issues || [])){
+              if(!it) continue;
+              const key = String(it.key || '').trim().toUpperCase();
+              const meta = key ? (metaByKey.get(key) || { tags: [] }) : { tags: [] };
+              const tags = Array.isArray(meta.tags) ? meta.tags : [];
+              if(hasTagFromSet(tags, CHPTYPES_CONFIG.vlet.tagSet)) n += 1;
+            }
+            return n;
           }
 
           function colorForTypeLabel(label){
@@ -1639,6 +2008,35 @@
             if(chpTableWrap) chpTableWrap.style.display = 'none';
           }
 
+          function setChpTypesEmpty(text){
+            if(!chpTypesEmpty) return;
+            chpTypesEmpty.textContent = text;
+            chpTypesEmpty.style.display = '';
+          }
+          function showChpTypesContent(){
+            if(chpTypesEmpty) chpTypesEmpty.style.display = 'none';
+            if(chpTypesContent) chpTypesContent.style.display = '';
+          }
+          function showChpTypesEmpty(text){
+            setChpTypesEmpty(text);
+            if(chpTypesContent) chpTypesContent.style.display = 'none';
+            if(chpTypesTableWrap) chpTypesTableWrap.style.display = 'none';
+            if(chpTypesPlatformsWrap) chpTypesPlatformsWrap.style.display = 'none';
+          }
+
+          function setChpTypesPlatforms(open){
+            if(!chpTypesPlatformsWrap) return;
+            chpTypesPlatformsWrap.style.display = open ? '' : 'none';
+            if(chpTypesPlatformsIco) chpTypesPlatformsIco.textContent = open ? '▾' : '▸';
+            if(chpTypesPlatformsText) chpTypesPlatformsText.textContent = open ? 'Скрыть графики по платформам' : 'Показать графики по платформам';
+            if(open){
+              requestAnimationFrame(() => requestAnimationFrame(() => {
+                chpTypesIosChart?.resize();
+                chpTypesAndChart?.resize();
+              }));
+            }
+          }
+
           function setCutEmpty(text){
             if(!cutEmpty) return;
             cutEmpty.textContent = text;
@@ -1694,6 +2092,8 @@
               showSelEmpty('Данные появятся после получения из источника');
               showAvgEmpty('Данные появятся после получения из источника');
               showChpEmpty('Данные появятся после получения из источника');
+              showChpTypesEmpty('Данные появятся после получения из источника');
+              setChpTypesPlatforms(false);
               showCutEmpty('Данные появятся после получения из источника');
               showIosTypesEmpty('Данные появятся после получения из источника');
               showAndTypesEmpty('Данные появятся после получения из источника');
@@ -1710,6 +2110,8 @@
           function saveInputs(){
             try{ localStorage.setItem(LS_TOKEN_KEY, inpAllureToken.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_DEPLOY_KEY, inpDeployToken.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_YT_TOKEN_KEY, inpYtToken.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_YT_BASE_KEY, inpYtBase.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' })); }catch(e){}
           }
 
@@ -1721,6 +2123,14 @@
             try{
               const dt = localStorage.getItem(LS_DEPLOY_KEY) || '';
               if(inpDeployToken) inpDeployToken.value = dt;
+            }catch(e){}
+            try{
+              const yt = localStorage.getItem(LS_YT_TOKEN_KEY) || '';
+              if(inpYtToken) inpYtToken.value = yt;
+            }catch(e){}
+            try{
+              const base = localStorage.getItem(LS_YT_BASE_KEY) || '';
+              if(inpYtBase && base) inpYtBase.value = base;
             }catch(e){}
             try{
               const raw = localStorage.getItem(LS_RANGE_KEY);
@@ -1773,6 +2183,23 @@
               chpChart.data.labels = [];
               chpChart.data.datasets.forEach(d => d.data = []);
               chpChart.update();
+            }
+            if(chpTypesTbody) chpTypesTbody.innerHTML = '';
+            if(chpTypesTableWrap) chpTypesTableWrap.style.display = 'none';
+            if(chpTypesChart){
+              chpTypesChart.data.labels = [];
+              chpTypesChart.data.datasets.forEach(d => d.data = []);
+              chpTypesChart.update();
+            }
+            if(chpTypesIosChart){
+              chpTypesIosChart.data.labels = [];
+              chpTypesIosChart.data.datasets.forEach(d => d.data = []);
+              chpTypesIosChart.update();
+            }
+            if(chpTypesAndChart){
+              chpTypesAndChart.data.labels = [];
+              chpTypesAndChart.data.datasets.forEach(d => d.data = []);
+              chpTypesAndChart.update();
             }
 
             if(cutTbody) cutTbody.innerHTML = '';
@@ -2313,6 +2740,7 @@
               selReleaseFilter,
               avgReleaseFilter,
               chpReleaseFilter,
+              chpTypesReleaseFilter,
               cutReleaseFilter,
               iosTypesReleaseFilter,
               andTypesReleaseFilter
@@ -2391,6 +2819,7 @@
             applyTbodyReleaseFilter(selReleaseFilter, selTbody);
             applyTbodyReleaseFilter(avgReleaseFilter, avgTbody);
             applyTbodyReleaseFilter(chpReleaseFilter, chpTbody);
+            applyTbodyReleaseFilter(chpTypesReleaseFilter, chpTypesTbody);
             applyTbodyReleaseFilter(cutReleaseFilter, cutTbody);
             applyTbodyReleaseFilter(iosTypesReleaseFilter, iosTypesTbody);
             applyTbodyReleaseFilter(andTypesReleaseFilter, andTypesTbody);
@@ -2883,6 +3312,71 @@
             });
           }
 
+          function buildChpTypesStackedChart(canvas){
+            if(!canvas || !window.Chart) return null;
+            const colorMap = {
+              product: cssVar('--chp-prod', '#22c55e'),
+              vlet: cssVar('--chp-vlet', '#f59e0b'),
+              bug: cssVar('--chp-bug', '#ef4444'),
+              crash: cssVar('--chp-crash', '#3b82f6')
+            };
+
+            return new Chart(canvas, {
+              type: 'bar',
+              data: {
+                labels: [],
+                datasets: CHPTYPES_ORDER.map((key) => ({
+                  label: CHPTYPES_CONFIG[key].label,
+                  data: [],
+                  backgroundColor: colorMap[key],
+                  borderColor: colorMap[key],
+                  borderWidth: 1,
+                  stack: 'chpTypes'
+                }))
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: { mode: 'index', intersect: false }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: { stacked: true },
+                  y: { stacked: true, beginAtZero: true }
+                }
+              }
+            });
+          }
+
+          function ensureChpTypesChart(){
+            if(!chpTypesCanvas || !window.Chart) return;
+            if(chpTypesChart){
+              chpTypesChart.data.labels = [];
+              chpTypesChart.data.datasets.forEach(d => d.data = []);
+              chpTypesChart.update();
+              return;
+            }
+            chpTypesChart = buildChpTypesStackedChart(chpTypesCanvas);
+          }
+
+          function ensureChpTypesPlatformCharts(){
+            if(chpTypesIosCanvas && !chpTypesIosChart){
+              chpTypesIosChart = buildChpTypesStackedChart(chpTypesIosCanvas);
+            }else if(chpTypesIosChart){
+              chpTypesIosChart.data.labels = [];
+              chpTypesIosChart.data.datasets.forEach(d => d.data = []);
+              chpTypesIosChart.update();
+            }
+            if(chpTypesAndCanvas && !chpTypesAndChart){
+              chpTypesAndChart = buildChpTypesStackedChart(chpTypesAndCanvas);
+            }else if(chpTypesAndChart){
+              chpTypesAndChart.data.labels = [];
+              chpTypesAndChart.data.datasets.forEach(d => d.data = []);
+              chpTypesAndChart.update();
+            }
+          }
+
           function ensureCutChart(){
             if(!cutCanvas || !window.Chart) return;
             if(cutChart){
@@ -3049,6 +3543,38 @@
             chpChart.update();
           }
 
+          function updateChpTypesChartInstance(chart, labels, rows){
+            if(!chart) return;
+            const dataMap = {
+              product: [],
+              vlet: [],
+              bug: [],
+              crash: []
+            };
+            for(const r of (rows || [])){
+              dataMap.product.push(Number(r.product) || 0);
+              dataMap.vlet.push(Number(r.vlet) || 0);
+              dataMap.bug.push(Number(r.bug) || 0);
+              dataMap.crash.push(Number(r.crash) || 0);
+            }
+            chart.data.labels = Array.isArray(labels) ? labels.slice() : [];
+            CHPTYPES_ORDER.forEach((key, idx) => {
+              if(chart.data.datasets[idx]){
+                chart.data.datasets[idx].data = dataMap[key] || [];
+              }
+            });
+            chart.update();
+          }
+
+          function updateChpTypesChart(labels, rows){
+            updateChpTypesChartInstance(chpTypesChart, labels, rows);
+          }
+
+          function updateChpTypesPlatformCharts(labels, iosRows, andRows){
+            updateChpTypesChartInstance(chpTypesIosChart, labels, iosRows);
+            updateChpTypesChartInstance(chpTypesAndChart, labels, andRows);
+          }
+
           function addCutPoint(release, dsIndex, yObjOrNull){
             if(!cutChart) return;
             if(cutChart.data.labels.length === 0 || cutChart.data.labels[cutChart.data.labels.length - 1] !== release){
@@ -3164,6 +3690,20 @@
               <td class="mono">${formatMsPerCase(totalMs)}</td>
             `;
             avgTbody.appendChild(tr);
+          }
+
+          function renderChpTypesRow({release, product, vlet, bug, crash}){
+            if(!chpTypesTbody) return;
+            const tr = document.createElement('tr');
+            tr.dataset.release = release;
+            tr.innerHTML = `
+              <td class="mono text-left">${release}</td>
+              <td class="mono">${product}</td>
+              <td class="mono">${vlet}</td>
+              <td class="mono">${bug}</td>
+              <td class="mono">${crash}</td>
+            `;
+            chpTypesTbody.appendChild(tr);
           }
 
           const CUT_TARGET_MINUTES = {
@@ -3295,6 +3835,9 @@
                 if(key === 'sel') selChart?.resize();
                 if(key === 'avg') avgChart?.resize();
                 if(key === 'chp') chpChart?.resize();
+                if(key === 'chpTypes') chpTypesChart?.resize();
+                if(key === 'chpTypes') chpTypesIosChart?.resize();
+                if(key === 'chpTypes') chpTypesAndChart?.resize();
                 if(key === 'cut') cutChart?.resize();
                 if(key === 'iosTypes') iosTypesChart?.resize();
                 if(key === 'andTypes') andTypesChart?.resize();
@@ -3381,6 +3924,8 @@
             ensureSelectiveChart();
             ensureAvgChart();
             ensureChpChart();
+            ensureChpTypesChart();
+            ensureChpTypesPlatformCharts();
             ensureCutChart();
 
             showContent();
@@ -3388,6 +3933,7 @@
             showSelContent();
             showAvgContent();
             showChpContent();
+            showChpTypesContent();
             showCutContent();
             showIosTypesContent();
             showAndTypesContent();
@@ -3681,14 +4227,24 @@
 
             // Типы задач (Deploy-lab issues): iOS + Android
             const deployTok = (inpDeployToken?.value || '').trim();
+            const ytTok = (inpYtToken?.value || '').trim();
             if(!deployTok){
               showIosTypesEmpty('Вставьте токен Deploy-lab');
               showAndTypesEmpty('Вставьте токен Deploy-lab');
+              showChpTypesEmpty('Вставьте токен Deploy-lab');
             }else{
               const iosRows = [];
               const andRows = [];
               const iosSet = new Set();
               const andSet = new Set();
+              const chpTypesRows = [];
+              const chpTypesRowsIos = [];
+              const chpTypesRowsAnd = [];
+              if(chpTypesTbody) chpTypesTbody.innerHTML = '';
+              const canChpTypes = Boolean(ytTok);
+              if(!canChpTypes){
+                showChpTypesEmpty('Вставьте токен YouTrack');
+              }
 
               for(const rel of releases){
                 if(signal?.aborted) break;
@@ -3710,6 +4266,57 @@
 
                 iosRows.push({ release: rel, counts: a1.counts, details: a1.details });
                 andRows.push({ release: rel, counts: a2.counts, details: a2.details });
+
+                if(canChpTypes){
+                  const iosChpIssues = (iosIssues || []).filter(it => it && it.merged_after_cutoff === true);
+                  const andChpIssues = (andIssues || []).filter(it => it && it.merged_after_cutoff === true);
+                  const iosAllIssues = uniqueIssuesByKey(iosIssues || []);
+                  const andAllIssues = uniqueIssuesByKey(andIssues || []);
+                  const allIssues = uniqueIssuesByKey([...(iosIssues || []), ...(andIssues || [])]);
+
+                  const chpByKey = new Map();
+                  for(const it of iosChpIssues){
+                    const k = String(it?.key || '').trim().toUpperCase();
+                    if(!k || chpByKey.has(k)) continue;
+                    chpByKey.set(k, it);
+                  }
+                  for(const it of andChpIssues){
+                    const k = String(it?.key || '').trim().toUpperCase();
+                    if(!k || chpByKey.has(k)) continue;
+                    chpByKey.set(k, it);
+                  }
+
+                  const chpIssues = Array.from(chpByKey.values());
+                  const keys = Array.from(new Set(allIssues.map(it => String(it?.key || '').trim().toUpperCase()).filter(Boolean)));
+                  const metaByKey = new Map();
+                  if(keys.length){
+                    const tagResults = await asyncPool(keys, 8, async (k) => {
+                      const meta = await fetchYtIssueMeta(k, signal);
+                      return { key: k, meta };
+                    }, signal);
+                    for(const r of tagResults){
+                      if(!r) continue;
+                      const kk = String(r.key || '').trim().toUpperCase();
+                      if(!kk) continue;
+                      const payload = r.meta && typeof r.meta === 'object' ? r.meta : { tags: [], typeValues: [] };
+                      metaByKey.set(kk, payload);
+                    }
+                  }
+
+                  const counts = computeChpTypesCounts(chpIssues, metaByKey);
+                  const countsIos = computeChpTypesCounts(iosChpIssues, metaByKey);
+                  const countsAnd = computeChpTypesCounts(andChpIssues, metaByKey);
+                  counts.vlet = computeVletCount(allIssues, metaByKey);
+                  countsIos.vlet = computeVletCount(iosAllIssues, metaByKey);
+                  countsAnd.vlet = computeVletCount(andAllIssues, metaByKey);
+                  const row = { release: rel, ...counts };
+                  const rowIos = { release: rel, ...countsIos };
+                  const rowAnd = { release: rel, ...countsAnd };
+                  chpTypesRows.push(row);
+                  chpTypesRowsIos.push(rowIos);
+                  chpTypesRowsAnd.push(rowAnd);
+                  renderChpTypesRow(row);
+                }
               }
 
               const iosTypes = sortTypesByCanon(iosSet);
@@ -3737,6 +4344,32 @@
                 showAndTypesContent();
                 renderTypesTable(andTypesTheadRow, andTypesTbody, andTypes, andRows);
                 andTypesChart = buildOrUpdateTypesChart(andTypesChart, andTypesCanvas, andTypesLegend, andTypes, releases, andRows);
+              }
+
+              if(canChpTypes){
+                const hasData = chpTypesRows.some(r => (Number(r.product)||0) + (Number(r.vlet)||0) + (Number(r.bug)||0) + (Number(r.crash)||0) > 0);
+                if(!hasData){
+                  showChpTypesEmpty('Нет данных по типам ЧП');
+                  if(chpTypesChart){
+                    chpTypesChart.data.labels = [];
+                    chpTypesChart.data.datasets.forEach(d => d.data = []);
+                    chpTypesChart.update();
+                  }
+                  if(chpTypesIosChart){
+                    chpTypesIosChart.data.labels = [];
+                    chpTypesIosChart.data.datasets.forEach(d => d.data = []);
+                    chpTypesIosChart.update();
+                  }
+                  if(chpTypesAndChart){
+                    chpTypesAndChart.data.labels = [];
+                    chpTypesAndChart.data.datasets.forEach(d => d.data = []);
+                    chpTypesAndChart.update();
+                  }
+                }else{
+                  showChpTypesContent();
+                  updateChpTypesChart(releases, chpTypesRows);
+                  updateChpTypesPlatformCharts(releases, chpTypesRowsIos, chpTypesRowsAnd);
+                }
               }
             }
 
@@ -3769,6 +4402,9 @@
             if(chpTableWrap && chpTbody && chpTbody.children.length){
               chpTableWrap.style.display = '';
             }
+            if(chpTypesTableWrap && chpTypesTbody && chpTypesTbody.children.length){
+              chpTypesTableWrap.style.display = '';
+            }
             if(cutTableWrap && cutTbody && cutTbody.children.length){
               cutTableWrap.style.display = '';
             }
@@ -3788,6 +4424,7 @@
           showSelEmpty('Данные появятся после получения из источника');
           showAvgEmpty('Данные появятся после получения из источника');
           showChpEmpty('Данные появятся после получения из источника');
+          showChpTypesEmpty('Данные появятся после получения из источника');
           showCutEmpty('Данные появятся после получения из источника');
           showIosTypesEmpty('Данные появятся после получения из источника');
           showAndTypesEmpty('Данные появятся после получения из источника');
@@ -3801,6 +4438,7 @@
             selReleaseFilter,
             avgReleaseFilter,
             chpReleaseFilter,
+            chpTypesReleaseFilter,
             cutReleaseFilter,
             iosTypesReleaseFilter,
             andTypesReleaseFilter
@@ -3810,6 +4448,11 @@
             sel.addEventListener('change', applyAllReleaseFilters);
           });
           initToggles();
+          setChpTypesPlatforms(false);
+          chpTypesPlatformsBtn?.addEventListener('click', () => {
+            const isOpen = chpTypesPlatformsWrap && chpTypesPlatformsWrap.style.display !== 'none';
+            setChpTypesPlatforms(!isOpen);
+          });
 
           proxyBtn?.addEventListener('click', async () => {
             try{
