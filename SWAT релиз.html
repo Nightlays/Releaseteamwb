@@ -8,6 +8,8 @@
   <!-- Tailwind CDN (как в CoreDashboard) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
   <!-- SheetJS для нормального .xlsx -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -46,7 +48,10 @@
           <div class="border border-[#ecebff] rounded-2xl bg-white p-4">
             <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
               <div class="md:col-span-4">
-                <label class="block text-xs font-semibold text-[#111827] mb-1">Версия релиза</label>
+                <label class="mb-1 flex items-center justify-between text-xs font-semibold text-[#111827]">
+                  <span>Версия релиза</span>
+                  <span class="text-[11px] font-semibold text-slate-400">мин. 7.4.2000</span>
+                </label>
                 <input class="input" id="releaseVersion" type="text" inputmode="numeric" placeholder="Напр. 7.4.5000" />
               </div>
 
@@ -80,7 +85,7 @@
             <div class="inline-flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-[#ecebff]">
               <button id="tabEmp" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Детали по сотруднику</button>
               <button id="tabPlat" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Детали по платформам</button>
-              <button id="tabRetry" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Перезапуски</button>
+              <button id="tabCases" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Кейсы сотрудников по дням</button>
             </div>
           </div>
 
@@ -97,6 +102,9 @@
             </span>
             <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-[#ecebff] text-slate-700 text-sm font-semibold">
               Кейсов всего: <span id="chipTotalCases" class="mono">—</span>
+            </span>
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-[#ecebff] text-slate-600 text-sm font-semibold">
+              Всего Android: <span id="chipTotalCasesAndroid" class="mono">—</span> · Всего iOS: <span id="chipTotalCasesIos" class="mono">—</span>
             </span>
             <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-[#ecebff] text-slate-700 text-sm font-semibold">
               Общее среднее на 1 кейс: <span id="chipAvg" class="mono">—</span>
@@ -137,14 +145,26 @@
           </div>
         </div>
 
-        <!-- Tab 3: Retries -->
-        <div id="wrapRetry" class="border border-[#ecebff] rounded-2xl bg-white/70 p-2 hidden">
-          <div class="swat-table-scroll">
-            <table id="tblRetry" class="swat-fixed-table">
-              <colgroup id="cgRetry"></colgroup>
-              <thead id="thRetry"></thead>
-              <tbody id="tbRetry"></tbody>
-            </table>
+        <!-- Tab 3: Cases by day -->
+        <div id="wrapCases" class="space-y-4 hidden">
+          <div class="flex items-center justify-end px-2">
+            <div class="text-xs font-semibold text-slate-500 mr-2">Фильтр</div>
+            <div id="casesFilterDropdown" class="dropdown dropdown--slim input" style="width:220px; --bd:#ecebff">
+              <div id="casesFilterSelectedText" class="dropdown-selected truncate">Все сотрудники</div>
+              <div id="casesFilterList" class="dropdown-list"></div>
+            </div>
+          </div>
+          <div class="border border-[#ecebff] rounded-2xl bg-white overflow-hidden">
+            <div class="px-4 pt-3 pb-2 text-sm font-semibold text-slate-700">Android</div>
+            <div class="chart-viewport" id="casesAndroidViewport">
+              <canvas id="casesAndroidChart" aria-label="Cases Android chart" role="img"></canvas>
+            </div>
+          </div>
+          <div class="border border-[#ecebff] rounded-2xl bg-white overflow-hidden">
+            <div class="px-4 pt-3 pb-2 text-sm font-semibold text-slate-700">iOS</div>
+            <div class="chart-viewport" id="casesIosViewport">
+              <canvas id="casesIosChart" aria-label="Cases iOS chart" role="img"></canvas>
+            </div>
           </div>
         </div>
       </section>
@@ -198,6 +218,8 @@
       const chipSwat = document.getElementById('chipSwat');
       const chipLaunches = document.getElementById('chipLaunches');
       const chipTotalCases = document.getElementById('chipTotalCases');
+      const chipTotalCasesAndroid = document.getElementById('chipTotalCasesAndroid');
+      const chipTotalCasesIos = document.getElementById('chipTotalCasesIos');
       const chipAvg = document.getElementById('chipAvg');
 
       const btnExportEmp = document.getElementById('btnExportEmp');
@@ -205,13 +227,16 @@
       // tabs
       const tabEmp = document.getElementById('tabEmp');
       const tabPlat = document.getElementById('tabPlat');
-      const tabRetry = document.getElementById('tabRetry');
+      const tabCases = document.getElementById('tabCases');
 
       const wrapEmp = document.getElementById('wrapEmp');
       const wrapPlat = document.getElementById('wrapPlat');
-      const wrapRetry = document.getElementById('wrapRetry');
+      const wrapCases = document.getElementById('wrapCases');
 
       const legendEmp = document.getElementById('legendEmp');
+
+      let casesAndroidChart = null;
+      let casesIosChart = null;
 
       // tables
       const cgEmp = document.getElementById('cgEmp');
@@ -223,9 +248,11 @@
       const thPlat = document.getElementById('thPlat');
       const tbPlat = document.getElementById('tbPlat');
 
-      const cgRetry = document.getElementById('cgRetry');
-      const thRetry = document.getElementById('thRetry');
-      const tbRetry = document.getElementById('tbRetry');
+      const casesAndroidCanvas = document.getElementById('casesAndroidChart');
+      const casesIosCanvas = document.getElementById('casesIosChart');
+      const casesFilterDropdown = document.getElementById('casesFilterDropdown');
+      const casesFilterSelectedText = document.getElementById('casesFilterSelectedText');
+      const casesFilterList = document.getElementById('casesFilterList');
 
       // popover
       const pathPopover = document.getElementById('pathPopover');
@@ -248,6 +275,13 @@
         sortKey: 'name',
         sortDir: 1
       };
+      const CASES_STATE = {
+        days: [],
+        rowsAndroidAll: [],
+        rowsIosAll: [],
+        users: [],
+        selectedLogins: new Set()
+      };
 
       // popover state
       let __pathPopoverOpen = false;
@@ -255,6 +289,19 @@
       let __pathPopoverAnchor = null;
 
       // ===== UI helpers =====
+      function initDropdown(dd){
+        if(!dd) return;
+        const sel = dd.querySelector('.dropdown-selected');
+        if(!sel) return;
+        sel.addEventListener('click', (e) => {
+          e.stopPropagation();
+          dd.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+          if(!dd.contains(e.target)) dd.classList.remove('open');
+        });
+      }
+
       function showToast(msg, ok=true){
         if(!toastEl || !toastInner) return;
         toastInner.textContent = msg;
@@ -291,7 +338,7 @@
         setHidden(dashContent, true);
         setHidden(wrapEmp, true);
         setHidden(wrapPlat, true);
-        setHidden(wrapRetry, true);
+        setHidden(wrapCases, true);
         setHidden(btnExportEmp, true);
       }
 
@@ -310,6 +357,19 @@
           .replaceAll('>','&gt;')
           .replaceAll('"','&quot;')
           .replaceAll("'","&#039;");
+      }
+
+      initDropdown(casesFilterDropdown);
+      if(casesFilterList){
+        casesFilterList.addEventListener('change', (e) => {
+          const t = e.target;
+          if(!(t instanceof HTMLInputElement)) return;
+          if(t.dataset.all === '1'){
+            const on = t.checked;
+            casesFilterList.querySelectorAll('input[data-login="1"]').forEach(cb => { cb.checked = on; });
+          }
+          updateCasesFilterFromUI();
+        });
       }
 
       // ===== Popover (Проходил) =====
@@ -432,7 +492,12 @@
       }
 
       function loadActiveTab(){
-        try{ return localStorage.getItem(LS_TAB) || 'emp'; }catch(e){ return 'emp'; }
+        try{
+          const v = localStorage.getItem(LS_TAB) || 'emp';
+          if(v === 'retry') return 'cases';
+          if(v === 'emp' || v === 'plat' || v === 'cases') return v;
+          return 'emp';
+        }catch(e){ return 'emp'; }
       }
       function saveActiveTab(v){
         try{ localStorage.setItem(LS_TAB, v); }catch(e){}
@@ -625,11 +690,11 @@
 
         tabEmp.className   = (active === 'emp')   ? on : off;
         tabPlat.className  = (active === 'plat')  ? on : off;
-        tabRetry.className = (active === 'retry') ? on : off;
+        tabCases.className = (active === 'cases') ? on : off;
 
         setHidden(wrapEmp, active !== 'emp');
         setHidden(wrapPlat, active !== 'plat');
-        setHidden(wrapRetry, active !== 'retry');
+        setHidden(wrapCases, active !== 'cases');
 
         setHidden(legendEmp, active !== 'emp');
         setHidden(btnExportEmp, !(active === 'emp' && EMP_STATE.rows.length));
@@ -978,7 +1043,7 @@
 
       // ===== Render: Platform table (#2) =====
       function renderPlatformTable(platformModel){
-        const { days, amountByDay, avgByDay, workersByDay, releaseAvgA, releaseAvgI, releaseAvgAll, swatCountByDay } = platformModel;
+        const { days, amountByDay, avgByDay, workersByDay, releaseAvgA, releaseAvgI, releaseAvgAll, swatCountByDay, uniqueWorkersA, uniqueWorkersI } = platformModel;
 
         const widthsSaved = loadColWidths();
 
@@ -1055,6 +1120,11 @@
         const iosAvg = days.map(d => toNum(avgByDay[d]?.iOS || 0));
         const allAvg = days.map(d => toNum(avgByDay[d]?.All || 0));
 
+        const totalACases = androidAmounts.reduce((s, n) => s + toInt(n), 0);
+        const totalICases = iosAmounts.reduce((s, n) => s + toInt(n), 0);
+        const sumAllAvg = allAvg.reduce((s, n) => s + toNum(n), 0);
+        const relAllCalc = days.length ? (sumAllAvg / days.length) : 0;
+
         tbPlat.innerHTML = `
           <tr>
             <td class="text-left font-semibold">Android</td>
@@ -1063,7 +1133,7 @@
               const w = toInt(workersByDay[d]?.Android || 0);
               return cell(v, `Кейсов: ${v}\nСотрудников: ${w}`);
             }).join('')}
-            ${cell(aRel, `Среднее Android за релиз: ${aRel}`)}
+            ${cell('', '')}
             ${cell('', '')}
           </tr>
           <tr>
@@ -1074,7 +1144,7 @@
               return cell(v, `Кейсов: ${v}\nСотрудников: ${w}`);
             }).join('')}
             ${cell('', '')}
-            ${cell(iRel, `Среднее iOS за релиз: ${iRel}`)}
+            ${cell('', '')}
           </tr>
           <tr>
             <td class="text-left font-semibold">Общее</td>
@@ -1092,10 +1162,12 @@
             ${androidAvg.map((v, idx) => {
               const d = days[idx];
               const w = toInt(workersByDay[d]?.Android || 0);
+              const c = toInt(amountByDay[d]?.Android || 0);
               const val = v.toFixed(2);
-              return cell(val, `Среднее: ${val}\nСотрудников: ${w}`);
+              const formula = w > 0 ? `${c} / ${w} = ${val}` : `${c} / 0 = 0`;
+              return cell(val, `Среднее: ${val}\nСотрудников: ${w}\nФормула: ${formula}`);
             }).join('')}
-            ${cell(aRel, `Среднее Android за релиз: ${aRel}`)}
+            ${cell(aRel, `Среднее Android за релиз: ${aRel}\nФормула: ${totalACases} / ${uniqueWorkersA || 0} = ${aRel}`)}
             ${cell('', '')}
           </tr>
           <tr>
@@ -1103,19 +1175,28 @@
             ${iosAvg.map((v, idx) => {
               const d = days[idx];
               const w = toInt(workersByDay[d]?.iOS || 0);
+              const c = toInt(amountByDay[d]?.iOS || 0);
               const val = v.toFixed(2);
-              return cell(val, `Среднее: ${val}\nСотрудников: ${w}`);
+              const formula = w > 0 ? `${c} / ${w} = ${val}` : `${c} / 0 = 0`;
+              return cell(val, `Среднее: ${val}\nСотрудников: ${w}\nФормула: ${formula}`);
             }).join('')}
             ${cell('', '')}
-            ${cell(iRel, `Среднее iOS за релиз: ${iRel}`)}
+            ${cell(iRel, `Среднее iOS за релиз: ${iRel}\nФормула: ${totalICases} / ${uniqueWorkersI || 0} = ${iRel}`)}
           </tr>
           <tr>
             <td class="text-left font-semibold">Среднее общее</td>
             ${allAvg.map((v, idx) => {
               const d = days[idx];
-              const w = toInt(workersByDay[d]?.All || 0);
+              const aW = toInt(workersByDay[d]?.Android || 0);
+              const iW = toInt(workersByDay[d]?.iOS || 0);
+              const aC = toInt(amountByDay[d]?.Android || 0);
+              const iC = toInt(amountByDay[d]?.iOS || 0);
+              const aVal = aW > 0 ? (aC / aW) : 0;
+              const iVal = iW > 0 ? (iC / iW) : 0;
               const val = v.toFixed(2);
-              return cell(val, `Среднее: ${val}\nСотрудников: ${w}`);
+              const aTxt = aW > 0 ? `${aC} / ${aW} = ${aVal.toFixed(2)}` : `${aC} / 0 = 0`;
+              const iTxt = iW > 0 ? `${iC} / ${iW} = ${iVal.toFixed(2)}` : `${iC} / 0 = 0`;
+              return cell(val, `Среднее: ${val}\nФормула: (${aTxt}) + (${iTxt}) = ${val}`);
             }).join('')}
             ${cell('', '')}
             ${cell('', '')}
@@ -1123,65 +1204,208 @@
 
           <tr>
             <td class="text-left font-semibold">Среднее за релиз</td>
-            ${days.map((d, idx) => idx === 0 ? cell(allRel, `Среднее за релиз: ${allRel}`) : cell('', '')).join('')}
+            ${days.map((d, idx) => idx === 0 ? cell(allRel, `Среднее за релиз: ${allRel}\nФормула: ${sumAllAvg.toFixed(2)} / ${days.length || 0} = ${relAllCalc.toFixed(2)}`) : cell('', '')).join('')}
             ${cell('', '')}
             ${cell('', '')}
           </tr>
         `;
       }
 
-      // ===== Render: Retries table (#3) =====
-      function renderRetryTable(retryModel){
-        const { rows } = retryModel;
-        const widthsSaved = loadColWidths();
+      // ===== Render: Cases by day charts (Android/iOS) =====
+      function colorForIndex(i){
+        const hue = (i * 47) % 360;
+        return {
+          border: `hsl(${hue} 60% 45%)`,
+          bg: `hsla(${hue} 70% 60% / 0.6)`
+        };
+      }
 
-        const cols = [
-          { key:'name', w: 240, min:160, label:'Сотрудник' },
-          { key:'stream', w: 320, min:180, label:'Стрим' },
-          { key:'ios', w: 140, min:110, label:'iOS' },
-          { key:'and', w: 140, min:110, label:'Android' },
-        ];
+      function buildCasesChart(canvas){
+        if(!canvas || !window.Chart) return null;
+        return new Chart(canvas, {
+          type: 'line',
+          data: { labels: [], datasets: [] },
+          options: {
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                itemSort: (a, b) => {
+                  const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                  const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                  return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                },
+                callbacks: {
+                  title: (items) => {
+                    const i = items?.[0]?.dataIndex ?? 0;
+                    const full = canvas._fullLabels?.[i];
+                    return full ? `День ${full}` : (items?.[0]?.label || '');
+                  },
+                  label: (ctx) => {
+                    const i = ctx.dataIndex;
+                    const chart = ctx.chart;
+                    const datasets = chart?.data?.datasets || [];
+                    const total = datasets.reduce((s, d) => s + Number(d?.data?.[i] || 0), 0);
+                    const val = Number(ctx.raw || 0);
+                    if(val <= 0) return null;
+                    const pct = total > 0 ? Math.round((val / total) * 1000) / 10 : 0;
+                    return `${ctx.dataset.label}: ${val} | ${pct}%`;
+                  },
+                  footer: (items) => {
+                    const rows = (items || []).filter(it => Number(it?.raw || 0) > 0);
+                    const sum = rows.reduce((s, it) => s + Number(it?.raw || 0), 0);
+                    const people = rows.length;
+                    return `Итого за день: ${sum}\nИтого сотрудников: ${people}`;
+                  }
+                }
+              }
+            },
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+              x: { ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+              y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
+            }
+          }
+        });
+      }
 
-        cgRetry.innerHTML = cols.map(c => {
-          const fullKey = `retry:${c.key}`;
-          const w = toInt(widthsSaved[fullKey]) || c.w;
-          return `<col data-col="${escapeHtml(fullKey)}" width="${w}">`;
-        }).join('');
-
-        thRetry.innerHTML = `
-          <tr>
-            ${cols.map(c => {
-              const fullKey = `retry:${c.key}`;
-              const align = (c.key==='ios'||c.key==='and') ? 'text-right' : 'text-left';
-              return `
-                <th class="${align} whitespace-nowrap" title="${escapeHtml(c.label)}">
-                  <div class="th-wrap"><div class="th-title">${escapeHtml(c.label)}</div></div>
-                  <div class="col-resize-handle" data-col="${escapeHtml(fullKey)}" data-minw="${c.min}"></div>
-                </th>
-              `;
-            }).join('')}
-          </tr>
-        `;
-
-        bindResizable(thRetry, cgRetry);
-
-        if(!rows.length){
-          tbRetry.innerHTML = `<tr><td class="text-left text-slate-500" colspan="4">Нет перезапусков (retriedCount = 0)</td></tr>`;
-          return;
+      function renderCasesChart({ chart, canvas, rows, days }){
+        if(!chart){
+          chart = buildCasesChart(canvas);
+          if(!chart) return null;
         }
 
-        tbRetry.innerHTML = rows.map(r => {
-          const disp = r.full_name || r.login;
-          const title = `${disp} (${r.login})`;
-          return `
-            <tr>
-              <td class="text-left font-semibold" title="${escapeHtml(title)}"><span class="cell-ellipsis">${escapeHtml(disp)}</span></td>
-              <td class="text-left" title="${escapeHtml(r.stream)}"><span class="cell-ellipsis">${escapeHtml(r.stream)}</span></td>
-              <td class="text-right mono" title="${escapeHtml(String(r.ios))}"><span class="cell-ellipsis">${escapeHtml(String(r.ios))}</span></td>
-              <td class="text-right mono" title="${escapeHtml(String(r.android))}"><span class="cell-ellipsis">${escapeHtml(String(r.android))}</span></td>
-            </tr>
-          `;
-        }).join('');
+        const labels = days.map(d => ruDowShort(d));
+        const fullLabels = days.map(d => `${ruDowShort(d)} ${ddmm(d)}`);
+
+        const datasets = rows.map((r, idx) => {
+          const disp = r.full_name || r.login || `User ${idx + 1}`;
+          const c = colorForIndex(idx);
+          return {
+            label: disp,
+            data: r.dayCounts || [],
+            borderColor: c.border,
+            backgroundColor: c.border,
+            pointBackgroundColor: c.border,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1,
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            fill: false
+          };
+        });
+
+        canvas._fullLabels = fullLabels;
+        chart.data.labels = labels;
+        chart.data.datasets = datasets;
+        chart.update();
+        return chart;
+      }
+
+      function filterCaseRows(rows){
+        const sel = CASES_STATE.selectedLogins;
+        if(!sel) return rows;
+        if(sel.size === 0) return [];
+        if(sel.size === CASES_STATE.users.length) return rows;
+        return rows.filter(r => sel.has(r.login));
+      }
+
+      function refreshCasesFilterCaption(){
+        if(!casesFilterSelectedText) return;
+        const total = CASES_STATE.users.length || 0;
+        const selected = CASES_STATE.selectedLogins ? CASES_STATE.selectedLogins.size : 0;
+        if(selected <= 0){
+          casesFilterSelectedText.textContent = 'Не выбрано';
+          return;
+        }
+        if(selected >= total){
+          casesFilterSelectedText.textContent = 'Все сотрудники';
+          return;
+        }
+        if(selected === 1){
+          const login = CASES_STATE.selectedLogins.values().next().value;
+          const user = CASES_STATE.users.find(u => u.login === login);
+          casesFilterSelectedText.textContent = user ? (user.full_name || user.login) : 'Выбрано: 1';
+          return;
+        }
+        casesFilterSelectedText.textContent = `Выбрано: ${selected}`;
+      }
+
+      function renderCasesChartsFiltered(){
+        const rowsA = filterCaseRows(CASES_STATE.rowsAndroidAll);
+        const rowsI = filterCaseRows(CASES_STATE.rowsIosAll);
+        casesAndroidChart = renderCasesChart({
+          chart: casesAndroidChart,
+          canvas: casesAndroidCanvas,
+          rows: rowsA,
+          days: CASES_STATE.days
+        });
+        casesIosChart = renderCasesChart({
+          chart: casesIosChart,
+          canvas: casesIosCanvas,
+          rows: rowsI,
+          days: CASES_STATE.days
+        });
+      }
+
+      function updateCasesFilterFromUI(){
+        if(!casesFilterList) return;
+        const items = Array.from(casesFilterList.querySelectorAll('input[type=checkbox][data-login="1"]'));
+        const selected = items.filter(cb => cb.checked).map(cb => cb.value);
+        const allCb = casesFilterList.querySelector('input[type=checkbox][data-all="1"]');
+        const allSelected = items.length ? items.every(cb => cb.checked) : false;
+        if(allCb) allCb.checked = allSelected;
+        CASES_STATE.selectedLogins = new Set(selected);
+        refreshCasesFilterCaption();
+        renderCasesChartsFiltered();
+      }
+
+      function buildCasesFilterOptions(users){
+        if(!casesFilterList) return;
+        CASES_STATE.users = users || [];
+        CASES_STATE.selectedLogins = new Set((users || []).map(u => u.login));
+        casesFilterList.innerHTML = '';
+
+        const allLabel = document.createElement('label');
+        allLabel.classList.add('cases-filter-item');
+        const allText = document.createElement('span');
+        allText.classList.add('cases-filter-name');
+        allText.textContent = 'Все';
+        const allCb = document.createElement('input');
+        allCb.type = 'checkbox';
+        allCb.checked = true;
+        allCb.setAttribute('data-all', '1');
+        allCb.classList.add('cases-filter-check');
+        allLabel.appendChild(allText);
+        allLabel.appendChild(allCb);
+        casesFilterList.appendChild(allLabel);
+
+        const sep = document.createElement('div');
+        sep.className = 'h-px bg-slate-100';
+        casesFilterList.appendChild(sep);
+
+        CASES_STATE.users.forEach((u) => {
+          const label = document.createElement('label');
+          label.classList.add('cases-filter-item');
+          const text = document.createElement('span');
+          text.classList.add('cases-filter-name');
+          text.textContent = u.full_name || u.login;
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = true;
+          cb.value = u.login;
+          cb.setAttribute('data-login', '1');
+          cb.classList.add('cases-filter-check');
+          label.appendChild(text);
+          label.appendChild(cb);
+          casesFilterList.appendChild(label);
+        });
+
+        refreshCasesFilterCaption();
       }
 
       // ===== Export to Excel (Нормальный .xlsx через SheetJS) =====
@@ -1295,7 +1519,16 @@
 
         tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">Сбор данных…</td></tr>`;
         tbPlat.innerHTML = `<tr><td class="text-left" colspan="99">Сбор данных…</td></tr>`;
-        tbRetry.innerHTML = `<tr><td class="text-left" colspan="99">Сбор данных…</td></tr>`;
+        if(casesAndroidChart){
+          casesAndroidChart.data.labels = [];
+          casesAndroidChart.data.datasets = [];
+          casesAndroidChart.update();
+        }
+        if(casesIosChart){
+          casesIosChart.data.labels = [];
+          casesIosChart.data.datasets = [];
+          casesIosChart.update();
+        }
 
         // ===== 1) SWAT + worked_days =====
         tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 1/4] Получаю SWAT и worked_days…</td></tr>`;
@@ -1376,6 +1609,8 @@
         const perUser = {};
         const perUserRetries = {};
         let swatTotalNoRetry = 0;
+        let swatTotalNoRetryAndroid = 0;
+        let swatTotalNoRetryIos = 0;
 
         const globalStreamAgg = {};
         function ensureGlobal(stream){
@@ -1445,7 +1680,11 @@
 
             if(!swatSet.has(assignee)) continue;
 
-            if(totalCases > 0) swatTotalNoRetry += totalCases;
+            if(totalCases > 0){
+              swatTotalNoRetry += totalCases;
+              if(plat === 'Android') swatTotalNoRetryAndroid += totalCases;
+              else if(plat === 'iOS') swatTotalNoRetryIos += totalCases;
+            }
 
             const u = ensureUser(assignee);
             const st = ensureStream(u, stream);
@@ -1529,10 +1768,17 @@
 
         const casesByDayPlatform = {};
         const usersByDayPlatform = {};
+        const casesByUserDayPlatform = { Android: {}, iOS: {} };
 
         function ensureDayPlatform(day){
           if(!casesByDayPlatform[day]) casesByDayPlatform[day] = { Android:0, iOS:0 };
           if(!usersByDayPlatform[day]) usersByDayPlatform[day] = { Android:new Set(), iOS:new Set() };
+        }
+
+        function addUserDayCase(login, day, plat){
+          if(!casesByUserDayPlatform[plat]) casesByUserDayPlatform[plat] = {};
+          if(!casesByUserDayPlatform[plat][login]) casesByUserDayPlatform[plat][login] = {};
+          casesByUserDayPlatform[plat][login][day] = (casesByUserDayPlatform[plat][login][day] || 0) + 1;
         }
 
         await mapLimit(launches, 4, async (L, idx) => {
@@ -1566,6 +1812,7 @@
                 ensureDayPlatform(dayKey);
                 casesByDayPlatform[dayKey][plat] += 1;
                 usersByDayPlatform[dayKey][plat].add(testedBy);
+                addUserDayCase(testedBy, dayKey, plat);
               }
             });
           }
@@ -1686,31 +1933,22 @@
           });
         }
 
-        const rowsRetry = [];
+        const rowsCasesAndroid = [];
+        const rowsCasesIos = [];
         for(const login of swatLogins){
-          const byStream = perUserRetries[login] || {};
-          for(const [stream, v] of Object.entries(byStream)){
-            const ios = toInt(v?.iOS);
-            const android = toInt(v?.Android);
-            if((ios + android) <= 0) continue;
-            rowsRetry.push({
-              login,
-              full_name: fullNameByLogin[login] || login,
-              stream,
-              ios,
-              android
-            });
-          }
+          const fullName = fullNameByLogin[login] || login;
+          const aMap = casesByUserDayPlatform.Android?.[login] || {};
+          const iMap = casesByUserDayPlatform.iOS?.[login] || {};
+
+          const dayCountsA = days.map(d => toInt(aMap[d] || 0));
+          const dayCountsI = days.map(d => toInt(iMap[d] || 0));
+
+          const totalA = dayCountsA.reduce((s, n) => s + toInt(n), 0);
+          const totalI = dayCountsI.reduce((s, n) => s + toInt(n), 0);
+
+          rowsCasesAndroid.push({ login, full_name: fullName, dayCounts: dayCountsA, total: totalA });
+          rowsCasesIos.push({ login, full_name: fullName, dayCounts: dayCountsI, total: totalI });
         }
-        rowsRetry.sort((a,b) => {
-          const an = String(a.full_name||a.login||'');
-          const bn = String(b.full_name||b.login||'');
-          const c = an.localeCompare(bn, 'ru');
-          if(c !== 0) return c;
-          const cs = String(a.stream||'').localeCompare(String(b.stream||''), 'ru');
-          if(cs !== 0) return cs;
-          return String(a.login).localeCompare(String(b.login), 'ru');
-        });
 
         const amountByDay = {};
         const avgByDay = {};
@@ -1747,15 +1985,24 @@
 
         const releaseAvgAll = dailyAllAvg.length ? (dailyAllAvg.reduce((s,n)=>s+n,0) / dailyAllAvg.length) : 0;
 
-        let totalACases = 0, totalICases = 0, totalAWorkers = 0, totalIWorkers = 0;
+        const uniqueWorkersASet = new Set();
+        const uniqueWorkersISet = new Set();
+        for(const d of days){
+          const aSet = usersByDayPlatform[d]?.Android;
+          const iSet = usersByDayPlatform[d]?.iOS;
+          if(aSet) for(const u of aSet) uniqueWorkersASet.add(u);
+          if(iSet) for(const u of iSet) uniqueWorkersISet.add(u);
+        }
+        const uniqueWorkersA = uniqueWorkersASet.size || 0;
+        const uniqueWorkersI = uniqueWorkersISet.size || 0;
+
+        let totalACases = 0, totalICases = 0;
         for(const d of days){
           totalACases += toInt(amountByDay[d]?.Android || 0);
           totalICases += toInt(amountByDay[d]?.iOS || 0);
-          totalAWorkers += toInt(workersByDay[d]?.Android || 0);
-          totalIWorkers += toInt(workersByDay[d]?.iOS || 0);
         }
-        const releaseAvgA = totalAWorkers > 0 ? (totalACases / totalAWorkers) : 0;
-        const releaseAvgI = totalIWorkers > 0 ? (totalICases / totalIWorkers) : 0;
+        const releaseAvgA = uniqueWorkersA > 0 ? (totalACases / uniqueWorkersA) : 0;
+        const releaseAvgI = uniqueWorkersI > 0 ? (totalICases / uniqueWorkersI) : 0;
 
         EMP_STATE.release = release;
         EMP_STATE.days = days;
@@ -1770,6 +2017,8 @@
         chipSwat.textContent = String(swatEntries.length || 0);
         chipLaunches.textContent = String(launches.length || 0);
         chipTotalCases.textContent = String(swatTotalNoRetry || 0);
+        chipTotalCasesAndroid.textContent = String(swatTotalNoRetryAndroid || 0);
+        chipTotalCasesIos.textContent = String(swatTotalNoRetryIos || 0);
         chipAvg.textContent = overallAvgMMSS || '—';
 
         renderEmployeeTable();
@@ -1782,10 +2031,16 @@
           releaseAvgA,
           releaseAvgI,
           releaseAvgAll,
-          swatCountByDay
+          swatCountByDay,
+          uniqueWorkersA,
+          uniqueWorkersI
         });
 
-        renderRetryTable({ rows: rowsRetry });
+        CASES_STATE.days = days;
+        CASES_STATE.rowsAndroidAll = rowsCasesAndroid;
+        CASES_STATE.rowsIosAll = rowsCasesIos;
+        buildCasesFilterOptions(swatEntries.map(s => ({ login: s.login, full_name: s.full_name || s.login })));
+        updateCasesFilterFromUI();
 
         showDashContent();
         applyTab(loadActiveTab());
@@ -1819,7 +2074,7 @@
 
       tabEmp?.addEventListener('click', () => applyTab('emp'));
       tabPlat?.addEventListener('click', () => applyTab('plat'));
-      tabRetry?.addEventListener('click', () => applyTab('retry'));
+      tabCases?.addEventListener('click', () => applyTab('cases'));
 
       btnExportEmp?.addEventListener('click', exportEmployeeTableToXls);
 
