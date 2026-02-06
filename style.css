@@ -873,8 +873,15 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
   text-overflow:clip;
 }
 #casesFilterList .cases-filter-check{
-  margin-left:12px;
   flex:0 0 16px;
+  width:16px;
+  height:16px;
+  margin-left:12px;
+  padding:0;
+  border:none;
+  background:transparent;
+  appearance:auto;
+  -webkit-appearance:auto;
 }
     .dropdown-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
 
