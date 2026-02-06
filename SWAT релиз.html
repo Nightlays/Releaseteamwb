@@ -1,0 +1,2092 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>SWAT Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Tailwind CDN (как в CoreDashboard) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- SheetJS для нормального .xlsx -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- style.css рядом (тот же, что у CoreDashboard) -->
+  <link rel="stylesheet" href="./style.css" />
+    <style>
+      /* v1.0.27: enlarge SWAT count in Platform table header */
+      .plat-swat-count{ font-size:1.2em; font-weight:600; color:#111827; }
+    </style>
+</head>
+
+<body class="min-h-screen">
+  <div class="max-w-[1900px] mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="brand-badge">
+        <span class="brand-dot"></span>
+        <div>
+          <div class="flex items-center gap-2">
+            <div class="font-extrabold leading-tight">SWAT Dashboard</div>
+            <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
+              <span aria-hidden="true">🏷️</span><span>v1.0.27</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="mt-5 space-y-4">
+      <!-- Параметры -->
+      <section class="card p-5 space-y-3">
+        <div>
+          <h2 class="text-lg font-semibold">Параметры запуска</h2>
+        </div>
+
+        <form class="w-full" onsubmit="return false;">
+          <div class="border border-[#ecebff] rounded-2xl bg-white p-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div class="md:col-span-4">
+                <label class="mb-1 flex items-center justify-between text-xs font-semibold text-[#111827]">
+                  <span>Версия релиза</span>
+                  <span class="text-[11px] font-semibold text-slate-400">мин. 7.4.2000</span>
+                </label>
+                <input class="input" id="releaseVersion" type="text" inputmode="numeric" placeholder="Напр. 7.4.5000" />
+              </div>
+
+              <div class="md:col-span-6">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Allure Api-Token</label>
+                <input class="input" id="swatToken" type="password" autocomplete="off" placeholder="Вставьте Api-Token Allure TestOps" />
+                <div id="swatTokenError" class="mt-1 text-xs font-semibold text-rose-600 hidden">
+                  Не удалось выполнить запрос — обновите токен / проверьте доступ к Allure.
+                </div>
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">&nbsp;</label>
+                <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
+                <button id="stopBtn" type="button" class="btn btn-danger w-full hidden">Остановить</button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- Таблица -->
+      <section class="card p-5 space-y-4">
+        <div class="relative flex items-center">
+          <div class="min-w-[220px]">
+            <h2 class="text-lg font-semibold">Таблица SWAT</h2>
+          </div>
+
+          <!-- tabs centered -->
+          <div class="absolute left-1/2 -translate-x-1/2">
+            <div class="inline-flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-[#ecebff]">
+              <button id="tabEmp" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Детали по сотруднику</button>
+              <button id="tabPlat" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Детали по платформам</button>
+              <button id="tabCases" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Кейсы сотрудников по дням</button>
+            </div>
+          </div>
+
+          <div class="ml-auto"></div>
+        </div>
+
+        <div id="dashContent" class="hidden">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-[#ecebff] text-slate-700 text-sm font-semibold">
+              SWAT: <span id="chipSwat" class="mono">—</span>
+            </span>
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-[#ecebff] text-slate-700 text-sm font-semibold">
+              Запусков: <span id="chipLaunches" class="mono">—</span>
+            </span>
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-[#ecebff] text-slate-700 text-sm font-semibold">
+              Кейсов всего: <span id="chipTotalCases" class="mono">—</span>
+            </span>
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-[#ecebff] text-slate-600 text-sm font-semibold">
+              Всего Android: <span id="chipTotalCasesAndroid" class="mono">—</span> · Всего iOS: <span id="chipTotalCasesIos" class="mono">—</span>
+            </span>
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-[#ecebff] text-slate-700 text-sm font-semibold">
+              Общее среднее на 1 кейс: <span id="chipAvg" class="mono">—</span>
+            </span>
+
+            <button id="btnExportEmp" type="button" class="btn btn-grad ml-auto shadow-md ring-1 ring-[#ecebff] hidden">
+              Выгрузить Excel
+            </button>
+
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-[#ecebff] text-slate-600 text-sm font-semibold" id="legendEmp">
+              <span class="inline-block w-3 h-3 rounded bg-emerald-300/70 ring-1 ring-emerald-200"></span> работал
+              <span class="inline-block w-3 h-3 rounded bg-rose-300/70 ring-1 ring-rose-200 ml-2"></span> не работал
+            </span>
+          </div>
+        </div>
+
+        <div id="dashEmpty" class="text-slate-600">Данные появятся после получения из источника</div>
+
+        <!-- Tab 1: Employee -->
+        <div id="wrapEmp" class="border border-[#ecebff] rounded-2xl bg-white/70 p-2 hidden">
+          <div class="swat-table-scroll">
+            <table id="tblEmp" class="swat-emp-table">
+              <colgroup id="cgEmp"></colgroup>
+              <thead id="thEmp"></thead>
+              <tbody id="tbEmp"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Platforms -->
+        <div id="wrapPlat" class="border border-[#ecebff] rounded-2xl bg-white/70 p-2 hidden">
+          <div class="swat-table-scroll">
+            <table id="tblPlat" class="swat-fixed-table">
+              <colgroup id="cgPlat"></colgroup>
+              <thead id="thPlat"></thead>
+              <tbody id="tbPlat"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 3: Cases by day -->
+        <div id="wrapCases" class="space-y-4 hidden">
+          <div class="flex items-center justify-end px-2">
+            <div class="text-xs font-semibold text-slate-500 mr-2">Фильтр</div>
+            <div id="casesFilterDropdown" class="dropdown dropdown--slim input" style="width:220px; --bd:#ecebff">
+              <div id="casesFilterSelectedText" class="dropdown-selected truncate">Все сотрудники</div>
+              <div id="casesFilterList" class="dropdown-list"></div>
+            </div>
+          </div>
+          <div class="border border-[#ecebff] rounded-2xl bg-white overflow-hidden">
+            <div class="px-4 pt-3 pb-2 text-sm font-semibold text-slate-700">Android</div>
+            <div class="chart-viewport" id="casesAndroidViewport">
+              <canvas id="casesAndroidChart" aria-label="Cases Android chart" role="img"></canvas>
+            </div>
+          </div>
+          <div class="border border-[#ecebff] rounded-2xl bg-white overflow-hidden">
+            <div class="px-4 pt-3 pb-2 text-sm font-semibold text-slate-700">iOS</div>
+            <div class="chart-viewport" id="casesIosViewport">
+              <canvas id="casesIosChart" aria-label="Cases iOS chart" role="img"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="swat-toast">
+    <div id="toastInner"></div>
+  </div>
+
+  <!-- Popover for "Проходил" (без затемнения) -->
+  <div id="pathPopover" class="swat-popover hidden" role="dialog" aria-modal="false">
+    <div class="swat-popover-head">
+      <div class="min-w-0">
+        <div id="pathPopoverTitle" class="swat-popover-title">Проходил</div>
+        <div id="pathPopoverSub" class="swat-popover-sub mono"></div>
+      </div>
+      <div class="swat-popover-actions">
+        <button id="pathPopoverCopy" type="button" class="swat-popover-btn" title="Копировать">⧉</button>
+        <button id="pathPopoverClose" type="button" class="swat-popover-btn" title="Закрыть">✕</button>
+      </div>
+    </div>
+    <pre id="pathPopoverBody" class="swat-popover-body"></pre>
+  </div>
+
+  <script>
+    (function(){
+      // ===== Consts =====
+      const ALLURE_BASE_URL = 'https://allure-testops.wb.ru';
+      const PROJECT_ID = 7;
+
+      const LS_SWAT_TOKEN = 'swat_uwu_token';
+      const LS_RELEASE = 'swat_uwu_release';
+      const LS_COLW = 'swat_dashboard_col_widths_v3';
+      const LS_TAB = 'swat_dashboard_active_tab_v1';
+
+      const SWAT_DAYS_URL = 'https://script.google.com/macros/s/AKfycbwr0XB69uSvHtUDczPUq96NEpSwmcSuwj_KbZ3ULcu-2mVG9MtMcdH409dD-X6ozVL_Ug/exec';
+
+      // ===== Els =====
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn  = document.getElementById('stopBtn');
+
+      const inpRelease = document.getElementById('releaseVersion');
+      const inpToken   = document.getElementById('swatToken');
+      const tokenErrEl = document.getElementById('swatTokenError');
+
+      const dashEmpty   = document.getElementById('dashEmpty');
+      const dashContent = document.getElementById('dashContent');
+
+      const chipSwat = document.getElementById('chipSwat');
+      const chipLaunches = document.getElementById('chipLaunches');
+      const chipTotalCases = document.getElementById('chipTotalCases');
+      const chipTotalCasesAndroid = document.getElementById('chipTotalCasesAndroid');
+      const chipTotalCasesIos = document.getElementById('chipTotalCasesIos');
+      const chipAvg = document.getElementById('chipAvg');
+
+      const btnExportEmp = document.getElementById('btnExportEmp');
+
+      // tabs
+      const tabEmp = document.getElementById('tabEmp');
+      const tabPlat = document.getElementById('tabPlat');
+      const tabCases = document.getElementById('tabCases');
+
+      const wrapEmp = document.getElementById('wrapEmp');
+      const wrapPlat = document.getElementById('wrapPlat');
+      const wrapCases = document.getElementById('wrapCases');
+
+      const legendEmp = document.getElementById('legendEmp');
+
+      let casesAndroidChart = null;
+      let casesIosChart = null;
+
+      // tables
+      const cgEmp = document.getElementById('cgEmp');
+      const thEmp = document.getElementById('thEmp');
+      const tbEmp = document.getElementById('tbEmp');
+      const tblEmp = document.getElementById('tblEmp');
+
+      const cgPlat = document.getElementById('cgPlat');
+      const thPlat = document.getElementById('thPlat');
+      const tbPlat = document.getElementById('tbPlat');
+
+      const casesAndroidCanvas = document.getElementById('casesAndroidChart');
+      const casesIosCanvas = document.getElementById('casesIosChart');
+      const casesFilterDropdown = document.getElementById('casesFilterDropdown');
+      const casesFilterSelectedText = document.getElementById('casesFilterSelectedText');
+      const casesFilterList = document.getElementById('casesFilterList');
+
+      // popover
+      const pathPopover = document.getElementById('pathPopover');
+      const pathPopoverClose = document.getElementById('pathPopoverClose');
+      const pathPopoverCopy = document.getElementById('pathPopoverCopy');
+      const pathPopoverTitle = document.getElementById('pathPopoverTitle');
+      const pathPopoverSub = document.getElementById('pathPopoverSub');
+      const pathPopoverBody = document.getElementById('pathPopoverBody');
+
+      // toast
+      const toastEl = document.getElementById('toast');
+      const toastInner = document.getElementById('toastInner');
+
+      // ===== State =====
+      const EMP_STATE = {
+        release: '',
+        days: [],
+        rows: [],
+        overallAvgMMSS: '—',
+        sortKey: 'name',
+        sortDir: 1
+      };
+      const CASES_STATE = {
+        days: [],
+        rowsAndroidAll: [],
+        rowsIosAll: [],
+        users: [],
+        selectedLogins: new Set()
+      };
+
+      // popover state
+      let __pathPopoverOpen = false;
+      let __pathPopoverLastText = '';
+      let __pathPopoverAnchor = null;
+
+      // ===== UI helpers =====
+      function initDropdown(dd){
+        if(!dd) return;
+        const sel = dd.querySelector('.dropdown-selected');
+        if(!sel) return;
+        sel.addEventListener('click', (e) => {
+          e.stopPropagation();
+          dd.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+          if(!dd.contains(e.target)) dd.classList.remove('open');
+        });
+      }
+
+      function showToast(msg, ok=true){
+        if(!toastEl || !toastInner) return;
+        toastInner.textContent = msg;
+        toastInner.className = 'px-4 py-2 rounded-2xl text-sm font-semibold ring-1 shadow ' + (ok
+          ? 'bg-white/90 ring-[#ecebff] text-slate-700'
+          : 'bg-rose-50 ring-rose-200 text-rose-700'
+        );
+        toastEl.classList.add('swat-toast-show');
+        clearTimeout(showToast.__t);
+        showToast.__t = setTimeout(() => { toastEl.classList.remove('swat-toast-show'); }, 1800);
+      }
+
+      function setHidden(el, hidden){
+        if(!el) return;
+        el.classList.toggle('hidden', !!hidden);
+      }
+
+      function setRunning(running){
+        if(running){
+          setHidden(startBtn, true);
+          setHidden(stopBtn, false);
+          window.__swatAbort = new AbortController();
+        }else{
+          setHidden(stopBtn, true);
+          setHidden(startBtn, false);
+          try{ window.__swatAbort?.abort(); }catch(e){}
+          window.__swatAbort = null;
+        }
+      }
+
+      function showDashEmpty(text){
+        dashEmpty.textContent = text;
+        setHidden(dashEmpty, false);
+        setHidden(dashContent, true);
+        setHidden(wrapEmp, true);
+        setHidden(wrapPlat, true);
+        setHidden(wrapCases, true);
+        setHidden(btnExportEmp, true);
+      }
+
+      function showDashContent(){
+        setHidden(dashEmpty, true);
+        setHidden(dashContent, false);
+      }
+
+      function clearTokenError(){ setHidden(tokenErrEl, true); }
+      function showTokenError(){ setHidden(tokenErrEl, false); }
+
+      function escapeHtml(s){
+        return String(s ?? '')
+          .replaceAll('&','&amp;')
+          .replaceAll('<','&lt;')
+          .replaceAll('>','&gt;')
+          .replaceAll('"','&quot;')
+          .replaceAll("'","&#039;");
+      }
+
+      initDropdown(casesFilterDropdown);
+      if(casesFilterList){
+        casesFilterList.addEventListener('change', (e) => {
+          const t = e.target;
+          if(!(t instanceof HTMLInputElement)) return;
+          if(t.dataset.all === '1'){
+            const on = t.checked;
+            casesFilterList.querySelectorAll('input[data-login="1"]').forEach(cb => { cb.checked = on; });
+          }
+          updateCasesFilterFromUI();
+        });
+      }
+
+      // ===== Popover (Проходил) =====
+      function closePathPopover(){
+        if(!pathPopover) return;
+        setHidden(pathPopover, true);
+        __pathPopoverOpen = false;
+        __pathPopoverLastText = '';
+        __pathPopoverAnchor = null;
+      }
+
+      async function copyTextToClipboard(text){
+        const t = String(text || '');
+        if(!t) return;
+        try{
+          await navigator.clipboard.writeText(t);
+        }catch(e){
+          const ta = document.createElement('textarea');
+          ta.value = t;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          ta.style.top = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try{ document.execCommand('copy'); }catch(_e){}
+          ta.remove();
+        }
+      }
+
+      function positionPopoverNearAnchor(anchorEl){
+        if(!pathPopover || !anchorEl) return;
+
+        const rect = anchorEl.getBoundingClientRect();
+        const popRect = pathPopover.getBoundingClientRect();
+
+        const gap = 10;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        let left = rect.right + gap;
+        let top = rect.top;
+
+        if(left + popRect.width > vw - 8){
+          left = rect.left - gap - popRect.width;
+        }
+
+        left = Math.max(8, Math.min(left, vw - popRect.width - 8));
+
+        if(top + popRect.height > vh - 8){
+          top = vh - popRect.height - 8;
+        }
+        top = Math.max(8, Math.min(top, vh - popRect.height - 8));
+
+        pathPopover.style.left = `${Math.round(left)}px`;
+        pathPopover.style.top  = `${Math.round(top)}px`;
+      }
+
+      function openPathPopover(anchorEl, title, sub, body){
+        if(!pathPopover) return;
+
+        pathPopoverTitle.textContent = title || 'Проходил';
+        pathPopoverSub.textContent = sub || '';
+        pathPopoverBody.textContent = body || '';
+
+        __pathPopoverLastText = body || '';
+        __pathPopoverAnchor = anchorEl;
+
+        setHidden(pathPopover, false);
+        __pathPopoverOpen = true;
+
+        requestAnimationFrame(() => positionPopoverNearAnchor(anchorEl));
+      }
+
+      pathPopoverClose?.addEventListener('click', closePathPopover);
+
+      pathPopoverCopy?.addEventListener('click', async () => {
+        await copyTextToClipboard(__pathPopoverLastText);
+        showToast('Скопировано', true);
+      });
+
+      document.addEventListener('mousedown', (e) => {
+        if(!__pathPopoverOpen) return;
+        const t = e.target;
+
+        if(pathPopover && pathPopover.contains(t)) return;
+        const cell = t?.closest?.('.swat-path-cell');
+        if(cell) return;
+
+        closePathPopover();
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape' && __pathPopoverOpen) closePathPopover();
+      });
+
+      tbEmp?.addEventListener('click', (e) => {
+        const cell = e.target?.closest?.('.swat-path-cell');
+        if(!cell) return;
+
+        const title = cell.getAttribute('data-modal-title') || 'Проходил';
+        const sub = cell.getAttribute('data-modal-sub') || '';
+        const body = (cell.getAttribute('data-modal-body') || '').replaceAll('&#10;', '\n');
+
+        if(__pathPopoverOpen && __pathPopoverAnchor === cell){
+          closePathPopover();
+          return;
+        }
+
+        openPathPopover(cell, title, sub, body);
+      });
+
+      // ===== Storage =====
+      function saveInputs(){
+        try{ localStorage.setItem(LS_SWAT_TOKEN, inpToken.value || ''); }catch(e){}
+        try{ localStorage.setItem(LS_RELEASE, inpRelease.value || ''); }catch(e){}
+      }
+      function restoreInputs(){
+        try{ inpToken.value = localStorage.getItem(LS_SWAT_TOKEN) || ''; }catch(e){}
+        try{ inpRelease.value = localStorage.getItem(LS_RELEASE) || ''; }catch(e){}
+      }
+
+      function loadActiveTab(){
+        try{
+          const v = localStorage.getItem(LS_TAB) || 'emp';
+          if(v === 'retry') return 'cases';
+          if(v === 'emp' || v === 'plat' || v === 'cases') return v;
+          return 'emp';
+        }catch(e){ return 'emp'; }
+      }
+      function saveActiveTab(v){
+        try{ localStorage.setItem(LS_TAB, v); }catch(e){}
+      }
+
+      // ===== Utils =====
+      function allureHeaders(){
+        const tok = (inpToken?.value || '').trim();
+        return { 'Accept': 'application/json', 'Authorization': `Api-Token ${tok}` };
+      }
+
+      async function getJson(url, headers, signal){
+        const r = await fetch(url, { headers, signal });
+        if(!r.ok){
+          const err = new Error(`HTTP ${r.status}`);
+          err.status = r.status;
+          throw err;
+        }
+        return r.json();
+      }
+
+      function b64Query(obj){
+        const json = JSON.stringify(obj);
+        const bytes = new TextEncoder().encode(json);
+        let bin = '';
+        for(const b of bytes) bin += String.fromCharCode(b);
+        return btoa(bin);
+      }
+
+      function toInt(x){ const n = Number(x); return Number.isFinite(n) ? n : 0; }
+      function toNum(x){ const n = Number(x); return Number.isFinite(n) ? n : 0; }
+
+      function platformOfLaunchName(name){
+        const s = String(name || '');
+        if(s.includes('[Android]')) return 'Android';
+        if(s.includes('[iOS]')) return 'iOS';
+        return 'Other';
+      }
+
+      function shortStreamName(launchName){
+        const name = String(launchName || '').trim();
+        const m = /\[Stream\s*([^\]]+)\]/i.exec(name);
+        if(m && m[1]) return m[1].trim();
+        return name
+          .replace(/\[High\/Blocker\]\s*/g, '')
+          .replace(/\[DeployLab\]\s*/g, '')
+          .replace(/\s*\[(Android|iOS)\]\s*/g, ' ')
+          .trim();
+      }
+
+      function memberTotalCount(memberItem){
+        let cnt = 0;
+        const s = Array.isArray(memberItem?.statistic) ? memberItem.statistic : [];
+        for(const it of s){
+          if(!('status' in it) || it.status == null) continue;
+          cnt += toInt(it.count);
+        }
+        return cnt;
+      }
+
+      function fmtMMSSFromMs(ms){
+        const totalSec = Math.max(0, Math.round(ms / 1000));
+        const mm = Math.floor(totalSec / 60);
+        const ss = totalSec % 60;
+        return `${mm}:${String(ss).padStart(2,'0')}`;
+      }
+
+      function fmtHoursFromMinutes(min){
+        const m = Math.max(0, toNum(min));
+        if(m <= 0) return '0';
+        return (m / 60).toFixed(2);
+      }
+
+      // v1.0.27: display hours as HH:MM (not decimal)
+      function fmtHHMMFromMinutes(min){
+        const m = Math.max(0, Math.round(toNum(min)));
+        const hh = Math.floor(m / 60);
+        const mm = m % 60;
+        return `${hh}:${String(mm).padStart(2,'0')}`;
+      }
+
+      // v1.0.27: UwU formatter (borrowed behavior from uwu_7)
+      function fmtUwU(n){
+        const x = toNum(n);
+        if(!Number.isFinite(x) || x <= 0) return '0';
+        const s = x.toFixed(2);
+        return s.replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+      }
+
+      function fmtShiftHours(h){
+        const n = toNum(h);
+        if(!Number.isFinite(n) || n <= 0) return '';
+        const s = String(n);
+        return s.endsWith('.0') ? s.slice(0, -2) : s;
+      }
+
+      function ruDowShort(dateStr){
+        const [y,m,d] = String(dateStr).split('-').map(n => parseInt(n, 10));
+        const dt = new Date(Date.UTC(y, (m||1)-1, d||1));
+        const day = dt.getUTCDay();
+        return ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'][day] || '—';
+      }
+
+      function ddmm(dateStr){
+        const [y,m,d] = String(dateStr).split('-');
+        if(!m || !d) return dateStr;
+        return `${String(d).padStart(2,'0')}.${String(m).padStart(2,'0')}`;
+      }
+
+      function toMskDateKeyFromEpochMs(ms){
+        const d = new Date(toInt(ms) + 3*60*60*1000);
+        return d.toISOString().slice(0,10);
+      }
+
+      async function mapLimit(items, limit, fn, signal){
+        const out = new Array(items.length);
+        let idx = 0;
+        const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+          while(true){
+            const cur = idx++;
+            if(cur >= items.length) break;
+            if(signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+            out[cur] = await fn(items[cur], cur);
+          }
+        });
+        await Promise.all(workers);
+        return out;
+      }
+
+      // ===== Column widths (persisted) =====
+      function loadColWidths(){
+        try{
+          const raw = localStorage.getItem(LS_COLW);
+          if(!raw) return {};
+          const obj = JSON.parse(raw);
+          return (obj && typeof obj === 'object') ? obj : {};
+        }catch(e){ return {}; }
+      }
+      function saveColWidths(map){
+        try{ localStorage.setItem(LS_COLW, JSON.stringify(map || {})); }catch(e){}
+      }
+
+      function bindResizable(theadEl, colgroupEl){
+        const handles = theadEl.querySelectorAll('.col-resize-handle');
+        handles.forEach(h => {
+          h.onmousedown = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+
+            const fullKey = h.getAttribute('data-col');
+            if(!fullKey) return;
+
+            const col = colgroupEl.querySelector(`col[data-col="${CSS.escape(fullKey)}"]`);
+            if(!col) return;
+
+            const widthsMap = loadColWidths();
+            const startX = ev.clientX;
+
+            const startW = parseInt(col.getAttribute('width') || col.width || '0', 10) || 120;
+            const minW = parseInt(h.getAttribute('data-minw') || '70', 10) || 70;
+
+            document.body.classList.add('col-resizing');
+
+            function onMove(e2){
+              const dx = e2.clientX - startX;
+              const next = Math.max(minW, Math.round(startW + dx));
+              col.setAttribute('width', String(next));
+            }
+            function onUp(){
+              document.removeEventListener('mousemove', onMove);
+              document.removeEventListener('mouseup', onUp);
+              document.body.classList.remove('col-resizing');
+              const finalW = parseInt(col.getAttribute('width') || col.width || '0', 10) || startW;
+              widthsMap[fullKey] = finalW;
+              saveColWidths(widthsMap);
+            }
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+          };
+
+          h.onclick = (e) => { e.preventDefault(); e.stopPropagation(); };
+        });
+      }
+
+      function applyTab(active){
+        const btnBase = 'px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff] transition-all';
+        const on  = btnBase + ' bg-white text-slate-900 shadow-md';
+        const off = btnBase + ' text-slate-700 hover:bg-white/60';
+
+        tabEmp.className   = (active === 'emp')   ? on : off;
+        tabPlat.className  = (active === 'plat')  ? on : off;
+        tabCases.className = (active === 'cases') ? on : off;
+
+        setHidden(wrapEmp, active !== 'emp');
+        setHidden(wrapPlat, active !== 'plat');
+        setHidden(wrapCases, active !== 'cases');
+
+        setHidden(legendEmp, active !== 'emp');
+        setHidden(btnExportEmp, !(active === 'emp' && EMP_STATE.rows.length));
+
+        saveActiveTab(active);
+
+        closePathPopover();
+      }
+
+      // ===== Sorting =====
+      function normalizeStr(s){ return String(s||'').toLowerCase(); }
+
+      function sortEmpRows(){
+        const { sortKey, sortDir } = EMP_STATE;
+        const dir = sortDir;
+
+        const getVal = (r) => {
+          switch(sortKey){
+            case 'name': return normalizeStr(r.full_name || r.login);
+            case 'target': return normalizeStr(r.targetStream || '');
+            case 'uwu': return toNum(r.uwuSum || 0);
+            case 'iosh': return toInt(r.iosMinutes ?? 0);
+            case 'andh': return toInt(r.androidMinutes ?? 0);
+            case 'iosc': return toInt(r.iosCases);
+            case 'andc': return toInt(r.androidCases);
+            case 'avg': return toNum(r.avgMsPerCase || 0);
+            default: return normalizeStr(r.full_name || r.login);
+          }
+        };
+
+        EMP_STATE.rows.sort((a,b) => {
+          const av = getVal(a);
+          const bv = getVal(b);
+
+          if(typeof av === 'number' && typeof bv === 'number'){
+            if(bv === av) return (normalizeStr(a.full_name||a.login)).localeCompare(normalizeStr(b.full_name||b.login),'ru');
+            return (av < bv ? -1 : 1) * dir;
+          }
+
+          const c = String(av).localeCompare(String(bv), 'ru');
+          if(c !== 0) return c * dir;
+          return (normalizeStr(a.full_name||a.login)).localeCompare(normalizeStr(b.full_name||b.login),'ru');
+        });
+      }
+
+      function setSort(key){
+        if(EMP_STATE.sortKey === key){
+          EMP_STATE.sortDir = EMP_STATE.sortDir === 1 ? -1 : 1;
+        }else{
+          EMP_STATE.sortKey = key;
+          EMP_STATE.sortDir = 1;
+        }
+        sortEmpRows();
+        renderEmployeeTable();
+      }
+
+      // ===== Data fetch =====
+      async function fetchSwatDaysBundle(release, signal){
+        const u = new URL(SWAT_DAYS_URL);
+        u.searchParams.set('release', release);
+        const r = await fetch(u.toString(), { signal });
+        if(!r.ok) throw new Error(`SWAT days HTTP ${r.status}`);
+        return r.json();
+      }
+
+      async function fetchLaunchesHB(version, signal){
+        const terms = [
+          `[High/Blocker][DeployLab] Регресс ${version}`,
+          `[High/Blocker] Регресс ${version}`
+        ];
+
+        const uniq = new Map();
+        const size = 1000;
+
+        for(const term of terms){
+          const search = b64Query([{ id:'name', type:'string', value: term }]);
+          let page = 0;
+
+          while(true){
+            const url = new URL(ALLURE_BASE_URL + '/api/launch');
+            url.searchParams.set('page', String(page));
+            url.searchParams.set('size', String(size));
+            url.searchParams.set('search', search);
+            url.searchParams.set('projectId', String(PROJECT_ID));
+            url.searchParams.set('preview', 'true');
+            url.searchParams.set('sort', 'createdDate,desc');
+
+            const data = await getJson(url.toString(), allureHeaders(), signal);
+            const content = Array.isArray(data?.content) ? data.content : [];
+            if(!content.length) break;
+
+            for(const it of content){
+              const id = toInt(it?.id);
+              if(!id) continue;
+              uniq.set(id, it);
+            }
+
+            if(content.length < size) break;
+            page += 1;
+          }
+        }
+
+        return Array.from(uniq.values());
+      }
+
+      async function fetchMemberStats(launchId, signal){
+        const url = new URL(`${ALLURE_BASE_URL}/api/launch/${launchId}/memberstats`);
+        url.searchParams.set('size', '1000');
+        url.searchParams.set('page', '0');
+        const data = await getJson(url.toString(), allureHeaders(), signal);
+        if(Array.isArray(data)) return data;
+        if(data && typeof data === 'object' && Array.isArray(data.content)) return data.content;
+        return [];
+      }
+
+      async function fetchTimeline(launchId, signal){
+        const url = new URL(`${ALLURE_BASE_URL}/api/testresult/timeline`);
+        url.searchParams.set('launchId', String(launchId));
+        url.searchParams.set('label', 'host, thread');
+        return getJson(url.toString(), allureHeaders(), signal);
+      }
+
+      function walkTimelineGroups(node, onLeaf){
+        if(!node) return;
+        if(Array.isArray(node.leafs)){
+          for(const leaf of node.leafs) onLeaf(leaf);
+        }
+        if(Array.isArray(node.groups)){
+          for(const g of node.groups) walkTimelineGroups(g, onLeaf);
+        }
+      }
+
+      
+      // ===== UwU (borrowed from uwu_7) =====
+      const UWU_PAGE_SIZE = 500;
+      const uwuCache = new Map();
+
+      async function listLeaf(launchId, signal){
+        let items = [];
+        let page = 0;
+        while(true){
+          const url = new URL(`${ALLURE_BASE_URL}/api/testresulttree/leaf`);
+          url.searchParams.set('launchId', String(launchId));
+          url.searchParams.set('sort', 'name,asc');
+          url.searchParams.set('size', String(UWU_PAGE_SIZE));
+          url.searchParams.set('page', String(page));
+          const data = await getJson(url.toString(), allureHeaders(), signal);
+          const content = (data && data.content) || [];
+          if(!Array.isArray(content) || content.length === 0) break;
+          items = items.concat(content);
+          if(content.length < UWU_PAGE_SIZE) break;
+          page += 1;
+        }
+        return items;
+      }
+
+      async function getUwU(tcid, signal){
+        if(uwuCache.has(tcid)) return uwuCache.get(tcid);
+
+        let uwuVal = null;
+        let platformVal = null;
+
+        try{
+          const data = await getJson(`${ALLURE_BASE_URL}/api/testcase/${tcid}/overview`, allureHeaders(), signal);
+          const fields = (data && data.customFields) || [];
+
+          for(const cf of fields){
+            const cfInfo = cf.customField || {};
+            const cfName = (cfInfo.name || '').trim();
+
+            if(cfName === 'UwU'){
+              let v = cf.name;
+              if(!v){
+                const vals = cf.values || [];
+                if(vals.length && vals[0]) v = vals[0].name;
+              }
+              if(v) uwuVal = String(v);
+            }else if(cfName === 'Platform'){
+              let p = cf.name;
+              if(!p){
+                const vals = cf.values || [];
+                if(vals.length && vals[0]) p = vals[0].name;
+              }
+              if(p) platformVal = String(p);
+            }
+          }
+        }catch(e){
+          console.error('UwU fetch error for', tcid, e);
+        }
+
+        const result = { uwuRaw: uwuVal, platform: platformVal };
+        uwuCache.set(tcid, result);
+        return result;
+      }
+
+      function parseUwUNumber(raw){
+        if(raw === null || raw === undefined) return 0;
+        const s = String(raw).trim();
+        if(!s || s === '0') return 0;
+        const num = parseFloat(s.replace(',', '.'));
+        return Number.isFinite(num) ? num : 0;
+      }
+
+// ===== Render: Employee table (#1) =====
+      function renderEmployeeTable(){
+        const days = EMP_STATE.days;
+        const rows = EMP_STATE.rows;
+
+        const widthsSaved = loadColWidths();
+
+        const fixedCols = [
+          { key:'name',   w: 260, min:170, title:'SWAT', sortableKey:'name', sticky:true },
+          { key:'target', w: 320, min:170, title:'Целевой стрим', sortableKey:'target' },
+          { key:'path',   w: 520, min:220, title:'Проходил', sortableKey:null },
+          { key:'iosh',   w: 150, min:120, title:'iOS (ч/м)', sortableKey:'iosh', align:'right' },
+          { key:'andh',   w: 160, min:120, title:'Android (ч/м)', sortableKey:'andh', align:'right' },
+          { key:'iosc',   w: 120, min:90,  title:'Кейсы iOS', sortableKey:'iosc', align:'right' },
+          { key:'andc',   w: 140, min:100, title:'Кейсы Android', sortableKey:'andc', align:'right' },
+          { key:'avg',    w: 160, min:120, title:'Среднее кейс', sortableKey:'avg', align:'right' },
+          { key:'uwu',    w: 120, min:90,  title:'uWu', sortableKey:'uwu', align:'right' }
+        ];
+        const dayW = 110;
+
+        cgEmp.innerHTML =
+          fixedCols.map(c => {
+            const fullKey = `emp:${c.key}`;
+            const w = toInt(widthsSaved[fullKey]) || c.w;
+            return `<col data-col="${escapeHtml(fullKey)}" width="${w}">`;
+          }).join('') +
+          days.map(d => {
+            const fullKey = `emp:day:${d}`;
+            const w = toInt(widthsSaved[fullKey]) || dayW;
+            return `<col data-col="${escapeHtml(fullKey)}" width="${w}">`;
+          }).join('');
+
+        const dayHeaders = days.map((d) => {
+          const fullKey = `emp:day:${d}`;
+          const dow = ruDowShort(d);
+          const dt = ddmm(d);
+          return `
+            <th class="text-center whitespace-nowrap" title="${escapeHtml(dow + ' ' + dt)}">
+              <div class="th-wrap">
+                <div class="th-title">
+                  <div class="leading-tight">
+                    <div class="font-semibold">${escapeHtml(dow)}</div>
+                    <div class="text-xs text-slate-500 mono">${escapeHtml(dt)}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-resize-handle" data-col="${escapeHtml(fullKey)}" data-minw="80"></div>
+            </th>
+          `;
+        }).join('');
+
+        thEmp.innerHTML = `
+          <tr>
+            ${fixedCols.map((c) => {
+              const fullKey = `emp:${c.key}`;
+              const align = c.align ? `text-${c.align}` : 'text-left';
+              const sortable = c.sortableKey ? 'sortable' : '';
+              const sticky = c.sticky ? 'sticky-name' : '';
+              const isSorted = (EMP_STATE.sortKey === c.sortableKey);
+              const ind = !c.sortableKey ? '' : (isSorted ? `<span class="sort-ind">${EMP_STATE.sortDir === 1 ? '▲' : '▼'}</span>` : `<span class="sort-ind">↕</span>`);
+              return `
+                <th class="${align} ${sortable} ${sticky} whitespace-nowrap"
+                    ${c.sortableKey ? `data-sort-key="${escapeHtml(c.sortableKey)}"` : ''}
+                    title="${escapeHtml(c.title)}">
+                  <div class="th-wrap">
+                    <div class="th-title">${escapeHtml(c.title)}${ind}</div>
+                  </div>
+                  <div class="col-resize-handle" data-col="${escapeHtml(fullKey)}" data-minw="${c.min}"></div>
+                </th>
+              `;
+            }).join('')}
+            ${dayHeaders}
+          </tr>
+        `;
+
+        bindResizable(thEmp, cgEmp);
+
+        thEmp.querySelectorAll('th[data-sort-key]').forEach(th => {
+          th.addEventListener('click', (ev) => {
+            if(ev.target && ev.target.closest && ev.target.closest('.col-resize-handle')) return;
+            const k = th.getAttribute('data-sort-key');
+            if(k) setSort(k);
+          });
+        });
+
+        tbEmp.innerHTML = '';
+        const frag = document.createDocumentFragment();
+
+        rows.forEach((r) => {
+          const tr = document.createElement('tr');
+
+          const displayName = r.full_name || r.login;
+          const nameTitle = `${displayName} (${r.login})`;
+
+          const targetText = r.targetStream || '—';
+          const targetHtml = `<span class="cell-ellipsis" title="${escapeHtml(targetText)}">${escapeHtml(targetText)}</span>`;
+
+          const pathText = r.allStreamsText?.length ? r.allStreamsText : '—';
+          const pathTitle = r.allStreamsHover || pathText;
+
+          const bodyAttr = escapeHtml(pathTitle).replaceAll('\n','&#10;');
+          const titleAttr = `Проходил`;
+          const subAttr = `${displayName} (${r.login})`;
+
+          const pathHtml = `<span class="cell-ellipsis">${escapeHtml(pathText)}</span>`;
+
+          const avgPerCase = r.avgMsPerCase > 0 ? fmtMMSSFromMs(r.avgMsPerCase) : '—';
+
+          const dayCells = r.days.map(dc => {
+            const ring = dc.worked ? 'ring-emerald-200' : 'ring-rose-200';
+            const cls = dc.worked ? 'day-worked' : 'day-not-worked';
+            const txt = dc.text || '';
+            const title = dc.title || '';
+            return `
+              <td class="day-cell ${cls} text-center whitespace-nowrap ring-1 ${ring} font-semibold" title="${escapeHtml(title)}">
+                <span class="cell-ellipsis">${escapeHtml(txt)}</span>
+              </td>
+            `;
+          }).join('');
+
+          tr.innerHTML = `
+            <td class="sticky-name text-left whitespace-nowrap font-semibold" title="${escapeHtml(nameTitle)}">
+              <span class="cell-ellipsis">${escapeHtml(displayName)}</span>
+            </td>
+            <td class="text-left">${targetHtml}</td>
+            <td class="text-left swat-path-cell" data-modal-title="${escapeHtml(titleAttr)}" data-modal-sub="${escapeHtml(subAttr)}" data-modal-body="${bodyAttr}">
+              ${pathHtml}
+            </td>
+            <td class="text-right whitespace-nowrap mono" title="${escapeHtml(r.iosHoursDec)}"><span class="cell-ellipsis">${escapeHtml(r.iosHoursDec)}</span></td>
+            <td class="text-right whitespace-nowrap mono" title="${escapeHtml(r.androidHoursDec)}"><span class="cell-ellipsis">${escapeHtml(r.androidHoursDec)}</span></td>
+            <td class="text-right whitespace-nowrap mono" title="${escapeHtml(String(r.iosCases || 0))}"><span class="cell-ellipsis">${escapeHtml(String(r.iosCases || 0))}</span></td>
+            <td class="text-right whitespace-nowrap mono" title="${escapeHtml(String(r.androidCases || 0))}"><span class="cell-ellipsis">${escapeHtml(String(r.androidCases || 0))}</span></td>
+            <td class="text-right whitespace-nowrap mono" title="${escapeHtml(avgPerCase)}"><span class="cell-ellipsis">${escapeHtml(avgPerCase)}</span></td>
+            <td class="text-right whitespace-nowrap mono" title="${escapeHtml(String(r.uwuText || '0'))}"><span class="cell-ellipsis">${escapeHtml(String(r.uwuText || '0'))}</span></td>
+            ${dayCells}
+          `;
+
+          frag.appendChild(tr);
+        });
+
+        tbEmp.appendChild(frag);
+      }
+
+      // ===== Render: Platform table (#2) =====
+      function renderPlatformTable(platformModel){
+        const { days, amountByDay, avgByDay, workersByDay, releaseAvgA, releaseAvgI, releaseAvgAll, swatCountByDay, uniqueWorkersA, uniqueWorkersI } = platformModel;
+
+        const widthsSaved = loadColWidths();
+
+        const cols = [
+          { key:'row', w: 220, min:150 },
+          ...days.map(d => ({ key:`day:${d}`, w: 96, min:85 })),
+          { key:'sumA', w: 140, min:110 },
+          { key:'sumI', w: 140, min:110 }
+        ];
+
+        cgPlat.innerHTML = cols.map(c => {
+          const fullKey = `plat:${c.key}`;
+          const w = toInt(widthsSaved[fullKey]) || c.w;
+          return `<col data-col="${escapeHtml(fullKey)}" width="${w}">`;
+        }).join('');
+
+        const dayHeaders = days.map(d => {
+          const dow = ruDowShort(d);
+          const dt = ddmm(d);
+          const cnt = toInt(swatCountByDay?.[d] || 0);
+          const fullKey = `plat:day:${d}`;
+          const top = `${dow}`;
+          const bottom = `${dt}`;
+          const bottomHtml = `${escapeHtml(dt)} (<span class="plat-swat-count">${escapeHtml(String(cnt))}</span>)`;
+          return `
+            <th class="text-center whitespace-nowrap" title="${escapeHtml(dow + ' ' + dt + ' (' + cnt + ')')}">
+              <div class="th-wrap">
+                <div class="th-title">
+                  <div class="leading-tight">
+                    <div class="font-semibold">${escapeHtml(top)}</div>
+                    <div class="text-xs text-slate-500 mono">${bottomHtml}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-resize-handle" data-col="${escapeHtml(fullKey)}" data-minw="80"></div>
+            </th>
+          `;
+        }).join('');
+
+        thPlat.innerHTML = `
+          <tr>
+            <th class="text-left whitespace-nowrap" title="Платформа / метрика">
+              <div class="th-wrap"><div class="th-title"> </div></div>
+              <div class="col-resize-handle" data-col="plat:row" data-minw="150"></div>
+            </th>
+            ${dayHeaders}
+            <th class="text-center whitespace-nowrap" title="Среднее Android за релиз">
+              <div class="th-wrap"><div class="th-title">Android общее</div></div>
+              <div class="col-resize-handle" data-col="plat:sumA" data-minw="110"></div>
+            </th>
+            <th class="text-center whitespace-nowrap" title="Среднее iOS за релиз">
+              <div class="th-wrap"><div class="th-title">iOS общее</div></div>
+              <div class="col-resize-handle" data-col="plat:sumI" data-minw="110"></div>
+            </th>
+          </tr>
+        `;
+
+        bindResizable(thPlat, cgPlat);
+
+        function cell(txt, title){
+          const s = (txt === null || txt === undefined) ? '' : String(txt);
+          return `<td class="text-center whitespace-nowrap mono" title="${escapeHtml(title || s)}"><span class="cell-ellipsis">${escapeHtml(s)}</span></td>`;
+        }
+
+        const aRel = releaseAvgA.toFixed(2);
+        const iRel = releaseAvgI.toFixed(2);
+        const allRel = releaseAvgAll.toFixed(2);
+
+        const androidAmounts = days.map(d => toInt(amountByDay[d]?.Android || 0));
+        const iosAmounts = days.map(d => toInt(amountByDay[d]?.iOS || 0));
+        const allAmounts = days.map(d => toInt(amountByDay[d]?.All || 0));
+
+        const androidAvg = days.map(d => toNum(avgByDay[d]?.Android || 0));
+        const iosAvg = days.map(d => toNum(avgByDay[d]?.iOS || 0));
+        const allAvg = days.map(d => toNum(avgByDay[d]?.All || 0));
+
+        const totalACases = androidAmounts.reduce((s, n) => s + toInt(n), 0);
+        const totalICases = iosAmounts.reduce((s, n) => s + toInt(n), 0);
+        const sumAllAvg = allAvg.reduce((s, n) => s + toNum(n), 0);
+        const relAllCalc = days.length ? (sumAllAvg / days.length) : 0;
+
+        tbPlat.innerHTML = `
+          <tr>
+            <td class="text-left font-semibold">Android</td>
+            ${androidAmounts.map((v, idx) => {
+              const d = days[idx];
+              const w = toInt(workersByDay[d]?.Android || 0);
+              return cell(v, `Кейсов: ${v}\nСотрудников: ${w}`);
+            }).join('')}
+            ${cell('', '')}
+            ${cell('', '')}
+          </tr>
+          <tr>
+            <td class="text-left font-semibold">iOS</td>
+            ${iosAmounts.map((v, idx) => {
+              const d = days[idx];
+              const w = toInt(workersByDay[d]?.iOS || 0);
+              return cell(v, `Кейсов: ${v}\nСотрудников: ${w}`);
+            }).join('')}
+            ${cell('', '')}
+            ${cell('', '')}
+          </tr>
+          <tr>
+            <td class="text-left font-semibold">Общее</td>
+            ${allAmounts.map((v, idx) => {
+              const d = days[idx];
+              const w = toInt(workersByDay[d]?.All || 0);
+              return cell(v, `Кейсов: ${v}\nСотрудников: ${w}`);
+            }).join('')}
+            ${cell('', '')}
+            ${cell('', '')}
+          </tr>
+
+          <tr>
+            <td class="text-left font-semibold">Среднее на свата Android</td>
+            ${androidAvg.map((v, idx) => {
+              const d = days[idx];
+              const w = toInt(workersByDay[d]?.Android || 0);
+              const c = toInt(amountByDay[d]?.Android || 0);
+              const val = v.toFixed(2);
+              const formula = w > 0 ? `${c} / ${w} = ${val}` : `${c} / 0 = 0`;
+              return cell(val, `Среднее: ${val}\nСотрудников: ${w}\nФормула: ${formula}`);
+            }).join('')}
+            ${cell(aRel, `Среднее Android за релиз: ${aRel}\nФормула: ${totalACases} / ${uniqueWorkersA || 0} = ${aRel}`)}
+            ${cell('', '')}
+          </tr>
+          <tr>
+            <td class="text-left font-semibold">Среднее на свата iOS</td>
+            ${iosAvg.map((v, idx) => {
+              const d = days[idx];
+              const w = toInt(workersByDay[d]?.iOS || 0);
+              const c = toInt(amountByDay[d]?.iOS || 0);
+              const val = v.toFixed(2);
+              const formula = w > 0 ? `${c} / ${w} = ${val}` : `${c} / 0 = 0`;
+              return cell(val, `Среднее: ${val}\nСотрудников: ${w}\nФормула: ${formula}`);
+            }).join('')}
+            ${cell('', '')}
+            ${cell(iRel, `Среднее iOS за релиз: ${iRel}\nФормула: ${totalICases} / ${uniqueWorkersI || 0} = ${iRel}`)}
+          </tr>
+          <tr>
+            <td class="text-left font-semibold">Среднее общее</td>
+            ${allAvg.map((v, idx) => {
+              const d = days[idx];
+              const aW = toInt(workersByDay[d]?.Android || 0);
+              const iW = toInt(workersByDay[d]?.iOS || 0);
+              const aC = toInt(amountByDay[d]?.Android || 0);
+              const iC = toInt(amountByDay[d]?.iOS || 0);
+              const aVal = aW > 0 ? (aC / aW) : 0;
+              const iVal = iW > 0 ? (iC / iW) : 0;
+              const val = v.toFixed(2);
+              const aTxt = aW > 0 ? `${aC} / ${aW} = ${aVal.toFixed(2)}` : `${aC} / 0 = 0`;
+              const iTxt = iW > 0 ? `${iC} / ${iW} = ${iVal.toFixed(2)}` : `${iC} / 0 = 0`;
+              return cell(val, `Среднее: ${val}\nФормула: (${aTxt}) + (${iTxt}) = ${val}`);
+            }).join('')}
+            ${cell('', '')}
+            ${cell('', '')}
+          </tr>
+
+          <tr>
+            <td class="text-left font-semibold">Среднее за релиз</td>
+            ${days.map((d, idx) => idx === 0 ? cell(allRel, `Среднее за релиз: ${allRel}\nФормула: ${sumAllAvg.toFixed(2)} / ${days.length || 0} = ${relAllCalc.toFixed(2)}`) : cell('', '')).join('')}
+            ${cell('', '')}
+            ${cell('', '')}
+          </tr>
+        `;
+      }
+
+      // ===== Render: Cases by day charts (Android/iOS) =====
+      function colorForIndex(i){
+        const hue = (i * 47) % 360;
+        return {
+          border: `hsl(${hue} 60% 45%)`,
+          bg: `hsla(${hue} 70% 60% / 0.6)`
+        };
+      }
+
+      function buildCasesChart(canvas){
+        if(!canvas || !window.Chart) return null;
+        return new Chart(canvas, {
+          type: 'line',
+          data: { labels: [], datasets: [] },
+          options: {
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                itemSort: (a, b) => {
+                  const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                  const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                  return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                },
+                callbacks: {
+                  title: (items) => {
+                    const i = items?.[0]?.dataIndex ?? 0;
+                    const full = canvas._fullLabels?.[i];
+                    return full ? `День ${full}` : (items?.[0]?.label || '');
+                  },
+                  label: (ctx) => {
+                    const i = ctx.dataIndex;
+                    const chart = ctx.chart;
+                    const datasets = chart?.data?.datasets || [];
+                    const total = datasets.reduce((s, d) => s + Number(d?.data?.[i] || 0), 0);
+                    const val = Number(ctx.raw || 0);
+                    if(val <= 0) return null;
+                    const pct = total > 0 ? Math.round((val / total) * 1000) / 10 : 0;
+                    return `${ctx.dataset.label}: ${val} | ${pct}%`;
+                  },
+                  footer: (items) => {
+                    const rows = (items || []).filter(it => Number(it?.raw || 0) > 0);
+                    const sum = rows.reduce((s, it) => s + Number(it?.raw || 0), 0);
+                    const people = rows.length;
+                    return `Итого за день: ${sum}\nИтого сотрудников: ${people}`;
+                  }
+                }
+              }
+            },
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+              x: { ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+              y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
+            }
+          }
+        });
+      }
+
+      function renderCasesChart({ chart, canvas, rows, days }){
+        if(!chart){
+          chart = buildCasesChart(canvas);
+          if(!chart) return null;
+        }
+
+        const labels = days.map(d => ruDowShort(d));
+        const fullLabels = days.map(d => `${ruDowShort(d)} ${ddmm(d)}`);
+
+        const datasets = rows.map((r, idx) => {
+          const disp = r.full_name || r.login || `User ${idx + 1}`;
+          const c = colorForIndex(idx);
+          return {
+            label: disp,
+            data: r.dayCounts || [],
+            borderColor: c.border,
+            backgroundColor: c.border,
+            pointBackgroundColor: c.border,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1,
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            fill: false
+          };
+        });
+
+        canvas._fullLabels = fullLabels;
+        chart.data.labels = labels;
+        chart.data.datasets = datasets;
+        chart.update();
+        return chart;
+      }
+
+      function filterCaseRows(rows){
+        const sel = CASES_STATE.selectedLogins;
+        if(!sel) return rows;
+        if(sel.size === 0) return [];
+        if(sel.size === CASES_STATE.users.length) return rows;
+        return rows.filter(r => sel.has(r.login));
+      }
+
+      function refreshCasesFilterCaption(){
+        if(!casesFilterSelectedText) return;
+        const total = CASES_STATE.users.length || 0;
+        const selected = CASES_STATE.selectedLogins ? CASES_STATE.selectedLogins.size : 0;
+        if(selected <= 0){
+          casesFilterSelectedText.textContent = 'Не выбрано';
+          return;
+        }
+        if(selected >= total){
+          casesFilterSelectedText.textContent = 'Все сотрудники';
+          return;
+        }
+        if(selected === 1){
+          const login = CASES_STATE.selectedLogins.values().next().value;
+          const user = CASES_STATE.users.find(u => u.login === login);
+          casesFilterSelectedText.textContent = user ? (user.full_name || user.login) : 'Выбрано: 1';
+          return;
+        }
+        casesFilterSelectedText.textContent = `Выбрано: ${selected}`;
+      }
+
+      function renderCasesChartsFiltered(){
+        const rowsA = filterCaseRows(CASES_STATE.rowsAndroidAll);
+        const rowsI = filterCaseRows(CASES_STATE.rowsIosAll);
+        casesAndroidChart = renderCasesChart({
+          chart: casesAndroidChart,
+          canvas: casesAndroidCanvas,
+          rows: rowsA,
+          days: CASES_STATE.days
+        });
+        casesIosChart = renderCasesChart({
+          chart: casesIosChart,
+          canvas: casesIosCanvas,
+          rows: rowsI,
+          days: CASES_STATE.days
+        });
+      }
+
+      function updateCasesFilterFromUI(){
+        if(!casesFilterList) return;
+        const items = Array.from(casesFilterList.querySelectorAll('input[type=checkbox][data-login="1"]'));
+        const selected = items.filter(cb => cb.checked).map(cb => cb.value);
+        const allCb = casesFilterList.querySelector('input[type=checkbox][data-all="1"]');
+        const allSelected = items.length ? items.every(cb => cb.checked) : false;
+        if(allCb) allCb.checked = allSelected;
+        CASES_STATE.selectedLogins = new Set(selected);
+        refreshCasesFilterCaption();
+        renderCasesChartsFiltered();
+      }
+
+      function buildCasesFilterOptions(users){
+        if(!casesFilterList) return;
+        CASES_STATE.users = users || [];
+        CASES_STATE.selectedLogins = new Set((users || []).map(u => u.login));
+        casesFilterList.innerHTML = '';
+
+        const allLabel = document.createElement('label');
+        allLabel.classList.add('cases-filter-item');
+        const allText = document.createElement('span');
+        allText.classList.add('cases-filter-name');
+        allText.textContent = 'Все';
+        const allCb = document.createElement('input');
+        allCb.type = 'checkbox';
+        allCb.checked = true;
+        allCb.setAttribute('data-all', '1');
+        allCb.classList.add('cases-filter-check');
+        allLabel.appendChild(allText);
+        allLabel.appendChild(allCb);
+        casesFilterList.appendChild(allLabel);
+
+        const sep = document.createElement('div');
+        sep.className = 'h-px bg-slate-100';
+        casesFilterList.appendChild(sep);
+
+        CASES_STATE.users.forEach((u) => {
+          const label = document.createElement('label');
+          label.classList.add('cases-filter-item');
+          const text = document.createElement('span');
+          text.classList.add('cases-filter-name');
+          text.textContent = u.full_name || u.login;
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = true;
+          cb.value = u.login;
+          cb.setAttribute('data-login', '1');
+          cb.classList.add('cases-filter-check');
+          label.appendChild(text);
+          label.appendChild(cb);
+          casesFilterList.appendChild(label);
+        });
+
+        refreshCasesFilterCaption();
+      }
+
+      // ===== Export to Excel (Нормальный .xlsx через SheetJS) =====
+      function exportEmployeeTableToXls(){
+        if(typeof XLSX === 'undefined' || !XLSX?.utils){
+          showToast('Не загружена библиотека XLSX', false);
+          return;
+        }
+
+        const days = EMP_STATE.days || [];
+        const rows = EMP_STATE.rows || [];
+        if(!rows.length){
+          showToast('Нет данных для выгрузки', false);
+          return;
+        }
+
+        const headers = [
+          'SWAT',
+          'uWu',
+          'Целевой стрим',
+          'Проходил',
+          'iOS (ч/м)',
+          'Android (ч/м)',
+          'Кейсы iOS',
+          'Кейсы Android',
+          'Среднее кейс',
+          ...days.map(d => `${ruDowShort(d)} ${ddmm(d)}`)
+        ];
+
+        const colCount = headers.length;
+
+        // AOA (всё как текст)
+        const aoa = [];
+        aoa.push([`Общее среднее на 1 кейс: ${EMP_STATE.overallAvgMMSS || '—'}`]);
+        aoa.push([]);
+        aoa.push(headers);
+
+        for(const r of rows){
+          const avg = (r.avgMsPerCase > 0) ? fmtMMSSFromMs(r.avgMsPerCase) : '—';
+          const name = (r.full_name || r.login || '');
+          const target = (r.targetStream || '—');
+          const path = (r.allStreamsText || '—');
+
+          aoa.push([
+            String(name),
+            String(r.uwuText || '0'),
+            String(target),
+            String(path),
+            String(r.iosHoursDec ?? ''),
+            String(r.androidHoursDec ?? ''),
+            String(r.iosCases ?? 0),
+            String(r.androidCases ?? 0),
+            String(avg),
+            ...((r.days || []).map(dc => String(dc?.text || '')))
+          ]);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+        // Принудительно текстовый формат для всех заполненных ячеек
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+        for(let R = range.s.r; R <= range.e.r; ++R){
+          for(let C = range.s.c; C <= range.e.c; ++C){
+            const addr = XLSX.utils.encode_cell({ r:R, c:C });
+            const cell = ws[addr];
+            if(!cell) continue;
+            cell.t = 's';
+          }
+        }
+
+        // Мёрджи для первой строки (как шапка) + пустой строки
+        ws['!merges'] = [
+          { s:{ r:0, c:0 }, e:{ r:0, c:colCount-1 } },
+          { s:{ r:1, c:0 }, e:{ r:1, c:colCount-1 } }
+        ];
+
+        // Прикидка ширин колонок (по максимальной длине)
+        const maxLen = new Array(colCount).fill(10);
+        for(let r = 0; r < aoa.length; r++){
+          for(let c = 0; c < colCount; c++){
+            const v = (aoa[r] && aoa[r][c] != null) ? String(aoa[r][c]) : '';
+            maxLen[c] = Math.max(maxLen[c], Math.min(60, Math.ceil(v.length * 1.05)));
+          }
+        }
+        ws['!cols'] = maxLen.map(wch => ({ wch }));
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'SWAT');
+
+        const rel = (EMP_STATE.release || inpRelease.value || 'release').replaceAll(' ', '_');
+        const filename = `SWAT_${rel}_employees.xlsx`;
+
+        XLSX.writeFile(wb, filename, { compression: true });
+      }
+
+      // ===== Run =====
+      async function run(){
+        clearTokenError();
+        saveInputs();
+
+        const tok = (inpToken.value || '').trim();
+        if(!tok){ showDashEmpty('Вставьте Allure Api-Token'); return; }
+
+        const release = (inpRelease.value || '').trim();
+        if(!release){ showDashEmpty('Укажите версию релиза (например 7.4.5000)'); return; }
+
+        const signal = window.__swatAbort?.signal;
+
+        showDashContent();
+        applyTab(loadActiveTab());
+
+        tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">Сбор данных…</td></tr>`;
+        tbPlat.innerHTML = `<tr><td class="text-left" colspan="99">Сбор данных…</td></tr>`;
+        if(casesAndroidChart){
+          casesAndroidChart.data.labels = [];
+          casesAndroidChart.data.datasets = [];
+          casesAndroidChart.update();
+        }
+        if(casesIosChart){
+          casesIosChart.data.labels = [];
+          casesIosChart.data.datasets = [];
+          casesIosChart.update();
+        }
+
+        // ===== 1) SWAT + worked_days =====
+        tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 1/4] Получаю SWAT и worked_days…</td></tr>`;
+        const swatBundle = await fetchSwatDaysBundle(release, signal);
+
+        const rawList = Array.isArray(swatBundle?.worked_SWAT?.login) ? swatBundle.worked_SWAT.login : [];
+        const swatEntries = rawList.map(it => {
+          if(!it || typeof it !== 'object') return null;
+          const login = String(it.login || '').trim().toLowerCase();
+          if(!login) return null;
+          return {
+            login,
+            full_name: String(it.full_name || '').trim() || login,
+            targetStream: String(it.stream || '').trim() || ''
+          };
+        }).filter(Boolean);
+
+        swatEntries.sort((a,b) => {
+          const an = String(a.full_name||a.login||'');
+          const bn = String(b.full_name||b.login||'');
+          const c = an.localeCompare(bn, 'ru');
+          if(c !== 0) return c;
+          return String(a.login).localeCompare(String(b.login), 'ru');
+        });
+
+        if(!swatEntries.length){
+          showDashEmpty('SWAT список пустой.');
+          return;
+        }
+
+        const swatLogins = swatEntries.map(x => x.login);
+        const swatSet = new Set(swatLogins);
+
+        const fullNameByLogin = Object.fromEntries(swatEntries.map(x => [x.login, x.full_name || x.login]));
+        const targetStreamByLogin = Object.fromEntries(swatEntries.map(x => [x.login, x.targetStream || '']));
+
+        const workedDays = (swatBundle && typeof swatBundle === 'object' && swatBundle.worked_days && typeof swatBundle.worked_days === 'object')
+          ? swatBundle.worked_days
+          : {};
+
+        const days = Object.keys(workedDays).sort();
+        const presenceByDay = {};
+        const shiftHoursByDay = {};
+        const swatCountByDay = {};
+
+        for(const d of days){
+          const map = workedDays?.[d]?.login && typeof workedDays[d].login === 'object' ? workedDays[d].login : {};
+          const set = new Set();
+          const sh = {};
+          for(const [login, val] of Object.entries(map)){
+            const l = String(login||'').trim().toLowerCase();
+            if(!l) continue;
+            set.add(l);
+            sh[l] = toNum(val);
+          }
+          presenceByDay[d] = set;
+          shiftHoursByDay[d] = sh;
+          swatCountByDay[d] = set.size;
+        }
+
+        // ===== 2) Запуски Allure =====
+        tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 2/4] Ищу High/Blocker запуски…</td></tr>`;
+        let launches = [];
+        try{
+          launches = await fetchLaunchesHB(release, signal);
+        }catch(e){
+          showTokenError();
+          throw e;
+        }
+        if(!launches.length){
+          showDashEmpty('Не найдено запусков High/Blocker для этого релиза.');
+          return;
+        }
+
+        // ===== 3) memberstats =====
+        tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 3/4] Считаю memberstats…</td></tr>`;
+
+        const perUser = {};
+        const perUserRetries = {};
+        let swatTotalNoRetry = 0;
+        let swatTotalNoRetryAndroid = 0;
+        let swatTotalNoRetryIos = 0;
+
+        const globalStreamAgg = {};
+        function ensureGlobal(stream){
+          if(globalStreamAgg[stream]) return globalStreamAgg[stream];
+          globalStreamAgg[stream] = {
+            iOS: { total:0 },
+            Android: { total:0 }
+          };
+          return globalStreamAgg[stream];
+        }
+
+        function ensureUser(login){
+          if(perUser[login]) return perUser[login];
+          perUser[login] = {
+            login,
+            iosDurMs: 0, androidDurMs: 0,
+            iosCases: 0, androidCases: 0,
+            streams: {},
+            uwuSum: 0
+          };
+          return perUser[login];
+        }
+
+        function ensureStream(u, stream){
+          if(u.streams[stream]) return u.streams[stream];
+          u.streams[stream] = {
+            iosDurMs: 0, androidDurMs: 0,
+            iosCases: 0, androidCases: 0
+          };
+          return u.streams[stream];
+        }
+
+        function addRetry(login, stream, plat, cnt){
+          if(!perUserRetries[login]) perUserRetries[login] = {};
+          if(!perUserRetries[login][stream]) perUserRetries[login][stream] = { iOS:0, Android:0 };
+          if(plat === 'iOS') perUserRetries[login][stream].iOS += cnt;
+          if(plat === 'Android') perUserRetries[login][stream].Android += cnt;
+        }
+
+        await mapLimit(launches, 6, async (L, idx) => {
+          if(signal?.aborted) throw new DOMException('Aborted','AbortError');
+
+          const lid = toInt(L?.id);
+          const name = String(L?.name||'');
+          const plat = platformOfLaunchName(name);
+          const stream = shortStreamName(name);
+
+          if(idx % 6 === 0){
+            tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 3/4] memberstats… ${idx}/${launches.length}</td></tr>`;
+          }
+
+          const ms = await fetchMemberStats(lid, signal);
+
+          for(const m of ms){
+            const assignee = String(m?.assignee||'').trim().toLowerCase();
+            if(!assignee) continue;
+
+            const totalCases = memberTotalCount(m);
+            const durMs = toInt(m?.durationSum);
+            const retried = toInt(m?.retriedCount);
+            const totalCasesWithRetries = totalCases + retried;
+
+            if(plat === 'iOS' || plat === 'Android'){
+              const g = ensureGlobal(stream);
+              g[plat].total += totalCasesWithRetries;
+            }
+
+            if(!swatSet.has(assignee)) continue;
+
+            if(totalCases > 0){
+              swatTotalNoRetry += totalCases;
+              if(plat === 'Android') swatTotalNoRetryAndroid += totalCases;
+              else if(plat === 'iOS') swatTotalNoRetryIos += totalCases;
+            }
+
+            const u = ensureUser(assignee);
+            const st = ensureStream(u, stream);
+
+            if(plat === 'iOS'){
+              u.iosCases += totalCasesWithRetries;
+              u.iosDurMs += durMs;
+              st.iosCases += totalCasesWithRetries;
+              st.iosDurMs += durMs;
+              if(retried) addRetry(assignee, stream, 'iOS', retried);
+            }else if(plat === 'Android'){
+              u.androidCases += totalCasesWithRetries;
+              u.androidDurMs += durMs;
+              st.androidCases += totalCasesWithRetries;
+              st.androidDurMs += durMs;
+              if(retried) addRetry(assignee, stream, 'Android', retried);
+            }
+          }
+        }, signal);
+
+        let totalDurMsAll = 0;
+        let totalCasesAll = 0;
+        for(const login of swatLogins){
+          const u = perUser[login];
+          if(!u) continue;
+          totalDurMsAll += (u.iosDurMs + u.androidDurMs);
+          totalCasesAll += (u.iosCases + u.androidCases);
+        }
+        const overallAvgMsPerCase = totalCasesAll > 0 ? (totalDurMsAll / totalCasesAll) : 0;
+        const overallAvgMMSS = overallAvgMsPerCase > 0 ? fmtMMSSFromMs(overallAvgMsPerCase) : '—';
+
+        
+        // ===== 3.5) UwU (borrowed from uwu_7) =====
+        tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 3/4] Собираю UwU…</td></tr>`;
+
+        const leafPairs = [];
+        await mapLimit(launches, 4, async (L, idx) => {
+          if(signal?.aborted) throw new DOMException('Aborted','AbortError');
+
+          const lid = toInt(L?.id);
+
+          if(idx % 4 === 0){
+            tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 3/4] UwU… ${idx}/${launches.length}</td></tr>`;
+          }
+
+          const items = await listLeaf(lid, signal);
+          for(const it of items){
+            const testedBy = String(it?.testedBy || '').trim().toLowerCase();
+            if(!testedBy || !swatSet.has(testedBy)) continue;
+
+            const tcid = toInt(it?.testCaseId);
+            if(!tcid) continue;
+            leafPairs.push({ login: testedBy, tcid });
+          }
+        }, signal);
+
+        const uniqTcids = Array.from(new Set(leafPairs.map(x => x.tcid)));
+        await mapLimit(uniqTcids, 16, async (tcid, idx) => {
+          if(signal?.aborted) throw new DOMException('Aborted','AbortError');
+          if(idx % 200 === 0){
+            tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 3/4] UwU… testcase ${idx}/${uniqTcids.length}</td></tr>`;
+          }
+          await getUwU(tcid, signal);
+        }, signal);
+
+        for(const p of leafPairs){
+          const uwuRaw = uwuCache.get(p.tcid)?.uwuRaw;
+          const uwuNum = parseUwUNumber(uwuRaw);
+          const u = ensureUser(p.login);
+          u.uwuSum = (toNum(u.uwuSum) || 0) + uwuNum;
+        }
+
+// ===== 4) timeline =====
+        tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 4/4] Считаю время/кейсы по дням…</td></tr>`;
+
+        const durByUserDay = {};
+        function addDur(login, day, ms){
+          if(!durByUserDay[login]) durByUserDay[login] = {};
+          durByUserDay[login][day] = (durByUserDay[login][day] || 0) + ms;
+        }
+
+        const casesByDayPlatform = {};
+        const usersByDayPlatform = {};
+        const casesByUserDayPlatform = { Android: {}, iOS: {} };
+
+        function ensureDayPlatform(day){
+          if(!casesByDayPlatform[day]) casesByDayPlatform[day] = { Android:0, iOS:0 };
+          if(!usersByDayPlatform[day]) usersByDayPlatform[day] = { Android:new Set(), iOS:new Set() };
+        }
+
+        function addUserDayCase(login, day, plat){
+          if(!casesByUserDayPlatform[plat]) casesByUserDayPlatform[plat] = {};
+          if(!casesByUserDayPlatform[plat][login]) casesByUserDayPlatform[plat][login] = {};
+          casesByUserDayPlatform[plat][login][day] = (casesByUserDayPlatform[plat][login][day] || 0) + 1;
+        }
+
+        await mapLimit(launches, 4, async (L, idx) => {
+          if(signal?.aborted) throw new DOMException('Aborted','AbortError');
+
+          const lid = toInt(L?.id);
+          const name = String(L?.name||'');
+          const plat = platformOfLaunchName(name);
+
+          if(idx % 4 === 0){
+            tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 4/4] timeline… ${idx}/${launches.length}</td></tr>`;
+          }
+
+          const tl = await fetchTimeline(lid, signal);
+          const rootGroups = Array.isArray(tl?.groups) ? tl.groups : [];
+
+          for(const g of rootGroups){
+            walkTimelineGroups(g, (leaf) => {
+              const testedBy = String(leaf?.testedBy || '').trim().toLowerCase();
+              if(!testedBy || !swatSet.has(testedBy)) return;
+
+              const start = toInt(leaf?.start);
+              const stop  = ('stop' in leaf) ? toInt(leaf?.stop) : (start + toInt(leaf?.duration));
+              const dur = Math.max(0, stop - start);
+
+              const dayKey = toMskDateKeyFromEpochMs(start);
+
+              addDur(testedBy, dayKey, dur);
+
+              if(plat === 'Android' || plat === 'iOS'){
+                ensureDayPlatform(dayKey);
+                casesByDayPlatform[dayKey][plat] += 1;
+                usersByDayPlatform[dayKey][plat].add(testedBy);
+                addUserDayCase(testedBy, dayKey, plat);
+              }
+            });
+          }
+        }, signal);
+
+        const rowsEmp = [];
+
+        for(const login of swatLogins){
+          const u = perUser[login] || { login, iosDurMs:0, androidDurMs:0, iosCases:0, androidCases:0, streams:{}, uwuSum:0 };
+
+          const iosMinutes = Math.round(u.iosDurMs / 60000);
+          const androidMinutes = Math.round(u.androidDurMs / 60000);
+
+          const iosHoursDec = fmtHHMMFromMinutes(iosMinutes);
+          const androidHoursDec = fmtHHMMFromMinutes(androidMinutes);
+
+          let primaryStream = '';
+          let primaryTotalCases = -1;
+
+          const streamEntries = Object.entries(u.streams || {});
+          for(const [streamName, st] of streamEntries){
+            const totalCases = toInt(st.iosCases) + toInt(st.androidCases);
+            if(totalCases > primaryTotalCases){
+              primaryTotalCases = totalCases;
+              primaryStream = streamName;
+            }
+          }
+
+          const orderedStreams = [];
+          if(primaryStream) orderedStreams.push(primaryStream);
+
+          streamEntries
+            .filter(([s]) => s && s !== primaryStream)
+            .sort((a,b) => {
+              const A = a[1] || {};
+              const B = b[1] || {};
+              const ai = Math.round(toInt(A.iosDurMs) / 60000);
+              const bi = Math.round(toInt(B.iosDurMs) / 60000);
+              if(bi !== ai) return bi - ai;
+              const at = Math.round((toInt(A.iosDurMs)+toInt(A.androidDurMs)) / 60000);
+              const bt = Math.round((toInt(B.iosDurMs)+toInt(B.androidDurMs)) / 60000);
+              return bt - at;
+            })
+            .forEach(([s]) => orderedStreams.push(s));
+
+          const allStreamsText = orderedStreams.length ? orderedStreams.join(' + ') : '—';
+
+          const hoverLines = [];
+          for(const s of orderedStreams){
+            const st = (u.streams && u.streams[s]) ? u.streams[s] : {};
+            const g = globalStreamAgg[s] || { iOS:{total:0}, Android:{total:0} };
+
+            const iosEmp = toInt(st.iosCases);
+            const andEmp = toInt(st.androidCases);
+
+            const iosTotalAll = toInt(g.iOS?.total);
+            const andTotalAll = toInt(g.Android?.total);
+
+            const parts = [];
+            if(iosEmp > 0) parts.push(`iOS ${iosEmp}/${iosTotalAll}`);
+            if(andEmp > 0) parts.push(`Android ${andEmp}/${andTotalAll}`);
+
+            if(!parts.length) continue;
+            hoverLines.push(`${s} — ${parts.join(', ')}`);
+          }
+          const allStreamsHover = hoverLines.length ? hoverLines.join('\n') : allStreamsText;
+
+          const totalCases = toInt(u.iosCases) + toInt(u.androidCases);
+          const totalDurMs = toInt(u.iosDurMs) + toInt(u.androidDurMs);
+          const avgMsPerCase = totalCases > 0 ? (totalDurMs / totalCases) : 0;
+
+          const dayCells = days.map(d => {
+            const workedFromShift = !!presenceByDay?.[d]?.has(login);
+            const shiftHours = toNum(shiftHoursByDay?.[d]?.[login] || 0);
+
+            const ms = toInt(durByUserDay?.[login]?.[d] || 0);
+            const minFromTimeline = Math.round(ms / 60000);
+            const allureHours = fmtHHMMFromMinutes(minFromTimeline);
+
+            const worked = workedFromShift || shiftHours > 0 || minFromTimeline > 0;
+
+            let text = '';
+            let title = '';
+
+            const shTxt = fmtShiftHours(shiftHours);
+            if(minFromTimeline > 0){
+              text = shTxt ? `${allureHours} (${shTxt})` : `${allureHours}`;
+              title = shTxt
+                ? `Allure: ${allureHours}ч, Смена: ${shTxt}ч`
+                : `Allure: ${allureHours}ч`;
+            }else if(shTxt){
+              text = `0:00 (${shTxt})`;
+              title = `Allure: 0:00ч, Смена: ${shTxt}ч`;
+            }else{
+              text = '';
+              title = worked ? 'worked_days: есть, но тайминг не найден' : 'не работал';
+            }
+
+            return { worked, text, title };
+          });
+
+          rowsEmp.push({
+            login,
+            full_name: fullNameByLogin[login] || login,
+            targetStream: targetStreamByLogin[login] || '',
+            allStreamsText,
+            allStreamsHover,
+            uwuSum: toNum(u.uwuSum || 0),
+            uwuText: fmtUwU(u.uwuSum || 0),
+            iosMinutes,
+            androidMinutes,
+            iosHoursDec,
+            androidHoursDec,
+            iosCases: toInt(u.iosCases),
+            androidCases: toInt(u.androidCases),
+            avgMsPerCase,
+            days: dayCells
+          });
+        }
+
+        const rowsCasesAndroid = [];
+        const rowsCasesIos = [];
+        for(const login of swatLogins){
+          const fullName = fullNameByLogin[login] || login;
+          const aMap = casesByUserDayPlatform.Android?.[login] || {};
+          const iMap = casesByUserDayPlatform.iOS?.[login] || {};
+
+          const dayCountsA = days.map(d => toInt(aMap[d] || 0));
+          const dayCountsI = days.map(d => toInt(iMap[d] || 0));
+
+          const totalA = dayCountsA.reduce((s, n) => s + toInt(n), 0);
+          const totalI = dayCountsI.reduce((s, n) => s + toInt(n), 0);
+
+          rowsCasesAndroid.push({ login, full_name: fullName, dayCounts: dayCountsA, total: totalA });
+          rowsCasesIos.push({ login, full_name: fullName, dayCounts: dayCountsI, total: totalI });
+        }
+
+        const amountByDay = {};
+        const avgByDay = {};
+        const workersByDay = {};
+        const dailyAllAvg = [];
+
+        for(const d of days){
+          ensureDayPlatform(d);
+
+          const aCases = toInt(casesByDayPlatform[d]?.Android || 0);
+          const iCases = toInt(casesByDayPlatform[d]?.iOS || 0);
+
+          const aSet = usersByDayPlatform[d]?.Android ? usersByDayPlatform[d].Android : new Set();
+          const iSet = usersByDayPlatform[d]?.iOS ? usersByDayPlatform[d].iOS : new Set();
+
+          const aWorkers = aSet.size || 0;
+          const iWorkers = iSet.size || 0;
+
+          const union = new Set();
+          for(const x of aSet) union.add(x);
+          for(const x of iSet) union.add(x);
+          const allWorkers = union.size || 0;
+
+          const aAvg = aWorkers > 0 ? (aCases / aWorkers) : 0;
+          const iAvg = iWorkers > 0 ? (iCases / iWorkers) : 0;
+          const allAvg = aAvg + iAvg;
+
+          amountByDay[d] = { Android: aCases, iOS: iCases, All: aCases + iCases };
+          avgByDay[d] = { Android: aAvg, iOS: iAvg, All: allAvg };
+          workersByDay[d] = { Android: aWorkers, iOS: iWorkers, All: allWorkers };
+
+          dailyAllAvg.push(allAvg);
+        }
+
+        const releaseAvgAll = dailyAllAvg.length ? (dailyAllAvg.reduce((s,n)=>s+n,0) / dailyAllAvg.length) : 0;
+
+        const uniqueWorkersASet = new Set();
+        const uniqueWorkersISet = new Set();
+        for(const d of days){
+          const aSet = usersByDayPlatform[d]?.Android;
+          const iSet = usersByDayPlatform[d]?.iOS;
+          if(aSet) for(const u of aSet) uniqueWorkersASet.add(u);
+          if(iSet) for(const u of iSet) uniqueWorkersISet.add(u);
+        }
+        const uniqueWorkersA = uniqueWorkersASet.size || 0;
+        const uniqueWorkersI = uniqueWorkersISet.size || 0;
+
+        let totalACases = 0, totalICases = 0;
+        for(const d of days){
+          totalACases += toInt(amountByDay[d]?.Android || 0);
+          totalICases += toInt(amountByDay[d]?.iOS || 0);
+        }
+        const releaseAvgA = uniqueWorkersA > 0 ? (totalACases / uniqueWorkersA) : 0;
+        const releaseAvgI = uniqueWorkersI > 0 ? (totalICases / uniqueWorkersI) : 0;
+
+        EMP_STATE.release = release;
+        EMP_STATE.days = days;
+        EMP_STATE.rows = rowsEmp;
+        EMP_STATE.overallAvgMMSS = overallAvgMMSS;
+
+        EMP_STATE.sortKey = EMP_STATE.sortKey || 'name';
+        EMP_STATE.sortDir = EMP_STATE.sortDir || 1;
+
+        sortEmpRows();
+
+        chipSwat.textContent = String(swatEntries.length || 0);
+        chipLaunches.textContent = String(launches.length || 0);
+        chipTotalCases.textContent = String(swatTotalNoRetry || 0);
+        chipTotalCasesAndroid.textContent = String(swatTotalNoRetryAndroid || 0);
+        chipTotalCasesIos.textContent = String(swatTotalNoRetryIos || 0);
+        chipAvg.textContent = overallAvgMMSS || '—';
+
+        renderEmployeeTable();
+
+        renderPlatformTable({
+          days,
+          amountByDay,
+          avgByDay,
+          workersByDay,
+          releaseAvgA,
+          releaseAvgI,
+          releaseAvgAll,
+          swatCountByDay,
+          uniqueWorkersA,
+          uniqueWorkersI
+        });
+
+        CASES_STATE.days = days;
+        CASES_STATE.rowsAndroidAll = rowsCasesAndroid;
+        CASES_STATE.rowsIosAll = rowsCasesIos;
+        buildCasesFilterOptions(swatEntries.map(s => ({ login: s.login, full_name: s.full_name || s.login })));
+        updateCasesFilterFromUI();
+
+        showDashContent();
+        applyTab(loadActiveTab());
+
+        showToast(`Готово: SWAT ${swatEntries.length}, запусков ${launches.length}`, true);
+      }
+
+      // ===== Events =====
+      startBtn?.addEventListener('click', async () => {
+        setRunning(true);
+        try{
+          await run();
+        }catch(e){
+          if(e && (e.name === 'AbortError' || String(e).includes('Aborted'))){
+            showDashEmpty('Остановлено пользователем');
+            showToast('Остановлено', false);
+          }else{
+            console.error(e);
+            showTokenError();
+            showDashEmpty(`Ошибка: ${e?.message || e}`);
+            showToast('Ошибка при сборе', false);
+          }
+        }finally{
+          setRunning(false);
+        }
+      });
+
+      stopBtn?.addEventListener('click', () => {
+        try{ window.__swatAbort?.abort(); }catch(e){}
+      });
+
+      tabEmp?.addEventListener('click', () => applyTab('emp'));
+      tabPlat?.addEventListener('click', () => applyTab('plat'));
+      tabCases?.addEventListener('click', () => applyTab('cases'));
+
+      btnExportEmp?.addEventListener('click', exportEmployeeTableToXls);
+
+      inpToken?.addEventListener('input', () => { clearTokenError(); saveInputs(); });
+      inpRelease?.addEventListener('input', () => saveInputs());
+
+      // ===== Init =====
+      restoreInputs();
+      clearTokenError();
+      applyTab(loadActiveTab());
+      showDashEmpty('Данные появятся после получения из источника');
+    })();
+  </script>
+</body>
+</html>

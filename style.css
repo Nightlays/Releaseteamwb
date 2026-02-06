@@ -830,11 +830,52 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
       border-radius:8px;
     }
     .dropdown-list label:hover{background:#faf7fd}
-    .dropdown-list input[type=checkbox],
-    .dropdown-list input[type=radio]{
-      margin-left:12px;
-      flex-shrink:0;
-    }
+.dropdown-list input[type=checkbox],
+.dropdown-list input[type=radio]{
+  margin-left:12px;
+  flex-shrink:0;
+}
+
+/* cases filter alignment */
+#casesFilterDropdown .dropdown-selected{
+  text-align:left;
+}
+#casesFilterDropdown .dropdown-list{
+  left:auto;
+  right:0;
+  min-width:256px;
+  gap:0;
+  padding:0;
+}
+#casesFilterList .cases-filter-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  padding:5px 8px;
+  line-height:1.3;
+  cursor:pointer;
+  user-select:none;
+  width:100%;
+  box-sizing:border-box;
+  margin:0;
+  border-radius:0;
+}
+#casesFilterList .cases-filter-item:hover{
+  background:#faf7fd;
+}
+#casesFilterList .cases-filter-name{
+  flex:1 1 auto;
+  min-width:0;
+  text-align:left;
+  white-space:nowrap;
+  overflow:visible;
+  text-overflow:clip;
+}
+#casesFilterList .cases-filter-check{
+  margin-left:12px;
+  flex:0 0 16px;
+}
     .dropdown-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
 
     .proxy-toggle{display:flex;flex-direction:column;align-items:center;margin-left:2px}
@@ -1383,4 +1424,32 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
       "snaplist"
       "cookie";
   }
+}
+
+/* focus edge for start/stop collection buttons */
+#startBtn:focus,
+#startBtn:focus-visible,
+#stopBtn:focus,
+#stopBtn:focus-visible{
+  outline:none;
+  border-color: rgba(17,24,39,.25);
+}
+#startBtn:hover{
+  background: linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+}
+#stopBtn:hover{
+  background: linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95));
+}
+#btnExportEmp:hover{
+  background: linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+}
+#startBtn:focus,
+#startBtn:focus-visible{
+  background: linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+  box-shadow: var(--ring), inset 0 0 0 2px rgba(17,24,39,.22);
+}
+#stopBtn:focus,
+#stopBtn:focus-visible{
+  background: linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95));
+  box-shadow: 0 10px 30px rgba(244,63,94,.20), inset 0 0 0 2px rgba(17,24,39,.22);
 }
