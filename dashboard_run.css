@@ -129,12 +129,41 @@
 
   .head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end}
   .nums{color:var(--muted);font-variant-numeric:tabular-nums}
+  #cards .head{flex-wrap:nowrap;align-items:center;min-height:34px;height:34px;overflow:hidden}
+  #cards{align-items:stretch;grid-auto-rows:480px}
+  #cards .card{height:100%;display:flex;flex-direction:column}
+  #cards .chart-wrap{flex:0 0 340px;height:340px}
+  #cards .kpis{margin-top:8px;flex:0 0 48px}
+  #cards .kpi{min-height:36px;padding:6px 8px;font-size:11px}
+  #cards .kpi .label{font-size:11px}
+  #cards .kpi .val{font-size:12px}
+  #cards .head > div:first-child{
+    flex:1 1 auto;
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    line-height:1;
+  }
+  #cards .head .export{
+    flex:0 0 auto;
+    white-space:nowrap;
+    line-height:1;
+  }
+  #cards .head .export .nums{white-space:nowrap;line-height:1}
 
   /* Гриды */
   .panel{display:grid;gap:12px;grid-template-columns:repeat(12, minmax(0,1fr));align-items:end}
-  .grid{display:grid;gap:18px;margin-top:16px;grid-template-columns:repeat(4,minmax(360px,1fr))}
+  .grid{display:grid;gap:18px;margin-top:16px;grid-template-columns:repeat(4,minmax(360px,1fr));align-items:stretch}
   @media (max-width:1400px){ .grid{grid-template-columns:repeat(3,minmax(320px,1fr));} }
-  @media (max-width:1100px){ .grid{grid-template-columns:repeat(2,minmax(320px,1fr));} }
+  @media (max-width:1100px){
+    .grid{grid-template-columns:repeat(2,minmax(320px,1fr));}
+    #cards{grid-auto-rows:420px}
+    #cards .card{height:100%}
+    #cards .chart-wrap{height:280px;flex:0 0 280px}
+    #cards .kpis{flex:0 0 44px;margin-top:6px}
+    .split{grid-auto-rows:340px}
+  }
   @media (max-width:700px){ .grid{grid-template-columns:1fr;} }
 
   /* Формы */
@@ -220,8 +249,14 @@
     font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     box-shadow:var(--shadow-sm);
   }
-  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media (max-width:900px){ .split{grid-template-columns:1fr} }
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;grid-auto-rows:380px}
+  .split > .card{height:100%;display:flex;flex-direction:column}
+  .split > .card .log{flex:1 1 auto;max-height:none;min-height:0}
+  #logProgressWrap{flex:0 0 auto}
+  @media (max-width:900px){
+    .split{grid-template-columns:1fr;grid-auto-rows:auto}
+    .split > .card{height:auto}
+  }
 
   /* Тост */
   .toast{

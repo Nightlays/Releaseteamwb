@@ -14,7 +14,7 @@
   <!-- Все кастомные стили вынесены в style.css -->
   <link rel="stylesheet" href="./style.css" />
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen wb-graphs">
    <div class="max-w-screen-2xl mx-auto px-4 py-6">
     <header class="flex items-center justify-between gap-3 flex-wrap">
       <div class="brand-badge">
@@ -23,7 +23,7 @@
           <div class="flex items-center gap-2">
             <div class="font-extrabold leading-tight">WB All Table</div>
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v0.2.15</span>
+              <span aria-hidden="true">🏷️</span><span>v0.2.22</span>
             </span>
             <button id="exportPdfBtn"
               class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
@@ -66,15 +66,11 @@
                 </button>
               </div>
 
-              <div class="md:col-span-4">
+              <div class="md:col-span-6">
                 <label class="block text-xs font-semibold text-[#111827] mb-1">Deploy-lab token</label>
                 <input class="input" id="deployToken" type="password" autocomplete="off" placeholder="Вставьте Deploy-lab token" />
               </div>
-              <div class="md:col-span-4">
-                <label class="block text-xs font-semibold text-[#111827] mb-1">YouTrack base</label>
-                <input class="input" id="ytBase" type="text" value="https://youtrack.wildberries.ru" placeholder="https://youtrack.example.com" />
-              </div>
-              <div class="md:col-span-4">
+              <div class="md:col-span-6">
                 <label class="block text-xs font-semibold text-[#111827] mb-1">YouTrack token</label>
                 <input class="input" id="ytToken" type="password" autocomplete="off" placeholder="Вставьте YouTrack token" />
               </div>
@@ -93,12 +89,6 @@
           <div class="flex items-center gap-2">
             <button type="button"
               class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
-              data-toggle="tcChart" aria-expanded="true">
-              <span aria-hidden="true">▾</span>
-              <span>График</span>
-            </button>
-            <button type="button"
-              class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
               data-collapse-btn="tc" aria-expanded="true">
               <span data-collapse-ico aria-hidden="true">▾</span>
               <span data-collapse-text>Свернуть</span>
@@ -108,21 +98,25 @@
 
         <div data-collapse-body="tc" class="space-y-4">
           <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-            <div id="tcEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            <div id="tcEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
               Данные появятся после получения из источника
             </div>
 
             <div id="tcContent" class="tc-content" style="display:none;">
-              <div class="chart-viewport" id="tcTrendViewport" data-toggle-body="tcChart">
+              <div class="chart-viewport" id="tcTrendViewport">
                 <canvas id="tcTrendChart" aria-label="Test cases chart" role="img"></canvas>
               </div>
 
-              <div id="tcStreamDeltaWrap" class="px-4 pb-4 pt-2" style="overflow:auto">
-                <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <div id="tcStreamDeltaWrap" class="px-4 pb-4 pt-2 table-block">
+                <div class="table-filter-row flex items-center justify-between gap-2 mb-2 flex-wrap">
                   <div class="text-xs font-semibold text-slate-600">Прирост/отток по стримам (Manual/AT)</div>
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                    <select id="tcReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+                  <div class="flex items-center gap-2 flex-wrap ml-auto justify-end">
+                    <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                    <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="tcReleaseFilter">
+                      <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="tcReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                     <button type="button"
                       class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
                       data-collapse-btn="tcStreamDelta" aria-expanded="true">
@@ -131,45 +125,63 @@
                     </button>
                   </div>
                 </div>
-                <table id="tcStreamDeltaTable" data-collapse-body="tcStreamDelta">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Релиз</th>
-                      <th class="text-left">Stream</th>
-                      <th>Manual Δ</th>
-                      <th>AT Δ</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tcStreamDeltaTbody"></tbody>
-                </table>
+                <div class="table-scroll-x">
+                  <table id="tcStreamDeltaTable" data-collapse-body="tcStreamDelta">
+                    <colgroup>
+                      <col class="tc-col-release" />
+                      <col class="tc-col-stream" />
+                      <col class="tc-col-manual" />
+                      <col class="tc-col-auto" />
+                      <col class="tc-col-uwu-manual" />
+                      <col class="tc-col-uwu-auto" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th class="text-left">Релиз</th>
+                        <th class="text-left">Stream</th>
+                        <th>Manual Δ</th>
+                        <th>AT Δ</th>
+                        <th>uWu Manual Δ</th>
+                        <th>uWu AT Δ</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tcStreamDeltaTbody"></tbody>
+                  </table>
+                </div>
               </div>
 
-              <div id="tcTableWrap" style="display:none; overflow:auto">
-                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
-                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                  <select id="tcTableReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              <div id="tcTableWrap" class="table-block" style="display:none;">
+                <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
+                  <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                  <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="tcTableReleaseFilter">
+                    <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="tcTableReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
-                <table id="tcTable">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Релиз</th>
-                      <th>Ручные</th>
-                      <th>Авто</th>
-                      <th>Всего</th>
-                      <th class="text-left">Полосы</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tcTbody"></tbody>
-                </table>
+                <div class="table-scroll-x">
+                  <table id="tcTable">
+                    <thead>
+                      <tr>
+                        <th class="text-left">Релиз</th>
+                        <th>Ручные</th>
+                        <th>Авто</th>
+                        <th>Всего</th>
+                        <th class="text-left">Полосы</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tcTbody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-start gap-3">
             <div class="legend">
-              <span class="lg-item"><span class="dot dot-manual"></span>Ручные</span>
-              <span class="lg-item"><span class="dot dot-auto"></span>Авто</span>
-              <span class="lg-item"><span class="dot dot-total"></span>Всего</span>
+              <span class="lg-item"><span class="dot dot-manual"></span><span class="lg-text">Ручные</span></span>
+              <span class="lg-item"><span class="dot dot-auto"></span><span class="lg-text">Авто</span></span>
+              <span class="lg-item"><span class="dot dot-total"></span><span class="lg-text">Всего</span></span>
             </div>
           </div>
         </div>
@@ -191,7 +203,7 @@
 
         <div data-collapse-body="cov" class="space-y-4">
           <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-            <div id="covEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            <div id="covEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
               Данные появятся после получения из источника
             </div>
 
@@ -200,32 +212,38 @@
                 <canvas id="covTrendChart" aria-label="SWAT/STREAM coverage chart" role="img"></canvas>
               </div>
 
-              <div id="covTableWrap" style="display:none; overflow:auto">
-                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
-                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                  <select id="covReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              <div id="covTableWrap" class="table-block" style="display:none;">
+                <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
+                  <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                  <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="covReleaseFilter">
+                    <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="covReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
-                <table id="covTable">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Номер релиза</th>
-                      <th>SWAT</th>
-                      <th>SWAT (сотр.)</th>
-                      <th>STREAM</th>
-                      <th>Всего</th>
-                      <th class="text-left">Покрытие</th>
-                    </tr>
-                  </thead>
-                  <tbody id="covTbody"></tbody>
-                </table>
+                <div class="table-scroll-x">
+                  <table id="covTable">
+                    <thead>
+                      <tr>
+                        <th class="text-left">Номер релиза</th>
+                        <th>SWAT</th>
+                        <th>SWAT (сотр.)</th>
+                        <th>STREAM</th>
+                        <th>Всего</th>
+                        <th class="text-left">Покрытие</th>
+                      </tr>
+                    </thead>
+                    <tbody id="covTbody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-start gap-3">
             <div class="legend">
-              <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
-              <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
+              <span class="lg-item"><span class="dot dot-swat"></span><span class="lg-text">SWAT</span></span>
+              <span class="lg-item"><span class="dot dot-stream"></span><span class="lg-text">STREAM</span></span>
             </div>
           </div>
         </div>
@@ -247,7 +265,7 @@
 
         <div data-collapse-body="sel" class="space-y-4">
           <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-            <div id="selEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            <div id="selEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
               Данные появятся после получения из источника
             </div>
 
@@ -256,32 +274,38 @@
                 <canvas id="selTrendChart" aria-label="SWAT/STREAM Selective chart" role="img"></canvas>
               </div>
 
-              <div id="selTableWrap" style="display:none; overflow:auto">
-                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
-                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                  <select id="selReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              <div id="selTableWrap" class="table-block" style="display:none;">
+                <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
+                  <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                  <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="selReleaseFilter">
+                    <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="selReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
-                <table id="selTable">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Номер релиза</th>
-                      <th>SWAT</th>
-                      <th>SWAT (сотр.)</th>
-                      <th>STREAM</th>
-                      <th>Всего</th>
-                      <th class="text-left">Покрытие</th>
-                    </tr>
-                  </thead>
-                  <tbody id="selTbody"></tbody>
-                </table>
+                <div class="table-scroll-x">
+                  <table id="selTable">
+                    <thead>
+                      <tr>
+                        <th class="text-left">Номер релиза</th>
+                        <th>SWAT</th>
+                        <th>SWAT (сотр.)</th>
+                        <th>STREAM</th>
+                        <th>Всего</th>
+                        <th class="text-left">Покрытие</th>
+                      </tr>
+                    </thead>
+                    <tbody id="selTbody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-start gap-3">
             <div class="legend">
-              <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
-              <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
+              <span class="lg-item"><span class="dot dot-swat"></span><span class="lg-text">SWAT</span></span>
+              <span class="lg-item"><span class="dot dot-stream"></span><span class="lg-text">STREAM</span></span>
             </div>
           </div>
         </div>
@@ -303,7 +327,7 @@
 
         <div data-collapse-body="avg" class="space-y-4">
           <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-            <div id="avgEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            <div id="avgEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
               Данные появятся после получения из источника
             </div>
 
@@ -312,31 +336,37 @@
                 <canvas id="avgTrendChart" aria-label="Average time chart" role="img"></canvas>
               </div>
 
-              <div id="avgTableWrap" style="display:none; overflow:auto">
-                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
-                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                  <select id="avgReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              <div id="avgTableWrap" class="table-block" style="display:none;">
+                <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
+                  <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                  <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="avgReleaseFilter">
+                    <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="avgReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
-                <table id="avgTable">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Номер релиза</th>
-                      <th>SWAT</th>
-                      <th>STREAM</th>
-                      <th>Общее</th>
-                    </tr>
-                  </thead>
-                  <tbody id="avgTbody"></tbody>
-                </table>
+                <div class="table-scroll-x">
+                  <table id="avgTable">
+                    <thead>
+                      <tr>
+                        <th class="text-left">Номер релиза</th>
+                        <th>SWAT</th>
+                        <th>STREAM</th>
+                        <th>Общее</th>
+                      </tr>
+                    </thead>
+                    <tbody id="avgTbody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-start gap-3">
             <div class="legend">
-              <span class="lg-item"><span class="dot dot-swat"></span>SWAT</span>
-              <span class="lg-item"><span class="dot dot-stream"></span>STREAM</span>
-              <span class="lg-item"><span class="dot dot-total"></span>Общее</span>
+              <span class="lg-item"><span class="dot dot-swat"></span><span class="lg-text">SWAT</span></span>
+              <span class="lg-item"><span class="dot dot-stream"></span><span class="lg-text">STREAM</span></span>
+              <span class="lg-item"><span class="dot dot-total"></span><span class="lg-text">Общее</span></span>
             </div>
           </div>
         </div>
@@ -358,7 +388,7 @@
 
         <div data-collapse-body="chp" class="space-y-4">
           <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-            <div id="chpEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            <div id="chpEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
               Данные появятся после получения из источника
             </div>
 
@@ -367,31 +397,37 @@
                 <canvas id="chpTrendChart" aria-label="Cherepiki chart" role="img"></canvas>
               </div>
 
-              <div id="chpTableWrap" style="display:none; overflow:auto">
-                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
-                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                  <select id="chpReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              <div id="chpTableWrap" class="table-block" style="display:none;">
+                <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
+                  <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                  <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="chpReleaseFilter">
+                    <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="chpReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
-                <table id="chpTable">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Номер релиза</th>
-                      <th>iOS</th>
-                      <th>Android</th>
-                      <th>Всего</th>
-                    </tr>
-                  </thead>
-                  <tbody id="chpTbody"></tbody>
-                </table>
+                <div class="table-scroll-x">
+                  <table id="chpTable">
+                    <thead>
+                      <tr>
+                        <th class="text-left">Номер релиза</th>
+                        <th>iOS</th>
+                        <th>Android</th>
+                        <th>Всего</th>
+                      </tr>
+                    </thead>
+                    <tbody id="chpTbody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-start gap-3">
             <div class="legend">
-              <span class="lg-item"><span class="dot" style="background: var(--chp-ios, #0ea5e9)"></span>iOS</span>
-              <span class="lg-item"><span class="dot" style="background: var(--chp-android, #22c55e)"></span>Android</span>
-              <span class="lg-item"><span class="dot" style="background: var(--chp-total, #a855f7)"></span>Всего</span>
+              <span class="lg-item"><span class="dot dot-chp-ios"></span><span class="lg-text">iOS</span></span>
+              <span class="lg-item"><span class="dot dot-chp-android"></span><span class="lg-text">Android</span></span>
+              <span class="lg-item"><span class="dot dot-chp-total"></span><span class="lg-text">Всего</span></span>
             </div>
           </div>
         </div>
@@ -413,66 +449,70 @@
 
         <div data-collapse-body="chpTypes" class="space-y-4">
           <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-            <div id="chpTypesEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            <div id="chpTypesEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
               Данные появятся после получения из источника
             </div>
 
             <div id="chpTypesContent" class="tc-content" style="display:none;">
+              <div class="px-4 pt-3 text-xs font-semibold text-slate-600">Обе платформы</div>
               <div class="chart-viewport" id="chpTypesTrendViewport">
                 <canvas id="chpTypesTrendChart" aria-label="Cherepiki types chart" role="img"></canvas>
               </div>
-
-              <div class="px-4 pt-2">
-                <button id="chpTypesPlatformsBtn" type="button"
-                  class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white">
-                  <span id="chpTypesPlatformsIco" aria-hidden="true">▸</span>
-                  <span id="chpTypesPlatformsText">Показать графики по платформам</span>
-                </button>
+              <div class="legend px-4 pb-2">
+                <span class="lg-item"><span class="dot dot-chp-prod"></span><span class="lg-text">Аналитика</span></span>
+                <span class="lg-item"><span class="dot dot-chp-vlet"></span><span class="lg-text">Влет</span></span>
+                <span class="lg-item"><span class="dot dot-chp-bug"></span><span class="lg-text">Баг</span></span>
+                <span class="lg-item"><span class="dot dot-chp-crash"></span><span class="lg-text">Краш</span></span>
               </div>
 
-              <div id="chpTypesPlatforms" class="px-4 pb-2" style="display:none;">
-                <div class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div class="border border-[#ecebff] rounded-2xl bg-white/70">
-                    <div class="px-4 pt-3 text-xs font-semibold text-slate-600">iOS</div>
-                    <div class="chart-viewport" style="min-height:380px">
-                      <canvas id="chpTypesIosChart" aria-label="Cherepiki types iOS chart" role="img"></canvas>
-                    </div>
-                  </div>
-                  <div class="border border-[#ecebff] rounded-2xl bg-white/70">
-                    <div class="px-4 pt-3 text-xs font-semibold text-slate-600">Android</div>
-                    <div class="chart-viewport" style="min-height:380px">
-                      <canvas id="chpTypesAndChart" aria-label="Cherepiki types Android chart" role="img"></canvas>
-                    </div>
-                  </div>
+              <div id="chpTypesPlatforms" class="px-4 pb-2 space-y-3">
+                <div class="text-xs font-semibold text-slate-600">Android</div>
+                <div class="chart-viewport chart-viewport-min-380">
+                  <canvas id="chpTypesAndChart" aria-label="Cherepiki types Android chart" role="img"></canvas>
+                </div>
+                <div class="legend pb-1">
+                  <span class="lg-item"><span class="dot dot-chp-prod"></span><span class="lg-text">Аналитика</span></span>
+                  <span class="lg-item"><span class="dot dot-chp-vlet"></span><span class="lg-text">Влет</span></span>
+                  <span class="lg-item"><span class="dot dot-chp-bug"></span><span class="lg-text">Баг</span></span>
+                  <span class="lg-item"><span class="dot dot-chp-crash"></span><span class="lg-text">Краш</span></span>
+                </div>
+                <div class="text-xs font-semibold text-slate-600 pt-2">iOS</div>
+                <div class="chart-viewport chart-viewport-min-380">
+                  <canvas id="chpTypesIosChart" aria-label="Cherepiki types iOS chart" role="img"></canvas>
+                </div>
+                <div class="legend pb-1">
+                  <span class="lg-item"><span class="dot dot-chp-prod"></span><span class="lg-text">Аналитика</span></span>
+                  <span class="lg-item"><span class="dot dot-chp-vlet"></span><span class="lg-text">Влет</span></span>
+                  <span class="lg-item"><span class="dot dot-chp-bug"></span><span class="lg-text">Баг</span></span>
+                  <span class="lg-item"><span class="dot dot-chp-crash"></span><span class="lg-text">Краш</span></span>
                 </div>
               </div>
 
-              <div id="chpTypesTableWrap" style="display:none; overflow:auto">
-                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
-                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                  <select id="chpTypesReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              <div id="chpTypesTableWrap" class="table-block" style="display:none;">
+                <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
+                  <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                  <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="chpTypesReleaseFilter">
+                    <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="chpTypesReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
-                <table id="chpTypesTable" class="types-table">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Номер релиза</th>
-                      <th>Аналитика</th>
-                      <th>Влет</th>
-                      <th>Баг</th>
-                      <th>Краш</th>
-                    </tr>
-                  </thead>
-                  <tbody id="chpTypesTbody"></tbody>
-                </table>
+                <div class="table-scroll-x">
+                  <table id="chpTypesTable" class="types-table">
+                    <thead>
+                      <tr>
+                        <th class="text-left">Номер релиза</th>
+                        <th>Аналитика</th>
+                        <th>Влет</th>
+                        <th>Баг</th>
+                        <th>Краш</th>
+                      </tr>
+                    </thead>
+                    <tbody id="chpTypesTbody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div class="legend px-4 pb-1">
-            <span class="lg-item"><span class="dot" style="background: var(--chp-prod, #22c55e)"></span>Аналитика</span>
-            <span class="lg-item"><span class="dot" style="background: var(--chp-vlet, #f59e0b)"></span>Влет</span>
-            <span class="lg-item"><span class="dot" style="background: var(--chp-bug, #ef4444)"></span>Баг</span>
-            <span class="lg-item"><span class="dot" style="background: var(--chp-crash, #3b82f6)"></span>Краш</span>
           </div>
         </div>
       </section>
@@ -493,7 +533,7 @@
 
         <div data-collapse-body="cut" class="space-y-4">
           <div class="overflow-auto border border-[#ecebff] rounded-2xl">
-            <div id="cutEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center" style="min-height:520px" aria-live="polite">
+            <div id="cutEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
               Данные появятся после получения из источника
             </div>
 
@@ -502,37 +542,44 @@
                 <canvas id="cutTrendChart" aria-label="Cutoff & Store chart" role="img"></canvas>
               </div>
 
-              <div id="cutTableWrap" style="display:none; overflow:auto">
-                <div class="flex items-center gap-2 flex-wrap px-4 pt-2">
-                  <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                  <select id="cutReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              <div id="cutTableWrap" class="table-block" style="display:none;">
+                <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
+                  <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                  <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="cutReleaseFilter">
+                    <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="cutReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
                 <div class="cutoff-legend px-4 pt-1 text-xs text-slate-600 flex items-center gap-3 flex-wrap">
                   <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>14:00-14:05 — старт вовремя</span>
                   <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>после 14:05 — старт позже</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-store-late"></span>после 18:00 — отправка позже</span>
                 </div>
-                <table id="cutTable">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Номер релиза</th>
-                      <th>iOS Cutoff</th>
-                      <th>iOS Store</th>
-                      <th>Android Cutoff</th>
-                      <th>Android Store</th>
-                    </tr>
-                  </thead>
-                  <tbody id="cutTbody"></tbody>
-                </table>
+                <div class="table-scroll-x">
+                  <table id="cutTable">
+                    <thead>
+                      <tr>
+                        <th class="text-left">Номер релиза</th>
+                        <th>iOS Cutoff</th>
+                        <th>iOS Store</th>
+                        <th>Android Cutoff</th>
+                        <th>Android Store</th>
+                      </tr>
+                    </thead>
+                    <tbody id="cutTbody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-start gap-3">
             <div class="legend">
-              <span class="lg-item"><span class="dot dot-ios-cutoff"></span>iOS Cutoff</span>
-              <span class="lg-item"><span class="dot dot-ios-store"></span>iOS Store</span>
-              <span class="lg-item"><span class="dot dot-android-cutoff"></span>Android Cutoff</span>
-              <span class="lg-item"><span class="dot dot-android-store"></span>Android Store</span>
+              <span class="lg-item"><span class="dot dot-ios-cutoff"></span><span class="lg-text">iOS Cutoff</span></span>
+              <span class="lg-item"><span class="dot dot-ios-store"></span><span class="lg-text">iOS Store</span></span>
+              <span class="lg-item"><span class="dot dot-android-cutoff"></span><span class="lg-text">Android Cutoff</span></span>
+              <span class="lg-item"><span class="dot dot-android-store"></span><span class="lg-text">Android Store</span></span>
             </div>
           </div>
         </div>
@@ -554,7 +601,7 @@
 
         <div data-collapse-body="iosTypes" class="space-y-3">
           <div class="overflow-auto border border-[#ecebff] rounded-2xl bg-white">
-            <div id="iosTypesEmpty" class="p-6 text-slate-500" style="min-height:520px">
+            <div id="iosTypesEmpty" class="p-6 text-slate-500 empty-min-520">
               Данные появятся после получения из источника
             </div>
 
@@ -565,17 +612,22 @@
 
               <div class="legend px-4 pb-3" id="iosTypesLegend"></div>
 
-            <div id="iosTypesTableWrap" style="overflow:auto" class="px-4 pb-4">
-              <div class="flex items-center gap-2 flex-wrap pt-2 pb-2">
-                <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                <select id="iosTypesReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              <div id="iosTypesTableWrap" class="px-4 pb-4 table-block">
+              <div class="table-filter-row flex items-center gap-2 flex-wrap pt-2 pb-2 justify-end">
+                <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="iosTypesReleaseFilter">
+                  <div class="dropdown-selected truncate">Все релизы</div>
+                  <div class="dropdown-list release-filter-list"></div>
+                </div>
+                <select id="iosTypesReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
               </div>
-              <table id="iosTypesTable" class="types-table">
-                  <thead>
-                    <tr id="iosTypesTheadRow"></tr>
-                  </thead>
-                  <tbody id="iosTypesTbody"></tbody>
-                </table>
+              <div class="table-scroll-x">
+                <table id="iosTypesTable" class="types-table">
+                    <thead>
+                      <tr id="iosTypesTheadRow"></tr>
+                    </thead>
+                    <tbody id="iosTypesTbody"></tbody>
+                  </table>
               </div>
             </div>
           </div>
@@ -598,7 +650,7 @@
 
         <div data-collapse-body="andTypes" class="space-y-3">
           <div class="overflow-auto border border-[#ecebff] rounded-2xl bg-white">
-            <div id="andTypesEmpty" class="p-6 text-slate-500" style="min-height:520px">
+            <div id="andTypesEmpty" class="p-6 text-slate-500 empty-min-520">
               Данные появятся после получения из источника
             </div>
 
@@ -609,17 +661,22 @@
 
               <div class="legend px-4 pb-3" id="andTypesLegend"></div>
 
-            <div id="andTypesTableWrap" style="overflow:auto" class="px-4 pb-4">
-              <div class="flex items-center gap-2 flex-wrap pt-2 pb-2">
-                <label class="text-xs text-slate-500" style="white-space:nowrap;">Релиз</label>
-                <select id="andTypesReleaseFilter" class="input text-xs" multiple size="1" style="min-width:200px;width:auto;flex:0 0 auto;"></select>
+              <div id="andTypesTableWrap" class="px-4 pb-4 table-block">
+              <div class="table-filter-row flex items-center gap-2 flex-wrap pt-2 pb-2 justify-end">
+                <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="andTypesReleaseFilter">
+                  <div class="dropdown-selected truncate">Все релизы</div>
+                  <div class="dropdown-list release-filter-list"></div>
+                </div>
+                <select id="andTypesReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
               </div>
-              <table id="andTypesTable" class="types-table">
-                  <thead>
-                    <tr id="andTypesTheadRow"></tr>
-                  </thead>
-                  <tbody id="andTypesTbody"></tbody>
-                </table>
+              <div class="table-scroll-x">
+                <table id="andTypesTable" class="types-table">
+                    <thead>
+                      <tr id="andTypesTheadRow"></tr>
+                    </thead>
+                    <tbody id="andTypesTbody"></tbody>
+                  </table>
               </div>
             </div>
           </div>
@@ -645,7 +702,7 @@
           const LS_RANGE_KEY = 'swat_uwu_release_range';
           const LS_DEPLOY_KEY = 'wb_all_table_deploy_token';
           const LS_YT_TOKEN_KEY = 'wb_all_table_yt_token';
-          const LS_YT_BASE_KEY = 'wb_all_table_yt_base';
+          const YT_BASE_URL = 'https://youtrack.wildberries.ru';
 
           const startBtn = document.getElementById('startBtn');
           const stopBtn  = document.getElementById('stopBtn');
@@ -655,7 +712,6 @@
           const inpTo    = document.getElementById('releaseTo');
           const inpAllureToken = document.getElementById('allureToken');
           const inpDeployToken = document.getElementById('deployToken');
-          const inpYtBase = document.getElementById('ytBase');
           const inpYtToken = document.getElementById('ytToken');
 
           document.getElementById('exportPdfBtn')
@@ -859,9 +915,6 @@
           const chpTypesReleaseFilter = document.getElementById('chpTypesReleaseFilter');
           const chpTypesCanvas = document.getElementById('chpTypesTrendChart');
           const chpTypesPlatformsWrap = document.getElementById('chpTypesPlatforms');
-          const chpTypesPlatformsBtn = document.getElementById('chpTypesPlatformsBtn');
-          const chpTypesPlatformsIco = document.getElementById('chpTypesPlatformsIco');
-          const chpTypesPlatformsText = document.getElementById('chpTypesPlatformsText');
           const chpTypesIosCanvas = document.getElementById('chpTypesIosChart');
           const chpTypesAndCanvas = document.getElementById('chpTypesAndChart');
 
@@ -1242,8 +1295,7 @@
           }
 
           function ytIssueURL(key){
-            const baseRaw = (inpYtBase?.value || 'https://youtrack.wildberries.ru').trim();
-            const base = baseRaw.replace(/\/+$/,'');
+            const base = YT_BASE_URL.replace(/\/+$/,'');
             const fields = [
               'idReadable',
               'summary',
@@ -1537,6 +1589,7 @@
               dot.style.background = ds.borderColor || ds.backgroundColor || '#999';
 
               const txt = document.createElement('span');
+              txt.className = 'lg-text';
               txt.textContent = ds.label || '';
 
               item.appendChild(dot);
@@ -1546,8 +1599,27 @@
           }
 
           function normalizeStreamLabel(x){
-            const s = String(x || '').trim();
+            let s = String(x || '').trim();
+            s = s.replace(/^stream\s+/i, '').trim();
             return s || 'Без стрима';
+          }
+
+          function formatReleaseShort(value){
+            const s = String(value || '').trim();
+            if(!s) return s;
+            const parts = s.split('.');
+            if(parts.length < 3) return s;
+            const last = parts[parts.length - 1];
+            const trimmed = last.replace(/0+$/,'');
+            parts[parts.length - 1] = trimmed || '0';
+            return parts.join('.');
+          }
+
+          function parseTimeMinutesFromText(text){
+            if(!text) return null;
+            const m = String(text).match(/(\d{1,2}):(\d{2})/);
+            if(!m) return null;
+            return Number(m[1]) * 60 + Number(m[2]);
           }
 
           function isExternalStreamLabel(label){
@@ -1724,7 +1796,7 @@
 
               const td0 = document.createElement('td');
               td0.className = 'mono text-left';
-              td0.textContent = row.release;
+              td0.textContent = formatReleaseShort(row.release);
               tr.appendChild(td0);
 
               for(const t of typeList){
@@ -2061,6 +2133,7 @@
           function showChpTypesContent(){
             if(chpTypesEmpty) chpTypesEmpty.style.display = 'none';
             if(chpTypesContent) chpTypesContent.style.display = '';
+            setChpTypesPlatforms(true);
           }
           function showChpTypesEmpty(text){
             setChpTypesEmpty(text);
@@ -2072,8 +2145,6 @@
           function setChpTypesPlatforms(open){
             if(!chpTypesPlatformsWrap) return;
             chpTypesPlatformsWrap.style.display = open ? '' : 'none';
-            if(chpTypesPlatformsIco) chpTypesPlatformsIco.textContent = open ? '▾' : '▸';
-            if(chpTypesPlatformsText) chpTypesPlatformsText.textContent = open ? 'Скрыть графики по платформам' : 'Показать графики по платформам';
             if(open){
               requestAnimationFrame(() => requestAnimationFrame(() => {
                 chpTypesIosChart?.resize();
@@ -2156,7 +2227,6 @@
             try{ localStorage.setItem(LS_TOKEN_KEY, inpAllureToken.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_DEPLOY_KEY, inpDeployToken.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_YT_TOKEN_KEY, inpYtToken.value || ''); }catch(e){}
-            try{ localStorage.setItem(LS_YT_BASE_KEY, inpYtBase.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' })); }catch(e){}
           }
 
@@ -2172,10 +2242,6 @@
             try{
               const yt = localStorage.getItem(LS_YT_TOKEN_KEY) || '';
               if(inpYtToken) inpYtToken.value = yt;
-            }catch(e){}
-            try{
-              const base = localStorage.getItem(LS_YT_BASE_KEY) || '';
-              if(inpYtBase && base) inpYtBase.value = base;
             }catch(e){}
             try{
               const raw = localStorage.getItem(LS_RANGE_KEY);
@@ -2304,8 +2370,11 @@
 
           function cssVar(name, fallback){
             try{
-              const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-              return v || fallback;
+              const body = document.body;
+              const vBody = body ? getComputedStyle(body).getPropertyValue(name).trim() : '';
+              if(vBody) return vBody;
+              const vRoot = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+              return vRoot || fallback;
             }catch{ return fallback; }
           }
 
@@ -2518,10 +2587,24 @@
           const __tcStreamCache = new Map();
           const LS_TC_STREAM_KEY = 'wb_tc_stream_cache_v1';
           let __tcStreamCacheLoaded = false;
+          const __tcUwuCache = new Map();
+          const LS_TC_UWU_KEY = 'wb_tc_uwu_cache_v1';
+          let __tcUwuCacheLoaded = false;
 
           function isStreamFieldName(name){
             const s = String(name || '').toLowerCase();
             return s.includes('stream') || s.includes('стрим');
+          }
+
+          function isUwuFieldName(name){
+            return String(name || '').trim().toLowerCase() === 'uwu';
+          }
+
+          function normalizeUwuValue(value){
+            if(value == null) return 0;
+            const raw = String(value).trim().replace(',', '.');
+            const n = Number(raw);
+            return Number.isFinite(n) ? n : 0;
           }
 
           async function fetchTestResultCfv(resultId, signal){
@@ -2570,6 +2653,32 @@
             }catch(e){}
           }
 
+          function loadTcUwuCache(){
+            if(__tcUwuCacheLoaded) return;
+            __tcUwuCacheLoaded = true;
+            try{
+              const raw = localStorage.getItem(LS_TC_UWU_KEY);
+              if(!raw) return;
+              const obj = JSON.parse(raw);
+              if(!obj || typeof obj !== 'object') return;
+              for(const [k,v] of Object.entries(obj)){
+                if(!k) continue;
+                const n = Number(v);
+                if(Number.isFinite(n)) __tcUwuCache.set(String(k), n);
+              }
+            }catch(e){}
+          }
+
+          function persistTcUwuCache(){
+            try{
+              const obj = Object.create(null);
+              for(const [k,v] of __tcUwuCache.entries()){
+                obj[k] = Number(v || 0);
+              }
+              localStorage.setItem(LS_TC_UWU_KEY, JSON.stringify(obj));
+            }catch(e){}
+          }
+
           function extractStreamFromCfv(cfvList){
             const list = Array.isArray(cfvList) ? cfvList : [];
             for(const item of list){
@@ -2608,6 +2717,28 @@
             return 'Без стрима';
           }
 
+          function extractUwuFromOverview(overview){
+            const list = Array.isArray(overview?.customFields) ? overview.customFields : [];
+            for(const item of list){
+              const cfName = item?.customField?.name;
+              if(!isUwuFieldName(cfName)) continue;
+              let v = item?.name;
+              if(!v){
+                const vals = item?.values;
+                if(Array.isArray(vals) && vals.length){
+                  const first = vals[0];
+                  v = (typeof first === 'string') ? first : first?.name;
+                }else if(vals && typeof vals === 'object' && vals.name){
+                  v = vals.name;
+                }else if(typeof vals === 'string'){
+                  v = vals;
+                }
+              }
+              return normalizeUwuValue(v);
+            }
+            return 0;
+          }
+
           function getLeafResultId(leaf){
             const id = leaf?.testResultId ?? leaf?.resultId ?? leaf?.result?.id ?? leaf?.id;
             return (id == null) ? null : String(id);
@@ -2618,8 +2749,9 @@
             return (id == null) ? null : String(id);
           }
 
-          async function collectStreamCountsByLaunch(launchId, allMap, autoMap, signal){
+          async function collectStreamCountsByLaunch(launchId, allMap, autoMap, allUwuMap, autoUwuMap, signal){
             loadTcStreamCache();
+            loadTcUwuCache();
             let page = 0;
             while(true){
               const data = await httpGet('/api/testresulttree/leaf', {
@@ -2634,6 +2766,7 @@
               for(const leaf of content){
                 const resultId = getLeafResultId(leaf);
                 let stream = 'Без стрима';
+                let uwu = 0;
                 let testCaseId = getLeafTestCaseId(leaf);
                 try{
                   if(testCaseId == null && resultId){
@@ -2642,18 +2775,33 @@
                   }
                 }catch(e){}
 
-                if(testCaseId != null && __tcStreamCache.has(testCaseId)){
-                  stream = __tcStreamCache.get(testCaseId);
-                }else if(testCaseId != null){
-                  try{
-                    const overview = await fetchTestCaseOverview(testCaseId, signal);
-                    stream = extractStreamFromOverview(overview);
-                  }catch(e){
-                    stream = 'Без стрима';
+                if(testCaseId != null){
+                  const key = String(testCaseId);
+                  const hasStream = __tcStreamCache.has(key);
+                  const hasUwu = __tcUwuCache.has(key);
+
+                  if(hasStream) stream = __tcStreamCache.get(key);
+                  if(hasUwu) uwu = Number(__tcUwuCache.get(key) || 0);
+
+                  if(!hasStream || !hasUwu){
+                    try{
+                      const overview = await fetchTestCaseOverview(key, signal);
+                      if(!hasStream){
+                        stream = extractStreamFromOverview(overview);
+                        __tcStreamCache.set(key, stream);
+                      }
+                      if(!hasUwu){
+                        uwu = extractUwuFromOverview(overview);
+                        __tcUwuCache.set(key, uwu);
+                      }
+                    }catch(e){
+                      if(!hasStream) stream = 'Без стрима';
+                      if(!hasUwu) uwu = 0;
+                    }
                   }
-                  __tcStreamCache.set(testCaseId, stream);
                 }
                 allMap.set(stream, (allMap.get(stream) || 0) + 1);
+                allUwuMap.set(stream, (allUwuMap.get(stream) || 0) + Number(uwu || 0));
               }
 
               if(content.length < LEAF_PAGE_SIZE) break;
@@ -2676,6 +2824,7 @@
               for(const leaf of content){
                 const resultId = getLeafResultId(leaf);
                 let stream = 'Без стрима';
+                let uwu = 0;
                 let testCaseId = getLeafTestCaseId(leaf);
                 try{
                   if(testCaseId == null && resultId){
@@ -2684,35 +2833,60 @@
                   }
                 }catch(e){}
 
-                if(testCaseId != null && __tcStreamCache.has(testCaseId)){
-                  stream = __tcStreamCache.get(testCaseId);
-                }else if(testCaseId != null){
-                  try{
-                    const overview = await fetchTestCaseOverview(testCaseId, signal);
-                    stream = extractStreamFromOverview(overview);
-                  }catch(e){
-                    stream = 'Без стрима';
+                if(testCaseId != null){
+                  const key = String(testCaseId);
+                  const hasStream = __tcStreamCache.has(key);
+                  const hasUwu = __tcUwuCache.has(key);
+
+                  if(hasStream) stream = __tcStreamCache.get(key);
+                  if(hasUwu) uwu = Number(__tcUwuCache.get(key) || 0);
+
+                  if(!hasStream || !hasUwu){
+                    try{
+                      const overview = await fetchTestCaseOverview(key, signal);
+                      if(!hasStream){
+                        stream = extractStreamFromOverview(overview);
+                        __tcStreamCache.set(key, stream);
+                      }
+                      if(!hasUwu){
+                        uwu = extractUwuFromOverview(overview);
+                        __tcUwuCache.set(key, uwu);
+                      }
+                    }catch(e){
+                      if(!hasStream) stream = 'Без стрима';
+                      if(!hasUwu) uwu = 0;
+                    }
                   }
-                  __tcStreamCache.set(testCaseId, stream);
                 }
                 autoMap.set(stream, (autoMap.get(stream) || 0) + 1);
+                autoUwuMap.set(stream, (autoUwuMap.get(stream) || 0) + Number(uwu || 0));
               }
 
               if(content.length < LEAF_PAGE_SIZE) break;
               page += 1;
             }
             persistTcStreamCache();
+            persistTcUwuCache();
           }
 
-          function buildCountsByStream(allMap, autoMap){
+          function buildCountsByStream(allMap, autoMap, allUwuMap, autoUwuMap){
             const out = new Map();
-            const streams = new Set([...allMap.keys(), ...autoMap.keys()]);
+            const streams = new Set([
+              ...allMap.keys(),
+              ...autoMap.keys(),
+              ...allUwuMap.keys(),
+              ...autoUwuMap.keys()
+            ]);
             for(const s of streams){
               const allCnt = Number(allMap.get(s) || 0);
               const autoCnt = Number(autoMap.get(s) || 0);
               let manualCnt = allCnt - autoCnt;
               if(manualCnt < 0) manualCnt = 0;
-              out.set(s, { manual: manualCnt, auto: autoCnt });
+              const allUwu = Number(allUwuMap.get(s) || 0);
+              const autoUwu = Number(autoUwuMap.get(s) || 0);
+              let manualUwu = allUwu - autoUwu;
+              if(manualUwu < 0) manualUwu = 0;
+              out.set(s, { manual: manualCnt, auto: autoCnt, uwuManual: manualUwu, uwuAuto: autoUwu });
             }
             return out;
           }
@@ -2728,7 +2902,7 @@
             tcStreamDeltaTbody.innerHTML = '';
             if(!rows.length){
               const tr = document.createElement('tr');
-              tr.innerHTML = `<td class="mono text-left" colspan="4">Нет изменений по стримам</td>`;
+              tr.innerHTML = `<td class="mono text-left" colspan="6">Нет изменений по стримам</td>`;
               tcStreamDeltaTbody.appendChild(tr);
               return;
             }
@@ -2736,11 +2910,17 @@
               const tr = document.createElement('tr');
               const m = Number(r.manualDelta || 0);
               const a = Number(r.autoDelta || 0);
+              const um = Number(r.uwuManualDelta || 0);
+              const ua = Number(r.uwuAutoDelta || 0);
+              const streamLabel = normalizeStreamLabel(r.stream);
+              const relLabel = formatReleaseShort(r.release);
               tr.innerHTML = `
-                <td class="mono text-left">${r.release}</td>
-                <td class="mono text-left">${r.stream}</td>
+                <td class="mono text-left">${relLabel}</td>
+                <td class="mono text-left">${streamLabel}</td>
                 <td class="mono text-center ${m>0?'text-emerald-600':(m<0?'text-rose-600':'text-slate-600')}">${m>0?'+':''}${m}</td>
                 <td class="mono text-center ${a>0?'text-emerald-600':(a<0?'text-rose-600':'text-slate-600')}">${a>0?'+':''}${a}</td>
+                <td class="mono text-center ${um>0?'text-emerald-600':(um<0?'text-rose-600':'text-slate-600')}">${um>0?'+':''}${um}</td>
+                <td class="mono text-center ${ua>0?'text-emerald-600':(ua<0?'text-rose-600':'text-slate-600')}">${ua>0?'+':''}${ua}</td>
               `;
               tr.dataset.release = r.release;
               tcStreamDeltaTbody.appendChild(tr);
@@ -2749,7 +2929,7 @@
 
           function populateReleaseSelect(sel, releases){
             if(!sel) return;
-            sel.style.display = '';
+            sel.style.display = 'none';
             sel.innerHTML = '';
             if(!releases || !releases.length){
               const opt = document.createElement('option');
@@ -2759,6 +2939,7 @@
               opt.selected = true;
               sel.appendChild(opt);
               sel.disabled = true;
+              syncReleaseDropdown(sel);
               return;
             }
             const optAll = document.createElement('option');
@@ -2768,12 +2949,158 @@
             for(const rel of releases){
               const opt = document.createElement('option');
               opt.value = rel;
-              opt.textContent = rel;
+              opt.textContent = formatReleaseShort(rel);
               opt.selected = true;
               sel.appendChild(opt);
             }
             sel.disabled = false;
             updateSelectAllState(sel);
+            syncReleaseDropdown(sel);
+          }
+
+          function getReleaseDropdownBySelect(sel){
+            if(!sel || !sel.id) return null;
+            return document.querySelector(`.release-filter-dropdown[data-release-select="${sel.id}"]`);
+          }
+
+          function refreshReleaseDropdownCaption(sel){
+            const dd = getReleaseDropdownBySelect(sel);
+            if(!dd) return;
+            const txt = dd.querySelector('.dropdown-selected');
+            if(!txt) return;
+            const opts = getRealOptions(sel);
+            const total = opts.length || 0;
+            const selected = opts.filter(o => o.selected);
+            if(total === 0){
+              txt.textContent = 'Нет релизов';
+              return;
+            }
+            if(selected.length <= 0){
+              txt.textContent = 'Не выбрано';
+              return;
+            }
+            if(selected.length >= total){
+              txt.textContent = 'Все релизы';
+              return;
+            }
+            if(selected.length === 1){
+              const base = selected[0]?.value || selected[0]?.textContent || '';
+              const short = formatReleaseShort(base);
+              txt.textContent = short || 'Выбрано: 1';
+              return;
+            }
+            txt.textContent = `Выбрано: ${selected.length}`;
+          }
+
+          function syncSelectFromReleaseList(sel, list){
+            if(!sel || !list) return;
+            const picked = new Set(
+              Array.from(list.querySelectorAll('input[type=checkbox][data-release="1"]'))
+                .filter(cb => cb.checked)
+                .map(cb => cb.value)
+            );
+            const allCb = list.querySelector('input[type=checkbox][data-all="1"]');
+            const items = Array.from(list.querySelectorAll('input[type=checkbox][data-release="1"]'));
+            const allSelected = items.length ? items.every(cb => cb.checked) : false;
+            if(allCb) allCb.checked = allSelected;
+            const opts = getRealOptions(sel);
+            opts.forEach(o => { o.selected = picked.has(o.value); });
+            updateSelectAllState(sel);
+            refreshReleaseDropdownCaption(sel);
+          }
+
+          function buildReleaseDropdownOptions(sel){
+            const dd = getReleaseDropdownBySelect(sel);
+            if(!dd) return;
+            const list = dd.querySelector('.release-filter-list') || dd.querySelector('.dropdown-list');
+            if(!list) return;
+            list.innerHTML = '';
+
+            const opts = getRealOptions(sel);
+            const total = opts.length || 0;
+            const allSelected = total ? opts.every(o => o.selected) : false;
+
+            const allLabel = document.createElement('label');
+            allLabel.classList.add('release-filter-item');
+            const allText = document.createElement('span');
+            allText.classList.add('release-filter-name');
+            allText.textContent = 'Все';
+            const allCb = document.createElement('input');
+            allCb.type = 'checkbox';
+            allCb.checked = allSelected;
+            allCb.setAttribute('data-all', '1');
+            allCb.classList.add('release-filter-check');
+            allLabel.appendChild(allText);
+            allLabel.appendChild(allCb);
+            list.appendChild(allLabel);
+
+            const sep = document.createElement('div');
+            sep.className = 'h-px bg-slate-100';
+            list.appendChild(sep);
+
+            opts.forEach(opt => {
+              const label = document.createElement('label');
+              label.classList.add('release-filter-item');
+              const text = document.createElement('span');
+              text.classList.add('release-filter-name');
+              const short = formatReleaseShort(opt.value || opt.textContent);
+              text.textContent = short || opt.textContent || opt.value;
+              const cb = document.createElement('input');
+              cb.type = 'checkbox';
+              cb.checked = !!opt.selected;
+              cb.value = opt.value;
+              cb.setAttribute('data-release', '1');
+              cb.classList.add('release-filter-check');
+              label.appendChild(text);
+              label.appendChild(cb);
+              list.appendChild(label);
+            });
+
+            refreshReleaseDropdownCaption(sel);
+          }
+
+          function initReleaseDropdown(dd){
+            if(!dd || dd.dataset.dropdownInit === '1') return;
+            dd.dataset.dropdownInit = '1';
+            const sel = dd.querySelector('.dropdown-selected');
+            const list = dd.querySelector('.release-filter-list') || dd.querySelector('.dropdown-list');
+            if(sel){
+              sel.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dd.classList.toggle('open');
+              });
+            }
+            document.addEventListener('click', (e) => {
+              if(!dd.contains(e.target)) dd.classList.remove('open');
+            });
+            if(list){
+              list.addEventListener('change', (e) => {
+                const t = e.target;
+                if(!(t instanceof HTMLInputElement)) return;
+                if(t.dataset.all === '1'){
+                  const on = t.checked;
+                  list.querySelectorAll('input[data-release="1"]').forEach(cb => { cb.checked = on; });
+                }
+                const selectId = dd.getAttribute('data-release-select');
+                const selEl = selectId ? document.getElementById(selectId) : null;
+                if(selEl){
+                  syncSelectFromReleaseList(selEl, list);
+                  applyAllReleaseFilters();
+                }
+              });
+            }
+          }
+
+          function syncReleaseDropdown(sel){
+            if(!sel) return;
+            const dd = getReleaseDropdownBySelect(sel);
+            if(!dd) return;
+            initReleaseDropdown(dd);
+            buildReleaseDropdownOptions(sel);
+          }
+
+          function initReleaseDropdowns(){
+            document.querySelectorAll('.release-filter-dropdown').forEach(initReleaseDropdown);
           }
 
           function populateAllReleaseFilters(releases){
@@ -3367,7 +3694,7 @@
             };
 
             return new Chart(canvas, {
-              type: 'bar',
+              type: 'line',
               data: {
                 labels: [],
                 datasets: CHPTYPES_ORDER.map((key) => ({
@@ -3375,20 +3702,36 @@
                   data: [],
                   backgroundColor: colorMap[key],
                   borderColor: colorMap[key],
-                  borderWidth: 1,
-                  stack: 'chpTypes'
+                  tension: 0.25,
+                  pointRadius: 3,
+                  pointHoverRadius: 5,
+                  spanGaps: true
                 }))
               },
               options: {
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
-                  tooltip: { mode: 'index', intersect: false }
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    itemSort: (a, b) => {
+                      const av = Number(a?.raw ?? a?.parsed?.y ?? 0);
+                      const bv = Number(b?.raw ?? b?.parsed?.y ?? 0);
+                      return (bv - av) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      }
+                    }
+                  }
                 },
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                  x: { stacked: true },
-                  y: { stacked: true, beginAtZero: true }
+                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
                 }
               }
             });
@@ -3479,12 +3822,12 @@
                   tooltip: {
                     mode: 'index',
                     intersect: false,
-                    // СНАЧАЛА cutoff (раньше — выше), ПОТОМ store (раньше — выше)
+                    // СНАЧАЛА store (раньше — выше), ПОТОМ cutoff (раньше — выше)
                     itemSort: (a, b) => {
                       const la = String(a?.dataset?.label || '');
                       const lb = String(b?.dataset?.label || '');
-                      const kindA = la.includes('Cutoff') ? 0 : 1;
-                      const kindB = lb.includes('Cutoff') ? 0 : 1;
+                      const kindA = la.includes('Store') ? 0 : 1;
+                      const kindB = lb.includes('Store') ? 0 : 1;
                       if(kindA !== kindB) return kindA - kindB;
 
                       const dsA = cutChart.data.datasets[a.datasetIndex];
@@ -3660,11 +4003,12 @@
             const pctM = Math.round((manual / max) * 100);
             const pctA = Math.round((auto / max) * 100);
             const pctT = 100;
+            const relLabel = formatReleaseShort(release);
 
             const tr = document.createElement('tr');
             tr.dataset.release = release;
             tr.innerHTML = `
-              <td class="mono text-left">${release}</td>
+              <td class="mono text-left">${relLabel}</td>
               <td class="mono">${manual}</td>
               <td class="mono">${auto}</td>
               <td class="mono">${total}</td>
@@ -3695,10 +4039,11 @@
             const sum = (Number(swatCount) || 0) + (Number(streamCount) || 0);
             const swPct = sum ? (Math.round(((Number(swatCount)||0) / sum) * 1000) / 10) : 0;
             const stPct = sum ? (Math.round(((Number(streamCount)||0) / sum) * 1000) / 10) : 0;
+            const relLabel = formatReleaseShort(release);
             const tr2 = document.createElement('tr');
             tr2.dataset.release = release;
             tr2.innerHTML = `
-              <td class="mono text-left">${release}</td>
+              <td class="mono text-left">${relLabel}</td>
               <td class="mono">${swatCount}</td>
               <td class="mono">${Number(swatPeople || 0)}</td>
               <td class="mono">${streamCount}</td>
@@ -3712,10 +4057,11 @@
             const sum = (Number(swatCount) || 0) + (Number(streamCount) || 0);
             const swPct = sum ? (Math.round(((Number(swatCount)||0) / sum) * 1000) / 10) : 0;
             const stPct = sum ? (Math.round(((Number(streamCount)||0) / sum) * 1000) / 10) : 0;
+            const relLabel = formatReleaseShort(release);
             const tr2 = document.createElement('tr');
             tr2.dataset.release = release;
             tr2.innerHTML = `
-              <td class="mono text-left">${release}</td>
+              <td class="mono text-left">${relLabel}</td>
               <td class="mono">${swatCount}</td>
               <td class="mono">${Number(swatPeople || 0)}</td>
               <td class="mono">${streamCount}</td>
@@ -3726,10 +4072,11 @@
           }
 
           function renderAvgRow({release, swatMs, streamMs, totalMs}){
+            const relLabel = formatReleaseShort(release);
             const tr = document.createElement('tr');
             tr.dataset.release = release;
             tr.innerHTML = `
-              <td class="mono text-left">${release}</td>
+              <td class="mono text-left">${relLabel}</td>
               <td class="mono">${formatMsPerCase(swatMs)}</td>
               <td class="mono">${formatMsPerCase(streamMs)}</td>
               <td class="mono">${formatMsPerCase(totalMs)}</td>
@@ -3739,10 +4086,11 @@
 
           function renderChpTypesRow({release, product, vlet, bug, crash}){
             if(!chpTypesTbody) return;
+            const relLabel = formatReleaseShort(release);
             const tr = document.createElement('tr');
             tr.dataset.release = release;
             tr.innerHTML = `
-              <td class="mono text-left">${release}</td>
+              <td class="mono text-left">${relLabel}</td>
               <td class="mono">${product}</td>
               <td class="mono">${vlet}</td>
               <td class="mono">${bug}</td>
@@ -3790,16 +4138,23 @@
           }
 
           function renderCutRow({release, iosCut, iosStore, andCut, andStore}){
+            const relLabel = formatReleaseShort(release);
+            const iosStoreMinutes = parseTimeMinutesFromText(iosStore);
+            const andStoreMinutes = parseTimeMinutesFromText(andStore);
+            const iosStoreLate = Number.isFinite(iosStoreMinutes) && iosStoreMinutes > (18 * 60);
+            const andStoreLate = Number.isFinite(andStoreMinutes) && andStoreMinutes > (18 * 60);
+            const iosStoreText = iosStore ? `${iosStore}${iosStoreLate ? ' (отправлено позже)' : ''}` : '';
+            const andStoreText = andStore ? `${andStore}${andStoreLate ? ' (отправлено позже)' : ''}` : '';
             const tr = document.createElement('tr');
             const iosFmt = formatCutLabel(iosCut, CUT_TARGET_MINUTES.ios);
             const andFmt = formatCutLabel(andCut, CUT_TARGET_MINUTES.android);
             tr.dataset.release = release;
             tr.innerHTML = `
-              <td class="mono text-left">${release}</td>
+              <td class="mono text-left">${relLabel}</td>
               <td class="mono cut-cell ${iosFmt.status || ''}">${iosFmt.html}</td>
-              <td class="mono">${iosStore || ''}</td>
+              <td class="mono ${iosStoreLate ? 'cut-store-late' : ''}">${iosStoreText}</td>
               <td class="mono cut-cell ${andFmt.status || ''}">${andFmt.html}</td>
-              <td class="mono">${andStore || ''}</td>
+              <td class="mono ${andStoreLate ? 'cut-store-late' : ''}">${andStoreText}</td>
             `;
             cutTbody.appendChild(tr);
           }
@@ -3928,21 +4283,6 @@
             });
           }
 
-          function initToggles(){
-            document.querySelectorAll('[data-toggle]').forEach(btn => {
-              const key = btn.getAttribute('data-toggle');
-              const body = document.querySelector(`[data-toggle-body="${key}"]`);
-              if(!body) return;
-              btn.addEventListener('click', () => {
-                const isHidden = body.style.display === 'none';
-                body.style.display = isHidden ? '' : 'none';
-                btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
-                const ico = btn.querySelector('span[aria-hidden="true"]');
-                if(ico) ico.textContent = isHidden ? '▾' : '▸';
-                try{ tcChart?.resize(); }catch(e){}
-              });
-            });
-          }
 
           // ---- RUN ----
           async function run(){
@@ -4142,18 +4482,24 @@
               if(idsAll.length){
                 const allMap = new Map();
                 const autoMap = new Map();
+                const allUwuMap = new Map();
+                const autoUwuMap = new Map();
                 const perStream = await asyncPool(idsAll, STREAM_CONCURRENCY, async (id) => {
                   const mAll = new Map();
                   const mAuto = new Map();
-                  await collectStreamCountsByLaunch(id, mAll, mAuto, signal);
-                  return { all: mAll, auto: mAuto };
+                  const mAllUwu = new Map();
+                  const mAutoUwu = new Map();
+                  await collectStreamCountsByLaunch(id, mAll, mAuto, mAllUwu, mAutoUwu, signal);
+                  return { all: mAll, auto: mAuto, uwuAll: mAllUwu, uwuAuto: mAutoUwu };
                 }, signal);
                 for(const r of perStream){
                   if(!r) continue;
                   mergeMapOfCounts(allMap, r.all || new Map());
                   mergeMapOfCounts(autoMap, r.auto || new Map());
+                  mergeMapOfCounts(allUwuMap, r.uwuAll || new Map());
+                  mergeMapOfCounts(autoUwuMap, r.uwuAuto || new Map());
                 }
-                tcStreamByRelease.push({ release: rel, counts: buildCountsByStream(allMap, autoMap) });
+                tcStreamByRelease.push({ release: rel, counts: buildCountsByStream(allMap, autoMap, allUwuMap, autoUwuMap) });
               }else{
                 tcStreamByRelease.push({ release: rel, counts: new Map() });
               }
@@ -4254,12 +4600,21 @@
                   ...Array.from(curr.counts.keys())
                 ]);
                 for(const s of streams){
-                  const p = prev.counts.get(s) || { manual: 0, auto: 0 };
-                  const c = curr.counts.get(s) || { manual: 0, auto: 0 };
+                  const p = prev.counts.get(s) || { manual: 0, auto: 0, uwuManual: 0, uwuAuto: 0 };
+                  const c = curr.counts.get(s) || { manual: 0, auto: 0, uwuManual: 0, uwuAuto: 0 };
                   const md = Number(c.manual||0) - Number(p.manual||0);
                   const ad = Number(c.auto||0) - Number(p.auto||0);
-                  if(md === 0 && ad === 0) continue;
-                  deltaRows.push({ release: curr.release, stream: s, manualDelta: md, autoDelta: ad });
+                  const umd = Number(c.uwuManual||0) - Number(p.uwuManual||0);
+                  const uad = Number(c.uwuAuto||0) - Number(p.uwuAuto||0);
+                  if(md === 0 && ad === 0 && umd === 0 && uad === 0) continue;
+                  deltaRows.push({
+                    release: curr.release,
+                    stream: s,
+                    manualDelta: md,
+                    autoDelta: ad,
+                    uwuManualDelta: umd,
+                    uwuAutoDelta: uad
+                  });
                 }
               }
               tcStreamDeltaRowsAll = deltaRows.slice();
@@ -4474,7 +4829,8 @@
           showIosTypesEmpty('Данные появятся после получения из источника');
           showAndTypesEmpty('Данные появятся после получения из источника');
           initCollapsers();
-          initToggles();
+          
+          initReleaseDropdowns();
 
           [
             tcReleaseFilter,
@@ -4492,12 +4848,7 @@
             attachSelectAllToggle(sel);
             sel.addEventListener('change', applyAllReleaseFilters);
           });
-          initToggles();
-          setChpTypesPlatforms(false);
-          chpTypesPlatformsBtn?.addEventListener('click', () => {
-            const isOpen = chpTypesPlatformsWrap && chpTypesPlatformsWrap.style.display !== 'none';
-            setChpTypesPlatforms(!isOpen);
-          });
+          setChpTypesPlatforms(true);
 
           proxyBtn?.addEventListener('click', async () => {
             try{
