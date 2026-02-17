@@ -914,6 +914,136 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
     table{width:100%;border-collapse:collapse;font-size:14px}
     th,td{padding:10px 8px;border-bottom:1px solid #eee;text-align:left}
     th{background:#faf7fd;user-select:none;cursor:default}
+
+    /* ===== WB графики (локальные правки) ===== */
+    .wb-graphs{
+      --tc-auto:#2563eb;
+      --tc-total:#ec4899;
+      --chp-total:#f97316;
+      --cut-ios-cutoff:#2563eb;
+      --cut-ios-store:#ef4444;
+      --cut-android-cutoff:#14b8a6;
+      --cut-android-store:#f59e0b;
+    }
+    .wb-graphs .overflow-auto{
+      overflow:visible;
+    }
+    .wb-graphs .table-block{
+      position:relative;
+    }
+    .wb-graphs .table-filter-row{
+      position:relative;
+      z-index:10;
+    }
+    .wb-graphs .table-scroll-x{
+      overflow-x:auto;
+      overflow-y:visible;
+      position:relative;
+      z-index:1;
+    }
+    .wb-graphs .card table th{
+      padding:6px 6px;
+      line-height:1.2;
+    }
+    .wb-graphs .card table td{
+      padding:8px 6px;
+      line-height:1.2;
+    }
+    .wb-graphs #tcTable thead th,
+    .wb-graphs #tcStreamDeltaTable thead th{
+      text-align:center !important;
+    }
+    .wb-graphs #tcStreamDeltaTable{
+      table-layout:fixed;
+    }
+    .wb-graphs #tcStreamDeltaTable col.tc-col-release{ width:16.666%; }
+    .wb-graphs #tcStreamDeltaTable col.tc-col-stream{ width:50%; }
+    .wb-graphs #tcStreamDeltaTable col.tc-col-manual{ width:8.333%; }
+    .wb-graphs #tcStreamDeltaTable col.tc-col-auto{ width:8.333%; }
+    .wb-graphs #tcStreamDeltaTable col.tc-col-uwu-manual{ width:8.333%; }
+    .wb-graphs #tcStreamDeltaTable col.tc-col-uwu-auto{ width:8.333%; }
+    .wb-graphs .release-filter-dropdown .dropdown-selected{
+      text-align:left;
+    }
+    .wb-graphs .release-filter-dropdown .dropdown-list{
+      left:auto;
+      right:0;
+      min-width:154px;
+      gap:0;
+      padding:0;
+      z-index:1200;
+    }
+    .wb-graphs .release-filter-dropdown{
+      position:relative;
+      z-index:20;
+    }
+    .wb-graphs .release-filter-dropdown.open{
+      z-index:1300;
+    }
+    .wb-graphs .release-filter-list .release-filter-item{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:6px;
+      padding:5px 8px;
+      line-height:1.3;
+      cursor:pointer;
+      user-select:none;
+      width:100%;
+      box-sizing:border-box;
+      margin:0;
+      border-radius:0;
+    }
+    .wb-graphs .release-filter-list .release-filter-item:hover{
+      background:#faf7fd;
+    }
+    .wb-graphs .release-filter-list .release-filter-name{
+      flex:1 1 auto;
+      min-width:0;
+      text-align:left;
+      white-space:nowrap;
+      overflow:visible;
+      text-overflow:clip;
+    }
+    .wb-graphs .release-filter-list .release-filter-check{
+      flex:0 0 16px;
+      width:16px;
+      height:16px;
+      margin-left:12px;
+      padding:0;
+      border:none;
+      background:transparent;
+      appearance:auto;
+      -webkit-appearance:auto;
+    }
+    .wb-graphs .release-filter-label{
+      white-space:nowrap;
+    }
+    .wb-graphs .release-filter-dropdown{
+      width:132px;
+      --bd:#ecebff;
+    }
+    .wb-graphs .release-select-hidden{
+      min-width:200px;
+      width:auto;
+      flex:0 0 auto;
+      display:none;
+    }
+    .wb-graphs .empty-min-520{
+      min-height:520px;
+    }
+    .wb-graphs .chart-viewport-min-380{
+      min-height:380px;
+    }
+    .wb-graphs .dot-chp-ios{background:var(--chp-ios, #0ea5e9)}
+    .wb-graphs .dot-chp-android{background:var(--chp-android, #22c55e)}
+    .wb-graphs .dot-chp-total{background:var(--chp-total, #a855f7)}
+    .wb-graphs .dot-chp-prod{background:var(--chp-prod, #22c55e)}
+    .wb-graphs .dot-chp-vlet{background:var(--chp-vlet, #f59e0b)}
+    .wb-graphs .dot-chp-bug{background:var(--chp-bug, #ef4444)}
+    .wb-graphs .dot-chp-crash{background:var(--chp-crash, #3b82f6)}
+    .wb-graphs .cutoff-store-late{background:var(--red);box-shadow:0 0 0 4px rgba(244,63,94,.12)}
+    .wb-graphs .cut-store-late{color:var(--red);font-weight:700}
     .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
     .kpi{background:#fff;border:1px solid #efe5f4;border-radius:10px;padding:10px 12px;min-width:160px}
     .kpi .muted{font-size:12px}
@@ -1334,6 +1464,27 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
   background:#f8fafc !important;
   border-color:#e2e8f0 !important;
   color:#0f172a !important;
+}
+.pdf-export .legend{
+  display:block !important;
+  align-items:stretch !important;
+}
+.pdf-export .legend .lg-item{
+  display:inline-block;
+  vertical-align:middle;
+  line-height:1;
+  white-space:nowrap;
+  margin-right:14px;
+}
+.pdf-export .legend .dot,
+.pdf-export .legend .lg-text{
+  display:inline-block;
+  vertical-align:middle;
+  line-height:1;
+}
+.pdf-export .legend .dot{
+  margin-right:6px;
+  box-shadow:none !important;
 }
 .pdf-export canvas,
 .pdf-export img{

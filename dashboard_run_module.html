@@ -25,7 +25,7 @@
 
 
 <div class="wrap">
-  <h1>Остаток кейсов на регресс v.3.1</h1>
+  <h1>Остаток кейсов на регресс v.3.11</h1>
 
  <div class="tabs">
   <button id="tabDashBtn" class="active">Дашборд</button>
@@ -865,10 +865,11 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
 
       const done = Math.max(0, Number(doneSum) || 0);
       const left = Math.max(0, Number(leftSum) || 0);
-      const total = Math.max(0, done + left);
-      const data = total > 0 ? [done, left] : [0, 1];
-      const donePct = total > 0 ? (done / total * 100) : 0;
-      const leftPct = total > 0 ? (left / total * 100) : 0;
+      const totalRaw = Math.max(0, done + left);
+      const pctBase = totalRaw > 0 ? totalRaw : 1;
+      const data = totalRaw > 0 ? [done, left] : [1, 0];
+      const donePct = totalRaw > 0 ? (done / pctBase * 100) : 0;
+      const leftPct = totalRaw > 0 ? (left / pctBase * 100) : 0;
 
       const centerPlugin = {
         id: 'uwuCenterPct',
@@ -879,13 +880,61 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
           ctx.save();
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
+          const fontFamily = Chart.defaults.font.family || 'Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+          const maxW = (right - left) * 0.9;
+          const baseMax = Math.min(ch.width, ch.height);
+
+          const countLines = [
+            done.toLocaleString('ru-RU'),
+            'из',
+            totalRaw.toLocaleString('ru-RU')
+          ];
+
+          const fitTextSizeMulti = (lines, maxWidth, maxSize, minSize, weight) => {
+            let size = Math.max(minSize, Math.round(maxSize));
+            for(; size >= minSize; size--){
+              ctx.font = `${weight} ${size}px ${fontFamily}`;
+              let ok = true;
+              for(const t of lines){
+                if(ctx.measureText(t).width > maxWidth){ ok = false; break; }
+              }
+              if(ok) return size;
+            }
+            return minSize;
+          };
+
           const baseSize = Math.max(14, Math.min(ch.width, ch.height) * 0.18);
-          ctx.fillStyle = getCSS('--ink') || getCSS('--text') || '#2a1446';
-          ctx.font = '700 ' + Math.round(baseSize) + 'px ' + Chart.defaults.font.family;
-          ctx.fillText(donePct.toFixed(1) + '%', x, y - baseSize*0.03);
-          ctx.fillStyle = getCSS('--muted') || '#8d77a6';
-          ctx.font = '600 ' + Math.round(baseSize*0.37) + 'px ' + Chart.defaults.font.family;
-          ctx.fillText('осталось ' + leftPct.toFixed(1) + '%', x, y + baseSize*0.75);
+          const countSize = fitTextSizeMulti(countLines, maxW, baseSize * 0.264, 9, 800);
+          const pctSize = Math.round(baseSize);
+          const pctSubSize = Math.round(baseSize * 0.37);
+
+          const countLineH = Math.round(countSize * 1.1);
+          const countBlockH = countLineH * countLines.length;
+          const topLimit = top + countLineH * 0.6;
+          let countStartY = (y - baseSize * 1.25) - countBlockH / 2 + 5;
+          if(countStartY < topLimit) countStartY = topLimit;
+
+          const drawLine = (text, size, weight, color, yy) => {
+            ctx.fillStyle = color;
+            ctx.font = `${weight} ${size}px ${fontFamily}`;
+            ctx.fillText(text, x, yy);
+          };
+
+          // count block (3 строки) выше процентов
+          const countColor = getCSS('--ink') || getCSS('--text') || '#2a1446';
+          const mutedColor = getCSS('--muted') || '#8d77a6';
+          for(let i=0;i<countLines.length;i++){
+            const yy = countStartY + countLineH * (i + 0.5);
+            const weight = (i === 1) ? 700 : 800;
+            const color = (i === 1) ? mutedColor : countColor;
+            drawLine(countLines[i], countSize, weight, color, yy);
+          }
+
+          // проценты на уровне обычных тест-кейсов
+          const pctY = y - baseSize * 0.03;
+          const leftY = y + baseSize * 0.75;
+          drawLine(`${donePct.toFixed(1)}%`, pctSize, 700, countColor, pctY);
+          drawLine(`осталось ${leftPct.toFixed(1)}%`, pctSubSize, 600, mutedColor, leftY);
           ctx.restore();
         }
       };
@@ -894,13 +943,16 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
         type: 'doughnut',
         data: {
           labels: ['Пройдено','Осталось'],
-          datasets: [{
-            data,
-            backgroundColor: [COLORS.finished, hexA(COLORS.remaining_total, .6)],
-            borderColor:'#fff',
-            borderWidth:2,
-            spacing:3
-          }]
+        datasets: [{
+          data,
+          backgroundColor: [
+            getCSS('--wb-deep') || getCSS('--c1') || COLORS.total || '#7a3af9',
+            hexA(COLORS.remaining_total, .6)
+          ],
+          borderColor:'#fff',
+          borderWidth:2,
+          spacing:3
+        }]
         },
         options: {
           maintainAspectRatio:false,
@@ -1086,22 +1138,38 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
   function renderAgg(agg, cardsId, barId, summaryEl, uwuAgg){
     var container=document.getElementById(cardsId);
     container.innerHTML='';
+
+    var labelOrder = ORDER.filter(function(l){ return l.indexOf('[Smoke]') === -1; });
+    var idxByLabel = {};
+    for(var i=0;i<labelOrder.length;i++){
+      idxByLabel[labelOrder[i]] = ORDER.indexOf(labelOrder[i]);
+    }
+
+    var hbLabels = labelOrder.filter(function(l){ return l.indexOf('[High/Blocker]') !== -1; });
+    var selLabels = labelOrder.filter(function(l){ return l.indexOf('[Selective]') !== -1; });
+    var otherLabels = labelOrder.filter(function(l){ return hbLabels.indexOf(l) === -1 && selLabels.indexOf(l) === -1; });
+
     var grand=0;
-    for(var oi=0;oi<ORDER.length;oi++){
-      var label=ORDER[oi];
-      if (label.indexOf('[Smoke]') !== -1) continue;
+    for(var gi=0;gi<labelOrder.length;gi++){
+      var aG = agg[labelOrder[gi]] || {total:0,finished:0,remaining_total:0,remaining:0,in_progress:0};
+      grand += aG.total;
+    }
+
+    function getUwuTotal(label){
+      var uwuStats = getUwuStatsFromAgg(uwuAgg, label);
+      return Number(uwuStats && uwuStats.total || 0);
+    }
+
+    function appendRegCard(label){
       var a=agg[label]||{total:0,finished:0,remaining_total:0,remaining:0,in_progress:0};
-      grand+=a.total;
+      var oi = idxByLabel[label];
       var canId='dn_'+cardsId+'_'+oi;
-      var uwuCanId='uwu_'+cardsId+'_'+oi;
-      var uwuMetaId='uwu_meta_'+cardsId+'_'+oi;
-      var uwuDoneId='uwu_done_'+cardsId+'_'+oi;
-      var uwuLeftId='uwu_left_'+cardsId+'_'+oi;
-      var isSelective = label.indexOf('[Selective]') !== -1;
+      var rightHtml = 'Всего: <b>' + (a.total||0).toLocaleString('ru-RU') + '</b>';
+
       var regCard=document.createElement('div');
       regCard.className='card';
       regCard.innerHTML=
-        '<div class="head"><div>'+label+'</div><div class="export"><div class="nums">Всего: <b>'+(a.total||0).toLocaleString('ru-RU')+'</b></div></div></div>'+
+        '<div class="head"><div>'+label+'</div><div class="export"><div class="nums">'+rightHtml+'</div></div></div>'+
         '<div class="chart-wrap"><canvas id="'+canId+'" class="chart"></canvas></div>'+
         '<div class="kpis">'+
           '<div class="kpi"><span class="label">Пройдено</span><span class="val">'+(a.finished||0).toLocaleString('ru-RU')+'</span></div>'+
@@ -1109,38 +1177,54 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
         '</div>';
       container.appendChild(regCard);
 
-      if (!isSelective){
-        var uwuCard=document.createElement('div');
-        uwuCard.className='card';
-        uwuCard.innerHTML=
-          '<div class="head"><div id="'+uwuMetaId+'">'+label+' UwU: —</div></div>'+
-          '<div class="chart-wrap"><canvas id="'+uwuCanId+'" class="chart"></canvas></div>'+
-          '<div class="kpis">'+
-            '<div class="kpi"><span class="label">Пройдено</span><span class="val" id="'+uwuDoneId+'">—</span></div>'+
-            '<div class="kpi"><span class="label">Осталось</span><span class="val" id="'+uwuLeftId+'">—</span></div>'+
-          '</div>';
-        container.appendChild(uwuCard);
-      }
-(function(canId,a){
-  // передаём только 2 числа: пройдено и осталось
-  var maker=makeDonut(document.getElementById(canId), [a.finished, a.remaining_total]);
-  requestAnimationFrame(function(){ maker(); });
-})(canId, a);
-      (function(uwuCanId, uwuMetaId, uwuDoneId, uwuLeftId, label, regStats){
-        if (label.indexOf('[Selective]') !== -1) return;
-        var metaEl = document.getElementById(uwuMetaId);
-        var doneEl = document.getElementById(uwuDoneId);
-        var leftEl = document.getElementById(uwuLeftId);
-        var uwuStats = getUwuStatsFromAgg(uwuAgg, label);
-        var sum = Number(uwuStats && uwuStats.total || 0);
-        var done = Number(uwuStats && uwuStats.done || 0);
-        var left = Number(uwuStats && uwuStats.left || 0);
-        if (metaEl) metaEl.textContent = label + ' UwU: ' + (sum ? sum.toLocaleString('ru-RU') : '0');
-        if (doneEl) doneEl.textContent = done.toLocaleString('ru-RU');
-        if (leftEl) leftEl.textContent = left.toLocaleString('ru-RU');
-        makeUwuDonut(uwuCanId, done, left);
-      })(uwuCanId, uwuMetaId, uwuDoneId, uwuLeftId, label, a);
+      // передаём только 2 числа: пройдено и осталось
+      var maker=makeDonut(document.getElementById(canId), [a.finished, a.remaining_total]);
+      requestAnimationFrame(function(){ maker(); });
     }
+
+    function appendUwuCard(label){
+      var oi = idxByLabel[label];
+      var uwuCanId='uwu_'+cardsId+'_'+oi;
+      var uwuMetaId='uwu_meta_'+cardsId+'_'+oi;
+      var uwuTotalId='uwu_total_'+cardsId+'_'+oi;
+      var uwuDoneId='uwu_done_'+cardsId+'_'+oi;
+      var uwuLeftId='uwu_left_'+cardsId+'_'+oi;
+
+      var uwuCard=document.createElement('div');
+      uwuCard.className='card';
+      uwuCard.innerHTML=
+        '<div class="head"><div id="'+uwuMetaId+'">'+label+' UwU</div><div class="export"><div class="nums" id="'+uwuTotalId+'">Всего: —</div></div></div>'+
+        '<div class="chart-wrap"><canvas id="'+uwuCanId+'" class="chart"></canvas></div>'+
+        '<div class="kpis">'+
+          '<div class="kpi"><span class="label">Пройдено</span><span class="val" id="'+uwuDoneId+'">—</span></div>'+
+          '<div class="kpi"><span class="label">Осталось</span><span class="val" id="'+uwuLeftId+'">—</span></div>'+
+        '</div>';
+      container.appendChild(uwuCard);
+
+      var metaEl = document.getElementById(uwuMetaId);
+      var totalEl = document.getElementById(uwuTotalId);
+      var doneEl = document.getElementById(uwuDoneId);
+      var leftEl = document.getElementById(uwuLeftId);
+      var uwuStats = getUwuStatsFromAgg(uwuAgg, label);
+      var sum = Number(uwuStats && uwuStats.total || 0);
+      var done = Number(uwuStats && uwuStats.done || 0);
+      var left = Number(uwuStats && uwuStats.left || 0);
+      if (metaEl) metaEl.textContent = label + ' UwU';
+      if (totalEl) totalEl.innerHTML = 'Всего: <b>' + (sum ? sum.toLocaleString('ru-RU') : '0') + '</b>';
+      if (doneEl) doneEl.textContent = done.toLocaleString('ru-RU');
+      if (leftEl) leftEl.textContent = left.toLocaleString('ru-RU');
+      makeUwuDonut(uwuCanId, done, left);
+    }
+
+    // 1) High/Blocker (обычные)
+    for(var h=0;h<hbLabels.length;h++){ appendRegCard(hbLabels[h]); }
+    // 2) High/Blocker UwU (отдельный ряд)
+    for(var hu=0;hu<hbLabels.length;hu++){ appendUwuCard(hbLabels[hu]); }
+    // 3) Selective (обычные + UwU в правом углу)
+    for(var s=0;s<selLabels.length;s++){ appendRegCard(selLabels[s]); }
+    // 4) Остальные (если появятся)
+    for(var o=0;o<otherLabels.length;o++){ appendRegCard(otherLabels[o]); }
+
     if(summaryEl) summaryEl.textContent='Всего групп: '+ORDER.length+', всего кейсов: '+grand.toLocaleString('ru-RU');
 
 
