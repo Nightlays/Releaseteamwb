@@ -55,6 +55,20 @@
       filter: saturate(1.05);
       transform: translateY(-1px);
     }
+
+    #loadBtn.btn-danger {
+      background: linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95)) !important;
+      color: #fff !important;
+      border-color: transparent !important;
+    }
+
+    #loadBtn.btn-danger:hover,
+    #loadBtn.btn-danger:focus {
+      background: linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95)) !important;
+      color: #fff !important;
+      filter: saturate(1.05);
+      transform: translateY(-1px);
+    }
   </style>
 </head>
 <body class="min-h-screen wb-graphs">
@@ -93,6 +107,7 @@
               </div>
               <div class="md:col-span-2">
                 <button id="loadBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
+                <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Отменить сбор</button>
                 <button id="proxyBtn" type="button" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
                   Проверить прокси
                 </button>
@@ -105,10 +120,20 @@
         <div id="summary" class="flex flex-wrap gap-2"></div>
       </section>
 
+      <section class="card p-3">
+        <div class="flex justify-center">
+          <div class="tabs" role="tablist" aria-label="Режим выгрузки">
+            <button id="tabElena" type="button" class="tab" aria-selected="true">Елена</button>
+            <button id="tabNadezhda" type="button" class="tab" aria-selected="false">Надежда</button>
+            <button id="tabDarya" type="button" class="tab" aria-selected="false">Дарья</button>
+          </div>
+        </div>
+      </section>
+
       <section class="card p-5">
         <div class="msg-block">
           <div class="msg-head flex items-center justify-between gap-3">
-            <span>Текст для отправки</span>
+            <span id="outputTitle">Текст для отправки</span>
             <button id="copyBtn" type="button" class="inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#cfd6df] text-slate-700 hover:bg-white">
               Копировать
             </button>
@@ -134,7 +159,14 @@
     const AGILE_SPRINTS_FIELDS = "archived,finish,goal,id,isDefault,isStarted,name,ordinal,report(id),start";
     const ISSUES_GETTER_FIELDS =
       "$type,attachments(id),canAddPublicComment,canUpdateVisibility,commentsCount,created,fields($type,hasStateMachine,id,isUpdatable,name,projectCustomField($type,bundle(id),canBeEmpty,emptyFieldText,field(fieldType(isMultiValue,valueType),id,localizedName,name,ordinal),id,isEstimation,isPublic,isSpentTime,ordinal,size),value($type,archived,avatarUrl,buildIntegration,buildLink,color(background,foreground,id),description,fullName,id,isResolved,localizedName,login,markdownText,minutes,name,presentation,ringId,text)),hasEmail,id,idReadable,project($type,id,isDemo,leader(id),name,plugins(helpDeskSettings(enabled)),ringId,shortName),reporter($type,avatarUrl,banBadge,banned,canReadProfile,email,fullName,id,isEmailVerified,isLocked,issueRelatedGroup(icon),login,name,online,profiles(general(trackOnlineStatus)),ringId,userType(id)),resolved,summary,tags(color(id),id,isUpdatable,isUsable,name,owner(id),query),transaction(authorId,timestamp),updated,updater($type,avatarUrl,banBadge,banned,canReadProfile,email,fullName,id,isEmailVerified,isLocked,issueRelatedGroup(icon),login,name,online,profiles(general(trackOnlineStatus)),ringId,userType(id)),visibility($type,implicitPermittedUsers($type,avatarUrl,banBadge,banned,canReadProfile,email,fullName,id,isEmailVerified,isLocked,issueRelatedGroup(icon),login,name,online,profiles(general(trackOnlineStatus)),ringId,userType(id)),permittedGroups($type,allUsersGroup,icon,id,name,ringId),permittedUsers($type,avatarUrl,banBadge,banned,canReadProfile,email,fullName,id,isEmailVerified,isLocked,issueRelatedGroup(icon),login,name,online,profiles(general(trackOnlineStatus)),ringId,userType(id))),voters(hasVote),votes,watchers(hasStar)";
+    const ISSUE_FALLBACK_FIELDS =
+      "id,idReadable,summary,description,fields($type,name,projectCustomField(field(name)),value($type,name,localizedName,text,markdownText,presentation))";
     const TOP_ROOT = 101;
+    const MODE_ELENA = "elena";
+    const MODE_NADEZHDA = "nadezhda";
+    const MODE_DARYA = "darya";
+    const IOS_SPRINT_FIELD = "{Версия релиза (ex. Sprint) iOS}";
+    const ANDROID_SPRINT_FIELD = "{Версия релиза (ex. Sprint) Android}";
     const PLATFORM_CFG = [
       { key: "ios", sprintField: "{Версия релиза (ex. Sprint) iOS}", agileId: "83-469" },
       { key: "android", sprintField: "{Версия релиза (ex. Sprint) Android}", agileId: "83-2175" }
@@ -145,13 +177,20 @@
       release: document.getElementById("release"),
       token: document.getElementById("token"),
       loadBtn: document.getElementById("loadBtn"),
+      stopBtn: document.getElementById("stopBtn"),
       proxyBtn: document.getElementById("proxyBtn"),
       copyBtn: document.getElementById("copyBtn"),
       status: document.getElementById("status"),
       summary: document.getElementById("summary"),
-      output: document.getElementById("output")
+      output: document.getElementById("output"),
+      outputTitle: document.getElementById("outputTitle"),
+      tabElena: document.getElementById("tabElena"),
+      tabNadezhda: document.getElementById("tabNadezhda"),
+      tabDarya: document.getElementById("tabDarya")
     };
     const sprintBoardInfoCache = new Map();
+    let activeMode = MODE_ELENA;
+    let activeRunController = null;
 
     function setStatus(text, type) {
       ui.status.textContent = text;
@@ -167,6 +206,86 @@
       ui.status.classList.add("text-slate-500");
     }
 
+    function renderSummary(chips) {
+      ui.summary.innerHTML = "";
+      chips.forEach(text => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = text;
+        ui.summary.appendChild(chip);
+      });
+    }
+
+    function setRunning(running) {
+      if (running) {
+        ui.loadBtn.style.display = "none";
+        ui.stopBtn.style.display = "";
+        ui.loadBtn.disabled = true;
+        ui.stopBtn.disabled = false;
+        return;
+      }
+      ui.stopBtn.style.display = "none";
+      ui.loadBtn.style.display = "";
+      ui.stopBtn.disabled = true;
+      ui.loadBtn.disabled = false;
+    }
+
+    function setMode(mode) {
+      if (activeRunController) return;
+      if (mode === MODE_NADEZHDA) {
+        activeMode = MODE_NADEZHDA;
+      } else if (mode === MODE_DARYA) {
+        activeMode = MODE_DARYA;
+      } else {
+        activeMode = MODE_ELENA;
+      }
+      const isElena = activeMode === MODE_ELENA;
+      ui.tabElena.setAttribute("aria-selected", isElena ? "true" : "false");
+      ui.tabNadezhda.setAttribute("aria-selected", activeMode === MODE_NADEZHDA ? "true" : "false");
+      ui.tabDarya.setAttribute("aria-selected", activeMode === MODE_DARYA ? "true" : "false");
+      if (ui.outputTitle) {
+        ui.outputTitle.textContent = isElena ? "Текст для отправки" : "Текст для копирования";
+      }
+      ui.output.textContent = isElena
+        ? "Здесь будет сформирован текст."
+        : "Здесь будет сформирован список задач.";
+      ui.summary.innerHTML = "";
+      setStatus("Введите релиз и токен, затем нажмите «Запустить сбор».", "");
+    }
+
+    function createAbortError() {
+      try {
+        return new DOMException("Aborted", "AbortError");
+      } catch (_) {
+        const err = new Error("Aborted");
+        err.name = "AbortError";
+        return err;
+      }
+    }
+
+    function isAbortError(error) {
+      return error?.name === "AbortError";
+    }
+
+    function waitWithAbort(ms, signal) {
+      if (!signal) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+      if (signal.aborted) return Promise.reject(createAbortError());
+      return new Promise((resolve, reject) => {
+        const t = setTimeout(() => {
+          signal.removeEventListener("abort", onAbort);
+          resolve();
+        }, ms);
+        const onAbort = () => {
+          clearTimeout(t);
+          signal.removeEventListener("abort", onAbort);
+          reject(createAbortError());
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+      });
+    }
+
     function asBearer(rawToken) {
       const token = String(rawToken || "").trim();
       if (!token) return "";
@@ -174,7 +293,7 @@
     }
 
     function buildQuery(release, sprintField) {
-      return `(Type: Epic OR Type: {User Story}) AND (${sprintField}: ${release}) `;
+      return `(Type: Epic OR Type: {User Story}) AND (${sprintField}: ${release}) AND State: -Rejected`;
     }
 
     function showToast(msg, ok = true) {
@@ -191,17 +310,19 @@
       showToast.__t = setTimeout(() => { el.style.opacity = "0"; }, 1800);
     }
 
-    async function fetchWithRetry(fetcher, { maxTries = 5, baseDelay = 200 } = {}) {
+    async function fetchWithRetry(fetcher, { maxTries = 5, baseDelay = 200, signal } = {}) {
       let lastErr;
       for (let i = 0; i < maxTries; i += 1) {
+        if (signal?.aborted) throw createAbortError();
         try {
           return await fetcher();
         } catch (error) {
+          if (isAbortError(error) || signal?.aborted) throw error;
           lastErr = error;
           if (i < maxTries - 1) {
             const jitter = Math.floor(Math.random() * 120);
             const waitMs = baseDelay * (2 ** i) + jitter;
-            await new Promise(resolve => setTimeout(resolve, waitMs));
+            await waitWithAbort(waitMs, signal);
             continue;
           }
         }
@@ -225,14 +346,14 @@
           throw new Error(`Proxy HTTP ${response.status}${text ? `. ${text}` : ""}`);
         }
         return response.json();
-      });
+      }, { signal });
     }
 
     async function proxyGetJson(targetUrl, headers, signal) {
       return proxyRequestJson(targetUrl, { method: "GET", headers, signal });
     }
 
-    async function fetchSortedIssueIds(query, authHeader) {
+    async function fetchSortedIssueIds(query, authHeader, signal) {
       const params = new URLSearchParams();
       params.set("$top", "-1");
       params.set("fields", SORTED_ISSUES_FIELDS);
@@ -247,13 +368,14 @@
         {
           Accept: "application/json",
           Authorization: authHeader
-        }
+        },
+        signal
       );
       const tree = Array.isArray(data?.tree) ? data.tree : [];
       return tree.map(node => node?.id).filter(Boolean);
     }
 
-    async function fetchIssueDetails(ids, authHeader) {
+    async function fetchIssueDetails(ids, authHeader, signal) {
       if (!Array.isArray(ids) || ids.length === 0) return [];
 
       const params = new URLSearchParams();
@@ -261,21 +383,75 @@
       params.set("fields", ISSUES_GETTER_FIELDS);
       params.set("fieldsVisibleOnList", "true");
 
-      const payload = ids.map(id => ({ id }));
+      const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+      const fetchByIds = async list => {
+        const payload = list.map(id => ({ id }));
+        const data = await proxyRequestJson(`${YT_BASE_URL}/api/issuesGetter?${params.toString()}`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: authHeader
+          },
+          body: JSON.stringify(payload),
+          signal
+        });
+        return Array.isArray(data) ? data : [];
+      };
+      const fetchOneIssueById = async id => {
+        const p = new URLSearchParams();
+        p.set("fields", ISSUE_FALLBACK_FIELDS);
+        const data = await proxyGetJson(
+          `${YT_BASE_URL}/api/issues/${encodeURIComponent(id)}?${p.toString()}`,
+          {
+            Accept: "application/json",
+            Authorization: authHeader
+          },
+          signal
+        );
+        return data && typeof data === "object" ? data : null;
+      };
 
-      const data = await proxyRequestJson(`${YT_BASE_URL}/api/issuesGetter?${params.toString()}`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: authHeader
-        },
-        body: JSON.stringify(payload)
+      const byId = new Map();
+      const firstPass = await fetchByIds(uniqueIds);
+      firstPass.forEach(item => {
+        if (item?.id) byId.set(item.id, item);
       });
-      return Array.isArray(data) ? data : [];
+
+      const missing = uniqueIds.filter(id => !byId.has(id));
+      if (missing.length > 0) {
+        const batchSize = 20;
+        for (let i = 0; i < missing.length; i += batchSize) {
+          const chunk = missing.slice(i, i + batchSize);
+          const recovered = await fetchByIds(chunk);
+          recovered.forEach(item => {
+            if (item?.id) byId.set(item.id, item);
+          });
+        }
+      }
+
+      const stillMissing = uniqueIds.filter(id => !byId.has(id));
+      if (stillMissing.length > 0) {
+        for (const id of stillMissing) {
+          let recovered = await fetchByIds([id]);
+          if (!Array.isArray(recovered) || recovered.length === 0) {
+            const single = await fetchOneIssueById(id);
+            if (single?.id) {
+              byId.set(single.id, single);
+              continue;
+            }
+            continue;
+          }
+          recovered.forEach(item => {
+            if (item?.id) byId.set(item.id, item);
+          });
+        }
+      }
+
+      return Array.from(byId.values());
     }
 
-    async function fetchAgileSprints(agileId, authHeader) {
+    async function fetchAgileSprints(agileId, authHeader, signal) {
       const params = new URLSearchParams();
       params.set("issuesQuery", "");
       params.set("$top", "-1");
@@ -286,7 +462,8 @@
         {
           Accept: "application/json",
           Authorization: authHeader
-        }
+        },
+        signal
       );
       return Array.isArray(data) ? data : [];
     }
@@ -334,14 +511,14 @@
       return formatStoreDate(Math.max(...candidates));
     }
 
-    async function fetchBoardInfoForRelease(agileId, release, authHeader) {
+    async function fetchBoardInfoForRelease(agileId, release, authHeader, signal) {
       const releaseNorm = normalizeReleaseName(release);
       const cacheKey = `${agileId}::${releaseNorm}`;
       if (sprintBoardInfoCache.has(cacheKey)) {
         return sprintBoardInfoCache.get(cacheKey);
       }
 
-      const sprints = await fetchAgileSprints(agileId, authHeader);
+      const sprints = await fetchAgileSprints(agileId, authHeader, signal);
       const sprint = sprints.find(item => normalizeReleaseName(item?.name) === releaseNorm);
       const url = sprint?.id
         ? `${YT_BASE_URL}/agiles/${agileId}/${sprint.id}`
@@ -356,38 +533,105 @@
       return info;
     }
 
+    function issueFieldName(field) {
+      return String(field?.name || field?.projectCustomField?.field?.name || "").trim();
+    }
+
+    function extractFieldText(value) {
+      if (typeof value === "string") return value;
+      if (!value) return "";
+      if (typeof value.text === "string") return value.text;
+      if (typeof value.markdownText === "string") return value.markdownText;
+      if (typeof value.name === "string") return value.name;
+      if (typeof value.localizedName === "string") return value.localizedName;
+      if (Array.isArray(value)) {
+        return value.map(item => extractFieldText(item)).filter(Boolean).join(" ");
+      }
+      return "";
+    }
+
+    function readIssueType(issue) {
+      const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+      for (const field of fields) {
+        const fieldName = issueFieldName(field).toLowerCase();
+        if (fieldName !== "type" && fieldName !== "тип") continue;
+        return extractFieldText(field?.value).trim();
+      }
+      return "";
+    }
+
+    function readIssueDescription(issue) {
+      if (typeof issue?.description === "string") return issue.description;
+      const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+      for (const field of fields) {
+        const fieldName = issueFieldName(field).toLowerCase();
+        if (fieldName !== "description" && fieldName !== "описание") continue;
+        return extractFieldText(field?.value).trim();
+      }
+      return "";
+    }
+
+    function readIssueState(issue) {
+      const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+      for (const field of fields) {
+        const fieldName = issueFieldName(field).toLowerCase();
+        if (
+          fieldName !== "state" &&
+          fieldName !== "status" &&
+          fieldName !== "состояние" &&
+          fieldName !== "статус"
+        ) continue;
+        return extractFieldText(field?.value).trim();
+      }
+      return "";
+    }
+
+    function isRejectedState(rawState) {
+      const value = String(rawState || "").trim().toLowerCase().replace(/\s+/g, " ");
+      return value === "rejected" || value.startsWith("rejected ");
+    }
+
+    function normalizeTypeBucket(rawType) {
+      const value = String(rawType || "").trim().toLowerCase();
+      if (value === "user story" || value === "userstory" || value === "история пользователя") {
+        return "user_story";
+      }
+      if (value === "epic" || value === "эпик") {
+        return "epic";
+      }
+      if (value === "task" || value === "задача") {
+        return "task";
+      }
+      return "";
+    }
+
     function normalizeIssue(issue) {
+      const type = readIssueType(issue);
+      const state = readIssueState(issue);
       return {
         key: String(issue?.idReadable || issue?.id || "-"),
-        summary: String(issue?.summary || "").trim()
+        summary: String(issue?.summary || "").trim(),
+        type,
+        typeBucket: normalizeTypeBucket(type),
+        description: readIssueDescription(issue),
+        state,
+        isRejected: isRejectedState(state)
       };
     }
 
-    function orderedIssueRows(idsInOrder, issueItems) {
+    function orderedIssueRows(idsInOrder, issueItems, { keepMissing = false } = {}) {
       const byId = new Map();
       issueItems.forEach(item => {
         if (item && item.id) byId.set(item.id, item);
       });
       return idsInOrder
-        .map(id => byId.get(id))
+        .map(id => byId.get(id) || (keepMissing ? {
+          id,
+          idReadable: id,
+          summary: "Нет данных по задаче (issuesGetter)"
+        } : null))
         .filter(Boolean)
         .map(normalizeIssue);
-    }
-
-    function renderSummary(info) {
-      ui.summary.innerHTML = "";
-      const chips = [
-        `Релиз: ${info.release}`,
-        `iOS: ${info.iosCount}`,
-        `Android: ${info.androidCount}`,
-        `Всего: ${info.totalCount}`
-      ];
-      chips.forEach(text => {
-        const chip = document.createElement("span");
-        chip.className = "chip";
-        chip.textContent = text;
-        ui.summary.appendChild(chip);
-      });
     }
 
     function issueLink(key) {
@@ -508,6 +752,50 @@
       };
     }
 
+    function buildStoryEpicQueryByField(release, sprintField) {
+      return `(${sprintField}: ${release}) AND (Type: {User Story} OR Type: {Epic}) AND State: -Rejected`;
+    }
+
+    function buildTasksQueryByField(release, sprintField) {
+      return `(${sprintField}: ${release}) AND (Type: -{User Story}) AND (Type: -{Epic}) AND State: -Rejected AND ((description: флаг OR description: enable OR description: 'фф') OR (summary: флаг OR summary: enable OR summary: 'фф'))`;
+    }
+
+    function appendNadezhdaSection(lines, title, rows) {
+      lines.push(`${title}:`);
+      if (rows.length === 0) {
+        lines.push("Нет задач");
+        lines.push("");
+        return;
+      }
+      rows.forEach(row => {
+        const key = asTableCell(row.key);
+        const summary = asTableCell(row.summary);
+        lines.push(`[${key}](${issueLink(key)}) ${summary}`);
+      });
+      lines.push("");
+    }
+
+    function buildNadezhdaTable(userStoryRows, epicRows, taskRows) {
+      const lines = [];
+      appendNadezhdaSection(lines, "User Story", userStoryRows);
+      appendNadezhdaSection(lines, "Epic", epicRows);
+      appendNadezhdaSection(lines, "Другие задачи", taskRows);
+      return lines.join("\n").trimEnd();
+    }
+
+    function buildNadezhdaMessage(release, platformLabel, emoji, boardLabel, boardUrl, userStoryRows, epicRows, taskRows) {
+      const lines = [];
+      lines.push(`**Привет! ${release} ${platformLabel}  ${emoji}**`);
+      lines.push("**Проверьте пожалуйста флаги в задачах релиза**");
+      if (boardUrl) {
+        const safeUrl = String(boardUrl).trim();
+        lines.push(`[Ссылка на доску ${boardLabel}](${safeUrl})`);
+      }
+      lines.push("");
+      lines.push(buildNadezhdaTable(userStoryRows, epicRows, taskRows));
+      return lines.join("\n");
+    }
+
     function persistInputs() {
       try {
         localStorage.setItem(LS_YT_TOKEN_KEY, ui.token.value || "");
@@ -539,13 +827,13 @@
       }
     }
 
-    async function collectPlatformLines(release, authHeader, cfg) {
+    async function collectPlatformLines(release, authHeader, cfg, signal) {
       const query = buildQuery(release, cfg.sprintField);
       const [boardInfo, sortedIds] = await Promise.all([
-        fetchBoardInfoForRelease(cfg.agileId, release, authHeader),
-        fetchSortedIssueIds(query, authHeader)
+        fetchBoardInfoForRelease(cfg.agileId, release, authHeader, signal),
+        fetchSortedIssueIds(query, authHeader, signal)
       ]);
-      const issueItems = await fetchIssueDetails(sortedIds, authHeader);
+      const issueItems = await fetchIssueDetails(sortedIds, authHeader, signal);
       const rows = orderedIssueRows(sortedIds, issueItems);
       return {
         ids: sortedIds,
@@ -553,6 +841,95 @@
         boardUrl: boardInfo?.url || "",
         releaseFinishMs: boardInfo?.releaseFinishMs ?? null
       };
+    }
+
+    async function collectRowsByQuery(query, authHeader, signal) {
+      const sortedIds = await fetchSortedIssueIds(query, authHeader, signal);
+      const issueItems = await fetchIssueDetails(sortedIds, authHeader, signal);
+      return orderedIssueRows(sortedIds, issueItems, { keepMissing: true });
+    }
+
+    async function runElena(release, authHeader, signal) {
+      const [iosResult, androidResult] = await Promise.all([
+        collectPlatformLines(release, authHeader, PLATFORM_CFG[0], signal),
+        collectPlatformLines(release, authHeader, PLATFORM_CFG[1], signal)
+      ]);
+
+      const releaseStoreDate = latestStoreDate([iosResult, androidResult]);
+      const message = buildMessageText(
+        release,
+        releaseStoreDate,
+        iosResult.rows,
+        iosResult.boardUrl,
+        androidResult.rows,
+        androidResult.boardUrl
+      );
+
+      return {
+        text: message.text,
+        chips: [
+          `Релиз: ${release}`,
+          `iOS: ${message.iosCount}`,
+          `Android: ${message.androidCount}`,
+          `Всего: ${message.iosCount + message.androidCount + message.commonCount}`
+        ]
+      };
+    }
+
+    async function runNadezhdaLike(release, authHeader, signal, cfg) {
+      const [storyEpicRows, taskRowsRaw, boardInfo] = await Promise.all([
+        collectRowsByQuery(buildStoryEpicQueryByField(release, cfg.sprintField), authHeader, signal),
+        collectRowsByQuery(buildTasksQueryByField(release, cfg.sprintField), authHeader, signal),
+        fetchBoardInfoForRelease(cfg.agileId, release, authHeader, signal)
+      ]);
+
+      const userStoryRows = storyEpicRows.filter(row => row.typeBucket === "user_story");
+      const epicRows = storyEpicRows.filter(row => row.typeBucket !== "user_story");
+      const taskRows = taskRowsRaw;
+      const totalCount = userStoryRows.length + epicRows.length + taskRows.length;
+
+      return {
+        text: buildNadezhdaMessage(
+          release,
+          cfg.platformLabel,
+          cfg.emoji,
+          cfg.boardLabel,
+          boardInfo?.url || "",
+          userStoryRows,
+          epicRows,
+          taskRows
+        ),
+        chips: [
+          `Режим: ${cfg.modeLabel}`,
+          `Релиз: ${release}`,
+          `User Story: ${userStoryRows.length}`,
+          `Epic: ${epicRows.length}`,
+          `Tasks: ${taskRows.length}`,
+          `Всего: ${totalCount}`
+        ]
+      };
+    }
+
+    async function runNadezhda(release, authHeader, signal) {
+      return runNadezhdaLike(release, authHeader, signal, {
+        sprintField: IOS_SPRINT_FIELD,
+        agileId: PLATFORM_CFG[0].agileId,
+        boardLabel: "IOS",
+        platformLabel: "iOS",
+        emoji: ":apple_company:",
+        modeLabel: "Надежда (iOS)"
+      });
+    }
+
+    async function runDarya(release, authHeader, signal) {
+      return runNadezhdaLike(release, authHeader, signal, {
+        sprintField: ANDROID_SPRINT_FIELD,
+        agileId: PLATFORM_CFG[1].agileId,
+        boardLabel: "Android",
+        platformLabel: "Android",
+        emoji: ":android:",
+        modeLabel: "Дарья (Android)"
+      });
     }
 
     async function run() {
@@ -567,42 +944,48 @@
         setStatus("Укажите YouTrack token.", "err");
         return;
       }
+      if (activeRunController) {
+        setStatus("Сбор уже выполняется.", "");
+        return;
+      }
 
       persistInputs();
-      ui.loadBtn.disabled = true;
+      const controller = new AbortController();
+      activeRunController = controller;
+      setRunning(true);
       ui.copyBtn.disabled = true;
       setStatus("Сбор задач из YouTrack...", "");
 
       try {
-        const [iosResult, androidResult] = await Promise.all([
-          collectPlatformLines(release, authHeader, PLATFORM_CFG[0]),
-          collectPlatformLines(release, authHeader, PLATFORM_CFG[1])
-        ]);
+        let result;
+        if (activeMode === MODE_NADEZHDA) {
+          result = await runNadezhda(release, authHeader, controller.signal);
+        } else if (activeMode === MODE_DARYA) {
+          result = await runDarya(release, authHeader, controller.signal);
+        } else {
+          result = await runElena(release, authHeader, controller.signal);
+        }
 
-        const releaseStoreDate = latestStoreDate([iosResult, androidResult]);
-        const message = buildMessageText(
-          release,
-          releaseStoreDate,
-          iosResult.rows,
-          iosResult.boardUrl,
-          androidResult.rows,
-          androidResult.boardUrl
-        );
-        ui.output.textContent = message.text;
-
-        renderSummary({
-          release,
-          iosCount: message.iosCount,
-          androidCount: message.androidCount,
-          totalCount: message.iosCount + message.androidCount + message.commonCount
-        });
+        ui.output.textContent = result.text;
+        renderSummary(result.chips);
         setStatus("Готово.", "ok");
       } catch (error) {
-        setStatus(error?.message || "Ошибка при загрузке задач.", "err");
+        if (isAbortError(error)) {
+          setStatus("Сбор остановлен.", "");
+          showToast("Сбор остановлен", false);
+        } else {
+          setStatus(error?.message || "Ошибка при загрузке задач.", "err");
+        }
       } finally {
-        ui.loadBtn.disabled = false;
+        activeRunController = null;
+        setRunning(false);
         ui.copyBtn.disabled = false;
       }
+    }
+
+    function cancelRun() {
+      if (!activeRunController) return;
+      activeRunController.abort();
     }
 
     async function checkProxy() {
@@ -638,13 +1021,19 @@
       ui.appVersion.innerHTML = `<span aria-hidden="true">🏷️</span><span>${APP_VERSION}</span>`;
     }
     restoreInputs();
+    setRunning(false);
+    setMode(MODE_ELENA);
     ui.release.addEventListener("input", persistInputs);
     ui.release.addEventListener("change", persistInputs);
     ui.token.addEventListener("input", persistInputs);
     ui.token.addEventListener("change", persistInputs);
     ui.loadBtn.addEventListener("click", run);
+    ui.stopBtn.addEventListener("click", cancelRun);
     ui.proxyBtn.addEventListener("click", checkProxy);
     ui.copyBtn.addEventListener("click", copyOutput);
+    ui.tabElena.addEventListener("click", () => setMode(MODE_ELENA));
+    ui.tabNadezhda.addEventListener("click", () => setMode(MODE_NADEZHDA));
+    ui.tabDarya.addEventListener("click", () => setMode(MODE_DARYA));
   </script>
 </body>
 </html>
