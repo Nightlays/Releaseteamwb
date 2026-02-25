@@ -15,13 +15,9 @@
 
   <!-- style.css рядом (тот же, что у CoreDashboard) -->
   <link rel="stylesheet" href="./style.css" />
-    <style>
-      /* v1.0.27: enlarge SWAT count in Platform table header */
-      .plat-swat-count{ font-size:1.2em; font-weight:600; color:#111827; }
-    </style>
 </head>
 
-<body class="min-h-screen">
+<body class="min-h-screen swat-release">
   <div class="max-w-[1900px] mx-auto px-4 py-6">
     <header class="flex items-center justify-between gap-3 flex-wrap">
       <div class="brand-badge">
@@ -75,21 +71,18 @@
 
       <!-- Таблица -->
       <section class="card p-5 space-y-4">
-        <div class="relative flex items-center">
+        <div class="flex items-center justify-between">
           <div class="min-w-[220px]">
             <h2 class="text-lg font-semibold">Таблица SWAT</h2>
           </div>
-
-          <!-- tabs centered -->
-          <div class="absolute left-1/2 -translate-x-1/2">
-            <div class="inline-flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-[#ecebff]">
-              <button id="tabEmp" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Детали по сотруднику</button>
-              <button id="tabPlat" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Детали по платформам</button>
-              <button id="tabCases" class="px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff]">Кейсы сотрудников по дням</button>
-            </div>
+        </div>
+        <div class="flex justify-center">
+          <div id="swatTabsShell" class="mt-2 inline-flex flex-wrap items-center justify-center gap-2 p-2 rounded-lg border border-[#dfe6ff] bg-slate-50/90 shadow-sm">
+            <button id="tabEmp" class="px-3 py-1.5 text-sm font-semibold rounded-md border border-[#d8e1ff] bg-white">Детали по сотруднику</button>
+            <button id="tabPlat" class="px-3 py-1.5 text-sm font-semibold rounded-md border border-[#d8e1ff] bg-white">Детали по платформам</button>
+            <button id="tabCases" class="px-3 py-1.5 text-sm font-semibold rounded-md border border-[#d8e1ff] bg-white">Кейсы сотрудников по дням</button>
+            <button id="tabCasesStreams" class="px-3 py-1.5 text-sm font-semibold rounded-md border border-[#d8e1ff] bg-white">Кейсы сотрудников по дням (стримы)</button>
           </div>
-
-          <div class="ml-auto"></div>
         </div>
 
         <div id="dashContent" class="hidden">
@@ -149,7 +142,7 @@
         <div id="wrapCases" class="space-y-4 hidden">
           <div class="flex items-center justify-end px-2">
             <div class="text-xs font-semibold text-slate-500 mr-2">Фильтр</div>
-            <div id="casesFilterDropdown" class="dropdown dropdown--slim input" style="width:220px; --bd:#ecebff">
+            <div id="casesFilterDropdown" class="dropdown dropdown--slim input">
               <div id="casesFilterSelectedText" class="dropdown-selected truncate">Все сотрудники</div>
               <div id="casesFilterList" class="dropdown-list"></div>
             </div>
@@ -166,6 +159,18 @@
               <canvas id="casesIosChart" aria-label="Cases iOS chart" role="img"></canvas>
             </div>
           </div>
+        </div>
+
+        <!-- Tab 4: Cases by day (streams) -->
+        <div id="wrapCasesStreams" class="space-y-4 hidden">
+          <div class="flex items-center justify-end px-2">
+            <div class="text-xs font-semibold text-slate-500 mr-2">Фильтр</div>
+            <div id="casesStreamsFilterDropdown" class="dropdown dropdown--slim input">
+              <div id="casesStreamsFilterSelectedText" class="dropdown-selected truncate">Все сотрудники</div>
+              <div id="casesStreamsFilterList" class="dropdown-list"></div>
+            </div>
+          </div>
+          <div id="casesStreamsGrid" class="space-y-4"></div>
         </div>
       </section>
     </main>
@@ -228,15 +233,18 @@
       const tabEmp = document.getElementById('tabEmp');
       const tabPlat = document.getElementById('tabPlat');
       const tabCases = document.getElementById('tabCases');
+      const tabCasesStreams = document.getElementById('tabCasesStreams');
 
       const wrapEmp = document.getElementById('wrapEmp');
       const wrapPlat = document.getElementById('wrapPlat');
       const wrapCases = document.getElementById('wrapCases');
+      const wrapCasesStreams = document.getElementById('wrapCasesStreams');
 
       const legendEmp = document.getElementById('legendEmp');
 
       let casesAndroidChart = null;
       let casesIosChart = null;
+      let casesStreamsCharts = [];
 
       // tables
       const cgEmp = document.getElementById('cgEmp');
@@ -253,6 +261,10 @@
       const casesFilterDropdown = document.getElementById('casesFilterDropdown');
       const casesFilterSelectedText = document.getElementById('casesFilterSelectedText');
       const casesFilterList = document.getElementById('casesFilterList');
+      const casesStreamsFilterDropdown = document.getElementById('casesStreamsFilterDropdown');
+      const casesStreamsFilterSelectedText = document.getElementById('casesStreamsFilterSelectedText');
+      const casesStreamsFilterList = document.getElementById('casesStreamsFilterList');
+      const casesStreamsGrid = document.getElementById('casesStreamsGrid');
 
       // popover
       const pathPopover = document.getElementById('pathPopover');
@@ -279,6 +291,7 @@
         days: [],
         rowsAndroidAll: [],
         rowsIosAll: [],
+        rowsStreamsAll: [],
         users: [],
         selectedLogins: new Set()
       };
@@ -339,6 +352,9 @@
         setHidden(wrapEmp, true);
         setHidden(wrapPlat, true);
         setHidden(wrapCases, true);
+        setHidden(wrapCasesStreams, true);
+        destroyCasesStreamsCharts();
+        if(casesStreamsGrid) casesStreamsGrid.innerHTML = '';
         setHidden(btnExportEmp, true);
       }
 
@@ -360,15 +376,17 @@
       }
 
       initDropdown(casesFilterDropdown);
-      if(casesFilterList){
-        casesFilterList.addEventListener('change', (e) => {
+      initDropdown(casesStreamsFilterDropdown);
+      for(const filterListEl of [casesFilterList, casesStreamsFilterList]){
+        if(!filterListEl) continue;
+        filterListEl.addEventListener('change', (e) => {
           const t = e.target;
           if(!(t instanceof HTMLInputElement)) return;
           if(t.dataset.all === '1'){
             const on = t.checked;
-            casesFilterList.querySelectorAll('input[data-login="1"]').forEach(cb => { cb.checked = on; });
+            filterListEl.querySelectorAll('input[data-login="1"]').forEach(cb => { cb.checked = on; });
           }
-          updateCasesFilterFromUI();
+          updateCasesFilterFromUI(filterListEl);
         });
       }
 
@@ -495,7 +513,7 @@
         try{
           const v = localStorage.getItem(LS_TAB) || 'emp';
           if(v === 'retry') return 'cases';
-          if(v === 'emp' || v === 'plat' || v === 'cases') return v;
+          if(v === 'emp' || v === 'plat' || v === 'cases' || v === 'cases_streams') return v;
           return 'emp';
         }catch(e){ return 'emp'; }
       }
@@ -684,17 +702,19 @@
       }
 
       function applyTab(active){
-        const btnBase = 'px-3 py-1.5 text-sm font-semibold rounded-xl border border-[#ecebff] transition-all';
-        const on  = btnBase + ' bg-white text-slate-900 shadow-md';
-        const off = btnBase + ' text-slate-700 hover:bg-white/60';
+        const btnBase = 'px-3 py-1.5 text-sm font-semibold rounded-md border border-[#d8e1ff] transition-all';
+        const on  = btnBase + ' bg-blue-50 text-blue-900 shadow-md ring-2 ring-blue-200 border-blue-300';
+        const off = btnBase + ' bg-slate-50 text-slate-700 hover:bg-white';
 
         tabEmp.className   = (active === 'emp')   ? on : off;
         tabPlat.className  = (active === 'plat')  ? on : off;
         tabCases.className = (active === 'cases') ? on : off;
+        tabCasesStreams.className = (active === 'cases_streams') ? on : off;
 
         setHidden(wrapEmp, active !== 'emp');
         setHidden(wrapPlat, active !== 'plat');
         setHidden(wrapCases, active !== 'cases');
+        setHidden(wrapCasesStreams, active !== 'cases_streams');
 
         setHidden(legendEmp, active !== 'emp');
         setHidden(btnExportEmp, !(active === 'emp' && EMP_STATE.rows.length));
@@ -1211,7 +1231,7 @@
         `;
       }
 
-      // ===== Render: Cases by day charts (Android/iOS) =====
+      // ===== Render: Cases by day charts (Android/iOS + Streams) =====
       function colorForIndex(i){
         const hue = (i * 47) % 360;
         return {
@@ -1220,7 +1240,7 @@
         };
       }
 
-      function buildCasesChart(canvas){
+      function buildCasesChart(canvas, { showLegend = false, legendAlign = 'start' } = {}){
         if(!canvas || !window.Chart) return null;
         return new Chart(canvas, {
           type: 'line',
@@ -1228,7 +1248,12 @@
           options: {
             maintainAspectRatio: false,
             plugins: {
-              legend: { display: false },
+              legend: {
+                display: !!showLegend,
+                position: 'top',
+                align: legendAlign,
+                labels: { boxWidth: 14, boxHeight: 8, usePointStyle: true, pointStyle: 'line' }
+              },
               tooltip: {
                 mode: 'index',
                 intersect: false,
@@ -1256,8 +1281,8 @@
                   footer: (items) => {
                     const rows = (items || []).filter(it => Number(it?.raw || 0) > 0);
                     const sum = rows.reduce((s, it) => s + Number(it?.raw || 0), 0);
-                    const people = rows.length;
-                    return `Итого за день: ${sum}\nИтого сотрудников: ${people}`;
+                    const entity = canvas._footerEntityLabel || 'сотрудников';
+                    return `Итого за день: ${sum}\nИтого ${entity}: ${rows.length}`;
                   }
                 }
               }
@@ -1271,9 +1296,9 @@
         });
       }
 
-      function renderCasesChart({ chart, canvas, rows, days }){
+      function renderCasesChart({ chart, canvas, rows, days, showLegend = false, legendAlign = 'start', footerEntityLabel = 'сотрудников' }){
         if(!chart){
-          chart = buildCasesChart(canvas);
+          chart = buildCasesChart(canvas, { showLegend, legendAlign });
           if(!chart) return null;
         }
 
@@ -1281,7 +1306,7 @@
         const fullLabels = days.map(d => `${ruDowShort(d)} ${ddmm(d)}`);
 
         const datasets = rows.map((r, idx) => {
-          const disp = r.full_name || r.login || `User ${idx + 1}`;
+          const disp = r.label || r.full_name || r.login || r.stream || `Series ${idx + 1}`;
           const c = colorForIndex(idx);
           return {
             label: disp,
@@ -1300,10 +1325,20 @@
         });
 
         canvas._fullLabels = fullLabels;
+        canvas._footerEntityLabel = footerEntityLabel;
+        chart.options.plugins.legend.display = !!showLegend;
+        chart.options.plugins.legend.align = legendAlign;
         chart.data.labels = labels;
         chart.data.datasets = datasets;
         chart.update();
         return chart;
+      }
+
+      function destroyCasesStreamsCharts(){
+        for(const ch of casesStreamsCharts){
+          try{ ch?.destroy?.(); }catch(e){}
+        }
+        casesStreamsCharts = [];
       }
 
       function filterCaseRows(rows){
@@ -1314,25 +1349,40 @@
         return rows.filter(r => sel.has(r.login));
       }
 
+      function getCasesFilterLists(){
+        return [casesFilterList, casesStreamsFilterList].filter(Boolean);
+      }
+
+      function syncCasesFilterUiFromSelection(){
+        const selected = CASES_STATE.selectedLogins || new Set();
+        for(const listEl of getCasesFilterLists()){
+          const items = Array.from(listEl.querySelectorAll('input[type=checkbox][data-login="1"]'));
+          for(const cb of items){
+            cb.checked = selected.has(cb.value);
+          }
+          const allCb = listEl.querySelector('input[type=checkbox][data-all="1"]');
+          const allSelected = items.length ? items.every(cb => cb.checked) : false;
+          if(allCb) allCb.checked = allSelected;
+        }
+      }
+
       function refreshCasesFilterCaption(){
-        if(!casesFilterSelectedText) return;
         const total = CASES_STATE.users.length || 0;
         const selected = CASES_STATE.selectedLogins ? CASES_STATE.selectedLogins.size : 0;
+        let caption = '';
         if(selected <= 0){
-          casesFilterSelectedText.textContent = 'Не выбрано';
-          return;
-        }
-        if(selected >= total){
-          casesFilterSelectedText.textContent = 'Все сотрудники';
-          return;
-        }
-        if(selected === 1){
+          caption = 'Не выбрано';
+        }else if(selected >= total){
+          caption = 'Все сотрудники';
+        }else if(selected === 1){
           const login = CASES_STATE.selectedLogins.values().next().value;
           const user = CASES_STATE.users.find(u => u.login === login);
-          casesFilterSelectedText.textContent = user ? (user.full_name || user.login) : 'Выбрано: 1';
-          return;
+          caption = user ? (user.full_name || user.login) : 'Выбрано: 1';
+        }else{
+          caption = `Выбрано: ${selected}`;
         }
-        casesFilterSelectedText.textContent = `Выбрано: ${selected}`;
+        if(casesFilterSelectedText) casesFilterSelectedText.textContent = caption;
+        if(casesStreamsFilterSelectedText) casesStreamsFilterSelectedText.textContent = caption;
       }
 
       function renderCasesChartsFiltered(){
@@ -1342,33 +1392,94 @@
           chart: casesAndroidChart,
           canvas: casesAndroidCanvas,
           rows: rowsA,
-          days: CASES_STATE.days
+          days: CASES_STATE.days,
+          showLegend: false,
+          footerEntityLabel: 'сотрудников'
         });
         casesIosChart = renderCasesChart({
           chart: casesIosChart,
           canvas: casesIosCanvas,
           rows: rowsI,
-          days: CASES_STATE.days
+          days: CASES_STATE.days,
+          showLegend: false,
+          footerEntityLabel: 'сотрудников'
         });
       }
 
-      function updateCasesFilterFromUI(){
-        if(!casesFilterList) return;
-        const items = Array.from(casesFilterList.querySelectorAll('input[type=checkbox][data-login="1"]'));
-        const selected = items.filter(cb => cb.checked).map(cb => cb.value);
-        const allCb = casesFilterList.querySelector('input[type=checkbox][data-all="1"]');
-        const allSelected = items.length ? items.every(cb => cb.checked) : false;
-        if(allCb) allCb.checked = allSelected;
-        CASES_STATE.selectedLogins = new Set(selected);
-        refreshCasesFilterCaption();
-        renderCasesChartsFiltered();
+      function renderCasesStreamsChartsFiltered(){
+        if(!casesStreamsGrid) return;
+
+        destroyCasesStreamsCharts();
+        casesStreamsGrid.innerHTML = '';
+
+        const rowsByUser = filterCaseRows(CASES_STATE.rowsStreamsAll || []);
+        if(!rowsByUser.length){
+          casesStreamsGrid.innerHTML = `<div class="border border-[#ecebff] rounded-2xl bg-white/80 p-4 text-sm text-slate-500">Не выбрано ни одного сотрудника.</div>`;
+          return;
+        }
+
+        let rendered = 0;
+        for(const row of rowsByUser){
+          const streams = Array.isArray(row?.streams) ? row.streams.filter(s => toInt(s.total) > 0) : [];
+          if(!streams.length) continue;
+
+          rendered += 1;
+
+          const card = document.createElement('div');
+          card.className = 'border border-[#ecebff] rounded-2xl bg-white overflow-hidden';
+
+          const titleWrap = document.createElement('div');
+          titleWrap.className = 'px-4 pt-3 pb-1 text-left';
+          titleWrap.innerHTML = `<div class="text-sm font-semibold text-slate-800">${escapeHtml(row.full_name || row.login || 'SWAT')}</div><div class="text-[11px] text-slate-500 mono">${escapeHtml(row.login || '')}</div>`;
+          card.appendChild(titleWrap);
+
+          const viewport = document.createElement('div');
+          viewport.className = 'chart-viewport';
+          const canvas = document.createElement('canvas');
+          canvas.setAttribute('role', 'img');
+          canvas.setAttribute('aria-label', `Cases streams chart ${row.login || ''}`);
+          viewport.appendChild(canvas);
+          card.appendChild(viewport);
+
+          casesStreamsGrid.appendChild(card);
+
+          const series = streams.map(s => ({
+            label: `${s.stream}`,
+            dayCounts: s.dayCounts
+          }));
+
+          const ch = renderCasesChart({
+            chart: null,
+            canvas,
+            rows: series,
+            days: CASES_STATE.days,
+            showLegend: true,
+            legendAlign: 'end',
+            footerEntityLabel: 'стримов'
+          });
+          if(ch) casesStreamsCharts.push(ch);
+        }
+
+        if(rendered === 0){
+          casesStreamsGrid.innerHTML = `<div class="border border-[#ecebff] rounded-2xl bg-white/80 p-4 text-sm text-slate-500">Для выбранных сотрудников нет кейсов по стримам.</div>`;
+        }
       }
 
-      function buildCasesFilterOptions(users){
-        if(!casesFilterList) return;
-        CASES_STATE.users = users || [];
-        CASES_STATE.selectedLogins = new Set((users || []).map(u => u.login));
-        casesFilterList.innerHTML = '';
+      function updateCasesFilterFromUI(sourceList){
+        const src = sourceList || casesFilterList || casesStreamsFilterList;
+        if(!src) return;
+        const items = Array.from(src.querySelectorAll('input[type=checkbox][data-login="1"]'));
+        const selected = items.filter(cb => cb.checked).map(cb => cb.value);
+        CASES_STATE.selectedLogins = new Set(selected);
+        syncCasesFilterUiFromSelection();
+        refreshCasesFilterCaption();
+        renderCasesChartsFiltered();
+        renderCasesStreamsChartsFiltered();
+      }
+
+      function buildCasesFilterList(listEl, users){
+        if(!listEl) return;
+        listEl.innerHTML = '';
 
         const allLabel = document.createElement('label');
         allLabel.classList.add('cases-filter-item');
@@ -1382,13 +1493,13 @@
         allCb.classList.add('cases-filter-check');
         allLabel.appendChild(allText);
         allLabel.appendChild(allCb);
-        casesFilterList.appendChild(allLabel);
+        listEl.appendChild(allLabel);
 
         const sep = document.createElement('div');
         sep.className = 'h-px bg-slate-100';
-        casesFilterList.appendChild(sep);
+        listEl.appendChild(sep);
 
-        CASES_STATE.users.forEach((u) => {
+        (users || []).forEach((u) => {
           const label = document.createElement('label');
           label.classList.add('cases-filter-item');
           const text = document.createElement('span');
@@ -1402,9 +1513,16 @@
           cb.classList.add('cases-filter-check');
           label.appendChild(text);
           label.appendChild(cb);
-          casesFilterList.appendChild(label);
+          listEl.appendChild(label);
         });
+      }
 
+      function buildCasesFilterOptions(users){
+        CASES_STATE.users = users || [];
+        CASES_STATE.selectedLogins = new Set((users || []).map(u => u.login));
+        buildCasesFilterList(casesFilterList, CASES_STATE.users);
+        buildCasesFilterList(casesStreamsFilterList, CASES_STATE.users);
+        syncCasesFilterUiFromSelection();
         refreshCasesFilterCaption();
       }
 
@@ -1705,15 +1823,19 @@
           }
         }, signal);
 
-        let totalDurMsAll = 0;
-        let totalCasesAll = 0;
+        // Top chip: arithmetic mean of per-SWAT averages (not weighted by case count).
+        let swatAvgMsSum = 0;
+        let swatAvgCount = 0;
         for(const login of swatLogins){
           const u = perUser[login];
           if(!u) continue;
-          totalDurMsAll += (u.iosDurMs + u.androidDurMs);
-          totalCasesAll += (u.iosCases + u.androidCases);
+          const totalCases = toInt(u.iosCases) + toInt(u.androidCases);
+          if(totalCases <= 0) continue;
+          const totalDurMs = toInt(u.iosDurMs) + toInt(u.androidDurMs);
+          swatAvgMsSum += (totalDurMs / totalCases);
+          swatAvgCount += 1;
         }
-        const overallAvgMsPerCase = totalCasesAll > 0 ? (totalDurMsAll / totalCasesAll) : 0;
+        const overallAvgMsPerCase = swatAvgCount > 0 ? (swatAvgMsSum / swatAvgCount) : 0;
         const overallAvgMMSS = overallAvgMsPerCase > 0 ? fmtMMSSFromMs(overallAvgMsPerCase) : '—';
 
         
@@ -1769,6 +1891,7 @@
         const casesByDayPlatform = {};
         const usersByDayPlatform = {};
         const casesByUserDayPlatform = { Android: {}, iOS: {} };
+        const casesByUserDayStream = {};
 
         function ensureDayPlatform(day){
           if(!casesByDayPlatform[day]) casesByDayPlatform[day] = { Android:0, iOS:0 };
@@ -1781,12 +1904,20 @@
           casesByUserDayPlatform[plat][login][day] = (casesByUserDayPlatform[plat][login][day] || 0) + 1;
         }
 
+        function addUserDayStreamCase(login, day, stream){
+          const streamName = String(stream || 'Без стрима').trim() || 'Без стрима';
+          if(!casesByUserDayStream[login]) casesByUserDayStream[login] = {};
+          if(!casesByUserDayStream[login][streamName]) casesByUserDayStream[login][streamName] = {};
+          casesByUserDayStream[login][streamName][day] = (casesByUserDayStream[login][streamName][day] || 0) + 1;
+        }
+
         await mapLimit(launches, 4, async (L, idx) => {
           if(signal?.aborted) throw new DOMException('Aborted','AbortError');
 
           const lid = toInt(L?.id);
           const name = String(L?.name||'');
           const plat = platformOfLaunchName(name);
+          const stream = shortStreamName(name) || 'Без стрима';
 
           if(idx % 4 === 0){
             tbEmp.innerHTML = `<tr><td class="text-left" colspan="99">[Шаг 4/4] timeline… ${idx}/${launches.length}</td></tr>`;
@@ -1813,6 +1944,7 @@
                 casesByDayPlatform[dayKey][plat] += 1;
                 usersByDayPlatform[dayKey][plat].add(testedBy);
                 addUserDayCase(testedBy, dayKey, plat);
+                addUserDayStreamCase(testedBy, dayKey, stream);
               }
             });
           }
@@ -1935,10 +2067,12 @@
 
         const rowsCasesAndroid = [];
         const rowsCasesIos = [];
+        const rowsCasesStreams = [];
         for(const login of swatLogins){
           const fullName = fullNameByLogin[login] || login;
           const aMap = casesByUserDayPlatform.Android?.[login] || {};
           const iMap = casesByUserDayPlatform.iOS?.[login] || {};
+          const sMap = casesByUserDayStream?.[login] || {};
 
           const dayCountsA = days.map(d => toInt(aMap[d] || 0));
           const dayCountsI = days.map(d => toInt(iMap[d] || 0));
@@ -1948,6 +2082,24 @@
 
           rowsCasesAndroid.push({ login, full_name: fullName, dayCounts: dayCountsA, total: totalA });
           rowsCasesIos.push({ login, full_name: fullName, dayCounts: dayCountsI, total: totalI });
+
+          const streamRows = Object.entries(sMap)
+            .map(([stream, byDay]) => {
+              const dayCounts = days.map(d => toInt(byDay?.[d] || 0));
+              const total = dayCounts.reduce((s, n) => s + toInt(n), 0);
+              return { stream, dayCounts, total };
+            })
+            .filter(s => toInt(s.total) > 0)
+            .sort((a, b) => {
+              if(toInt(b.total) !== toInt(a.total)) return toInt(b.total) - toInt(a.total);
+              return String(a.stream || '').localeCompare(String(b.stream || ''), 'ru');
+            });
+
+          rowsCasesStreams.push({
+            login,
+            full_name: fullName,
+            streams: streamRows
+          });
         }
 
         const amountByDay = {};
@@ -2039,6 +2191,7 @@
         CASES_STATE.days = days;
         CASES_STATE.rowsAndroidAll = rowsCasesAndroid;
         CASES_STATE.rowsIosAll = rowsCasesIos;
+        CASES_STATE.rowsStreamsAll = rowsCasesStreams;
         buildCasesFilterOptions(swatEntries.map(s => ({ login: s.login, full_name: s.full_name || s.login })));
         updateCasesFilterFromUI();
 
@@ -2075,6 +2228,7 @@
       tabEmp?.addEventListener('click', () => applyTab('emp'));
       tabPlat?.addEventListener('click', () => applyTab('plat'));
       tabCases?.addEventListener('click', () => applyTab('cases'));
+      tabCasesStreams?.addEventListener('click', () => applyTab('cases_streams'));
 
       btnExportEmp?.addEventListener('click', exportEmployeeTableToXls);
 
