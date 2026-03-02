@@ -584,7 +584,7 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
         ctx.font = `700 ${Math.round(baseSize)}px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
         ctx.fillText(`${donePct.toFixed(1)}%`, x, y - baseSize*0.03);
 
-        ctx.fillStyle = getCSS('--muted') || '#8d77a6';
+        ctx.fillStyle = COLORS.remaining_total || getCSS('--muted') || '#8d77a6';
         ctx.font = `600 ${Math.round(baseSize*0.37)}px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
         ctx.fillText(`осталось ${leftPct.toFixed(1)}%`, x, y + baseSize*0.75);
         ctx.restore();
@@ -934,7 +934,7 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
           const pctY = y - baseSize * 0.03;
           const leftY = y + baseSize * 0.75;
           drawLine(`${donePct.toFixed(1)}%`, pctSize, 700, countColor, pctY);
-          drawLine(`осталось ${leftPct.toFixed(1)}%`, pctSubSize, 600, mutedColor, leftY);
+          drawLine(`осталось ${leftPct.toFixed(1)}%`, pctSubSize, 600, COLORS.remaining_total || mutedColor, leftY);
           ctx.restore();
         }
       };
@@ -947,7 +947,7 @@ const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
           data,
           backgroundColor: [
             getCSS('--wb-deep') || getCSS('--c1') || COLORS.total || '#7a3af9',
-            hexA(COLORS.remaining_total, .6)
+            COLORS.remaining_total
           ],
           borderColor:'#fff',
           borderWidth:2,
@@ -1623,7 +1623,7 @@ function makeSnapTitle(o){
             labels: ['Пройдено','Осталось'],
             datasets: [{
               data: [finished, Math.max(0, total - finished)],
-              backgroundColor: [COLORS.finished, hexA(COLORS.remaining_total, .6)],
+              backgroundColor: [COLORS.finished, COLORS.remaining_total],
               borderColor:'#fff', borderWidth:2, spacing:2
             }]
           },
@@ -1631,7 +1631,13 @@ function makeSnapTitle(o){
             maintainAspectRatio:false,
             animation:false,
             cutout:'70%',
-            plugins:{ legend:{display:false} }
+            plugins:{
+              legend:{
+                display:true,
+                position:'bottom',
+                labels:{ padding:6, boxWidth:8, boxHeight:8, font:{size:10} }
+              }
+            }
           },
           plugins:[{
             id:'centerPct2',
