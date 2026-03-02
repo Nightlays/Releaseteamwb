@@ -2,7 +2,7 @@
       --wb-bg:#faf5ff; --wb-bg-2:#f8f7ff;
       --wb-primary:#9b5cff; --wb-secondary:#ff5ac8; --wb-deep:#7c3aed;
       --green:#22c55e; --red:#f43f5e;
-      --chp-prod:#22c55e; --chp-vlet:#f59e0b; --chp-bug:#ef4444; --chp-crash:#3b82f6;
+      --chp-prod:#facc15; --chp-vlet:#111827; --chp-bug:#dc2626; --chp-crash:#2563eb;
       --ring: 0 10px 30px rgba(155,92,255,.25);
       --card: 0 12px 36px rgba(31,41,55,.08);
       --r-xl:22px;
@@ -1101,10 +1101,10 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
     .wb-graphs .dot-chp-ios{background:var(--chp-ios, #0ea5e9)}
     .wb-graphs .dot-chp-android{background:var(--chp-android, #22c55e)}
     .wb-graphs .dot-chp-total{background:var(--chp-total, #a855f7)}
-    .wb-graphs .dot-chp-prod{background:var(--chp-prod, #22c55e)}
-    .wb-graphs .dot-chp-vlet{background:var(--chp-vlet, #f59e0b)}
-    .wb-graphs .dot-chp-bug{background:var(--chp-bug, #ef4444)}
-    .wb-graphs .dot-chp-crash{background:var(--chp-crash, #3b82f6)}
+    .wb-graphs .dot-chp-prod{background:var(--chp-prod, #facc15)}
+    .wb-graphs .dot-chp-vlet{background:var(--chp-vlet, #111827)}
+    .wb-graphs .dot-chp-bug{background:var(--chp-bug, #dc2626)}
+    .wb-graphs .dot-chp-crash{background:var(--chp-crash, #2563eb)}
     .wb-graphs .cutoff-store-late{background:var(--red);box-shadow:0 0 0 4px rgba(244,63,94,.12)}
     .wb-graphs .cut-store-late{color:var(--red);font-weight:700}
     .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}

@@ -311,11 +311,11 @@
         </div>
       </section>
 
-      <!-- 4) Среднее время -->
+      <!-- 4) Среднее время ХБ -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h2 class="text-lg font-semibold">Среднее время прохождения кейса</h2>
+            <h2 class="text-lg font-semibold">Среднее время прохождения кейса ХБ</h2>
           </div>
           <button type="button"
             class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
@@ -333,7 +333,7 @@
 
             <div id="avgContent" class="tc-content" style="display:none;">
               <div class="chart-viewport" id="avgTrendViewport">
-                <canvas id="avgTrendChart" aria-label="Average time chart" role="img"></canvas>
+                <canvas id="avgTrendChart" aria-label="Average HB time chart" role="img"></canvas>
               </div>
 
               <div id="avgTableWrap" class="table-block" style="display:none;">
@@ -1052,6 +1052,98 @@
             }
           };
 
+          // Plugin: absolute value labels with anti-overlap (grouped by x)
+          const pointValueLabelsPlugin = {
+            id: 'pointValueLabels',
+            afterDatasetsDraw(chart, args, pluginOptions){
+              const opts = pluginOptions || chart?.options?.plugins?.pointValueLabels;
+              const dsList = Array.isArray(opts?.datasets) ? opts.datasets : [];
+              if(!opts || !dsList.length) return;
+
+              const font = opts.font || '600 10px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+              const color = opts.color || '#0f172a';
+              const offsetY = Number(opts.offsetY ?? 12);
+              const minGap = Number(opts.minGap ?? 12);
+              const minTop = Number(opts.minTop ?? 10);
+              const useDatasetColor = opts.useDatasetColor !== false;
+              const skipZero = !!opts.skipZero;
+              const strokeColor = opts.strokeColor || 'rgba(255,255,255,0.95)';
+              const strokeWidth = Number(opts.strokeWidth ?? 3);
+              const format = (typeof opts.formatter === 'function')
+                ? opts.formatter
+                : (v) => Math.round(Number(v) || 0).toLocaleString('ru-RU');
+
+              const byX = new Map();
+              for(const rawIndex of dsList){
+                const dsIndex = Number(rawIndex);
+                if(!Number.isFinite(dsIndex)) continue;
+                const ds = chart.data?.datasets?.[dsIndex];
+                const meta = chart.getDatasetMeta(dsIndex);
+                if(!ds || !meta || !Array.isArray(meta.data) || meta.hidden) continue;
+
+                const data = Array.isArray(ds.data) ? ds.data : [];
+                for(let i = 0; i < data.length; i++){
+                  const raw = Number(data[i]);
+                  if(!Number.isFinite(raw)) continue;
+                  if(skipZero && raw === 0) continue;
+
+                  const pt = meta.data[i];
+                  if(!pt || pt.skip) continue;
+
+                  const text = String(format(raw, {
+                    chart, datasetIndex: dsIndex, dataIndex: i, dataset: ds
+                  }) || '').trim();
+                  if(!text) continue;
+
+                  const xKey = Math.round(pt.x);
+                  if(!byX.has(xKey)) byX.set(xKey, []);
+                  byX.get(xKey).push({
+                    x: pt.x,
+                    anchorY: pt.y,
+                    color: useDatasetColor ? (ds.borderColor || ds.backgroundColor || color) : color,
+                    text
+                  });
+                }
+              }
+
+              if(!byX.size) return;
+
+              const ctx = chart.ctx;
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(0, 0, chart.width, chart.height);
+              ctx.clip();
+              ctx.font = font;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              if(strokeWidth > 0){
+                ctx.lineWidth = strokeWidth;
+                ctx.strokeStyle = strokeColor;
+              }
+
+              for(const entries of byX.values()){
+                // bottom -> top, then push upper labels upward if lines are close
+                entries.sort((a, b) => b.anchorY - a.anchorY);
+                let prevY = Number.POSITIVE_INFINITY;
+                for(const it of entries){
+                  let y = it.anchorY - offsetY;
+                  if(Number.isFinite(prevY) && y > (prevY - minGap)){
+                    y = prevY - minGap;
+                  }
+                  y = Math.min(y, it.anchorY - 4);
+                  y = Math.max(minTop, y);
+
+                  if(strokeWidth > 0) ctx.strokeText(it.text, it.x, y);
+                  ctx.fillStyle = it.color || color;
+                  ctx.fillText(it.text, it.x, y);
+                  prevY = y;
+                }
+              }
+
+              ctx.restore();
+            }
+          };
+
           const cutTimeLabelsPlugin = {
             id: 'cutTimeLabels',
             afterDatasetsDraw(chart, args, pluginOptions){
@@ -1142,6 +1234,7 @@
             if(window.Chart && typeof window.Chart.register === 'function'){
               window.Chart.register(deltaLabelsPlugin);
               window.Chart.register(valueLabelsPlugin);
+              window.Chart.register(pointValueLabelsPlugin);
               window.Chart.register(cutTimeLabelsPlugin);
             }
           }catch(e){}
@@ -2558,6 +2651,36 @@
             return Array.from(byId.values());
           }
 
+          async function fetchHBLaunchesSwatRelease(version, signal){
+            const terms = [
+              `[High/Blocker][DeployLab] Регресс ${version}`,
+              `[High/Blocker] Регресс ${version}`
+            ];
+            const byId = new Map();
+            for(const term of terms){
+              const search = b64Query([{ id:'name', type:'string', value: term }]);
+              let page = 0;
+              while(true){
+                const data = await httpGet('/api/launch', {
+                  page, size: PAGE_SIZE, search,
+                  projectId: PROJECT_ID,
+                  preview: 'true',
+                  sort: 'createdDate,desc'
+                }, signal);
+
+                const content = (data && data.content) ? data.content : [];
+                if(!content.length) break;
+                content.forEach(it => {
+                  const id = Number(it && it.id);
+                  if(Number.isFinite(id)) byId.set(id, it);
+                });
+                if(content.length < PAGE_SIZE) break;
+                page += 1;
+              }
+            }
+            return Array.from(byId.values());
+          }
+
           async function fetchTotalCases(launchId, signal){
             const data = await httpGet(`/api/launch/${launchId}/statistic`, null, signal);
             if(!Array.isArray(data)) return 0;
@@ -3348,6 +3471,24 @@
             return total;
           }
 
+          function memberTotalCountSwatRelease(m){
+            if(!m || typeof m !== 'object') return 0;
+            let cnt = 0;
+            const stat = Array.isArray(m.statistic) ? m.statistic : [];
+            for(const it of stat){
+              if(!it || typeof it !== 'object') continue;
+              if(!('status' in it) || it.status == null) continue;
+              cnt += Number(it.count) || 0;
+            }
+            return cnt > 0 ? cnt : 0;
+          }
+
+          function memberRetryCount(m){
+            if(!m || typeof m !== 'object') return 0;
+            const retries = Number(m.retriedCount ?? m.retryCount ?? 0) || 0;
+            return retries > 0 ? retries : 0;
+          }
+
           function extractSwatAssignees(memberstats, swatSet){
             const set = new Set();
             for(const m of (memberstats || [])){
@@ -3658,7 +3799,16 @@
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
-                  deltaLabels: { datasetIndex: 2 },
+                  pointValueLabels: {
+                    datasets: [2, 1, 0],
+                    useDatasetColor: true,
+                    offsetY: 12,
+                    minGap: 12,
+                    minTop: 10,
+                    font: '600 10px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial',
+                    strokeWidth: 3,
+                    skipZero: false
+                  },
                   tooltip: {
                     mode: 'index',
                     intersect: false,
@@ -3687,10 +3837,10 @@
           function buildChpTypesStackedChart(canvas){
             if(!canvas || !window.Chart) return null;
             const colorMap = {
-              product: cssVar('--chp-prod', '#22c55e'),
-              vlet: cssVar('--chp-vlet', '#f59e0b'),
-              bug: cssVar('--chp-bug', '#ef4444'),
-              crash: cssVar('--chp-crash', '#3b82f6')
+              product: cssVar('--chp-prod', '#facc15'),
+              vlet: cssVar('--chp-vlet', '#111827'),
+              bug: cssVar('--chp-bug', '#dc2626'),
+              crash: cssVar('--chp-crash', '#2563eb')
             };
 
             return new Chart(canvas, {
@@ -3712,6 +3862,16 @@
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
+                  pointValueLabels: {
+                    datasets: [0, 1, 2, 3],
+                    useDatasetColor: true,
+                    offsetY: 11,
+                    minGap: 11,
+                    minTop: 10,
+                    font: '600 10px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial',
+                    strokeWidth: 3,
+                    skipZero: true
+                  },
                   tooltip: {
                     mode: 'index',
                     intersect: false,
@@ -4367,39 +4527,74 @@
               }
               const idsAll = Array.from(launchMapAll.keys());
 
-              // AVG TIME: memberstats (counts+durations)
-              let avgSwatCnt = 0, avgStreamCnt = 0;
-              let avgSwatDur = 0, avgStreamDur = 0;
+              // AVG TIME HB: aligned with SWAT release "overall average per case" logic.
+              // 1) Only High/Blocker launches (same terms as SWAT release page).
+              // 2) Cases per assignee = memberTotalCount + retriedCount.
+              // 3) Duration per assignee = durationSum.
+              // 4) Final average = arithmetic mean of per-assignee averages.
+              const hbAvgLaunches = await fetchHBLaunchesSwatRelease(rel, signal);
+              const idsAvgHB = hbAvgLaunches.map(l => Number(l?.id)).filter(id => Number.isFinite(id));
 
-              const perAvg = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
+              const perAvg = await asyncPool(idsAvgHB, LAUNCH_CONCURRENCY, async (id) => {
                 const ms = await fetchMemberStats(id, signal);
-                const agg = swatStreamAgg(ms, swatSet);
+                const byLogin = new Map();
 
-                if((agg.swatDur + agg.streamDur) <= 0){
-                  const launchDur = await fetchLaunchDurationMs(id, signal);
-                  const totalCnt = Math.max(1, (agg.swatTotal + agg.streamTotal));
-                  const swShare = (agg.swatTotal || 0) / totalCnt;
-                  const stShare = (agg.streamTotal || 0) / totalCnt;
-                  agg.swatDur = launchDur * swShare;
-                  agg.streamDur = launchDur * stShare;
+                for(const m of (ms || [])){
+                  if(!m || typeof m !== 'object') continue;
+                  const assignee = String(m.assignee || '').trim().toLowerCase();
+                  if(!assignee) continue;
+
+                  const totalCases = memberTotalCountSwatRelease(m);
+                  const retried = memberRetryCount(m);
+                  const totalCasesWithRetries = totalCases + retried;
+                  if(totalCasesWithRetries <= 0) continue;
+
+                  const durMs = Number(m.durationSum ?? 0) || 0;
+                  if(!byLogin.has(assignee)) byLogin.set(assignee, { cases: 0, dur: 0 });
+                  const bucket = byLogin.get(assignee);
+                  bucket.cases += totalCasesWithRetries;
+                  bucket.dur += durMs;
                 }
-                return agg;
+
+                return byLogin;
               }, signal);
 
-              for(const r of perAvg){
-                if(!r) continue;
-                avgSwatCnt += Number(r.swatTotal || 0);
-                avgStreamCnt += Number(r.streamTotal || 0);
-                avgSwatDur += Number(r.swatDur || 0);
-                avgStreamDur += Number(r.streamDur || 0);
+              const avgByLogin = new Map();
+              for(const launchMap of perAvg){
+                if(!(launchMap instanceof Map)) continue;
+                for(const [login, agg] of launchMap.entries()){
+                  if(!avgByLogin.has(login)) avgByLogin.set(login, { cases: 0, dur: 0 });
+                  const bucket = avgByLogin.get(login);
+                  bucket.cases += Number(agg?.cases || 0);
+                  bucket.dur += Number(agg?.dur || 0);
+                }
               }
 
-              const avgTotalCnt = avgSwatCnt + avgStreamCnt;
-              const avgTotalDur = avgSwatDur + avgStreamDur;
+              let swatAvgMsSum = 0, swatAvgCount = 0;
+              let streamAvgMsSum = 0, streamAvgCount = 0;
+              let totalAvgMsSum = 0, totalAvgCount = 0;
 
-              const swatMsPerCase = avgSwatCnt ? (avgSwatDur / avgSwatCnt) : 0;
-              const streamMsPerCase = avgStreamCnt ? (avgStreamDur / avgStreamCnt) : 0;
-              const totalMsPerCase = avgTotalCnt ? (avgTotalDur / avgTotalCnt) : 0;
+              for(const [login, agg] of avgByLogin.entries()){
+                const cases = Number(agg?.cases || 0);
+                if(cases <= 0) continue;
+                const dur = Number(agg?.dur || 0);
+                const avgMs = dur / cases;
+
+                totalAvgMsSum += avgMs;
+                totalAvgCount += 1;
+
+                if(swatSet.has(login)){
+                  swatAvgMsSum += avgMs;
+                  swatAvgCount += 1;
+                }else{
+                  streamAvgMsSum += avgMs;
+                  streamAvgCount += 1;
+                }
+              }
+
+              const swatMsPerCase = swatAvgCount ? (swatAvgMsSum / swatAvgCount) : 0;
+              const streamMsPerCase = streamAvgCount ? (streamAvgMsSum / streamAvgCount) : 0;
+              const totalMsPerCase = totalAvgCount ? (totalAvgMsSum / totalAvgCount) : 0;
 
               addAvgPoint(rel, swatMsPerCase/60000, streamMsPerCase/60000, totalMsPerCase/60000);
               if(avgTbody){
@@ -4716,6 +4911,12 @@
                   chpTypesRowsIos.push(rowIos);
                   chpTypesRowsAnd.push(rowAnd);
                   renderChpTypesRow(row);
+
+                  // Incremental chart update right after each release is processed.
+                  const doneLabels = chpTypesRows.map(r => r.release);
+                  showChpTypesContent();
+                  updateChpTypesChart(doneLabels, chpTypesRows);
+                  updateChpTypesPlatformCharts(doneLabels, chpTypesRowsIos, chpTypesRowsAnd);
                 }
               }
 
