@@ -321,6 +321,28 @@
     </div>
   </section>
 
+  <!-- ===== Android: свод по магазинам ===== -->
+  <section class="card p-5 space-y-4" id="androidSummaryCard">
+    <div class="inline" style="justify-content:space-between;align-items:center">
+      <div class="muted">Android — распределение пользователей по типу сборки</div>
+      <div class="muted">Доля от общего числа Android</div>
+    </div>
+    <div style="overflow:auto">
+      <table id="androidTbl">
+        <thead>
+        <tr>
+          <th>Категория</th>
+          <th>Пользователи</th>
+          <th>% от Android</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr><td class="muted" colspan="3">Нет данных</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- ===== Аналитика версий (Δ-таблица) ===== -->
   <section class="card p-5 space-y-4" id="growthCard">
     <div class="inline" style="justify-content:space-between;align-items:center">
@@ -366,6 +388,7 @@ const proxyBase=$('proxyBase'), proxyMode=$('proxyMode'), useProxy=$('useProxy')
 const btnRunAll=$('btnRunAll'), respEl=$('response'), logsEl=$('logs'), statusEl=$('status');
 const jwtBadge=$('jwtBadge'), cacheCount=$('cacheCount'), healthPill=$('healthPill');
 const btnExportCsv=$('btnExportCsv'); const btnExportSummaryCsv=$('btnExportSummaryCsv'); const btnExportGrowthCsv=$('btnExportGrowthCsv'); const btnSaveSettings=$('btnSaveSettings'); const tblBody=document.querySelector('#tbl tbody');
+const androidTblBody=document.querySelector('#androidTbl tbody');
 
 const platformDropdown=$('platformDropdown'), intervalDropdown=$('intervalDropdown');
 const platformSelectedText=$('platformSelectedText'), intervalSelectedText=$('intervalSelectedText');
@@ -911,7 +934,49 @@ function renderView(fullRecords){
       }))
     : [];
   applySummaryFiltersSort();
+  renderAndroidSummary(summaryRaw);
   cacheCount.textContent=(JSON.parse(localStorage.getItem('wb_local_cache')||'[]')).length;
+}
+
+function classifyAndroidRelease(release){
+  const r = String(release || '').toLowerCase();
+  if (r.includes('rustore')) return 'rustore';
+  if (r.includes('huawei')) return 'huawei';
+  return 'google';
+}
+
+function renderAndroidSummary(records){
+  if (!androidTblBody) return;
+  const rows = Array.isArray(records)
+    ? records.filter(r => String(r.platform || '').toLowerCase() === 'android')
+    : [];
+  let total = 0;
+  const counts = { rustore: 0, huawei: 0, google: 0 };
+  rows.forEach(r=>{
+    const u = Number(r.users || 0) || 0;
+    total += u;
+    const tag = classifyAndroidRelease(r.release);
+    counts[tag] = (counts[tag] || 0) + u;
+  });
+
+  androidTblBody.innerHTML = '';
+  if (!rows.length){
+    androidTblBody.innerHTML = '<tr><td class=\"muted\" colspan=\"3\">Нет данных</td></tr>';
+    return;
+  }
+
+  const data = [
+    { label: 'Всего Android', users: total, share: total > 0 ? 100 : 0 },
+    { label: 'RuStore', users: counts.rustore, share: total > 0 ? (counts.rustore / total * 100) : 0 },
+    { label: 'Huawei', users: counts.huawei, share: total > 0 ? (counts.huawei / total * 100) : 0 },
+    { label: 'Google', users: counts.google, share: total > 0 ? (counts.google / total * 100) : 0 }
+  ];
+
+  data.forEach(row=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${esc(row.label)}</td><td>${num(row.users)}</td><td>${row.share.toFixed(2)}</td>`;
+    androidTblBody.appendChild(tr);
+  });
 }
 
 /* ---------- Summary table ---------- */
