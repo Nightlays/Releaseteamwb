@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <title>WB BI Devices — Популярные устройства</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
     :root{
       --bd:#ecebff;
@@ -19,6 +21,9 @@
     label{display:block;font-size:13px;font-weight:700;letter-spacing:.01em;color:#4b4054;margin:6px 0 6px}
     .muted{color:var(--muted);font-size:13px}
     .inline{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .inline label{display:inline-flex;align-items:center;gap:8px;margin:0}
+    label.inline{display:inline-flex;align-items:center;gap:8px;margin:0}
+    .inline input[type="checkbox"], .inline input[type="radio"]{margin:0}
     .pill{border-radius:999px;padding:6px 10px;background:#fff;border:1px dashed rgba(124,58,237,.25);font-size:12px}
     .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(124,58,237,.12);color:#4a0f54;padding:6px 10px;border-radius:999px;font-weight:800;font-size:13px}
 
@@ -50,6 +55,9 @@
     .dropdown--slim{border:1px solid var(--bd)}
     .dropdown--slim .dropdown-selected{padding:8px 10px;font-size:13px}
     .dropdown.form-ctl{ padding:0; display:flex; align-items:center; min-height:40px; }
+
+    .release-item{display:flex;gap:10px;align-items:flex-start}
+    .release-item input{margin-top:3px}
 
     .settings-foot{ display:grid; grid-template-columns: 1fr auto auto; gap:12px; align-items:center; margin-top:8px; }
     @media (max-width: 780px){ .settings-foot{ grid-template-columns: 1fr; } }
@@ -117,6 +125,22 @@
     @media (max-width:980px){ .top-grid{grid-template-columns:1fr} }
     .os-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
     @media (max-width:980px){ .os-grid{grid-template-columns:1fr} }
+
+    /* PDF export */
+    .pdf-export .card,
+    .pdf-export .chart-wrap,
+    .pdf-export .chart-notes{ box-shadow:none !important; }
+    .pdf-sheet{
+      width:1200px;
+      padding:16px;
+      background:#ffffff;
+      color:#111827;
+      font-family:'Manrope', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    .pdf-sheet .pdf-title{font-weight:800;font-size:18px;margin-bottom:6px}
+    .pdf-sheet .pdf-meta{font-size:12px;color:#6b7280;margin-bottom:10px}
+    .pdf-sheet table{width:100%;border-collapse:collapse}
+    .pdf-sheet th,.pdf-sheet td{border:1px solid #eee;padding:6px 8px;font-size:12px;text-align:left;vertical-align:top}
   </style>
   <link rel="stylesheet" href="./style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -136,6 +160,7 @@
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <a href="local-cors-proxy-macos.zip" class="btn btn-soft" download>Скачать локальный прокси (macOS)</a>
+        <button id="exportPdfBtn" type="button" class="btn btn-soft">Экспорт PDF</button>
       </div>
     </header>
 
@@ -396,7 +421,7 @@
   <!-- ===== Топ устройств ===== -->
   <section class="card p-5 space-y-4" id="topDevicesCard">
     <div class="inline" style="justify-content:space-between;align-items:center">
-      <div class="muted">Топ устройств по последней выгрузке</div>
+      <div class="muted">Топ устройств по последнему снепшоту</div>
       <div class="muted">Лимит: 10</div>
     </div>
 
@@ -559,10 +584,33 @@ function deviceKeyFull(r){
   const ml = model.toLowerCase(), mf = mfg.toLowerCase();
   return ml.startsWith(mf) ? model : `${mfg} ${model}`;
 }
-function shortDeviceLabel(name, max=10){
+function wrapLabel(name, maxLen=12){
   const s = normalizeDeviceName(name);
   if(!s) return '';
-  return s.length>max ? s.slice(0,max-1)+'…' : s;
+  const words = s.split(/\s+/);
+  const lines = [];
+  let line = '';
+  const pushLine = () => { if(line) { lines.push(line); line=''; } };
+  for(const w of words){
+    const test = (line ? line + ' ' : '') + w;
+    if(test.length <= maxLen){
+      line = test;
+      continue;
+    }
+    pushLine();
+    if(w.length <= maxLen){
+      line = w;
+      continue;
+    }
+    // break long word
+    const parts = w.match(new RegExp(`.{1,${maxLen}}`, 'g')) || [w];
+    parts.forEach((p, i)=>{
+      if(i === parts.length-1) line = p;
+      else lines.push(p);
+    });
+  }
+  pushLine();
+  return lines.length ? lines : s;
 }
 function hexToRgba(hex, alpha=1){
   const h = hex.replace('#','').trim();
@@ -1139,12 +1187,12 @@ function renderReleasesList(fullNames, totals, mask){
     const id = 'rel_' + btoa(unescape(encodeURIComponent(name))).replace(/=+/g,'');
     const checked = selectedReleasesSet.has(name) ? 'checked' : '';
     const users = totals.get(name)||0;
-    return `<label class="release-item" for="${id}" style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+    return `<label class="release-item" for="${id}">
+      <input id="${id}" type="checkbox" value="${esc(name)}" ${checked}>
       <div>
         <div class="release-name" style="font-weight:700;color:#2c1b33;font-size:13px">${esc(name)}</div>
         <div class="release-sub" style="font-size:11px;color:#7a6f82">${num(users)} пользователей</div>
       </div>
-      <input id="${id}" type="checkbox" value="${esc(name)}" ${checked}>
     </label>`;
   }).join('');
 
@@ -1349,18 +1397,20 @@ function drawCharts(){
 
   const releases = chooseReleases(maps, latestMap);
 
-  const palette = ['#6f1d7a','#2e7d32','#1565c0','#ef6c00','#00897b','#8e24aa','#5d4037','#3949ab','#f4511e','#00acc1'];
+  const datasetColors = ['#2563eb','#16a34a','#f59e0b','#e11d48','#8b5cf6','#0ea5e9'];
   const datasets = maps.map((snapMap, idx) => {
     const label = idx === maps.length-1 ? `Текущий (${metaDates[idx]})` : `t-${maps.length-1-idx} (${metaDates[idx]})`;
     const alphaFill = idx === maps.length-1 ? 0.28 : 0.12;
     const alphaBorder = idx === maps.length-1 ? 0.9 : 0.35;
-    const bg = releases.map((_,i)=>hexToRgba(palette[i % palette.length], alphaFill));
-    const br = releases.map((_,i)=>hexToRgba(palette[i % palette.length], alphaBorder));
+    const base = datasetColors[idx % datasetColors.length];
+    const bg = hexToRgba(base, alphaFill);
+    const br = hexToRgba(base, alphaBorder);
     return {
       label,
       data: releases.map(r => snapMap.get(r) || 0),
       backgroundColor: bg,
       borderColor: br,
+      hoverBackgroundColor: hexToRgba(base, Math.min(0.45, alphaFill + 0.15)),
       borderWidth: idx === maps.length-1 ? 1.8 : 1,
       borderRadius: 6,
       barPercentage: .82,
@@ -1379,8 +1429,6 @@ function drawCharts(){
   const deltaLabels = DeltaLabelsPlugin();
 
   const fullByIndex = releases.map(r => r);
-  const shortByIndex = releases.map(r => shortDeviceLabel(r, 10));
-
   deltaChart=new Chart(document.getElementById('deltaChart'),{
     type:'bar',
     data:{ labels: fullByIndex, datasets },
@@ -1403,12 +1451,12 @@ function drawCharts(){
         x:{ticks:{
               autoSkip:true,
               maxTicksLimit: Math.min(10, releases.length),
-              maxRotation:35,
+              maxRotation:0,
               minRotation:0,
               autoSkipPadding:10,
               padding:8,
               font:{size:12},
-              callback:(v,i)=> shortByIndex[i] || ''
+              callback:(v,i)=> wrapLabel(fullByIndex[i] || '', 12)
             },grid:{display:false}},
         y:{beginAtZero:true,title:{display:true,text:'Пользователи',font:{size:14,weight:'700'}},
            ticks:{font:{size:13},callback:v=>v.toLocaleString('ru-RU')},
@@ -1438,9 +1486,9 @@ function drawCharts(){
     data:{
       labels: trendAll.labels,
       datasets:[
-        ...(plats.has('iOS')?[{label:'iOS',data:trendAll.ios}]:[]),
-        ...(plats.has('Android')?[{label:'Android',data:trendAll.andr}]:[]),
-        {label:'Итого',data:trendAll.total}
+        ...(plats.has('iOS')?[{label:'iOS',data:trendAll.ios,borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,0.15)',tension:0.3,pointRadius:3}]:[]),
+        ...(plats.has('Android')?[{label:'Android',data:trendAll.andr,borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,0.15)',tension:0.3,pointRadius:3}]:[]),
+        {label:'Итого',data:trendAll.total,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.15)',tension:0.3,borderWidth:2,pointRadius:4}
       ]
     },
     options:{
@@ -1668,6 +1716,160 @@ function renderGrowth(){ renderGrowthFromSummary(); }
 
 /* первичный рендер */
 renderGrowthFromSummary();
+
+/* ---------- PDF Export ---------- */
+async function exportChartsPdf(){
+  const btn = $('exportPdfBtn');
+  if (!window.jspdf || !window.jspdf.jsPDF){
+    alert('PDF библиотеки не загрузились.');
+    return;
+  }
+  const originalText = btn ? btn.textContent : '';
+  if (btn){ btn.textContent = 'Готовим PDF...'; btn.disabled = true; }
+  try{
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: false });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const maxW = pdfW - margin*2;
+    let pageIndex = 0;
+
+    const charts = [
+      document.getElementById('deltaChart'),
+      document.getElementById('trendChart')
+    ].filter(Boolean);
+    if (!charts.length){
+      alert('Не найдено ни одного графика для экспорта.');
+      return;
+    }
+
+    const chartScale = 3;
+    const chartGap = 32;
+    const toImgData = (canvas, scale=3) => {
+      const tmp = document.createElement('canvas');
+      tmp.width = Math.max(1, Math.round(canvas.width * scale));
+      tmp.height = Math.max(1, Math.round(canvas.height * scale));
+      const ctx = tmp.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,tmp.width,tmp.height);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.drawImage(canvas, 0, 0);
+      return {
+        ratio: tmp.height / tmp.width,
+        data: tmp.toDataURL('image/jpeg', 0.98)
+      };
+    };
+    const composeCharts = (list, scale=3, gap=32) => {
+      const valid = list.filter(Boolean);
+      const maxW = Math.max(...valid.map(c=>c.width));
+      const totalH = valid.reduce((sum,c)=> sum + c.height, 0) + gap * (valid.length - 1);
+      const tmp = document.createElement('canvas');
+      tmp.width = Math.max(1, Math.round(maxW * scale));
+      tmp.height = Math.max(1, Math.round(totalH * scale));
+      const ctx = tmp.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,tmp.width,tmp.height);
+      let y = 0;
+      valid.forEach((c, idx)=>{
+        const w = c.width * scale;
+        const h = c.height * scale;
+        const x = Math.round(((maxW - c.width) * scale) / 2);
+        ctx.drawImage(c, x, y, w, h);
+        y += h + gap * scale;
+      });
+      return { ratio: tmp.height / tmp.width, data: tmp.toDataURL('image/jpeg', 0.98) };
+    };
+
+    const addImagePage = (img) => {
+      if (pageIndex > 0) pdf.addPage();
+      pdf.setFillColor(255,255,255);
+      pdf.rect(0,0,pdfW,pdfH,'F');
+      const maxH = pdfH - margin*2;
+      let imgW = maxW;
+      let imgH = img.ratio * imgW;
+      if (imgH > maxH){
+        imgH = maxH;
+        imgW = imgH / img.ratio;
+      }
+      const x = Math.max(margin, (pdfW - imgW) / 2);
+      const y = Math.max(margin, (pdfH - imgH) / 2);
+      pdf.addImage(img.data, 'JPEG', x, y, imgW, imgH, undefined, 'FAST');
+      pageIndex += 1;
+    };
+
+    if (charts.length > 1){
+      addImagePage(composeCharts(charts, chartScale, chartGap));
+    } else {
+      charts.forEach((canvas) => {
+        addImagePage(toImgData(canvas, chartScale));
+      });
+    }
+
+    if (window.html2canvas){
+      document.body.classList.add('pdf-export');
+      try{ await (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()); }catch{}
+
+      const makeSheet = (title, metaText, nodes=[]) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdf-sheet';
+        wrap.innerHTML = `<div class="pdf-title">${esc(title)}</div>` +
+          (metaText ? `<div class="pdf-meta">${esc(metaText)}</div>` : '');
+        nodes.forEach(n => { if (n) wrap.appendChild(n); });
+        wrap.style.position = 'fixed';
+        wrap.style.left = '-10000px';
+        wrap.style.top = '0';
+        document.body.appendChild(wrap);
+        return wrap;
+      };
+      const waitFrame = () => new Promise(r=>requestAnimationFrame(()=>r()));
+
+      const tbl = document.getElementById('tbl');
+      const tblClone = tbl ? tbl.cloneNode(true) : null;
+      const summaryMeta = `Платформа: ${sumPlat.value}; Фильтр: ${sumRel.value || '—'}`;
+      const summarySheet = makeSheet('Сводная таблица по устройствам', summaryMeta, [tblClone]);
+      await waitFrame();
+      const sumCanvas = await html2canvas(summarySheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+      addImagePage(toImgData(sumCanvas, 1));
+      summarySheet.remove();
+
+      const topCard = document.getElementById('topDevicesCard');
+      const topClone = topCard ? topCard.cloneNode(true) : null;
+      const topSheet = makeSheet('Топ устройств по последнему снепшоту', 'Лимит: 10', [topClone]);
+      await waitFrame();
+      const topCanvas = await html2canvas(topSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+      addImagePage(toImgData(topCanvas, 1));
+      topSheet.remove();
+
+      const osCard = document.getElementById('osVersionsCard');
+      const osClone = osCard ? osCard.cloneNode(true) : null;
+      const osSheet = makeSheet('Популярные версии ОС', `Интервал: ${getIntervalValue()}`, [osClone]);
+      await waitFrame();
+      const osCanvas = await html2canvas(osSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+      addImagePage(toImgData(osCanvas, 1));
+      osSheet.remove();
+
+      const kpis = document.getElementById('growthKpis');
+      const kpisClone = kpis ? kpis.cloneNode(true) : null;
+      const gtbl = document.getElementById('growthTbl');
+      const gtblClone = gtbl ? gtbl.cloneNode(true) : null;
+      const growthMeta = `Снепшоты: ${$('growthSnapsMeta')?.textContent || '—'}`;
+      const growthSheet = makeSheet('Аналитика устройств: прирост/убывание (топ-4)', growthMeta, [kpisClone, gtblClone]);
+      await waitFrame();
+      const growthCanvas = await html2canvas(growthSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+      addImagePage(toImgData(growthCanvas, 1));
+      growthSheet.remove();
+    }
+
+    const stamp = new Date().toISOString().slice(0,10);
+    pdf.save(`wb-bi-devices-full-${stamp}.pdf`);
+  } finally {
+    document.body.classList.remove('pdf-export');
+    if (btn){ btn.textContent = originalText || 'Экспорт PDF'; btn.disabled = false; }
+  }
+}
+const exportPdfBtn = $('exportPdfBtn');
+if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportChartsPdf);
 
 /* ---------- Init ---------- */
 setJwtState(); pingProxy();
