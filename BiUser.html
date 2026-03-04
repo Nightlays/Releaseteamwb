@@ -1671,7 +1671,8 @@ const agg = snap => {
       `<span class="pill">Лимит: ${esc(showCountEl.value)}, порядок: ${esc(orderDirectionEl.value)}</span>`;
   }
 
-  const trendAll = calcTrend(getHistory());
+  // Тренд должен учитывать выбранные снепшоты и диапазон дат
+  const trendAll = calcTrend(chosenSnaps());
   if(trendChart) trendChart.destroy();
 // ---- Trend (sum by platforms) ----
 const platSetGlobal = new Set(getSelectedPlatforms().map(v => String(v).toLowerCase()));
@@ -2096,11 +2097,11 @@ async function exportChartsPdf(){
   if (btn){ btn.textContent = 'Готовим PDF...'; btn.disabled = true; }
   try{
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: false });
-    const pdfW = pdf.internal.pageSize.getWidth();
-    const pdfH = pdf.internal.pageSize.getHeight();
-    const margin = 10;
-    const maxW = pdfW - margin*2;
+    const A4 = [297, 210];
+    const CHART_ZOOM = 1.75; // 175% zoom for charts page
+    const CHART_FORMAT = [A4[0] * CHART_ZOOM, A4[1] * CHART_ZOOM];
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: CHART_FORMAT, compress: false });
+    const margin = 6;
     let pageIndex = 0;
 
     const charts = [
@@ -2112,7 +2113,7 @@ async function exportChartsPdf(){
       return;
     }
 
-    const toImgData = (canvas, scale=2) => {
+    const toImgData = (canvas, scale=2, mime='image/png', quality=1) => {
       const tmp = document.createElement('canvas');
       tmp.width = Math.max(1, Math.round(canvas.width * scale));
       tmp.height = Math.max(1, Math.round(canvas.height * scale));
@@ -2123,32 +2124,76 @@ async function exportChartsPdf(){
       ctx.drawImage(canvas, 0, 0);
       return {
         ratio: tmp.height / tmp.width,
-        data: tmp.toDataURL('image/jpeg', 0.98)
+        data: tmp.toDataURL(mime, quality),
+        format: mime.includes('png') ? 'PNG' : 'JPEG'
       };
     };
-    const addImagePage = (img) => {
-      if (pageIndex > 0) pdf.addPage();
+    const composeCharts = (list, scale=3, gap=18) => {
+      const valid = list.filter(Boolean);
+      const maxW = Math.max(...valid.map(c=>c.width));
+      const totalH = valid.reduce((sum,c)=> sum + c.height, 0) + gap * (valid.length - 1);
+      const tmp = document.createElement('canvas');
+      tmp.width = Math.max(1, Math.round(maxW * scale));
+      tmp.height = Math.max(1, Math.round(totalH * scale));
+      const ctx = tmp.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,tmp.width,tmp.height);
+      let y = 0;
+      valid.forEach((c) => {
+        const w = c.width * scale;
+        const h = c.height * scale;
+        const x = Math.round(((maxW - c.width) * scale) / 2);
+        ctx.drawImage(c, x, y, w, h);
+        y += h + gap * scale;
+      });
+      return {
+        ratio: tmp.height / tmp.width,
+        data: tmp.toDataURL('image/png', 1),
+        format: 'PNG'
+      };
+    };
+    const addImagePage = (img, opts = {}) => {
+      if (pageIndex > 0){
+        if (opts.format) pdf.addPage(opts.format, 'landscape');
+        else pdf.addPage();
+      }
+      const pdfW = pdf.internal.pageSize.getWidth();
+      const pdfH = pdf.internal.pageSize.getHeight();
+      const maxW = pdfW - margin*2;
+      const maxH = pdfH - margin*2;
       pdf.setFillColor(255,255,255);
       pdf.rect(0,0,pdfW,pdfH,'F');
-      const imgW = maxW;
-      const imgH = img.ratio * imgW;
+      let imgW = maxW;
+      let imgH = img.ratio * imgW;
+      if (imgH > maxH){
+        imgH = maxH;
+        imgW = imgH / img.ratio;
+      }
+      const x = Math.max(margin, (pdfW - imgW) / 2);
       const y = Math.max(margin, (pdfH - imgH) / 2);
-      pdf.addImage(img.data, 'JPEG', margin, y, imgW, imgH, undefined, 'FAST');
+      const fmt = img.format || 'PNG';
+      const compress = fmt === 'JPEG' ? 'FAST' : undefined;
+      pdf.addImage(img.data, fmt, x, y, imgW, imgH, undefined, compress);
       pageIndex += 1;
     };
 
-    charts.forEach((canvas) => {
-      addImagePage(toImgData(canvas, 2));
-    });
+    // --- Charts: one page, higher quality ---
+    if (charts.length > 1){
+      addImagePage(composeCharts(charts, 3, 16));
+    } else {
+      charts.forEach((canvas) => {
+        addImagePage(toImgData(canvas, 3, 'image/png', 1));
+      });
+    }
 
     // --- Summary & Analytics as PDF pages ---
     if (window.html2canvas){
       document.body.classList.add('pdf-export');
       try{ await (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()); }catch{}
 
-      const makeSheet = (title, metaText, nodes=[]) => {
+      const makeSheet = (title, metaText, nodes=[], className='pdf-sheet') => {
         const wrap = document.createElement('div');
-        wrap.className = 'pdf-sheet';
+        wrap.className = className;
         wrap.innerHTML = `<div class="pdf-title">${esc(title)}</div>` +
           (metaText ? `<div class="pdf-meta">${esc(metaText)}</div>` : '');
         nodes.forEach(n => { if (n) wrap.appendChild(n); });
@@ -2167,8 +2212,19 @@ async function exportChartsPdf(){
       const summarySheet = makeSheet('Сводная таблица по релизам (топ-20)', summaryMeta, [tblClone]);
       await waitFrame();
       const sumCanvas = await html2canvas(summarySheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
-      addImagePage(toImgData(sumCanvas, 1));
+      addImagePage(toImgData(sumCanvas, 1, 'image/jpeg', 0.98), { format: A4 });
       summarySheet.remove();
+
+      // Android summary (RuStore / Huawei / Google)
+      const androidCard = document.getElementById('androidSummaryCard');
+      const androidClone = androidCard ? androidCard.cloneNode(true) : null;
+      if (androidClone){
+        const androidSheet = makeSheet('Android — распределение по типу сборки', 'Доля от общего числа Android', [androidClone], 'pdf-sheet pdf-sheet--android');
+        await waitFrame();
+        const androidCanvas = await html2canvas(androidSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+        addImagePage(toImgData(androidCanvas, 1, 'image/jpeg', 0.98), { format: A4 });
+        androidSheet.remove();
+      }
 
       // Growth sheet (top-4)
       const kpis = document.getElementById('growthKpis');
@@ -2179,7 +2235,7 @@ async function exportChartsPdf(){
       const growthSheet = makeSheet('Аналитика версий: прирост/убывание (топ-4)', growthMeta, [kpisClone, gtblClone]);
       await waitFrame();
       const growthCanvas = await html2canvas(growthSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
-      addImagePage(toImgData(growthCanvas, 1));
+      addImagePage(toImgData(growthCanvas, 1, 'image/jpeg', 0.98), { format: A4 });
       growthSheet.remove();
     }
 
