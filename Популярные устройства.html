@@ -142,6 +142,34 @@
     .pdf-sheet table{width:100%;border-collapse:collapse}
     .pdf-sheet th,.pdf-sheet td{border:1px solid #eee;padding:6px 8px;font-size:12px;text-align:left;vertical-align:top}
 
+    /* PDF: stronger contrast for Top devices & OS versions */
+    .pdf-sheet--top, .pdf-sheet--os{ color:#0f172a; }
+    .pdf-sheet--top .card, .pdf-sheet--os .card{
+      background:#ffffff !important;
+      border:1px solid #cbd5e1 !important;
+      box-shadow:none !important;
+      opacity:1 !important;
+      filter:none !important;
+    }
+    .pdf-sheet--top .muted, .pdf-sheet--os .muted{ color:#475569 !important; font-weight:600; }
+    .pdf-sheet--top table, .pdf-sheet--os table{ font-size:13px; color:#0f172a; }
+    .pdf-sheet--top thead th, .pdf-sheet--os thead th{
+      background:#f7f5ff;
+      color:#4c1d95;
+      border-color:#cbd5e1;
+      font-weight:800;
+    }
+    .pdf-sheet--top td, .pdf-sheet--os td{
+      color:#0f172a !important;
+      border-color:#cbd5e1;
+      font-weight:600;
+      opacity:1 !important;
+    }
+    .pdf-sheet--top .top-title, .pdf-sheet--os .top-title{
+      color:#4c1d95;
+      font-weight:800;
+    }
+
     /* ===== Mobile tweaks ===== */
     @media (max-width: 900px){
       .app-shell{ max-width:100%; }
@@ -229,6 +257,8 @@
                 let summaryRaw=[]; let summarySort='desc'; let page=1, pageSize=10; let filteredRows=[];
                 let osVersions={ Android:[], iOS:[] };
                 const HISTORY_LIMIT=12;
+                const SNAP_DEFAULT=4;
+                const SNAP_LIMIT=20;
                 const SNAPSHOT_MAX_PER_PLATFORM=300;
                 const ts=()=>new Date().toLocaleTimeString();
                 const log=m=>{
@@ -377,20 +407,21 @@
                 }
                 function refreshSnapshotsCaption(){
                   const selected = getSelectedSnapshotTimes().length;
-                  snapshotsSelectedText.textContent = selected ? `Выбрано: ${selected}` : 'Последние 4';
+                  snapshotsSelectedText.textContent = selected ? `Выбрано: ${selected}` : `Последние ${SNAP_DEFAULT}`;
                 }
                 const btns = {
-                  snapPickLast4: ()=>{ const nodes = snapshotsList.querySelectorAll('input[type=checkbox]'); nodes.forEach(cb=>cb.checked=false); [...nodes].slice(0,4).forEach(cb=>cb.checked=true); },
+                  snapPickLast4: ()=>{ const nodes = snapshotsList.querySelectorAll('input[type=checkbox]'); nodes.forEach(cb=>cb.checked=false); [...nodes].slice(0,SNAP_DEFAULT).forEach(cb=>cb.checked=true); },
+                  snapPickLast20: ()=>{ const nodes = snapshotsList.querySelectorAll('input[type=checkbox]'); nodes.forEach(cb=>cb.checked=false); [...nodes].slice(0,SNAP_LIMIT).forEach(cb=>cb.checked=true); },
                   snapUncheckAll: ()=>{ snapshotsList.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false); },
                   btnSnapApply: ()=>{},
                   btnSnapClear: ()=>{ snapFrom.value=''; snapTo.value=''; buildSnapshotsDropdown(); }
                 };
-                ['snapPickLast4','snapUncheckAll','btnSnapApply','btnSnapClear'].forEach(id=>{
+                ['snapPickLast4','snapPickLast20','snapUncheckAll','btnSnapApply','btnSnapClear'].forEach(id=>{
                   const el=$(id); if(el) el.addEventListener('click',()=>{ btns[id](); refreshSnapshotsCaption(); updateSnapshotBadges(); buildReleasesDropdown(); drawCharts(); renderGrowth(); renderViewFromHistory(); });
                 });
                 snapshotsList?.addEventListener('change', e=>{
                   const checked = snapshotsList.querySelectorAll('input[type=checkbox]:checked');
-                  if(checked.length>4){ e.target.checked=false; return; }
+                  if(checked.length>SNAP_LIMIT){ e.target.checked=false; return; }
                   refreshSnapshotsCaption(); updateSnapshotBadges(); buildReleasesDropdown(); drawCharts(); renderGrowth(); renderViewFromHistory();
                 });
         
@@ -758,9 +789,9 @@
                     const set=new Set(chosenTimes);
                     snaps = filtered.filter(s=>set.has(s.time));
                     snaps.sort((a,b)=>new Date(a.time)-new Date(b.time));
-                    snaps = snaps.slice(-4);
+                    snaps = snaps.slice(-SNAP_LIMIT);
                   } else {
-                    snaps = filtered.slice(-4);
+                    snaps = filtered.slice(-SNAP_DEFAULT);
                   }
                   return snaps;
                 }
@@ -1154,7 +1185,7 @@
                       `<span class="pill">Лимит: ${esc(showCountEl.value)}, порядок: ${esc(orderDirectionEl.value)}</span>`;
                   }
         
-                  const trendAll = calcTrend(getHistory());
+                  const trendAll = calcTrend(chosenSnaps());
                   if(trendChart) trendChart.destroy();
                   trendChart = new Chart(document.getElementById('trendChart'),{
                     type:'line',
@@ -1485,9 +1516,9 @@
                       document.body.classList.add('pdf-export');
                       try{ await (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()); }catch{}
         
-                      const makeSheet = (title, metaText, nodes=[]) => {
+                      const makeSheet = (title, metaText, nodes=[], className='pdf-sheet') => {
                         const wrap = document.createElement('div');
-                        wrap.className = 'pdf-sheet';
+                        wrap.className = className;
                         wrap.innerHTML = `<div class="pdf-title">${esc(title)}</div>` +
                           (metaText ? `<div class="pdf-meta">${esc(metaText)}</div>` : '');
                         nodes.forEach(n => { if (n) wrap.appendChild(n); });
@@ -1510,7 +1541,7 @@
         
                       const topCard = document.getElementById('topDevicesCard');
                       const topClone = topCard ? topCard.cloneNode(true) : null;
-                      const topSheet = makeSheet('Топ устройств по последнему снепшоту', 'Лимит: 10', [topClone]);
+                      const topSheet = makeSheet('Топ устройств по последнему снепшоту', 'Лимит: 10', [topClone], 'pdf-sheet pdf-sheet--top');
                       await waitFrame();
                       const topCanvas = await html2canvas(topSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
                       addImagePage(toImgData(topCanvas, 1));
@@ -1518,7 +1549,7 @@
         
                       const osCard = document.getElementById('osVersionsCard');
                       const osClone = osCard ? osCard.cloneNode(true) : null;
-                      const osSheet = makeSheet('Популярные версии ОС', `Интервал: ${getIntervalValue()}`, [osClone]);
+                      const osSheet = makeSheet('Популярные версии ОС', `Интервал: ${getIntervalValue()}`, [osClone], 'pdf-sheet pdf-sheet--os');
                       await waitFrame();
                       const osCanvas = await html2canvas(osSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
                       addImagePage(toImgData(osCanvas, 1));
@@ -1652,12 +1683,13 @@
           </div>
       
           <div className="form-field" style={{ gridColumn: "span 2" }}>
-            <label>Выбрать снэпшоты (до 4)</label>
+            <label>Выбрать снэпшоты (до 20)</label>
             <div className="dropdown form-ctl input dropdown--slim" id="snapshotsDropdown">
               <div className="dropdown-selected" id="snapshotsSelectedText">Последние 4</div>
               <div className="dropdown-list">
                 <div className="toolbar" style={{ justifyContent: "space-between" }}>
                   <button type="button" className="btn-sm" id="snapPickLast4">Последние 4</button>
+                  <button type="button" className="btn-sm" id="snapPickLast20">Последние 20</button>
                   <button type="button" className="btn-sm" id="snapUncheckAll">Сброс</button>
                 </div>
                 <div className="snapshots-list" id="snapshotsList" style={{ maxHeight: "220px", overflow: "auto", display: "flex", flexDirection: "column", gap: "6px", padding: "6px" }}></div>
