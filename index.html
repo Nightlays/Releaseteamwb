@@ -858,6 +858,44 @@ table { font-size: 13.5px; }
     background: #cb11ab;
     color: #fff;
   }
+  .btn-secondary{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px 12px;
+    color:var(--ink);
+    font-weight:700;
+    cursor:pointer;
+    transition:.15s ease;
+  }
+  .btn-secondary:hover{ border-color:var(--line-strong); transform:translateY(-1px); }
+  .btn-primary{
+    background:var(--grad);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:10px 14px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:var(--shadow-sm);
+    transition:.15s ease;
+  }
+  .btn-primary:hover{ filter:brightness(1.05); transform:translateY(-1px); }
+  .role-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    background: var(--grad);
+    color:#fff;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.2px;
+    box-shadow:var(--shadow-sm);
+    white-space:nowrap;
+  }
+  body.rb-locked .role-chip{ display:none !important; }
 
   body.authed .topbar .actions .btn-logout {
     display: inline-flex !important;
@@ -869,6 +907,81 @@ table { font-size: 13.5px; }
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(15px); }
     to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Роли и доступы */
+  .role-access-card{ margin: 16px 0 18px; }
+  .role-access-grid{
+    display:grid;
+    grid-template-columns: 220px 1fr;
+    gap:14px;
+  }
+  .role-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .role-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    cursor:pointer;
+    font-weight:700;
+    color:var(--ink);
+    transition:.15s ease;
+  }
+  .role-item:hover{ border-color:var(--line-strong); transform:translateY(-1px); }
+  .role-item.active{
+    background:var(--grad);
+    color:#fff;
+    border-color:transparent;
+    box-shadow:0 10px 24px rgba(203,17,171,.28);
+  }
+  .access-list{
+    display:grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap:10px 14px;
+  }
+  .access-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    font-size:13px;
+    color:var(--ink);
+  }
+  .access-item input{ accent-color: #cb11ab; }
+  .role-actions{
+    display:flex;
+    gap:8px;
+    margin-top:12px;
+    flex-wrap:wrap;
+  }
+  #roleAccessCard, #userAccessCard { display:none; }
+  body.role-superadmin.access-open #roleAccessCard,
+  body.role-superadmin.access-open #userAccessCard { display:block; }
+  body:not(.role-superadmin) #accessToggleBtn{ display:none !important; }
+  body:not(.role-superadmin) #roleAccessCard{ display:none !important; }
+  body:not(.role-superadmin) #userAccessCard{ display:none !important; }
+  @media (max-width: 900px){
+    .role-access-grid{ grid-template-columns: 1fr; }
+    .access-list{ grid-template-columns: 1fr; }
+  }
+  .role-access-card select{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:#fff;
+    color:var(--ink);
+    font-weight:700;
   }
 </style>
 
@@ -895,19 +1008,85 @@ table { font-size: 13.5px; }
   </form>
 </div>
 <script>
+(() => {
+  const RB_CONFIG_URL = 'rb_roles_access.json';
+  const RB_FALLBACK_CONFIG = {
+    roles: [
+      { id: 'superadmin', label: 'Суперадмин' },
+      { id: 'admin', label: 'Администратор' },
+      { id: 'manager', label: 'Менеджер' },
+      { id: 'analyst', label: 'Аналитик' },
+      { id: 'viewer', label: 'Наблюдатель' },
+    ],
+    users: [
+      { login: 'Nightlays', pass: 'P132868s', role: 'superadmin' },
+      { login: 'Lena', pass: 'qwerty', role: 'manager' },
+      { login: 'Lesha', pass: 'darowa', role: 'analyst' },
+      { login: 'Nadya', pass: 'P132868s', role: 'manager' },
+      { login: 'Viktor', pass: 'qwerty', role: 'viewer' },
+      { login: 'Andrei', pass: 'Pa$$w0rd', role: 'admin' },
+      { login: 'Olesya', pass: 'Pa$$w0rd', role: 'analyst' },
+      { login: 'Daria', pass: 'qwerty', role: 'viewer' }
+    ],
+    roleAccess: {
+      superadmin: ['*'],
+      admin: ['*'],
+      manager: [
+        'dashboard_run_module.html',
+        'Ванговатор.html',
+        'Создание рана.html',
+        'Сбор ЧП.html',
+        'УВУ.html',
+        'BiUser.html',
+        'Популярные устройства.html',
+        'Графики.html',
+        'SWAT релиз.html',
+        'Копирование данных из YT.html'
+      ],
+      analyst: [
+        'dashboard_run_module.html',
+        'Графики.html',
+        'BiUser.html',
+        'Популярные устройства.html'
+      ],
+      viewer: ['dashboard_run_module.html']
+    },
+    userAccess: {}
+  };
+
+  function normalizeConfig(cfg) {
+    const safe = cfg && typeof cfg === 'object' ? cfg : {};
+    const roles = Array.isArray(safe.roles) && safe.roles.length ? safe.roles : RB_FALLBACK_CONFIG.roles;
+    const users = Array.isArray(safe.users) && safe.users.length ? safe.users : RB_FALLBACK_CONFIG.users;
+    const roleAccess = { ...RB_FALLBACK_CONFIG.roleAccess, ...(safe.roleAccess || {}) };
+    const userAccess = { ...(safe.userAccess || {}) };
+    return { roles, users, roleAccess, userAccess };
+  }
+
+  window.loadRbConfig = function loadRbConfig() {
+    if (window.RB_CONFIG_PROMISE) return window.RB_CONFIG_PROMISE;
+    window.RB_CONFIG_PROMISE = fetch(RB_CONFIG_URL, { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : null)
+      .catch(() => null)
+      .then(cfg => {
+        const normalized = normalizeConfig(cfg);
+        window.RB_CONFIG = normalized;
+        return normalized;
+      });
+    return window.RB_CONFIG_PROMISE;
+  };
+})();
+</script>
+<script>
 document.addEventListener('DOMContentLoaded', () => {
-  const USERS = [
-    { login: 'Nightlays', pass: 'P132868s' },
-    { login: 'Lena', pass: 'qwerty' },
-    { login: 'Lesha', pass: 'darowa' },
-    { login: 'Nadya', pass: 'P132868s' },
-    { login: 'Viktor', pass: 'qwerty' },
-    { login: 'Andrei', pass: 'Pa$$w0rd' },
-    { login: 'Olesya', pass: 'Pa$$w0rd' },
-    { login: 'Daria', pass: 'qwerty' }
-  ];
+  const loadConfig = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
+  loadConfig.then((cfg) => {
+    const USERS = Array.isArray(cfg?.users) ? cfg.users : [];
 
   const AUTH_KEY = 'rb_auth_ok_v1';
+  const ROLE_KEY = 'rb_role_v1';
+  const USER_KEY = 'rb_user_v1';
+  const USER_ROLE_KEY = 'rb_user_roles_v1';
 
   const form = document.getElementById('rbAuthForm');
   const loginInput = document.getElementById('rbAuthLogin');
@@ -932,8 +1111,29 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('authed');
   }
 
+  function getStoredUserRole(loginVal) {
+    try {
+      const raw = localStorage.getItem(USER_ROLE_KEY);
+      if (!raw) return null;
+      const map = JSON.parse(raw);
+      return map?.[loginVal] || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setRole(role, loginVal) {
+    const roleId = role || 'viewer';
+    localStorage.setItem(ROLE_KEY, roleId);
+    if (loginVal) localStorage.setItem(USER_KEY, loginVal);
+    document.body.dataset.role = roleId;
+    document.body.classList.toggle('role-admin', roleId === 'admin');
+    document.body.classList.toggle('role-superadmin', roleId === 'superadmin');
+    window.dispatchEvent(new CustomEvent('rb-role-changed', { detail: { role: roleId, user: loginVal } }));
+  }
+
   function checkCredentials(loginVal, passVal) {
-    return USERS.some(u => u.login === loginVal && u.pass === passVal);
+    return USERS.find(u => u.login === loginVal && u.pass === passVal);
   }
 
   if (form) {
@@ -950,8 +1150,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      if (checkCredentials(l, p)) {
+      const user = checkCredentials(l, p);
+      if (user) {
         localStorage.setItem(AUTH_KEY, '1');
+        const storedRole = getStoredUserRole(user.login);
+        let roleToSet = user.login === 'Nightlays' ? 'superadmin' : (storedRole || user.role || 'viewer');
+        if (user.login !== 'Nightlays' && roleToSet === 'superadmin') roleToSet = 'admin';
+        setRole(roleToSet, user.login);
         if (err) err.style.display = 'none';
         hideAuth();
       } else {
@@ -966,6 +1171,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnLogout) {
     btnLogout.addEventListener('click', () => {
       localStorage.removeItem(AUTH_KEY);
+      localStorage.removeItem(ROLE_KEY);
+      localStorage.removeItem(USER_KEY);
+      document.body.classList.remove('role-admin');
+      document.body.classList.remove('role-superadmin');
+      document.body.dataset.role = 'viewer';
       showAuth();
     });
   }
@@ -973,11 +1183,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Первичная инициализация после загрузки DOM
   if (isAuthed()) {
     hideAuth();
+    const savedRole = localStorage.getItem(ROLE_KEY) || 'viewer';
+    const savedUser = localStorage.getItem(USER_KEY) || '';
+    let roleToSet = savedUser === 'Nightlays' ? 'superadmin' : savedRole;
+    if (savedUser !== 'Nightlays' && roleToSet === 'superadmin') roleToSet = 'admin';
+    setRole(roleToSet, savedUser);
   } else {
     showAuth();
   }
 
-  
+  });
 });
 </script>
 <!-- ======= ШАПКА С ЛОГОТИПОМ WILDBERRIES ======= -->
@@ -1010,19 +1225,72 @@ document.addEventListener('DOMContentLoaded', () => {
     -->
     </div>
     <div class="actions">
+      <button id="accessToggleBtn" class="btn-secondary" type="button">Доступы</button>
+      <div class="role-chip" id="roleChip">роль</div>
       <button id="rbAuthLogout" class="btn-logout" type="button">Выйти</button>
     </div>
   </div>
 </div>
-  <!-- Панель вкладок оболочки: сюда можно добавлять кнопки с data-module="file.html" --><!-- Контейнер для подгружаемых HTML-модулей -->
-  <div class="card card-shell" style="padding:0; overflow:hidden; background:transparent;">
-    <iframe id="rbModuleFrame"
-            title="Модуль"
-            src="dashboard_run_module.html"
-            style="width:100%; min-height:80vh; border:0; display:block; background:transparent;">
-    </iframe>
+  <div class="wrap">
+    <div class="card role-access-card" id="roleAccessCard">
+      <div class="head" style="align-items:center;">
+        <div>
+          <div style="font-weight:900; font-size:16px;">Роли и доступы</div>
+          <div class="nums">Настройка доступа к модулям для каждой роли</div>
+        </div>
+        <div class="nums" id="roleAccessHint">Доступно администратору</div>
+      </div>
+      <div class="role-access-grid" style="margin-top:12px;">
+        <div class="role-list" id="roleList"></div>
+        <div>
+          <div class="access-list" id="accessList"></div>
+          <div class="role-actions">
+            <button class="btn-secondary" id="accessSelectAll" type="button">Выбрать все</button>
+            <button class="btn-secondary" id="accessClearAll" type="button">Очистить</button>
+            <button class="btn-primary" id="accessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить доступы</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card role-access-card" id="userAccessCard">
+      <div class="head" style="align-items:center;">
+        <div>
+          <div style="font-weight:900; font-size:16px;">Пользователи и доступы</div>
+          <div class="nums">Назначение роли и доступа для каждого пользователя</div>
+        </div>
+        <div class="nums">Только для Nightlays (суперадмин)</div>
+      </div>
+      <div class="role-access-grid" style="margin-top:12px;">
+        <div class="role-list" id="userList"></div>
+        <div>
+          <div class="field" style="margin-bottom:10px;">
+            <label>Роль пользователя</label>
+            <select id="userRoleSelect"></select>
+          </div>
+          <label class="access-item" style="margin-bottom:10px;">
+            <input type="checkbox" id="userUseRoleAccess" checked />
+            <span>Использовать доступы роли</span>
+          </label>
+          <div class="access-list" id="userAccessList"></div>
+          <div class="role-actions">
+            <button class="btn-secondary" id="userAccessSelectAll" type="button">Выбрать все</button>
+            <button class="btn-secondary" id="userAccessClearAll" type="button">Очистить</button>
+            <button class="btn-primary" id="userAccessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить пользователя</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Панель вкладок оболочки: сюда можно добавлять кнопки с data-module="file.html" --><!-- Контейнер для подгружаемых HTML-модулей -->
+    <div class="card card-shell" style="padding:0; overflow:hidden; background:transparent;">
+      <iframe id="rbModuleFrame"
+              title="Модуль"
+              src="dashboard_run_module.html"
+              style="width:100%; min-height:80vh; border:0; display:block; background:transparent;">
+      </iframe>
+    </div>
   </div>
-</div>
 
 <script>
 // Оболочка: переключение модулей по кнопкам data-module + гарды по data-guard
@@ -1037,6 +1305,236 @@ document.addEventListener('DOMContentLoaded', () => {
     .filter(Boolean);
 
   const navToggle = document.querySelector('.nav-toggle');
+  const accessToggleBtn = document.getElementById('accessToggleBtn');
+  const ROLE_KEY = 'rb_role_v1';
+  const USER_KEY = 'rb_user_v1';
+  const ACCESS_KEY = 'rb_role_access_v1';
+  const USER_ROLE_KEY = 'rb_user_roles_v1';
+  const USER_ACCESS_KEY = 'rb_user_access_v1';
+  const roleListEl = document.getElementById('roleList');
+  const accessListEl = document.getElementById('accessList');
+  const roleChipEl = document.getElementById('roleChip');
+  const selectAllBtn = document.getElementById('accessSelectAll');
+  const clearAllBtn = document.getElementById('accessClearAll');
+  const saveBtn = document.getElementById('accessSave');
+  const toastEl = document.getElementById('toast');
+  const userListEl = document.getElementById('userList');
+  const userRoleSelect = document.getElementById('userRoleSelect');
+  const userUseRoleAccess = document.getElementById('userUseRoleAccess');
+  const userAccessList = document.getElementById('userAccessList');
+  const userSelectAllBtn = document.getElementById('userAccessSelectAll');
+  const userClearAllBtn = document.getElementById('userAccessClearAll');
+  const userSaveBtn = document.getElementById('userAccessSave');
+
+  let toastTimer = null;
+  function showToast(message) {
+    if (!toastEl) return;
+    toastEl.textContent = message;
+    toastEl.classList.add('show');
+    if (toastTimer) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      toastEl.classList.remove('show');
+    }, 2200);
+  }
+
+  const modules = buttons.map(btn => ({
+    id: btn.getAttribute('data-module'),
+    label: (btn.textContent || '').trim()
+  }));
+
+  const loadConfig = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
+  loadConfig.then((cfg) => {
+    const roles = Array.isArray(cfg?.roles) ? cfg.roles : [];
+    const BASE_USERS = Array.isArray(cfg?.users) ? cfg.users.map(u => ({ login: u.login, role: u.role || 'viewer' })) : [];
+    const configRoleAccess = cfg?.roleAccess || {};
+    const configUserAccess = cfg?.userAccess || {};
+
+  function buildDefaultAccess() {
+    const all = modules.map(m => m.id);
+    const byLabel = (re) => modules.filter(m => re.test(m.label)).map(m => m.id);
+    const analyst = byLabel(/Дашборд|Графики|Пользователи|Популярные|РАН/i);
+    return {
+      superadmin: ['*'],
+      admin: ['*'],
+      manager: all.slice(),
+      analyst: analyst.length ? analyst : (all[0] ? [all[0]] : []),
+      viewer: all[0] ? [all[0]] : []
+    };
+  }
+
+  function loadAccessMap() {
+    try {
+      const raw = localStorage.getItem(ACCESS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return { ...buildDefaultAccess(), ...configRoleAccess, ...parsed };
+      }
+    } catch (e) {}
+    return { ...buildDefaultAccess(), ...configRoleAccess };
+  }
+
+  let accessMap = loadAccessMap();
+  let selectedRole = roles[0].id;
+  let selectedUser = BASE_USERS[0]?.login || '';
+  let userRoleMap = {};
+  let userAccessMap = {};
+  let userEditUseRole = null;
+
+  function roleLabel(roleId) {
+    return roles.find(r => r.id === roleId)?.label || roleId;
+  }
+
+  function loadUserRoleMap() {
+    try {
+      const raw = localStorage.getItem(USER_ROLE_KEY);
+      if (raw) return JSON.parse(raw) || {};
+    } catch (e) {}
+    return {};
+  }
+
+  function loadUserAccessMap() {
+    try {
+      const raw = localStorage.getItem(USER_ACCESS_KEY);
+      if (raw) return JSON.parse(raw) || {};
+    } catch (e) {}
+    return {};
+  }
+
+  function resolveUserRole(login) {
+    if (login === 'Nightlays') return 'superadmin';
+    const role = userRoleMap[login] || BASE_USERS.find(u => u.login === login)?.role || 'viewer';
+    return role === 'superadmin' ? 'admin' : role;
+  }
+
+  function getAllowedSet(roleId) {
+    const list = accessMap[roleId] || [];
+    if (list.includes('*')) return null; // null => all allowed
+    return new Set(list);
+  }
+
+  function resolveAllowedForUser(login, roleId) {
+    const userCfg = userAccessMap[login];
+    if (userCfg && userCfg.useRole === false) {
+      return new Set(userCfg.access || []);
+    }
+    return getAllowedSet(roleId);
+  }
+
+  function applyRoleAccess(roleId, login) {
+    const allowed = resolveAllowedForUser(login, roleId);
+    buttons.forEach(btn => {
+      const moduleId = btn.getAttribute('data-module');
+      const isAllowed = !allowed || allowed.has(moduleId);
+      btn.style.display = isAllowed ? '' : 'none';
+    });
+
+    const visibleButtons = buttons.filter(b => b.style.display !== 'none');
+    if (!visibleButtons.length) {
+      frame.src = 'about:blank';
+      return;
+    }
+    const activeVisible = visibleButtons.find(b => b.classList.contains('active'));
+    if (!activeVisible) {
+      activateButton(visibleButtons[0]);
+    }
+  }
+
+  function renderRoleList() {
+    if (!roleListEl) return;
+    roleListEl.innerHTML = roles.map(r => `
+      <div class="role-item ${r.id === selectedRole ? 'active' : ''}" data-role="${r.id}">
+        <span>${r.label}</span>
+        <span class="nums">${(accessMap[r.id]?.includes('*') ? 'Все' : (accessMap[r.id]?.length || 0))}</span>
+      </div>
+    `).join('');
+    roleListEl.querySelectorAll('.role-item').forEach(item => {
+      item.addEventListener('click', () => {
+        selectedRole = item.getAttribute('data-role');
+        renderRoleList();
+        renderAccessList();
+      });
+    });
+  }
+
+  function renderAccessList() {
+    if (!accessListEl) return;
+    const allowed = getAllowedSet(selectedRole);
+    accessListEl.innerHTML = modules.map(m => {
+      const checked = !allowed || allowed.has(m.id) ? 'checked' : '';
+      return `
+        <label class="access-item">
+          <input type="checkbox" data-module="${m.id}" ${checked} />
+          <span>${m.label}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  function renderUserList() {
+    if (!userListEl) return;
+    userListEl.innerHTML = BASE_USERS.map(u => {
+      const role = resolveUserRole(u.login);
+      return `
+        <div class="role-item ${u.login === selectedUser ? 'active' : ''}" data-user="${u.login}">
+          <span>${u.login}</span>
+          <span class="nums">${roleLabel(role)}</span>
+        </div>
+      `;
+    }).join('');
+    userListEl.querySelectorAll('.role-item').forEach(item => {
+      item.addEventListener('click', () => {
+        selectedUser = item.getAttribute('data-user');
+        userEditUseRole = null;
+        renderUserList();
+        renderUserEditor();
+      });
+    });
+  }
+
+  function renderUserEditor() {
+    if (!userRoleSelect || !userAccessList || !userUseRoleAccess) return;
+    const role = resolveUserRole(selectedUser);
+    const isNightlays = selectedUser === 'Nightlays';
+    const userCfg = userAccessMap[selectedUser] || { useRole: true, access: [] };
+    if (isNightlays) {
+      userRoleSelect.innerHTML = '<option value="superadmin">Суперадмин</option>';
+      userRoleSelect.value = 'superadmin';
+      userRoleSelect.disabled = true;
+      userUseRoleAccess.checked = true;
+    } else {
+      const roleOptions = roles.filter(r => r.id !== 'superadmin').map(r => `<option value="${r.id}">${r.label}</option>`).join('');
+      userRoleSelect.innerHTML = roleOptions;
+      userRoleSelect.value = role;
+      userRoleSelect.disabled = false;
+      userUseRoleAccess.checked = userEditUseRole !== null ? userEditUseRole : (userCfg.useRole !== false);
+    }
+    userUseRoleAccess.disabled = isNightlays;
+
+    const useRole = userUseRoleAccess.checked;
+    const allowed = useRole ? getAllowedSet(role) : new Set(userCfg.access || []);
+    userAccessList.innerHTML = modules.map(m => {
+      const checked = !allowed || allowed.has(m.id) ? 'checked' : '';
+      const disabled = (isNightlays || useRole) ? 'disabled' : '';
+      return `
+        <label class="access-item">
+          <input type="checkbox" data-module="${m.id}" ${checked} ${disabled} />
+          <span>${m.label}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  function updateRoleChip(roleId) {
+    if (!roleChipEl) return;
+    roleChipEl.textContent = roleLabel(roleId);
+  }
+
+  function setAccessOpen(open) {
+    document.body.classList.toggle('access-open', open);
+    if (accessToggleBtn) {
+      accessToggleBtn.textContent = open ? 'Скрыть доступы' : 'Доступы';
+    }
+  }
 
   const closeNav = () => {
     document.body.classList.remove('nav-open');
@@ -1086,8 +1584,116 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Активируем первую кнопку по умолчанию, если она есть
   const initiallyActive = buttons.find(b => b.classList.contains('active')) || buttons[0];
-  if (initiallyActive) {
-    activateButton(initiallyActive);
+  if (initiallyActive) activateButton(initiallyActive);
+
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', () => {
+      accessMap[selectedRole] = ['*'];
+      renderRoleList();
+      renderAccessList();
+    });
+  }
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', () => {
+      accessMap[selectedRole] = [];
+      renderRoleList();
+      renderAccessList();
+    });
+  }
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      const checked = Array.from(accessListEl?.querySelectorAll('input[type="checkbox"]') || [])
+        .filter(i => i.checked)
+        .map(i => i.getAttribute('data-module'));
+      accessMap[selectedRole] = checked.length ? checked : [];
+      localStorage.setItem(ACCESS_KEY, JSON.stringify(accessMap));
+      renderRoleList();
+      renderAccessList();
+      const roleId = localStorage.getItem(ROLE_KEY) || 'viewer';
+      const login = localStorage.getItem(USER_KEY) || '';
+      applyRoleAccess(roleId, login);
+      showToast('Настройки сохранены');
+    });
+  }
+
+  userRoleMap = { ...BASE_USERS.reduce((acc, u) => { acc[u.login] = u.role; return acc; }, {}), ...loadUserRoleMap() };
+  userAccessMap = { ...configUserAccess, ...loadUserAccessMap() };
+  const initialRole = localStorage.getItem(ROLE_KEY) || 'viewer';
+  const initialUser = localStorage.getItem(USER_KEY) || '';
+  document.body.dataset.role = initialRole;
+  document.body.classList.toggle('role-admin', initialRole === 'admin');
+  document.body.classList.toggle('role-superadmin', initialRole === 'superadmin');
+  setAccessOpen(false);
+  updateRoleChip(initialRole);
+  renderRoleList();
+  renderAccessList();
+  renderUserList();
+  renderUserEditor();
+  applyRoleAccess(initialRole, initialUser);
+
+  window.addEventListener('rb-role-changed', (e) => {
+    const roleId = e.detail?.role || 'viewer';
+    const login = e.detail?.user || localStorage.getItem(USER_KEY) || '';
+    document.body.dataset.role = roleId;
+    document.body.classList.toggle('role-admin', roleId === 'admin');
+    document.body.classList.toggle('role-superadmin', roleId === 'superadmin');
+    if (roleId !== 'superadmin') setAccessOpen(false);
+    updateRoleChip(roleId);
+    applyRoleAccess(roleId, login);
+  });
+
+  if (accessToggleBtn) {
+    accessToggleBtn.addEventListener('click', () => {
+      const next = !document.body.classList.contains('access-open');
+      setAccessOpen(next);
+    });
+  }
+
+  if (userUseRoleAccess) {
+    userUseRoleAccess.addEventListener('change', () => {
+      userEditUseRole = userUseRoleAccess.checked;
+      renderUserEditor();
+    });
+  }
+  if (userSelectAllBtn) {
+    userSelectAllBtn.addEventListener('click', () => {
+      userEditUseRole = false;
+      userUseRoleAccess.checked = false;
+      renderUserEditor();
+      userAccessList.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = true);
+    });
+  }
+  if (userClearAllBtn) {
+    userClearAllBtn.addEventListener('click', () => {
+      userEditUseRole = false;
+      userUseRoleAccess.checked = false;
+      renderUserEditor();
+      userAccessList.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = false);
+    });
+  }
+  if (userSaveBtn) {
+    userSaveBtn.addEventListener('click', () => {
+      if (!selectedUser) return;
+      const isNightlays = selectedUser === 'Nightlays';
+      const chosenRole = isNightlays ? 'superadmin' : (userRoleSelect?.value || 'viewer');
+      userRoleMap[selectedUser] = chosenRole;
+      const useRole = isNightlays ? true : !!userUseRoleAccess.checked;
+      const checked = Array.from(userAccessList?.querySelectorAll('input[type="checkbox"]') || [])
+        .filter(i => i.checked)
+        .map(i => i.getAttribute('data-module'));
+      userAccessMap[selectedUser] = { useRole, access: checked };
+      localStorage.setItem(USER_ROLE_KEY, JSON.stringify(userRoleMap));
+      localStorage.setItem(USER_ACCESS_KEY, JSON.stringify(userAccessMap));
+      userEditUseRole = null;
+      renderUserList();
+      renderUserEditor();
+      const currentUser = localStorage.getItem(USER_KEY) || '';
+      if (currentUser === selectedUser) {
+        updateRoleChip(chosenRole);
+        applyRoleAccess(chosenRole, currentUser);
+      }
+      showToast('Настройки сохранены');
+    });
   }
 
   // Close menu on outside click and escape
@@ -1102,8 +1708,11 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('resize', () => {
     if (window.innerWidth > 900) closeNav();
   });
+  });
 });
 </script>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 </body>
 </html>
