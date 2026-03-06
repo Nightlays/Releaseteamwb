@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Запуск релиза</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body class="min-h-screen wb-graphs release-launch">
+  <div class="max-w-screen-2xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="brand-badge">
+        <span class="brand-dot"></span>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="font-extrabold leading-tight">WB All Table</div>
+            <span class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
+              <span aria-hidden="true">🏷️</span><span>v1.0.52</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="mt-5 grid grid-cols-1 gap-4">
+      <section class="card p-3 space-y-3 release-launch-params">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Параметры запуска</h2>
+          </div>
+          <div class="flex flex-col items-stretch w-full sm:w-56">
+            <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
+            <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Остановить</button>
+            <button id="checkProxyBtn" type="button" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">Проверить прокси</button>
+          </div>
+        </div>
+
+        <div id="bandCookiesDetails">
+          <input id="bandChannelId" type="hidden" />
+          <div class="release-launch-cookies-layout">
+            <label class="release-launch-field">
+              <span class="release-launch-label">Cookies (чтение/поиск users и post)</span>
+              <input id="bandCookiesRead" class="input release-launch-mono-input" type="text" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
+            </label>
+            <label class="release-launch-field">
+              <span class="release-launch-label">Cookies (admin)</span>
+              <input id="bandCookiesAdmin" class="input release-launch-mono-input" type="text" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
+            </label>
+          </div>
+        </div>
+
+        <div class="release-launch-status-row">
+          <div id="baseInfo" class="release-launch-status release-launch-status-muted">База выборки сообщений: не рассчитана</div>
+          <div id="statusInfo" class="release-launch-status release-launch-status-muted">Готов к запуску</div>
+        </div>
+      </section>
+
+      <section class="card p-5 space-y-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <h2 class="text-lg font-semibold">Результат сбора</h2>
+	          <div class="flex items-center gap-2 flex-wrap">
+	            <div class="release-launch-kpis">
+	              <span class="chip">Стримов: <b id="kpiStreams">0</b></span>
+	              <span class="chip">Заполнено: <b id="kpiFilled">0</b></span>
+	              <span class="chip">С пропусками: <b id="kpiMissing">0</b></span>
+	            </div>
+	            <button id="resultsCopyBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white">
+	              Копировать
+	            </button>
+	            <button id="resultsCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
+	              <span id="resultsCollapseIco" aria-hidden="true">▾</span>
+	              <span id="resultsCollapseText">Скрыть</span>
+	            </button>
+	          </div>
+        </div>
+
+        <div id="resultsBody" class="space-y-4">
+          <div id="resultsEmpty" class="release-launch-empty">Данные появятся после запуска сбора</div>
+
+          <div id="resultsWrap" class="release-launch-table-wrap" style="display:none;">
+            <table id="resultsTable">
+              <thead>
+                <tr>
+                  <th style="width:58px;">#</th>
+                  <th>Стрим</th>
+                  <th>iOS</th>
+                  <th>Android</th>
+                  <th>Лид</th>
+                  <th style="width:130px;">Статус</th>
+                </tr>
+              </thead>
+              <tbody id="resultsTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="card p-5 space-y-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <h2 class="text-lg font-semibold">Пошаговый запуск</h2>
+          <button id="workflowResetBtn" type="button" class="btn btn-soft">Сбросить шаги</button>
+        </div>
+        <div id="workflowHint" class="release-launch-status release-launch-status-muted">Сначала нажми «Запустить сбор», затем проходи шаги по порядку.</div>
+        <div id="workflowList" class="space-y-2"></div>
+      </section>
+
+      <section class="card p-5 space-y-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <h2 class="text-lg font-semibold">Пинги и постинг</h2>
+          <button id="pingCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
+            <span id="pingCollapseIco" aria-hidden="true">▾</span>
+            <span id="pingCollapseText">Скрыть</span>
+          </button>
+        </div>
+        <div id="pingBody" class="space-y-4">
+          <textarea id="pingMessage" class="input release-launch-textarea release-launch-ping" placeholder="Текст пинга сформируется автоматически"></textarea>
+          <div class="release-launch-actions">
+            <button id="copyPingBtn" type="button" class="btn btn-soft">Копировать текст</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card p-5 space-y-3">
+        <h2 class="text-lg font-semibold">Логи</h2>
+        <div id="logs" class="release-launch-log"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 opacity-0 transition-opacity duration-200">
+    <div id="toastInner" class="px-4 py-2 rounded-2xl text-sm font-semibold bg-white/90 ring-1 ring-[#ecebff] text-slate-700 shadow"></div>
+  </div>
+
+  <script>
+    (function(){
+      const $ = (id) => document.getElementById(id);
+      const LS_SETTINGS_KEY = 'wb_release_launch_settings_v1';
+      const LS_DETAILS_STATE_KEY = 'wb_release_launch_details_state_v1';
+      const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
+      const PROXY_BASE = 'http://localhost:8787';
+      const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
+      const BAND_POST_USER_ID = 'nibrb4qs8ty4zp61x1pgyeziqe';
+      const BAND_CHANNEL_ID_FIXED = '6sqki85urpbfbqdkcdfen33owh';
+      const GROUP_ANDROID_ID_FIXED = 'bbtekcuhfjykmm9awe56gebj9y';
+      const GROUP_IOS_ID_FIXED = '6skkxrr3ufrkmy1u3paepd35ar';
+
+      const ALLURE_API_TOKEN = 'c60f6235-440d-4657-983a-51dc71c53cf2';
+      const ALLURE_TESTPLAN_LEAF_URL = 'https://allure-testops.wb.ru/api/testplan/3918/tree/leaf?treeId=987&projectId=7&path=7904&sort=name%2Casc&size=100';
+      const QA_LEADS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxPTT8Gc8rQLKV7tIrtwsUQd_ciUOkESbS7WoQ3JfPEoBtxB0gr6GpOs640uBIaPTCy8A/exec';
+
+      const STREAM_ALIASES = {
+        'Core': ['Core Android', 'Core iOS'],
+        'C2C': ['С2С', 'С2C', 'C2С'],
+        'Корзина (B2B)': ['B2B', 'Корзина B2B', 'Корзина (B2B)'],
+        'Способы доставки': ['Способы доставок'],
+        'ДБО Депозиты и накопления': ['Депозиты и накопления']
+      };
+
+      const EXCLUDED_STREAMS = [
+        'WBA Автоматизаторы аналитики',
+        'Релизный стрим (мигра, вшитки)',
+        'Релизный стрим (мигра, вшитки,сват)',
+        'Релизный стрим (мигра, вшитки, сват)'
+      ];
+
+      const DEFAULTS = {
+        bandChannelId: BAND_CHANNEL_ID_FIXED,
+        bandCookiesRead: '',
+        bandCookiesAdmin: ''
+      };
+
+      const SETTINGS_FIELDS = Object.keys(DEFAULTS);
+      const FINTECH_PREFIX_RE = /^\[Финтех\]\s*/i;
+
+      const PLATFORM_SEP = '(?:\\s*[-—:–.]+\\s*)*';
+      const DUTY_WORD = 'Дежурн[\\p{L}\\p{N}_]*';
+      const RE_BLOCK_QUOTED = new RegExp(`${DUTY_WORD}\\s*"([^"]+)"([\\s\\S]*?)(?=${DUTY_WORD}\\s*"|$)`, 'giu');
+      const RE_BLOCK_OT = new RegExp(`${DUTY_WORD}\\s+от\\s+([^\\n\\r"]+)\\s*([\\s\\S]*?)(?=${DUTY_WORD}|$)`, 'giu');
+      const RE_BLOCK_HEADER = new RegExp(`${DUTY_WORD}\\s+(?!от\\b)([^\\n\\r"@]+?)\\s*[\\r\\n]+([\\s\\S]*?)(?=${DUTY_WORD}|$)`, 'giu');
+      const RE_INLINE_FREE = new RegExp(`${DUTY_WORD}\\s+([^\\n\\r"@]+?)` + PLATFORM_SEP + '@([^\\n\\r,; ]+)', 'giu');
+      const RE_ANDROID = new RegExp('\\b(?:Android|andr)\\b' + PLATFORM_SEP + '@([^\\n\\r,; ]+)', 'iu');
+      const RE_IOS = new RegExp('\\bios\\b' + PLATFORM_SEP + '@([^\\n\\r,; ]+)', 'iu');
+
+      const startBtn = $('startBtn');
+      const stopBtn = $('stopBtn');
+      const checkProxyBtn = $('checkProxyBtn');
+      const statusInfo = $('statusInfo');
+      const baseInfo = $('baseInfo');
+      const logs = $('logs');
+      const pingMessage = $('pingMessage');
+      const copyPingBtn = $('copyPingBtn');
+      const pingBody = $('pingBody');
+      const pingCollapseBtn = $('pingCollapseBtn');
+      const pingCollapseIco = $('pingCollapseIco');
+      const pingCollapseText = $('pingCollapseText');
+      const resultsBody = $('resultsBody');
+      const resultsCopyBtn = $('resultsCopyBtn');
+      const resultsCollapseBtn = $('resultsCollapseBtn');
+      const resultsCollapseIco = $('resultsCollapseIco');
+      const resultsCollapseText = $('resultsCollapseText');
+      const workflowList = $('workflowList');
+      const workflowHint = $('workflowHint');
+      const workflowResetBtn = $('workflowResetBtn');
+
+      const resultsEmpty = $('resultsEmpty');
+      const resultsWrap = $('resultsWrap');
+      const resultsTbody = $('resultsTbody');
+      const kpiStreams = $('kpiStreams');
+      const kpiFilled = $('kpiFilled');
+      const kpiMissing = $('kpiMissing');
+
+      const appState = {
+        abortController: null,
+        running: false,
+        lastRun: null,
+        androidIdMap: {},
+        iosIdMap: {},
+        resultsCollapsed: false,
+        pingCollapsed: false,
+        workflowCurrentIndex: 0,
+        workflowStatuses: [],
+        workflowRunning: false,
+        workflowPingFound: false
+      };
+
+      const WORKFLOW_STEPS = [
+        {
+          code: 'Шаг 1',
+          title: 'Опубликовать в чат просьбу указать дежурных',
+          action: 'publishPing'
+        },
+        {
+          code: 'Шаг 2',
+          title: 'Опубликовать в чат недостающих дежурных',
+          action: 'publishMissing'
+        },
+        {
+          code: 'Шаг 3',
+          title: 'Запросить user_id новых дежурных',
+          action: 'findIds'
+        },
+        {
+          code: 'Шаг 4',
+          title: 'Удалить старых дежурных из групп',
+          action: 'clearGroups'
+        },
+        {
+          code: 'Шаг 5',
+          title: 'Добавить новых дежурных в группы',
+          action: 'addGroups'
+        }
+      ];
+
+      function escHtml(value){
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function safeJson(raw){
+        if(typeof raw !== 'string') return null;
+        const txt = raw.replace(/^\uFEFF/, '').trim();
+        if(!txt) return null;
+        try{ return JSON.parse(txt); }catch(_){ return null; }
+      }
+
+      function norm(s){
+        return String(s || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU');
+      }
+
+      function normLoose(s){
+        return String(s || '')
+          .toLocaleLowerCase('ru-RU')
+          .replace(/[«»"“”'`]/gu, ' ')
+          .replace(/[^\p{L}\p{N}]+/gu, ' ')
+          .trim()
+          .replace(/\s+/g, ' ');
+      }
+
+      function dedupKeepOrder(items){
+        const seen = new Set();
+        const out = [];
+        for(const it of items){
+          if(!seen.has(it)){
+            seen.add(it);
+            out.push(it);
+          }
+        }
+        return out;
+      }
+
+      function sleep(ms){
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      function log(message, kind){
+        if(!logs) return;
+        const line = document.createElement('div');
+        line.className = 'release-launch-log-line' + (kind ? ` ${kind}` : '');
+        line.textContent = `[${new Date().toLocaleTimeString('ru-RU')}] ${message}`;
+        logs.appendChild(line);
+        logs.scrollTop = logs.scrollHeight;
+      }
+
+      function setStatus(message, mode){
+        if(!statusInfo) return;
+        statusInfo.textContent = message;
+        statusInfo.className = 'release-launch-status ' + (mode || 'release-launch-status-muted');
+      }
+
+      function showToast(message, ok){
+        const box = $('toast');
+        const inner = $('toastInner');
+        if(!box || !inner) return;
+        inner.textContent = message;
+        inner.className = 'px-4 py-2 rounded-2xl text-sm font-semibold ring-1 shadow ' + (ok === false
+          ? 'bg-rose-50 ring-rose-200 text-rose-700'
+          : 'bg-white/90 ring-[#ecebff] text-slate-700'
+        );
+        box.style.opacity = '1';
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => { box.style.opacity = '0'; }, 1800);
+      }
+
+      function two(n){
+        return String(n).padStart(2, '0');
+      }
+
+      function formatMskHuman(dateObj){
+        const weekdaysFrom = ['воскресенья', 'понедельника', 'вторника', 'среды', 'четверга', 'пятницы', 'субботы'];
+        const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+        const mskDate = new Date(dateObj.getTime() + MSK_OFFSET_MS);
+        const weekdayFrom = weekdaysFrom[mskDate.getUTCDay()];
+        const day = mskDate.getUTCDate();
+        const month = months[mskDate.getUTCMonth()];
+        const year = mskDate.getUTCFullYear();
+        const hh = two(mskDate.getUTCHours());
+        const mm = two(mskDate.getUTCMinutes());
+        return `от ${weekdayFrom}, ${day} ${month} ${year}, ${hh}:${mm} (МСК)`;
+      }
+
+      function buildSinceWindow(){
+        const nowPseudoMsk = new Date(Date.now() + MSK_OFFSET_MS);
+        const dow = nowPseudoMsk.getUTCDay();
+        const daysBack = (dow + 7 - 3) % 7;
+
+        const y = nowPseudoMsk.getUTCFullYear();
+        const m = nowPseudoMsk.getUTCMonth();
+        const d = nowPseudoMsk.getUTCDate() - daysBack;
+
+        const baseMskMs = Date.UTC(y, m, d, 0, 0, 0, 0);
+        const sinceMs = baseMskMs - MSK_OFFSET_MS;
+
+        return {
+          sinceMs,
+          baseMskDate: new Date(baseMskMs),
+          baseUtcDate: new Date(sinceMs)
+        };
+      }
+
+      function collectSettings(){
+        const cfg = {};
+        for(const key of SETTINGS_FIELDS){
+          const el = $(key);
+          cfg[key] = el ? String(el.value || '') : '';
+        }
+        cfg.bandChannelId = BAND_CHANNEL_ID_FIXED;
+        return cfg;
+      }
+
+      function applySettings(values){
+        for(const key of SETTINGS_FIELDS){
+          const el = $(key);
+          if(!el) continue;
+          if(typeof values[key] === 'string') el.value = values[key];
+        }
+        const channelInput = $('bandChannelId');
+        if(channelInput) channelInput.value = BAND_CHANNEL_ID_FIXED;
+      }
+
+      function loadSettings(){
+        let saved = {};
+        try{
+          saved = JSON.parse(localStorage.getItem(LS_SETTINGS_KEY) || '{}') || {};
+        }catch(_){
+          saved = {};
+        }
+        if(!saved || typeof saved !== 'object'){
+          saved = {};
+        }
+        if(!String(saved.bandCookiesRead || '').trim() && String(saved.bandCookiesPost || '').trim()){
+          saved.bandCookiesRead = String(saved.bandCookiesPost || '');
+        }
+        saved.bandChannelId = BAND_CHANNEL_ID_FIXED;
+        delete saved.bandCookiesPost;
+        delete saved.bandCsrfPost;
+        delete saved.bandCsrfSearch;
+        delete saved.bandCsrfAdmin;
+        delete saved.bandReadChannelId;
+        delete saved.bandPostChannelId;
+        delete saved.groupAndroidId;
+        delete saved.groupIosId;
+        return Object.assign({}, DEFAULTS, saved);
+      }
+
+      function saveSettings(){
+        try{
+          localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(collectSettings()));
+        }catch(_){ }
+      }
+
+      function applyResultsCollapseState(){
+        const collapsed = !!appState.resultsCollapsed;
+        if(resultsBody) resultsBody.style.display = collapsed ? 'none' : '';
+        if(resultsCollapseBtn) resultsCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        if(resultsCollapseIco) resultsCollapseIco.textContent = collapsed ? '▸' : '▾';
+        if(resultsCollapseText) resultsCollapseText.textContent = collapsed ? 'Показать' : 'Скрыть';
+      }
+
+      function applyPingCollapseState(){
+        const collapsed = !!appState.pingCollapsed;
+        if(pingBody) pingBody.style.display = collapsed ? 'none' : '';
+        if(pingCollapseBtn) pingCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        if(pingCollapseIco) pingCollapseIco.textContent = collapsed ? '▸' : '▾';
+        if(pingCollapseText) pingCollapseText.textContent = collapsed ? 'Показать' : 'Скрыть';
+      }
+
+      function resetWorkflowState(){
+        appState.workflowCurrentIndex = 0;
+        appState.workflowStatuses = WORKFLOW_STEPS.map(() => 'pending');
+        appState.workflowRunning = false;
+        appState.workflowPingFound = false;
+        renderWorkflow();
+      }
+
+      function workflowStatusMeta(status){
+        if(status === 'done') return { icon: '✅', text: 'Выполнено', badgeClass: 'text-emerald-700 bg-emerald-50 ring-emerald-200' };
+        if(status === 'skipped') return { icon: '❌', text: 'Пропущено', badgeClass: 'text-rose-700 bg-rose-50 ring-rose-200' };
+        if(status === 'running') return { icon: '⏳', text: 'Выполняется', badgeClass: 'text-amber-700 bg-amber-50 ring-amber-200' };
+        return { icon: '○', text: 'Ожидает', badgeClass: 'text-slate-500 bg-white/80 ring-[#ecebff]' };
+      }
+
+      function renderWorkflow(){
+        if(!workflowList) return;
+
+        const finished = appState.workflowCurrentIndex >= WORKFLOW_STEPS.length;
+        if(workflowHint){
+          if(finished){
+            workflowHint.textContent = 'Все шаги пройдены. Можно запускать следующий цикл.';
+            workflowHint.className = 'release-launch-status release-launch-status-ok';
+          }else if(!appState.lastRun){
+            workflowHint.textContent = 'Начните сбор дежурных и дождитесь выполнения, затем переходите к шагам.';
+            workflowHint.className = 'release-launch-status release-launch-status-warn';
+          }else{
+            const current = WORKFLOW_STEPS[appState.workflowCurrentIndex];
+            workflowHint.textContent = `Текущий шаг: ${current.code} — ${current.title}`;
+            workflowHint.className = 'release-launch-status release-launch-status-muted';
+          }
+        }
+
+        workflowList.innerHTML = WORKFLOW_STEPS.map((step, idx) => {
+          const status = appState.workflowStatuses[idx] || 'pending';
+          const meta = workflowStatusMeta(status);
+          const isCurrent = !finished && idx === appState.workflowCurrentIndex;
+          const isLockedByCollection = idx === 0 && !appState.lastRun;
+          const isLockedBySequence = !finished && status === 'pending' && idx > appState.workflowCurrentIndex;
+          const isLockedByRules = isLockedByCollection || isLockedBySequence;
+          const statusIcon = isLockedByRules ? '🔒' : meta.icon;
+          const statusText = isLockedByRules ? 'Заблокирован' : meta.text;
+          const statusBadgeClass = isLockedByRules
+            ? 'text-slate-500 bg-slate-100 ring-slate-200'
+            : meta.badgeClass;
+          const rowClass = status === 'done'
+            ? 'ring-1 ring-emerald-200 bg-emerald-50/70'
+            : status === 'skipped'
+              ? 'ring-1 ring-rose-200 bg-rose-50/70'
+              : isCurrent
+                ? 'ring-1 ring-[#d9d8ff] bg-white release-launch-workflow-row-current'
+                : isLockedByRules
+                  ? 'ring-1 ring-slate-200 bg-slate-100/80 release-launch-workflow-row-locked'
+                  : 'ring-1 ring-[#ecebff] bg-slate-50/70';
+          const locked = appState.running || appState.workflowRunning || finished || !isCurrent || status !== 'pending' || isLockedByCollection;
+          const yesDisabled = locked ? 'disabled' : '';
+          const noDisabled = locked ? 'disabled' : '';
+          const blockedComment = isLockedByCollection
+            ? '<div class="text-[11px] mt-1 text-slate-500">Начните сбор дежурных и дождитесь выполнения</div>'
+            : '';
+          const pingFoundComment = (idx === 0 && appState.workflowPingFound)
+            ? '<div class="text-[11px] mt-1 text-emerald-700">Сообщение пинг-найдено</div>'
+            : '';
+          return `
+            <div class="rounded-2xl p-3 release-launch-workflow-row ${rowClass}">
+              <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div class="flex items-start gap-3 min-w-[260px]">
+                  <span class="text-base leading-6">${statusIcon}</span>
+                  <div>
+                    <div class="text-sm font-semibold text-slate-800">${step.code}. ${escHtml(step.title)}</div>
+                    <span class="inline-flex items-center mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ring-1 ${statusBadgeClass}">${statusText}</span>
+                    ${blockedComment}
+                    ${pingFoundComment}
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" class="btn btn-grad release-launch-workflow-yes" data-workflow-step="${idx}" data-workflow-decision="yes" ${yesDisabled}>Да</button>
+                  <button type="button" class="btn btn-soft" data-workflow-step="${idx}" data-workflow-decision="no" ${noDisabled}>Нет</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        if(workflowResetBtn){
+          workflowResetBtn.disabled = appState.running || appState.workflowRunning;
+        }
+      }
+
+      async function runWorkflowStepAction(action){
+        if(action === 'publishPing'){
+          if(!appState.lastRun) throw new Error('Сначала запусти сбор');
+          if(!String(pingMessage.value || '').trim()){
+            log('[Шаг 1] Публикация запроса не требуется: все дежурные найдены.', 'ok');
+            showToast('Шаг 1: публикация не требуется');
+            return;
+          }
+          await publishPing();
+          return;
+        }
+        if(action === 'publishMissing'){
+          if(!appState.lastRun) throw new Error('Сначала запусти сбор');
+          await publishMissingPosts();
+          return;
+        }
+        if(action === 'findIds'){
+          if(!appState.lastRun) throw new Error('Сначала запусти сбор');
+          await findUserIds();
+          return;
+        }
+        if(action === 'clearGroups'){
+          await clearGroups({ skipConfirm: true });
+          return;
+        }
+        if(action === 'addGroups'){
+          await addGroups();
+          return;
+        }
+        throw new Error('Неизвестный шаг сценария');
+      }
+
+      async function applyWorkflowDecision(stepIdx, decision){
+        if(appState.running || appState.workflowRunning) return;
+        if(!Number.isFinite(stepIdx)) return;
+        if(stepIdx < 0 || stepIdx >= WORKFLOW_STEPS.length) return;
+        if(stepIdx !== appState.workflowCurrentIndex) return;
+        if(appState.workflowStatuses[stepIdx] !== 'pending') return;
+
+        const step = WORKFLOW_STEPS[stepIdx];
+
+        if(decision === 'no'){
+          appState.workflowStatuses[stepIdx] = 'skipped';
+          appState.workflowCurrentIndex += 1;
+          log(`[${step.code}] Пропущено по решению пользователя.`, 'warn');
+          renderWorkflow();
+          if(appState.workflowCurrentIndex >= WORKFLOW_STEPS.length){
+            showToast('Все шаги сценария пройдены');
+          }
+          return;
+        }
+
+        if(decision !== 'yes') return;
+
+        appState.workflowRunning = true;
+        appState.workflowStatuses[stepIdx] = 'running';
+        renderWorkflow();
+
+        try{
+          await runWorkflowStepAction(step.action);
+          appState.workflowStatuses[stepIdx] = 'done';
+          appState.workflowCurrentIndex += 1;
+          log(`[${step.code}] Выполнено.`, 'ok');
+          if(appState.workflowCurrentIndex >= WORKFLOW_STEPS.length){
+            showToast('Все шаги сценария пройдены');
+          }
+        }catch(error){
+          appState.workflowStatuses[stepIdx] = 'pending';
+          throw error;
+        }finally{
+          appState.workflowRunning = false;
+          renderWorkflow();
+          refreshButtons();
+        }
+      }
+
+      function collectDetailsState(){
+        return {
+          resultsCollapsed: !!appState.resultsCollapsed,
+          pingCollapsed: !!appState.pingCollapsed
+        };
+      }
+
+      function loadDetailsState(){
+        let saved = {};
+        try{
+          saved = JSON.parse(localStorage.getItem(LS_DETAILS_STATE_KEY) || '{}') || {};
+        }catch(_){
+          saved = {};
+        }
+        if(!saved || typeof saved !== 'object'){
+          return {};
+        }
+        return saved;
+      }
+
+      function applyDetailsState(values){
+        if(typeof values.resultsCollapsed === 'boolean'){
+          appState.resultsCollapsed = values.resultsCollapsed;
+        }
+        if(typeof values.pingCollapsed === 'boolean'){
+          appState.pingCollapsed = values.pingCollapsed;
+        }
+        applyResultsCollapseState();
+        applyPingCollapseState();
+      }
+
+      function saveDetailsState(){
+        try{
+          localStorage.setItem(LS_DETAILS_STATE_KEY, JSON.stringify(collectDetailsState()));
+        }catch(_){ }
+      }
+
+      let saveTimer = null;
+      function scheduleSave(){
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveSettings, 220);
+      }
+
+      function getMmCsrfFromCookies(cookieStr){
+        const parts = String(cookieStr || '').split(';').map((s) => s.trim()).filter(Boolean);
+        for(const p of parts){
+          const i = p.indexOf('=');
+          if(i === -1) continue;
+          const k = p.slice(0, i).trim();
+          const v = p.slice(i + 1).trim();
+          if(k === 'MMCSRF') return v;
+        }
+        return '';
+      }
+
+      async function proxyRequestJson(method, targetUrl, headers, body, signal){
+        const p = new URL(PROXY_BASE + '/proxy');
+        p.searchParams.set('url', targetUrl);
+
+        const opts = { method, headers: headers || {}, signal };
+        if(body !== undefined){
+          opts.body = (typeof body === 'string') ? body : JSON.stringify(body);
+        }
+
+        let r;
+        try{
+          r = await fetch(p.toString(), opts);
+        }catch(error){
+          const msg = error && error.message ? error.message : String(error);
+          throw new Error(`Сетевой/CORS блок для proxy ${targetUrl}: ${msg}`);
+        }
+
+        if(!r.ok){
+          const err = new Error(`Proxy HTTP ${r.status}`);
+          err.status = r.status;
+          try{ err.body = await r.text(); }catch(_){}
+          throw err;
+        }
+
+        const ct = String(r.headers.get('content-type') || '').toLowerCase();
+        if(ct.includes('application/json')){
+          return r.json();
+        }
+        const txt = await r.text();
+        try{ return JSON.parse(txt); }catch(_){ return { raw: txt }; }
+      }
+
+      async function checkProxy(){
+        const base = PROXY_BASE.replace(/\/+$/, '');
+        const r = await fetch(base + '/health', { cache: 'no-store' });
+        let js = null;
+        try{
+          js = await r.json();
+        }catch(_){
+          js = null;
+        }
+        if(!r.ok){
+          throw new Error(`HTTP ${r.status}`);
+        }
+        const ok = !!(js && js.ok === true && Number(js.port) === 8787);
+        if(!ok){
+          throw new Error('Неожиданный ответ /health');
+        }
+        log(`Прокси OK (порт ${js.port}).`, 'ok');
+        showToast(`Прокси OK (порт ${js.port})`);
+      }
+
+      async function httpRequest(rawUrl, opts){
+        const options = opts || {};
+        const method = options.method || 'GET';
+        const headers = new Headers(options.headers || {});
+        const body = options.body;
+        const signal = options.signal;
+        const credentials = options.credentials;
+        const rawCookie = options.cookie;
+
+        if(rawCookie !== undefined && rawCookie !== null && String(rawCookie).length > 0){
+          const cookieExact = String(rawCookie);
+          // Для proxy-сценария: прокси подставляет это значение в Cookie upstream-запроса.
+          headers.set('X-Proxy-Cookie', cookieExact);
+          // Для сред, где разрешено, пробуем передать и стандартный Cookie.
+          try { headers.set('Cookie', cookieExact); } catch (_) {}
+        }
+        if(body != null && !headers.has('Content-Type')){
+          headers.set('Content-Type', 'application/json');
+        }
+
+        const init = {
+          method,
+          headers,
+          signal,
+          cache: 'no-store'
+        };
+
+        if(credentials){
+          init.credentials = credentials;
+        }
+
+        if(body != null){
+          init.body = (typeof body === 'string') ? body : JSON.stringify(body);
+        }
+
+        let res;
+        try{
+          res = await fetch(rawUrl, init);
+        }catch(error){
+          const msg = error && error.message ? error.message : String(error);
+          throw new Error(`Сетевой/CORS блок для ${rawUrl}: ${msg}`);
+        }
+        const text = await res.text();
+        const json = safeJson(text);
+
+        if(!res.ok){
+          const details = text ? `: ${text.slice(0, 300)}` : '';
+          throw new Error(`${method} ${rawUrl} -> HTTP ${res.status}${details}`);
+        }
+
+        return { status: res.status, text, json };
+      }
+
+      async function httpJson(rawUrl, opts){
+        const resp = await httpRequest(rawUrl, opts);
+        if(resp.json === null){
+          throw new Error(`Ответ не JSON для ${rawUrl}`);
+        }
+        return resp.json;
+      }
+
+      function allureHeaders(){
+        return {
+          'Accept': 'application/json',
+          'Authorization': `Api-Token ${ALLURE_API_TOKEN}`,
+          'X-ALLURE-API-TOKEN': ALLURE_API_TOKEN,
+          'allure-api-token': ALLURE_API_TOKEN
+        };
+      }
+
+      function parseStreamsFromLeafJson(data){
+        const content = (data && Array.isArray(data.content)) ? data.content : [];
+        const names = [];
+        for(const item of content){
+          const nm = (item && typeof item.name === 'string') ? item.name.trim() : '';
+          if(nm) names.push(nm);
+        }
+        return dedupKeepOrder(names);
+      }
+
+      async function fetchStreams(signal){
+        let page = 0;
+        let guard = 0;
+        const allNames = [];
+
+        while(true){
+          const url = new URL(ALLURE_TESTPLAN_LEAF_URL);
+          url.searchParams.set('page', String(page));
+
+          const data = await httpJson(url.toString(), {
+            method: 'GET',
+            headers: allureHeaders(),
+            signal
+          });
+
+          allNames.push(...parseStreamsFromLeafJson(data));
+
+          const last = data && data.last === true;
+          const totalPages = data && Number.isInteger(data.totalPages) ? data.totalPages : null;
+          if(last) break;
+          if(totalPages !== null && page >= totalPages - 1) break;
+
+          page += 1;
+          guard += 1;
+          if(guard > 50) break;
+        }
+
+        return dedupKeepOrder(allNames.map((x) => String(x || '').trim()).filter(Boolean));
+      }
+
+      function normalizeLeadsData(raw){
+        if(!raw || typeof raw !== 'object' || Array.isArray(raw)){
+          throw new Error('JSON лидов должен быть объектом вида {"@handle": ["Stream"]}');
+        }
+
+        const out = {};
+        for(const [key, value] of Object.entries(raw)){
+          if(typeof key !== 'string') continue;
+          const k = key.trim();
+          if(!k) continue;
+
+          if(Array.isArray(value)){
+            out[k] = value.map((v) => String(v || '').trim()).filter(Boolean);
+          }else{
+            const single = String(value || '').trim();
+            out[k] = single ? [single] : [];
+          }
+        }
+        return out;
+      }
+
+      async function fetchQaLeads(signal){
+        const resp = await httpRequest(QA_LEADS_SCRIPT_URL, {
+          method: 'GET',
+          signal
+        });
+
+        const payload = resp.json || safeJson(resp.text);
+        if(payload == null){
+          throw new Error('Не удалось распарсить JSON лидов QA');
+        }
+
+        // Поддержка нескольких форматов ответа от Apps Script:
+        // 1) {"@lead":["Stream"]} 2) {"data": {...}} 3) {"leads": {...}}
+        let leadsRaw = payload;
+        if(payload && typeof payload === 'object' && !Array.isArray(payload)){
+          if(payload.leads && typeof payload.leads === 'object' && !Array.isArray(payload.leads)){
+            leadsRaw = payload.leads;
+          }else if(payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)){
+            leadsRaw = payload.data;
+          }
+        }
+
+        return normalizeLeadsData(leadsRaw);
+      }
+
+      function buildHardcodedAliases(){
+        const out = {};
+        for(const [key, val] of Object.entries(STREAM_ALIASES)){
+          if(typeof key !== 'string') continue;
+          const kk = key.trim();
+          if(!kk) continue;
+          if(!Array.isArray(val)) continue;
+          out[kk] = val.map((x) => String(x || '').trim()).filter(Boolean);
+        }
+        return out;
+      }
+
+      function buildHardcodedExcludeSet(){
+        return new Set(EXCLUDED_STREAMS.map((x) => norm(x)));
+      }
+
+      function buildStreamNorm2Canonical(allStreams, streamAliases){
+        const norm2orig = {};
+        for(const stream of allStreams){
+          const fullNorm = norm(stream);
+          if(fullNorm) norm2orig[fullNorm] = stream;
+          const fullLoose = normLoose(stream);
+          if(fullLoose && !norm2orig[fullLoose]){
+            norm2orig[fullLoose] = stream;
+          }
+
+          // Сообщения часто без префикса "[Финтех]" — добавляем и такой ключ.
+          const shortNorm = norm(displayStreamName(stream));
+          if(shortNorm && !norm2orig[shortNorm]){
+            norm2orig[shortNorm] = stream;
+          }
+          const shortLoose = normLoose(displayStreamName(stream));
+          if(shortLoose && !norm2orig[shortLoose]){
+            norm2orig[shortLoose] = stream;
+          }
+        }
+
+        const out = Object.assign({}, norm2orig);
+
+        for(const [canonical, aliases] of Object.entries(streamAliases || {})){
+          let canonicalReal = '';
+          const canonicalNorm = norm(canonical);
+
+          if(norm2orig[canonicalNorm]){
+            canonicalReal = norm2orig[canonicalNorm];
+          }else{
+            for(const alias of aliases || []){
+              const aliasNorm = norm(alias);
+              if(norm2orig[aliasNorm]){
+                canonicalReal = norm2orig[aliasNorm];
+                break;
+              }
+            }
+          }
+
+          if(!canonicalReal) continue;
+
+          if(canonicalNorm) out[canonicalNorm] = canonicalReal;
+          const canonicalLoose = normLoose(canonical);
+          if(canonicalLoose) out[canonicalLoose] = canonicalReal;
+          out[norm(canonicalReal)] = canonicalReal;
+          const canonicalRealLoose = normLoose(canonicalReal);
+          if(canonicalRealLoose) out[canonicalRealLoose] = canonicalReal;
+          for(const alias of aliases || []){
+            const aliasNorm = norm(alias);
+            if(aliasNorm) out[aliasNorm] = canonicalReal;
+            const aliasLoose = normLoose(alias);
+            if(aliasLoose) out[aliasLoose] = canonicalReal;
+          }
+        }
+
+        return out;
+      }
+
+      function buildLeadIndex(leads, streamNorm2Canonical){
+        const leadByStreamNorm = new Map();
+        const coreAndroid = new Set();
+        const coreIos = new Set();
+
+        for(const [handleRaw, streams] of Object.entries(leads || {})){
+          if(typeof handleRaw !== 'string') continue;
+          let handle = handleRaw.trim();
+          if(!handle) continue;
+          if(!handle.startsWith('@')) handle = '@' + handle;
+
+          for(const streamRaw of (Array.isArray(streams) ? streams : [])){
+            const stream = String(streamRaw || '').trim();
+            if(!stream) continue;
+            const nrm = norm(stream);
+
+            if(nrm === norm('Core Android')){
+              coreAndroid.add(handle);
+              continue;
+            }
+            if(nrm === norm('Core iOS')){
+              coreIos.add(handle);
+              continue;
+            }
+
+            const canonical = streamNorm2Canonical[nrm] || stream;
+            const key = norm(canonical);
+            if(!leadByStreamNorm.has(key)) leadByStreamNorm.set(key, new Set());
+            leadByStreamNorm.get(key).add(handle);
+          }
+        }
+
+        return { leadByStreamNorm, coreAndroid, coreIos };
+      }
+
+      function leadsForStream(streamCanonical, platform, leadIndex){
+        if(norm(streamCanonical) === norm('Core')){
+          const chosen = platform === 'Android' ? leadIndex.coreAndroid : leadIndex.coreIos;
+          return Array.from(chosen).sort();
+        }
+
+        const values = leadIndex.leadByStreamNorm.get(norm(streamCanonical));
+        return values ? Array.from(values).sort() : [];
+      }
+
+      function unwrapBandPostsPayload(raw){
+        let node = raw;
+        for(let i = 0; i < 4; i += 1){
+          if(node && typeof node === 'object' && node.posts && typeof node.posts === 'object'){
+            return node;
+          }
+
+          if(node && typeof node === 'object' && node.body !== undefined){
+            if(typeof node.body === 'string'){
+              const parsed = safeJson(node.body);
+              if(parsed && typeof parsed === 'object'){
+                node = parsed;
+                continue;
+              }
+            }else if(node.body && typeof node.body === 'object'){
+              node = node.body;
+              continue;
+            }
+          }
+
+          if(node && typeof node === 'object' && node.data && typeof node.data === 'object'){
+            node = node.data;
+            continue;
+          }
+
+          break;
+        }
+        return (raw && typeof raw === 'object') ? raw : {};
+      }
+
+      async function fetchBandMessagesSince(sinceMs, cfg, signal){
+        const channel = String(cfg.bandChannelId || '').trim();
+        if(!channel) throw new Error('Заполни Канал SWAT QA');
+
+        const url = `https://band.wb.ru/api/v4/channels/${encodeURIComponent(channel)}/posts?since=${sinceMs}&skipFetchThreads=false&collapsedThreads=true&collapsedThreadsExtended=false`;
+        const headers = {
+          'Accept': 'application/json',
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+        const data = await proxyRequestJson('GET', url, headers, undefined, signal);
+        const payload = unwrapBandPostsPayload(data);
+
+        const postsMap = payload && payload.posts && typeof payload.posts === 'object' ? payload.posts : {};
+        const order = Array.isArray(payload && payload.order) ? payload.order : [];
+        const rawPosts = [];
+
+        if(order.length){
+          const used = new Set();
+          for(const id of order){
+            if(typeof id !== 'string') continue;
+            const post = postsMap[id];
+            if(post && typeof post === 'object'){
+              rawPosts.push(post);
+              used.add(id);
+            }
+          }
+          for(const [id, post] of Object.entries(postsMap)){
+            if(used.has(id)) continue;
+            if(post && typeof post === 'object') rawPosts.push(post);
+          }
+        }else{
+          rawPosts.push(...Object.values(postsMap));
+        }
+
+        const messages = [];
+
+        for(const post of rawPosts){
+          const deletedAt = post && Number(post.delete_at);
+          if(Number.isFinite(deletedAt) && deletedAt > 0) continue;
+          const created = post && Number(post.create_at);
+          if(Number.isFinite(created) && created < sinceMs) continue;
+          const msg = post && typeof post.message === 'string' ? post.message.trim() : '';
+          if(msg) messages.push(msg);
+        }
+
+        return messages;
+      }
+
+      function toHandle(value){
+        const v = String(value || '').trim().replace(/^@+/, '');
+        return v ? '@' + v : '';
+      }
+
+      function matchStream(rawName, streamNorm2Canonical){
+        const cleaned = String(rawName || '')
+          .replace(/^[«"'\s]+|[»"'\s]+$/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const keyNorm = norm(cleaned);
+        if(streamNorm2Canonical[keyNorm]) return streamNorm2Canonical[keyNorm];
+        const keyLoose = normLoose(cleaned);
+        if(keyLoose && streamNorm2Canonical[keyLoose]) return streamNorm2Canonical[keyLoose];
+
+        let best = '';
+        let bestLen = -1;
+        for(const [aliasNorm, canonical] of Object.entries(streamNorm2Canonical)){
+          if(!aliasNorm) continue;
+          const strictHit = keyNorm && (keyNorm.includes(aliasNorm) || aliasNorm.includes(keyNorm));
+          const looseHit = keyLoose && (keyLoose.includes(aliasNorm) || aliasNorm.includes(keyLoose));
+          if(!strictHit && !looseHit) continue;
+          if(aliasNorm.length > bestLen){
+            best = canonical;
+            bestLen = aliasNorm.length;
+          }
+        }
+
+        return best || '';
+      }
+
+      function parseDuties(messages, allStreams, streamAliases){
+        const duties = {};
+        const streamNorm2Canonical = buildStreamNorm2Canonical(allStreams, streamAliases);
+        const unmatchedStreams = new Set();
+        let quotedBlocks = 0;
+        let otBlocks = 0;
+        let headerBlocks = 0;
+        let inlineBlocks = 0;
+
+        const ensureRow = (streamName) => {
+          if(!duties[streamName]) duties[streamName] = { Android: '', iOS: '' };
+          return duties[streamName];
+        };
+
+        for(const msg of messages){
+          for(const m of msg.matchAll(RE_BLOCK_QUOTED)){
+            quotedBlocks += 1;
+            const streamRaw = String(m[1] || '').trim();
+            const body = String(m[2] || '');
+            const streamName = matchStream(streamRaw, streamNorm2Canonical);
+            if(!streamName){
+              if(RE_ANDROID.test(body) || RE_IOS.test(body)){
+                unmatchedStreams.add(streamRaw);
+              }
+              continue;
+            }
+
+            const row = ensureRow(streamName);
+            const ma = body.match(RE_ANDROID);
+            const mi = body.match(RE_IOS);
+            if(ma) row.Android = toHandle(ma[1]);
+            if(mi) row.iOS = toHandle(mi[1]);
+          }
+        }
+
+        for(const msg of messages){
+          for(const m of msg.matchAll(RE_BLOCK_OT)){
+            otBlocks += 1;
+            const streamRaw = String(m[1] || '').trim();
+            const body = String(m[2] || '');
+            const streamName = matchStream(streamRaw, streamNorm2Canonical);
+            if(!streamName){
+              if(RE_ANDROID.test(body) || RE_IOS.test(body)){
+                unmatchedStreams.add(streamRaw);
+              }
+              continue;
+            }
+
+            const row = ensureRow(streamName);
+            const ma = body.match(RE_ANDROID);
+            const mi = body.match(RE_IOS);
+            if(ma && !row.Android) row.Android = toHandle(ma[1]);
+            if(mi && !row.iOS) row.iOS = toHandle(mi[1]);
+          }
+        }
+
+        for(const msg of messages){
+          for(const m of msg.matchAll(RE_BLOCK_HEADER)){
+            headerBlocks += 1;
+            const header = String(m[1] || '').trim();
+            const body = String(m[2] || '');
+            const streamName = matchStream(header, streamNorm2Canonical);
+            if(!streamName){
+              if(RE_ANDROID.test(body) || RE_IOS.test(body)){
+                unmatchedStreams.add(header);
+              }
+              continue;
+            }
+
+            const row = ensureRow(streamName);
+            const ma = body.match(RE_ANDROID);
+            const mi = body.match(RE_IOS);
+            if(ma && !row.Android) row.Android = toHandle(ma[1]);
+            if(mi && !row.iOS) row.iOS = toHandle(mi[1]);
+          }
+        }
+
+        for(const msg of messages){
+          for(const m of msg.matchAll(RE_INLINE_FREE)){
+            inlineBlocks += 1;
+            const rawName = String(m[1] || '').replace(/\s+/g, ' ').trim();
+            const person = toHandle(m[2]);
+            if(!rawName || !person) continue;
+
+            const tokens = rawName.split(/\s+/).filter(Boolean);
+            let platform = '';
+            let baseStream = rawName;
+
+            if(tokens.length){
+              const last = norm(tokens[tokens.length - 1]);
+              if(last === 'android' || last === 'andr' || last === 'ios'){
+                platform = (last === 'ios') ? 'iOS' : 'Android';
+                baseStream = tokens.slice(0, -1).join(' ').trim();
+              }
+            }
+
+            const streamName = matchStream(baseStream, streamNorm2Canonical);
+            if(!streamName){
+              unmatchedStreams.add(baseStream);
+              continue;
+            }
+            const row = ensureRow(streamName);
+            if(platform) row[platform] = person;
+          }
+        }
+
+        let iosFilled = 0;
+        let androidFilled = 0;
+        for(const row of Object.values(duties)){
+          if(row && row.iOS) iosFilled += 1;
+          if(row && row.Android) androidFilled += 1;
+        }
+
+        return {
+          duties,
+          stats: {
+            matchedStreams: Object.keys(duties).length,
+            iosFilled,
+            androidFilled,
+            quotedBlocks,
+            otBlocks,
+            headerBlocks,
+            inlineBlocks,
+            unmatchedSamples: Array.from(unmatchedStreams).slice(0, 8)
+          }
+        };
+      }
+
+      function displayStreamName(streamName){
+        return String(streamName || '').replace(FINTECH_PREFIX_RE, '').trim();
+      }
+
+      function buildRows(allStreams, duties, leadIndex, excludeSet){
+        const rows = [];
+
+        const requiredPlatformsForStream = (streamName) => {
+          const title = norm(displayStreamName(streamName));
+          const hasCore = title.includes('core');
+          const hasIos = title.includes('ios') || title.includes('айос');
+          const hasAndroid = title.includes('android') || title.includes('andr') || title.includes('андроид');
+
+          if(hasCore && hasIos && !hasAndroid){
+            return { requireIos: true, requireAndroid: false };
+          }
+          if(hasCore && hasAndroid && !hasIos){
+            return { requireIos: false, requireAndroid: true };
+          }
+          return { requireIos: true, requireAndroid: true };
+        };
+
+        for(const stream of allStreams){
+          if(excludeSet.has(norm(stream))) continue;
+
+          const row = duties[stream] || {};
+          const iosDuty = String(row.iOS || '').trim();
+          const androidDuty = String(row.Android || '').trim();
+          // Лидов считаем всегда: они нужны для таблицы даже если дежурные уже найдены.
+          const iosLeads = leadsForStream(stream, 'iOS', leadIndex);
+          const androidLeads = leadsForStream(stream, 'Android', leadIndex);
+          const req = requiredPlatformsForStream(stream);
+          const missing = (req.requireIos && !iosDuty) || (req.requireAndroid && !androidDuty);
+
+          rows.push({
+            stream,
+            streamDisplay: displayStreamName(stream),
+            iosDuty,
+            androidDuty,
+            iosLeads,
+            androidLeads,
+            requireIos: req.requireIos,
+            requireAndroid: req.requireAndroid,
+            missing
+          });
+        }
+        return rows;
+      }
+
+      function buildPingRequestMessageForMissing(rows){
+        const missingRows = rows.filter((r) => r.missing);
+        if(!missingRows.length) return '';
+
+        const lines = [];
+        for(const row of missingRows){
+          const leadsOrdered = [];
+
+          if(row.requireIos && !row.iosDuty){
+            for(const handle of row.iosLeads){
+              if(!leadsOrdered.includes(handle)) leadsOrdered.push(handle);
+            }
+          }
+
+          if(row.requireAndroid && !row.androidDuty){
+            for(const handle of row.androidLeads){
+              if(!leadsOrdered.includes(handle)) leadsOrdered.push(handle);
+            }
+          }
+
+          lines.push(`${row.streamDisplay} - ${leadsOrdered.join(' ')}`.trim());
+        }
+
+        const header = [
+          'Привет, просьба указать дежурных на ближайший релиз отдельным тредом по шаблону',
+          'Дежурный "Название_стрима"',
+          'iOS - @дежурный',
+          'Android - @дежурный'
+        ].join('\n');
+
+        const footer = '\n\nЕсли дежурных будет лид, тред создадим сами, можно самостоятельно его не присылать';
+        return `${header}\n\n${lines.join('\n')}${footer}`;
+      }
+
+      function buildCurrentDutiesCopyText(rows){
+        const source = Array.isArray(rows) ? rows : [];
+        if(!source.length) return '';
+
+        const iosLines = [];
+        const androidLines = [];
+
+        for(const row of source){
+          const stream = String(row.streamDisplay || row.stream || '').trim();
+          if(!stream) continue;
+          iosLines.push(`${stream} ${row.iosDuty || '?'}`);
+          androidLines.push(`${stream} ${row.androidDuty || '?'}`);
+        }
+
+        if(!iosLines.length && !androidLines.length) return '';
+
+        return [
+          '[iOS]',
+          ...iosLines,
+          '',
+          '[Android]',
+          ...androidLines
+        ].join('\n').trim();
+      }
+
+      function extractHandles(duties){
+        const android = new Set();
+        const ios = new Set();
+
+        for(const value of Object.values(duties || {})){
+          const a = String((value && value.Android) || '').trim();
+          const i = String((value && value.iOS) || '').trim();
+          if(a.startsWith('@')) android.add(a);
+          if(i.startsWith('@')) ios.add(i);
+        }
+
+        return { android, ios };
+      }
+
+      async function bandCreatePost(message, cfg, signal){
+        const channelId = String(cfg.bandChannelId || '').trim();
+        const userId = BAND_POST_USER_ID;
+        if(!channelId) throw new Error('Заполни Канал SWAT QA');
+        if(!userId) throw new Error('Не задан BAND_POST_USER_ID');
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesRead);
+
+        const nowMs = Date.now();
+        const payload = {
+          file_ids: [],
+          message,
+          channel_id: channelId,
+          root_id: '',
+          pending_post_id: `${userId}:${nowMs}`,
+          user_id: userId,
+          create_at: 0,
+          metadata: {},
+          props: {},
+          update_at: nowMs,
+          reply_count: 0
+        };
+
+        const headers = {
+          'Accept': '*/*',
+          'Accept-Language': 'ru',
+          'Content-Type': 'application/json',
+          'Origin': 'https://band.wb.ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+        await proxyRequestJson('POST', 'https://band.wb.ru/api/v4/posts', headers, payload, signal);
+      }
+
+      async function bandSearchUserIds(handles, cfg, signal){
+        const out = {};
+        if(!handles.size) return out;
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesRead);
+
+        for(const handle of Array.from(handles).sort()){
+          const headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+            [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+          };
+          const data = await proxyRequestJson(
+            'POST',
+            'https://band.wb.ru/api/v4/users/search',
+            headers,
+            { term: handle, team_id: '' },
+            signal
+          );
+
+          if(Array.isArray(data)){
+            const wanted = handle.replace(/^@+/, '');
+            let foundId = '';
+
+            for(const user of data){
+              if(user && user.username === wanted && typeof user.id === 'string'){
+                foundId = user.id;
+                break;
+              }
+            }
+
+            if(!foundId && data.length && data[0] && typeof data[0].id === 'string'){
+              foundId = data[0].id;
+            }
+
+            if(foundId) out[handle] = foundId;
+          }
+        }
+
+        return out;
+      }
+
+      async function bandGetGroupUserIds(groupId, cfg, signal){
+        const url = `https://band.wb.ru/api/v4/users?in_group=${encodeURIComponent(groupId)}&page=0&per_page=200&sort=`;
+        const headers = {
+          'Accept': 'application/json',
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesAdmin || '')
+        };
+        const data = await proxyRequestJson('GET', url, headers, undefined, signal);
+
+        const out = [];
+        if(Array.isArray(data)){
+          for(const user of data){
+            if(user && typeof user.id === 'string') out.push(user.id);
+          }
+        }
+        return out;
+      }
+
+      async function bandDeleteGroupMembersBulk(groupId, userIds, cfg, signal){
+        if(!Array.isArray(userIds) || !userIds.length) return;
+        const url = `https://band.wb.ru/api/v4/groups/${encodeURIComponent(groupId)}/members`;
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesAdmin);
+        const headers = {
+          'Accept': '*/*',
+          'Accept-Language': 'en',
+          'Content-Type': 'application/json',
+          'Origin': 'https://band.wb.ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesAdmin || '')
+        };
+        await proxyRequestJson('DELETE', url, headers, { user_ids: userIds }, signal);
+      }
+
+      async function bandAddGroupMembers(groupId, userIds, cfg, signal){
+        if(!Array.isArray(userIds) || !userIds.length) return;
+        const url = `https://band.wb.ru/api/v4/groups/${encodeURIComponent(groupId)}/members`;
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesAdmin);
+        const headers = {
+          'Accept': '*/*',
+          'Accept-Language': 'en',
+          'Content-Type': 'application/json',
+          'Origin': 'https://band.wb.ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesAdmin || '')
+        };
+        await proxyRequestJson('POST', url, headers, { user_ids: userIds }, signal);
+      }
+
+      function renderResults(rows){
+        const displayRows = [];
+
+        for(const row of rows){
+          const isCoreStream = norm(row.streamDisplay || row.stream) === norm('Core');
+          if(isCoreStream){
+            displayRows.push({
+              streamDisplay: 'Core iOS',
+              iosDuty: row.iosDuty,
+              androidDuty: '',
+              leadText: (row.iosLeads || []).join(' '),
+              requireIos: true,
+              requireAndroid: false,
+              missing: !row.iosDuty
+            });
+            displayRows.push({
+              streamDisplay: 'Core Android',
+              iosDuty: '',
+              androidDuty: row.androidDuty,
+              leadText: (row.androidLeads || []).join(' '),
+              requireIos: false,
+              requireAndroid: true,
+              missing: !row.androidDuty
+            });
+            continue;
+          }
+
+          const mergedLeads = dedupKeepOrder([...(row.iosLeads || []), ...(row.androidLeads || [])]);
+          displayRows.push({
+            streamDisplay: row.streamDisplay,
+            iosDuty: row.iosDuty,
+            androidDuty: row.androidDuty,
+            leadText: mergedLeads.join(' '),
+            requireIos: row.requireIos !== false,
+            requireAndroid: row.requireAndroid !== false,
+            missing: row.missing
+          });
+        }
+
+        // В таблице сначала показываем стримы с пропусками, затем заполненные.
+        // Внутри групп сохраняем исходный порядок.
+        const sortedRows = displayRows
+          .map((row, idx) => ({ row, idx }))
+          .sort((a, b) => {
+            if(a.row.missing !== b.row.missing){
+              return a.row.missing ? -1 : 1;
+            }
+            return a.idx - b.idx;
+          })
+          .map((x) => x.row);
+
+        const total = sortedRows.length;
+        const missing = sortedRows.filter((r) => r.missing).length;
+        const filled = total - missing;
+
+        kpiStreams.textContent = String(total);
+        kpiMissing.textContent = String(missing);
+        kpiFilled.textContent = String(filled);
+
+        if(!rows.length){
+          resultsWrap.style.display = 'none';
+          resultsEmpty.style.display = '';
+          resultsEmpty.textContent = 'Нет данных для отображения';
+          resultsTbody.innerHTML = '';
+          return;
+        }
+
+        resultsWrap.style.display = '';
+        resultsEmpty.style.display = 'none';
+
+        const html = sortedRows.map((row, idx) => {
+          const iosDuty = row.iosDuty
+            ? escHtml(row.iosDuty)
+            : (row.requireIos ? '<span class="release-launch-missing">- ?</span>' : '<span class="release-launch-muted">—</span>');
+          const andDuty = row.androidDuty
+            ? escHtml(row.androidDuty)
+            : (row.requireAndroid ? '<span class="release-launch-missing">- ?</span>' : '<span class="release-launch-muted">—</span>');
+          const leadCell = row.leadText ? escHtml(row.leadText) : '<span class="release-launch-muted">—</span>';
+          const stateBadge = row.missing
+            ? '<span class="release-launch-state-ico release-launch-state-ico-miss" title="Не найден" aria-label="Не найден">✕</span>'
+            : '<span class="release-launch-state-ico release-launch-state-ico-ok" title="Найден" aria-label="Найден">✓</span>';
+
+          return `
+            <tr class="${row.missing ? 'release-launch-row-missing' : ''}">
+              <td>${idx + 1}</td>
+              <td>${escHtml(row.streamDisplay)}</td>
+              <td>${iosDuty}</td>
+              <td>${andDuty}</td>
+              <td>${leadCell}</td>
+              <td class="release-launch-status-cell">${stateBadge}</td>
+            </tr>
+          `;
+        }).join('');
+
+        resultsTbody.innerHTML = html;
+      }
+
+      function renderCandidates(handles){
+        return {
+          android: Array.from((handles && handles.android) || []).sort(),
+          ios: Array.from((handles && handles.ios) || []).sort()
+        };
+      }
+
+      function renderIds(){
+        const andEntries = Object.entries(appState.androidIdMap || {}).sort((a, b) => a[0].localeCompare(b[0], 'ru'));
+        const iosEntries = Object.entries(appState.iosIdMap || {}).sort((a, b) => a[0].localeCompare(b[0], 'ru'));
+        return { andEntries, iosEntries };
+      }
+
+      function refreshButtons(){
+        if(resultsCopyBtn){
+          const hasRows = !!(appState.lastRun && Array.isArray(appState.lastRun.rows) && appState.lastRun.rows.length);
+          resultsCopyBtn.disabled = appState.running || !hasRows;
+        }
+        renderWorkflow();
+      }
+
+      function applyWorkflowAutoDoneForFoundDuties(rows, options){
+        const list = Array.isArray(rows) ? rows : [];
+        if(!list.length) return false;
+        if(!list.every((row) => row && row.missing === false)) return false;
+        const keepCurrentStep = !!(options && options.keepCurrentStep);
+
+        if(!Array.isArray(appState.workflowStatuses) || appState.workflowStatuses.length < WORKFLOW_STEPS.length){
+          appState.workflowStatuses = WORKFLOW_STEPS.map(() => 'pending');
+        }
+
+        const changed = appState.workflowStatuses[0] !== 'done'
+          || appState.workflowStatuses[1] !== 'done'
+          || (!keepCurrentStep && appState.workflowCurrentIndex < 2);
+
+        appState.workflowStatuses[0] = 'done';
+        appState.workflowStatuses[1] = 'done';
+        if(!keepCurrentStep){
+          appState.workflowCurrentIndex = Math.max(appState.workflowCurrentIndex, 2);
+        }
+
+        return changed;
+      }
+
+      function hasPingMessage(messages){
+        const list = Array.isArray(messages) ? messages : [];
+        for(const msg of list){
+          const txt = norm(String(msg || ''));
+          if(!txt) continue;
+          if(txt.includes('привет, просьба указать дежурных на ближайший релиз')
+            && txt.includes('дежурный "название_стрима"')){
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function applyWorkflowAutoDoneForPingMessage(messages){
+        const found = hasPingMessage(messages);
+        appState.workflowPingFound = found;
+        if(!found) return false;
+
+        if(!Array.isArray(appState.workflowStatuses) || appState.workflowStatuses.length < WORKFLOW_STEPS.length){
+          appState.workflowStatuses = WORKFLOW_STEPS.map(() => 'pending');
+        }
+
+        const changed = appState.workflowStatuses[0] !== 'done'
+          || appState.workflowCurrentIndex < 1;
+
+        appState.workflowStatuses[0] = 'done';
+        appState.workflowCurrentIndex = Math.max(appState.workflowCurrentIndex, 1);
+
+        return changed;
+      }
+
+      function resetOutput(){
+        resultsTbody.innerHTML = '';
+        resultsWrap.style.display = 'none';
+        resultsEmpty.style.display = '';
+        resultsEmpty.textContent = 'Сбор выполняется...';
+        kpiStreams.textContent = '0';
+        kpiFilled.textContent = '0';
+        kpiMissing.textContent = '0';
+
+        pingMessage.value = '';
+        appState.lastRun = null;
+        appState.androidIdMap = {};
+        appState.iosIdMap = {};
+        resetWorkflowState();
+        refreshButtons();
+      }
+
+      function setRunning(running){
+        appState.running = !!running;
+        startBtn.style.display = running ? 'none' : '';
+        stopBtn.style.display = running ? '' : 'none';
+        if(checkProxyBtn) checkProxyBtn.disabled = running;
+
+        for(const key of SETTINGS_FIELDS){
+          const el = $(key);
+          if(el) el.disabled = running;
+        }
+
+        copyPingBtn.disabled = running;
+        if(resultsCopyBtn) resultsCopyBtn.disabled = running;
+        renderWorkflow();
+      }
+
+      async function withButtonBusy(button, busyText, task){
+        const old = button.textContent;
+        button.disabled = true;
+        if(busyText) button.textContent = busyText;
+        try{
+          return await task();
+        }finally{
+          button.textContent = old;
+          button.disabled = false;
+          refreshButtons();
+        }
+      }
+
+      async function runCollection(){
+        if(appState.running) return;
+
+        const cfg = collectSettings();
+        if(!String(cfg.bandCookiesRead || '').length) throw new Error('Заполни Cookies (чтение/поиск users и post)');
+
+        saveSettings();
+        resetOutput();
+        logs.innerHTML = '';
+
+        const ctrl = new AbortController();
+        appState.abortController = ctrl;
+        setRunning(true);
+
+        try{
+          setStatus('Сбор запущен...', 'release-launch-status-progress');
+
+          const windowInfo = buildSinceWindow();
+          const baseText = `База выборки сообщений: ${formatMskHuman(windowInfo.baseUtcDate)}`;
+          baseInfo.textContent = baseText;
+          log(baseText);
+
+          log('Шаг 1/4: загружаю список стримов из Allure...');
+          const streams = await fetchStreams(ctrl.signal);
+          log(`Стримов получено: ${streams.length}`, 'ok');
+
+          log('Шаг 2/4: загружаю лидов QA...');
+          const leadsRaw = await fetchQaLeads(ctrl.signal);
+          log(`Лидов загружено: ${Object.keys(leadsRaw).length}`, 'ok');
+
+          log('Шаг 3/4: читаю сообщения из Band...');
+          const messages = await fetchBandMessagesSince(windowInfo.sinceMs, cfg, ctrl.signal);
+          log(`Сообщений получено: ${messages.length}`, 'ok');
+
+          log('Шаг 4/4: парсю дежурных...');
+          const aliases = buildHardcodedAliases();
+          const excludeSet = buildHardcodedExcludeSet();
+          const parsed = parseDuties(messages, streams, aliases);
+          const duties = parsed.duties;
+          const parseStats = parsed.stats || { matchedStreams: 0, iosFilled: 0, androidFilled: 0, quotedBlocks: 0, otBlocks: 0, headerBlocks: 0, inlineBlocks: 0, unmatchedSamples: [] };
+          const parseKind = parseStats.matchedStreams > 0 ? 'ok' : 'warn';
+          log(
+            `Парсинг: стримов с дежурными=${parseStats.matchedStreams}, iOS=${parseStats.iosFilled}, Android=${parseStats.androidFilled}, блоки=${parseStats.quotedBlocks}/${parseStats.otBlocks}/${parseStats.headerBlocks}/${parseStats.inlineBlocks}`,
+            parseKind
+          );
+          if(parseStats.unmatchedSamples && parseStats.unmatchedSamples.length){
+            log(`Не сопоставлены названия: ${parseStats.unmatchedSamples.join(' | ')}`, 'warn');
+          }
+
+          const streamMap = buildStreamNorm2Canonical(streams, aliases);
+          const leadIndex = buildLeadIndex(leadsRaw, streamMap);
+          const rows = buildRows(streams, duties, leadIndex, excludeSet);
+
+          renderResults(rows);
+
+          const pingText = buildPingRequestMessageForMissing(rows);
+          pingMessage.value = pingText;
+
+          const handles = extractHandles(duties);
+          renderCandidates(handles);
+
+          appState.androidIdMap = {};
+          appState.iosIdMap = {};
+          renderIds();
+
+          appState.lastRun = {
+            cfg,
+            streams,
+            duties,
+            rows,
+            handles,
+            leadIndex,
+            sinceMs: windowInfo.sinceMs,
+            parseStats
+          };
+
+          if(applyWorkflowAutoDoneForPingMessage(messages)){
+            log('Сообщение пинг-найдено', 'ok');
+          }
+
+          if(applyWorkflowAutoDoneForFoundDuties(rows)){
+            log('Все дежурные найдены: Шаг 1 и Шаг 2 отмечены как выполненные.', 'ok');
+          }
+
+          refreshButtons();
+          setStatus('Сбор завершен', 'release-launch-status-ok');
+          showToast('Сбор завершен');
+          log('Готово: данные обновлены.', 'ok');
+        }catch(error){
+          if(ctrl.signal.aborted){
+            setStatus('Сбор остановлен', 'release-launch-status-warn');
+            log('Сбор остановлен пользователем.', 'warn');
+          }else{
+            setStatus('Ошибка сбора', 'release-launch-status-err');
+            log(`Ошибка: ${error.message || error}`, 'err');
+            showToast('Ошибка во время сбора', false);
+          }
+        }finally{
+          appState.abortController = null;
+          setRunning(false);
+          refreshButtons();
+        }
+      }
+
+      async function copyPingMessage(){
+        const text = String(pingMessage.value || '').trim();
+        if(!text){
+          showToast('Текст пинга пуст', false);
+          return;
+        }
+
+        try{
+          await navigator.clipboard.writeText(text);
+          showToast('Текст скопирован');
+        }catch(_){
+          pingMessage.focus();
+          pingMessage.select();
+          document.execCommand('copy');
+          showToast('Текст скопирован');
+        }
+      }
+
+      async function copyCurrentDutiesMessage(){
+        const rows = (appState.lastRun && Array.isArray(appState.lastRun.rows)) ? appState.lastRun.rows : [];
+        const text = buildCurrentDutiesCopyText(rows);
+        if(!text){
+          showToast('Нет текущих дежурных для копирования', false);
+          return;
+        }
+
+        try{
+          await navigator.clipboard.writeText(text);
+          showToast('Текущие дежурные скопированы');
+        }catch(_){
+          const area = document.createElement('textarea');
+          area.value = text;
+          area.setAttribute('readonly', 'true');
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          area.style.pointerEvents = 'none';
+          document.body.appendChild(area);
+          area.focus();
+          area.select();
+          document.execCommand('copy');
+          area.remove();
+          showToast('Текущие дежурные скопированы');
+        }
+      }
+
+      function ensurePostFields(cfg){
+        if(!String(cfg.bandCookiesRead || '').length) throw new Error('Заполни Cookies (чтение/поиск users и post)');
+        if(!String(cfg.bandChannelId || '').trim()) throw new Error('Заполни Канал SWAT QA');
+      }
+
+      function ensureAdminFields(cfg){
+        if(!String(cfg.bandCookiesAdmin || '').length) throw new Error('Заполни Cookies (admin)');
+      }
+
+      async function publishPing(){
+        const text = String(pingMessage.value || '').trim();
+        if(!text) throw new Error('Текст пинга пуст');
+
+        const cfg = collectSettings();
+        ensurePostFields(cfg);
+
+        await bandCreatePost(text, cfg);
+        log('Пинг опубликован в Band.', 'ok');
+        showToast('Пинг опубликован');
+      }
+
+      async function publishMissingPosts(){
+        if(!appState.lastRun) throw new Error('Сначала запусти сбор');
+
+        const cfg = collectSettings();
+        ensurePostFields(cfg);
+
+        const rows = appState.lastRun.rows.filter((r) => r.missing);
+        if(!rows.length){
+          showToast('Нет пропущенных стримов');
+          return;
+        }
+
+        for(const row of rows){
+          const iosValue = row.iosDuty || (row.requireIos ? (row.iosLeads.length ? row.iosLeads.join(' ') : '- ?') : '—');
+          const androidValue = row.androidDuty || (row.requireAndroid ? (row.androidLeads.length ? row.androidLeads.join(' ') : '- ?') : '—');
+
+          const msg = `Дежурный "${row.streamDisplay}" \niOS - ${iosValue}\nAndroid - ${androidValue}`;
+          await bandCreatePost(msg, cfg);
+          log(`Опубликован пост для стрима: ${row.streamDisplay}`, 'ok');
+          await sleep(150);
+        }
+
+        showToast(`Опубликовано постов: ${rows.length}`);
+        await refreshAfterPublishingMissing();
+      }
+
+      async function refreshAfterPublishingMissing(){
+        if(!appState.lastRun) return;
+
+        const cfg = collectSettings();
+        const streams = appState.lastRun.streams || [];
+        const leadIndex = appState.lastRun.leadIndex;
+        const sinceMs = Number.isFinite(Number(appState.lastRun.sinceMs))
+          ? Number(appState.lastRun.sinceMs)
+          : Number(buildSinceWindow().sinceMs);
+        if(!streams.length || !leadIndex){
+          return;
+        }
+
+        // Даем Band короткое время, чтобы наши свежие посты точно попали в выдачу.
+        await sleep(350);
+        log('Обновляю результат: перечитываю сообщения после публикации...', 'warn');
+
+        const aliases = buildHardcodedAliases();
+        const excludeSet = buildHardcodedExcludeSet();
+        const messages = await fetchBandMessagesSince(sinceMs, cfg);
+        const parsed = parseDuties(messages, streams, aliases);
+        const duties = parsed.duties;
+        const parseStats = parsed.stats || { matchedStreams: 0, iosFilled: 0, androidFilled: 0, quotedBlocks: 0, otBlocks: 0, headerBlocks: 0, inlineBlocks: 0, unmatchedSamples: [] };
+        const parseKind = parseStats.matchedStreams > 0 ? 'ok' : 'warn';
+        log(
+          `Перепарсинг: стримов с дежурными=${parseStats.matchedStreams}, iOS=${parseStats.iosFilled}, Android=${parseStats.androidFilled}, блоки=${parseStats.quotedBlocks}/${parseStats.otBlocks}/${parseStats.headerBlocks}/${parseStats.inlineBlocks}`,
+          parseKind
+        );
+        if(parseStats.unmatchedSamples && parseStats.unmatchedSamples.length){
+          log(`Не сопоставлены названия: ${parseStats.unmatchedSamples.join(' | ')}`, 'warn');
+        }
+        const rows = buildRows(streams, duties, leadIndex, excludeSet);
+
+        renderResults(rows);
+        pingMessage.value = buildPingRequestMessageForMissing(rows);
+
+        const handles = extractHandles(duties);
+        renderCandidates(handles);
+
+        appState.androidIdMap = {};
+        appState.iosIdMap = {};
+        renderIds();
+
+        appState.lastRun = {
+          ...appState.lastRun,
+          cfg,
+          duties,
+          rows,
+          handles,
+          sinceMs,
+          parseStats
+        };
+
+        if(applyWorkflowAutoDoneForPingMessage(messages)){
+          log('Сообщение пинг-найдено', 'ok');
+        }
+
+        if(applyWorkflowAutoDoneForFoundDuties(rows, { keepCurrentStep: true })){
+          log('Все дежурные найдены: Шаг 1 и Шаг 2 отмечены как выполненные.', 'ok');
+        }
+
+        refreshButtons();
+        log('Результат сбора обновлён по свежим сообщениям.', 'ok');
+        showToast('Результат обновлён');
+      }
+
+      async function findUserIds(){
+        if(!appState.lastRun) throw new Error('Сначала запусти сбор');
+
+        const cfg = collectSettings();
+        if(!String(cfg.bandCookiesRead || '').length) throw new Error('Заполни Cookies (чтение/поиск users и post)');
+
+        const handles = appState.lastRun.handles || { android: new Set(), ios: new Set() };
+        log('Ищу user_id для Android кандидатов...');
+        appState.androidIdMap = await bandSearchUserIds(handles.android, cfg);
+        log(`Найдено Android user_id: ${Object.keys(appState.androidIdMap).length}`, 'ok');
+
+        log('Ищу user_id для iOS кандидатов...');
+        appState.iosIdMap = await bandSearchUserIds(handles.ios, cfg);
+        log(`Найдено iOS user_id: ${Object.keys(appState.iosIdMap).length}`, 'ok');
+
+        renderIds();
+        showToast('Поиск user_id завершен');
+      }
+
+      async function clearGroups(options){
+        const cfg = collectSettings();
+        ensureAdminFields(cfg);
+
+        const skipConfirm = !!(options && options.skipConfirm);
+        if(!skipConfirm){
+          const ok = confirm('Удалить текущих участников из Android/iOS групп?');
+          if(!ok){
+            log('Очистка групп отменена пользователем.', 'warn');
+            return false;
+          }
+        }
+
+        log('Получаю текущих участников Android-группы...');
+        const currentAndroid = await bandGetGroupUserIds(GROUP_ANDROID_ID_FIXED, cfg);
+        log(`В Android-группе: ${currentAndroid.length}`);
+        await bandDeleteGroupMembersBulk(GROUP_ANDROID_ID_FIXED, currentAndroid, cfg);
+        log(`Удалено из Android-группы: ${currentAndroid.length}`, 'ok');
+
+        log('Получаю текущих участников iOS-группы...');
+        const currentIos = await bandGetGroupUserIds(GROUP_IOS_ID_FIXED, cfg);
+        log(`В iOS-группе: ${currentIos.length}`);
+        await bandDeleteGroupMembersBulk(GROUP_IOS_ID_FIXED, currentIos, cfg);
+        log(`Удалено из iOS-группы: ${currentIos.length}`, 'ok');
+
+        showToast('Группы очищены');
+        return true;
+      }
+
+      async function addGroups(){
+        const cfg = collectSettings();
+        ensureAdminFields(cfg);
+
+        const androidIdsList = Object.values(appState.androidIdMap || {});
+        const iosIdsList = Object.values(appState.iosIdMap || {});
+
+        if(!androidIdsList.length && !iosIdsList.length){
+          throw new Error('Нет найденных user_id для добавления');
+        }
+
+        await bandAddGroupMembers(GROUP_ANDROID_ID_FIXED, androidIdsList, cfg);
+        log(`Добавлено в Android-группу: ${androidIdsList.length}`, 'ok');
+
+        await bandAddGroupMembers(GROUP_IOS_ID_FIXED, iosIdsList, cfg);
+        log(`Добавлено в iOS-группу: ${iosIdsList.length}`, 'ok');
+
+        showToast('Кандидаты добавлены в группы');
+      }
+
+      function init(){
+        applySettings(loadSettings());
+        applyDetailsState(loadDetailsState());
+
+        for(const key of SETTINGS_FIELDS){
+          const el = $(key);
+          if(!el) continue;
+          el.addEventListener('input', scheduleSave);
+          el.addEventListener('change', saveSettings);
+        }
+
+        resultsCollapseBtn?.addEventListener('click', () => {
+          appState.resultsCollapsed = !appState.resultsCollapsed;
+          applyResultsCollapseState();
+          saveDetailsState();
+        });
+        pingCollapseBtn?.addEventListener('click', () => {
+          appState.pingCollapsed = !appState.pingCollapsed;
+          applyPingCollapseState();
+          saveDetailsState();
+        });
+        workflowResetBtn?.addEventListener('click', () => {
+          resetWorkflowState();
+          showToast('Шаги сброшены');
+        });
+        workflowList?.addEventListener('click', (event) => {
+          const btn = event.target && event.target.closest ? event.target.closest('button[data-workflow-step]') : null;
+          if(!btn) return;
+          const stepIdx = Number(btn.getAttribute('data-workflow-step'));
+          const decision = String(btn.getAttribute('data-workflow-decision') || '');
+          applyWorkflowDecision(stepIdx, decision).catch((err) => {
+            log(`Сценарий: ${err.message || err}`, 'err');
+            showToast(err.message || 'Ошибка шага', false);
+          });
+        });
+
+        const windowInfo = buildSinceWindow();
+        baseInfo.textContent = `База выборки сообщений: ${formatMskHuman(windowInfo.baseUtcDate)}`;
+
+        resetWorkflowState();
+        renderCandidates({ android: new Set(), ios: new Set() });
+        renderIds();
+        refreshButtons();
+
+        startBtn?.addEventListener('click', () => {
+          runCollection().catch((err) => {
+            log(`Ошибка запуска: ${err.message || err}`, 'err');
+            setStatus('Ошибка запуска', 'release-launch-status-err');
+          });
+        });
+        checkProxyBtn?.addEventListener('click', () => withButtonBusy(checkProxyBtn, 'Проверяю...', checkProxy).catch((err) => {
+          log(`Проверка proxy: ${err.message || err}`, 'err');
+          showToast('Прокси не отвечает', false);
+        }));
+        stopBtn?.addEventListener('click', () => {
+          if(appState.abortController){
+            appState.abortController.abort();
+          }
+        });
+
+        pingMessage?.addEventListener('input', refreshButtons);
+        resultsCopyBtn?.addEventListener('click', copyCurrentDutiesMessage);
+        copyPingBtn?.addEventListener('click', copyPingMessage);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
