@@ -1671,15 +1671,22 @@ table { font-size: 13.5px; }
     padding:12px;
     display:flex;
     flex-direction:column;
+    flex-wrap:nowrap;
+    align-items:stretch;
     gap:10px;
-    overflow:auto;
+    overflow-x:hidden;
+    overflow-y:auto;
     flex:1;
+    min-width:0;
+    overscroll-behavior:contain;
   }
   .sidebar-tabs button{
     display:flex;
     align-items:center;
     gap:12px;
     width:100%;
+    max-width:100%;
+    flex:0 0 auto;
     justify-content:flex-start !important;
     text-align:left;
     position:relative;
