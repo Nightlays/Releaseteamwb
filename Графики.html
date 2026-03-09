@@ -84,7 +84,7 @@
       <section class="card p-5 space-y-4" id="mlSummaryCard">
         <div class="flex items-start justify-between gap-4 flex-wrap ml-summary-toolbar">
           <div>
-            <h2 class="text-lg font-semibold">ML Summary — регресс и релиз</h2>
+            <h2 class="text-lg font-semibold">Summary — регресс и релиз</h2>
             <div class="hint">Разделяет метрики на регресс, релизное качество, стабильность и аномалии</div>
           </div>
           <div class="flex items-center gap-2">
@@ -2370,7 +2370,7 @@
             <div class="ml-summary-shell">
               <div class="ml-summary-top">
                 <div class="ml-status-row">
-                  <div class="ml-status ml-tip-target ${statusClass}" ${tip('Общая оценка риска по ML-модели. Она строится по истории ваших предыдущих выгрузок и текущему набору метрик.')}>Статус ML: ${statusText}</div>
+                  <div class="ml-status ml-tip-target ${statusClass}" ${tip('Общая оценка риска по ML-модели. Она строится по истории ваших предыдущих выгрузок и текущему набору метрик.')}>Статус: ${statusText}</div>
                   <div class="ml-meta-strip">
                     <span class="ml-meta-pill ml-tip-target" ${tip('Сколько раз вы сохраняли ML-выгрузку для этой страницы.')}>Выгрузок: ${data.length}</span>
                     <span class="ml-meta-pill ml-tip-target" ${tip('Сколько выгрузок уже размечено как OK или Регресс и участвует в обучении.')}>Метки: ${model.count || 0}</span>
@@ -2384,7 +2384,7 @@
 
               <div class="ml-brief-grid">
                 <section class="ml-brief-card ml-brief-card--${executiveBrief.tone}">
-                  <div class="ml-brief-eyebrow">Краткий вывод ML</div>
+                  <div class="ml-brief-eyebrow">Общий вывод</div>
                   <div class="ml-brief-title">${escHtml(executiveBrief.title)}</div>
                   <div class="ml-brief-body">${escHtml(executiveBrief.body)}</div>
                   <div class="ml-brief-focus">${escHtml(executiveBrief.focus)}</div>
