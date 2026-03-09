@@ -80,6 +80,26 @@
         </form>
       </section>
 
+      <!-- ===== ML Summary ===== -->
+      <section class="card p-5 space-y-4" id="mlSummaryCard">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">ML Summary — успешность регресса</h2>
+            <div class="hint">Обучается на выгрузках и сравнивает текущую с предыдущей</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+              <input type="checkbox" id="comparePrevOnly" />
+              Только сравнение с предыдущим
+            </label>
+            <button type="button" class="btn btn-ghost" id="mlSaveBtn">Сохранить выгрузку</button>
+            <button type="button" class="btn btn-ghost" id="mlLabelOk">Пометить OK</button>
+            <button type="button" class="btn btn-ghost" id="mlLabelFail">Пометить Регресс</button>
+          </div>
+        </div>
+        <div id="mlSummaryBody" class="ml-summary-body">—</div>
+      </section>
+
       <!-- 1) Тест кейсы -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -691,7 +711,27 @@
           const PAGE_SIZE = 1000;
           const KINDS = ['Smoke', 'Selective'];
           const SWAT_LIST_URL = 'https://script.google.com/macros/s/AKfycbzLmb5ATmHOip7REPsl_iSLH2GuEHui0W_czyrPgW_8G1Wl-RY8CiM2UeAdqQQEwoNx-Q/exec';
-          const PROXY_BASE = 'http://localhost:8787';
+          const LS_PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
+          function readRuntimeProxyBase(){
+            try {
+              const q = new URLSearchParams(window.location.search);
+              const fromQuery = q.get('rbProxyBase');
+              if (fromQuery) return String(fromQuery).trim();
+            } catch (e) {}
+            try {
+              const fromTop = window.top && window.top.__RB_PROXY_CONFIG && window.top.__RB_PROXY_CONFIG.base;
+              if (fromTop) return String(fromTop).trim();
+            } catch (e) {}
+            try {
+              const raw = localStorage.getItem(LS_PROXY_RUNTIME_KEY);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.base) return String(parsed.base).trim();
+              }
+            } catch (e) {}
+            return 'http://localhost:8787';
+          }
+          const PROXY_BASE = readRuntimeProxyBase().replace(/\/+$/, '');
           const LS_COLLAPSE_KEY = 'wb_all_table_collapsed';
 
           const DEPLOY_BASE_URL_TMPL   = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
@@ -707,12 +747,39 @@
           const startBtn = document.getElementById('startBtn');
           const stopBtn  = document.getElementById('stopBtn');
           const proxyBtn = document.getElementById('proxyBtn');
+          let mlTooltip = document.getElementById('mlTooltip');
+          if(!mlTooltip && document.body){
+            mlTooltip = document.createElement('div');
+            mlTooltip.id = 'mlTooltip';
+            mlTooltip.className = 'ml-tooltip';
+            mlTooltip.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(mlTooltip);
+          }
+          const comparePrevOnly = document.getElementById('comparePrevOnly');
 
           const inpFrom  = document.getElementById('releaseFrom');
           const inpTo    = document.getElementById('releaseTo');
           const inpAllureToken = document.getElementById('allureToken');
           const inpDeployToken = document.getElementById('deployToken');
           const inpYtToken = document.getElementById('ytToken');
+          const mlSummaryBody = document.getElementById('mlSummaryBody');
+          const mlSaveBtn = document.getElementById('mlSaveBtn');
+          const mlLabelOkBtn = document.getElementById('mlLabelOk');
+          const mlLabelFailBtn = document.getElementById('mlLabelFail');
+
+          if(window.Chart){
+            Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
+            Chart.defaults.plugins.tooltip = Chart.defaults.plugins.tooltip || {};
+            Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,23,42,0.95)';
+            Chart.defaults.plugins.tooltip.titleColor = '#f8fafc';
+            Chart.defaults.plugins.tooltip.bodyColor = '#e2e8f0';
+            Chart.defaults.plugins.tooltip.titleFont = { size: 12, weight: '700' };
+            Chart.defaults.plugins.tooltip.bodyFont = { size: 12 };
+            Chart.defaults.plugins.tooltip.padding = 8;
+            Chart.defaults.plugins.tooltip.cornerRadius = 8;
+            Chart.defaults.plugins.tooltip.boxPadding = 4;
+            Chart.defaults.plugins.tooltip.displayColors = true;
+          }
 
           document.getElementById('exportPdfBtn')
             ?.addEventListener('click', exportAllChartsToPDF);
@@ -741,134 +808,830 @@
           };
         }
 
-        async function exportAllChartsToPDF(){
-          if (!window.jspdf || !window.html2canvas) return;
+        async function renderCardCanvas(card, scale){
+          if(!card || !window.html2canvas) return null;
+          const cardRestore = {
+            overflow: card.style.overflow,
+            width: card.style.width,
+            height: card.style.height,
+            maxHeight: card.style.maxHeight,
+            maxWidth: card.style.maxWidth
+          };
+          card.style.overflow = 'visible';
+          card.style.maxHeight = 'none';
+          card.style.maxWidth = 'none';
 
-          const { jsPDF } = window.jspdf;
-          const pdf = new jsPDF('p', 'mm', 'a4');
-
-          const pageW = pdf.internal.pageSize.getWidth();
-          const pageH = pdf.internal.pageSize.getHeight();
-          const margin = 10;
-          const contentH = pageH - margin * 2;
-          let y = margin;
-
-          const restoreTooltips = disableChartTooltips();
-          document.body.classList.add('pdf-export');
-          try{
-            // Берём именно карточки графиков целиком
-            const cards = Array.from(document.querySelectorAll('section.card'))
-              .filter(card => card.querySelector('canvas'));
-
-            for (const card of cards) {
-              const scale = 2;
-              const cardRestore = {
-                overflow: card.style.overflow,
-                width: card.style.width,
-                height: card.style.height,
-                maxHeight: card.style.maxHeight,
-                maxWidth: card.style.maxWidth
-              };
-              card.style.overflow = 'visible';
-              card.style.maxHeight = 'none';
-              card.style.maxWidth = 'none';
-
-              const viewports = Array.from(card.querySelectorAll('.chart-viewport'));
-              const viewportRestore = viewports.map(el => ({ el, overflow: el.style.overflow }));
-              for(const v of viewports){
-                v.style.overflow = 'visible';
-              }
-
-              const scrollables = Array.from(card.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
-              const restore = [];
-              for(const el of scrollables){
-                restore.push({
-                  el,
-                  overflow: el.style.overflow,
-                  overflowX: el.style.overflowX,
-                  overflowY: el.style.overflowY,
-                  height: el.style.height,
-                  maxHeight: el.style.maxHeight
-                });
-                el.style.overflow = 'visible';
-                el.style.overflowX = 'visible';
-                el.style.overflowY = 'visible';
-                el.style.height = el.scrollHeight + 'px';
-                el.style.maxHeight = 'none';
-              }
-
-              card.style.width = card.scrollWidth + 'px';
-              card.style.height = card.scrollHeight + 'px';
-
-              // Рендер DOM карточки в canvas
-              const canvas = await html2canvas(card, {
-                backgroundColor: '#ffffff',
-                scale: scale,
-                useCORS: true,
-                scrollX: 0,
-                scrollY: 0,
-                windowWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, card.scrollWidth),
-                windowHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, card.scrollHeight)
-              });
-
-              for(const r of restore){
-                r.el.style.overflow = r.overflow;
-                r.el.style.overflowX = r.overflowX;
-                r.el.style.overflowY = r.overflowY;
-                r.el.style.height = r.height;
-                r.el.style.maxHeight = r.maxHeight;
-              }
-              for(const v of viewportRestore){
-                v.el.style.overflow = v.overflow;
-              }
-              card.style.overflow = cardRestore.overflow;
-              card.style.width = cardRestore.width;
-              card.style.height = cardRestore.height;
-              card.style.maxHeight = cardRestore.maxHeight;
-              card.style.maxWidth = cardRestore.maxWidth;
-
-              const imgW = pageW - margin * 2;
-              const imgH = imgW * (canvas.height / canvas.width);
-
-              if (imgH <= contentH) {
-                if (y + imgH > pageH - margin && y !== margin) {
-                  pdf.addPage();
-                  y = margin;
-                }
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, imgW, imgH);
-                y += imgH + 10;
-              } else {
-                if (y !== margin) {
-                  pdf.addPage();
-                  y = margin;
-                }
-                const pxPerMm = canvas.width / imgW;
-                const pagePx = Math.floor(contentH * pxPerMm);
-                let sy = 0;
-                while (sy < canvas.height) {
-                  const sliceH = Math.min(pagePx, canvas.height - sy);
-                  const slice = document.createElement('canvas');
-                  slice.width = canvas.width;
-                  slice.height = sliceH;
-                  const sctx = slice.getContext('2d');
-                  sctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-
-                  const sliceH_mm = sliceH / pxPerMm;
-                  pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceH_mm);
-                  sy += sliceH;
-                  if (sy < canvas.height) {
-                    pdf.addPage();
-                  }
-                }
-                y = margin;
-              }
-            }
-          }finally{
-            restoreTooltips();
-            document.body.classList.remove('pdf-export');
+          const viewports = Array.from(card.querySelectorAll('.chart-viewport'));
+          const viewportRestore = viewports.map(el => ({ el, overflow: el.style.overflow }));
+          for(const v of viewports){
+            v.style.overflow = 'visible';
           }
 
-          pdf.save('WB_All_Charts.pdf');
+          const scrollables = Array.from(card.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
+          const restore = [];
+          for(const el of scrollables){
+            restore.push({
+              el,
+              overflow: el.style.overflow,
+              overflowX: el.style.overflowX,
+              overflowY: el.style.overflowY,
+              height: el.style.height,
+              maxHeight: el.style.maxHeight
+            });
+            el.style.overflow = 'visible';
+            el.style.overflowX = 'visible';
+            el.style.overflowY = 'visible';
+            el.style.height = el.scrollHeight + 'px';
+            el.style.maxHeight = 'none';
+          }
+
+          card.style.width = card.scrollWidth + 'px';
+          card.style.height = card.scrollHeight + 'px';
+
+          const canvas = await html2canvas(card, {
+            backgroundColor: '#ffffff',
+            scale: scale,
+            useCORS: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, card.scrollWidth),
+            windowHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, card.scrollHeight)
+          });
+
+          for(const r of restore){
+            r.el.style.overflow = r.overflow;
+            r.el.style.overflowX = r.overflowX;
+            r.el.style.overflowY = r.overflowY;
+            r.el.style.height = r.height;
+            r.el.style.maxHeight = r.maxHeight;
+          }
+          for(const v of viewportRestore){
+            v.el.style.overflow = v.overflow;
+          }
+          card.style.overflow = cardRestore.overflow;
+          card.style.width = cardRestore.width;
+          card.style.height = cardRestore.height;
+          card.style.maxHeight = cardRestore.maxHeight;
+          card.style.maxWidth = cardRestore.maxWidth;
+
+          return canvas;
+        }
+
+        async function exportAllChartsToPDF(){
+          try{
+            if (!window.jspdf || !window.html2canvas){
+              showToast('PDF библиотеки не загрузились', false);
+              return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = pdf.internal.pageSize.getHeight();
+            const margin = 10;
+            const contentH = pageH - margin * 2;
+            let y = margin;
+
+            // фиксируем ML-выгрузку и обновляем summary
+            try{
+              recordMlExport();
+              renderMlSummary();
+            }catch(e){
+              console.error('ML export error', e);
+            }
+
+            const restoreTooltips = disableChartTooltips();
+            document.body.classList.add('pdf-export');
+            try{
+              const addCanvasToPdf = (canvas) => {
+                if(!canvas) return;
+                const imgW = pageW - margin * 2;
+                const imgH = imgW * (canvas.height / canvas.width);
+
+                if (imgH <= contentH) {
+                  if (y + imgH > pageH - margin && y !== margin) {
+                    pdf.addPage();
+                    y = margin;
+                  }
+                  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, imgW, imgH);
+                  y += imgH + 10;
+                } else {
+                  if (y !== margin) {
+                    pdf.addPage();
+                    y = margin;
+                  }
+                  const pxPerMm = canvas.width / imgW;
+                  const pagePx = Math.floor(contentH * pxPerMm);
+                  let sy = 0;
+                  while (sy < canvas.height) {
+                    const sliceH = Math.min(pagePx, canvas.height - sy);
+                    const slice = document.createElement('canvas');
+                    slice.width = canvas.width;
+                    slice.height = sliceH;
+                    const sctx = slice.getContext('2d');
+                    sctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+
+                    const sliceH_mm = sliceH / pxPerMm;
+                    pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceH_mm);
+                    sy += sliceH;
+                    if (sy < canvas.height) {
+                      pdf.addPage();
+                    }
+                  }
+                  y = margin;
+                }
+              };
+
+              const summaryCard = document.getElementById('mlSummaryCard');
+              if(summaryCard){
+                try{
+                  summaryCard.classList.add('pdf-sheet--ml');
+                  const summaryCanvas = await renderCardCanvas(summaryCard, 2);
+                  summaryCard.classList.remove('pdf-sheet--ml');
+                  addCanvasToPdf(summaryCanvas);
+                  const chartCards = Array.from(document.querySelectorAll('section.card'))
+                    .filter(card => card.querySelector('canvas'));
+                  if(chartCards.length){
+                    pdf.addPage();
+                    y = margin;
+                  }
+                }catch(e){
+                  console.error('ML summary capture error', e);
+                }
+              }
+
+              // Берём именно карточки графиков целиком
+              const cards = Array.from(document.querySelectorAll('section.card'))
+                .filter(card => card.querySelector('canvas'));
+
+              for (const card of cards) {
+                const canvas = await renderCardCanvas(card, 2);
+                addCanvasToPdf(canvas);
+              }
+            }finally{
+              restoreTooltips();
+              document.body.classList.remove('pdf-export');
+            }
+
+            pdf.save('WB_All_Charts.pdf');
+          }catch(e){
+            console.error('PDF export failed', e);
+            showToast(`PDF ошибка: ${e?.message || e}`, false);
+          }
+        }
+
+        /* ---------- ML Summary ---------- */
+        const ML_DATA_KEY = 'wb_graphs_v0_2_9_ml_dataset';
+        const ML_MAX_RECORDS = 200;
+        let mlLastAnomalies = null;
+        const FEATURE_KEYS = [
+          'tc_total','tc_total_delta','tc_total_delta_pct',
+          'tc_volatility','tc_slope_pct',
+          'cov_swat_delta_pct','cov_stream_delta_pct',
+          'sel_swat_delta_pct','sel_stream_delta_pct',
+          'avg_total_delta',
+          'chp_total_delta_pct','chp_ios_delta_pct','chp_android_delta_pct',
+          'release_anoms','type_anoms','platform_anoms','anom_score'
+        ];
+
+        function getMlDataset(){
+          try{ return JSON.parse(localStorage.getItem(ML_DATA_KEY) || '[]'); }catch{ return []; }
+        }
+        function setMlDataset(arr){
+          const out = Array.isArray(arr) ? arr.slice(-ML_MAX_RECORDS) : [];
+          localStorage.setItem(ML_DATA_KEY, JSON.stringify(out));
+        }
+        function featureVector(f){
+          return FEATURE_KEYS.map(k => Number(f?.[k] ?? 0));
+        }
+        function findDataset(chart, label){
+          if(!chart?.data?.datasets) return null;
+          const l = String(label || '').toLowerCase();
+          return chart.data.datasets.find(d => String(d.label || '').toLowerCase().includes(l)) || null;
+        }
+        function seriesStats(arr){
+          const data = (Array.isArray(arr) ? arr : []).map(v => Number(v) || 0);
+          const n = data.length;
+          const last = n ? data[n-1] : 0;
+          const prev = n > 1 ? data[n-2] : 0;
+          const delta = last - prev;
+          const deltaPct = prev !== 0 ? (delta / prev * 100) : (last !== 0 ? 100 : 0);
+          const mean = n ? data.reduce((s,v)=>s+v,0) / n : 0;
+          const std = n ? Math.sqrt(data.reduce((s,v)=>s+Math.pow(v-mean,2),0) / n) : 0;
+          const slopePct = n > 1 ? ((last - data[0]) / (data[0] || 1) * 100) : 0;
+          return { last, prev, delta, deltaPct, mean, std, vol: std, slopePct, data };
+        }
+        function anomalyFromSeries(series, label, opts = {}){
+          const stat = seriesStats(series);
+          if(!stat.data.length || stat.data.length < 2) return null;
+          const z = stat.std ? ((stat.last - stat.mean) / stat.std) : 0;
+          const minAbs = Number(opts.minAbs ?? 5);
+          const pct = Number(opts.pct ?? 30);
+          const zTh = Number(opts.z ?? 2);
+          const deltaAbs = Math.abs(stat.delta);
+          const deltaPctAbs = Math.abs(stat.deltaPct);
+          const isAnom = (Math.abs(z) >= zTh && deltaAbs >= minAbs) ||
+            (deltaPctAbs >= pct && deltaAbs >= minAbs);
+          if(!isAnom) return null;
+          return { label, delta: stat.delta, deltaPct: stat.deltaPct, last: stat.last, prev: stat.prev, z };
+        }
+        function buildSeriesFromRows(rows, pick){
+          return (Array.isArray(rows) ? rows : []).map(r => Number(pick(r)) || 0);
+        }
+        function getCutSeriesByLabel(part){
+          if(!cutChart?.data?.datasets) return [];
+          const key = String(part || '').toLowerCase();
+          const ds = cutChart.data.datasets.find(d => String(d.label || '').toLowerCase().includes(key));
+          return Array.isArray(ds?.data) ? ds.data.slice() : [];
+        }
+        function buildLagSeries(storeSeries, cutSeries){
+          const len = Math.max(storeSeries.length, cutSeries.length);
+          const out = [];
+          for(let i=0;i<len;i++){
+            const s = Number(storeSeries[i]);
+            const c = Number(cutSeries[i]);
+            if(Number.isFinite(s) && Number.isFinite(c)) out.push(s - c);
+          }
+          return out;
+        }
+        function detectReleaseAnomalies(){
+          const out = [];
+          const tcRows = window.__tcRowsAll || [];
+          const covRows = window.__covRowsAll || [];
+          const selRows = window.__selRowsAll || [];
+          const avgRows = window.__avgRowsAll || [];
+          const chpRows = window.__chpRowsAll || [];
+
+          const tcSeries = buildSeriesFromRows(tcRows, r => r.total);
+          const covSwatSeries = buildSeriesFromRows(covRows, r => Number(r.swatCount||0));
+          const covStreamSeries = buildSeriesFromRows(covRows, r => Number(r.streamCount||0));
+          const covSeries = buildSeriesFromRows(covRows, r => (Number(r.swatCount||0) + Number(r.streamCount||0)));
+          const selSeries = buildSeriesFromRows(selRows, r => (Number(r.swatCount||0) + Number(r.streamCount||0)));
+          const avgSeries = buildSeriesFromRows(avgRows, r => (Number(r.total||0) / 60000));
+          const avgWeightedSeries = buildSeriesFromRows(avgRows, r => (Number(r.totalWeighted||0) / 60000));
+          const chpSeries = buildSeriesFromRows(chpRows, r => Number(r.total||0));
+          const storeIosSeries = getCutSeriesByLabel('ios store');
+          const storeAndSeries = getCutSeriesByLabel('android store');
+          const cutIosSeries = getCutSeriesByLabel('ios cutoff');
+          const cutAndSeries = getCutSeriesByLabel('android cutoff');
+          const lagIosSeries = buildLagSeries(storeIosSeries, cutIosSeries);
+          const lagAndSeries = buildLagSeries(storeAndSeries, cutAndSeries);
+
+          const pushIf = (label, series, opts) => {
+            const a = anomalyFromSeries(series, label, opts);
+            if(a) out.push(a);
+          };
+          pushIf('TC Total', tcSeries, { pct: 25, z: 2 });
+          pushIf('High/Blocker SWAT', covSwatSeries, { pct: 30, z: 2 });
+          pushIf('High/Blocker STREAM', covStreamSeries, { pct: 30, z: 2 });
+          pushIf('High/Blocker SWAT+Stream', covSeries, { pct: 30, z: 2 });
+          pushIf('Selective Total', selSeries, { pct: 30, z: 2 });
+          pushIf('Avg Time (Total)', avgSeries, { pct: 15, z: 2, minAbs: 0.5 });
+          pushIf('Avg Time (Weighted)', avgWeightedSeries, { pct: 15, z: 2, minAbs: 0.5 });
+          pushIf('Cherepiki Total', chpSeries, { pct: 40, z: 2, minAbs: 3 });
+          pushIf('Store iOS', storeIosSeries, { pct: 3, z: 2, minAbs: 20 });
+          pushIf('Store Android', storeAndSeries, { pct: 3, z: 2, minAbs: 20 });
+          pushIf('Lag Store iOS', lagIosSeries, { pct: 20, z: 2, minAbs: 15 });
+          pushIf('Lag Store Android', lagAndSeries, { pct: 20, z: 2, minAbs: 15 });
+
+          out.sort((a,b)=> (Math.abs(b.z||0) + Math.abs(b.deltaPct||0)/100) - (Math.abs(a.z||0) + Math.abs(a.deltaPct||0)/100));
+          return { count: out.length, list: out.slice(0, 4) };
+        }
+        function typeAnomsFromRows(rows, platformLabel){
+          if(!Array.isArray(rows) || rows.length < 2) return [];
+          const last = rows[rows.length-1] || {};
+          const prev = rows[rows.length-2] || {};
+          const keys = new Set([...(Object.keys(last.counts || {})), ...(Object.keys(prev.counts || {}))]);
+          const out = [];
+          keys.forEach(k => {
+            const lastVal = Number(last.counts?.[k] || 0);
+            const prevVal = Number(prev.counts?.[k] || 0);
+            const delta = lastVal - prevVal;
+            const deltaAbs = Math.abs(delta);
+            const deltaPct = prevVal ? (delta / prevVal * 100) : (lastVal ? 100 : 0);
+            if(deltaAbs >= 20 || (deltaAbs >= 5 && Math.abs(deltaPct) >= 60)){
+              out.push({ label: `${platformLabel}: ${k}`, delta, deltaPct, last: lastVal, prev: prevVal });
+            }
+          });
+          return out;
+        }
+        function typeAnomsFromChp(rows, labelPrefix){
+          if(!Array.isArray(rows) || rows.length < 2) return [];
+          const last = rows[rows.length-1] || {};
+          const prev = rows[rows.length-2] || {};
+          const keys = ['product','vlet','bug','crash'];
+          const out = [];
+          for(const k of keys){
+            const lastVal = Number(last[k] || 0);
+            const prevVal = Number(prev[k] || 0);
+            const delta = lastVal - prevVal;
+            const deltaAbs = Math.abs(delta);
+            const deltaPct = prevVal ? (delta / prevVal * 100) : (lastVal ? 100 : 0);
+            if(deltaAbs >= 10 || (deltaAbs >= 3 && Math.abs(deltaPct) >= 60)){
+              out.push({ label: `${labelPrefix}: ${k.toUpperCase()}`, delta, deltaPct, last: lastVal, prev: prevVal });
+            }
+          }
+          return out;
+        }
+        function detectTypeAnomalies(){
+          const out = [];
+          const iosRows = window.__iosTypesRowsAll || [];
+          const andRows = window.__andTypesRowsAll || [];
+          const chpRows = window.__chpTypesRowsAll || [];
+          out.push(...typeAnomsFromRows(iosRows, 'iOS'));
+          out.push(...typeAnomsFromRows(andRows, 'Android'));
+          out.push(...typeAnomsFromChp(chpRows, 'ЧП'));
+          out.sort((a,b)=> Math.abs(b.delta) - Math.abs(a.delta));
+          return { count: out.length, list: out.slice(0, 6) };
+        }
+        function detectPlatformAnomalies(){
+          const out = [];
+          const chpRows = window.__chpRowsAll || [];
+          if(chpRows.length >= 2){
+            const last = chpRows[chpRows.length-1];
+            const prev = chpRows[chpRows.length-2];
+            const metrics = [
+              { label: 'Cherepiki iOS', last: Number(last.ios||0), prev: Number(prev.ios||0) },
+              { label: 'Cherepiki Android', last: Number(last.android||0), prev: Number(prev.android||0) }
+            ];
+            for(const m of metrics){
+              const delta = m.last - m.prev;
+              const deltaAbs = Math.abs(delta);
+              const deltaPct = m.prev ? (delta / m.prev * 100) : (m.last ? 100 : 0);
+              if(deltaAbs >= 5 && Math.abs(deltaPct) >= 40){
+                out.push({ label: m.label, delta, deltaPct, last: m.last, prev: m.prev });
+              }
+            }
+          }
+
+          const iosRows = window.__iosTypesRowsAll || [];
+          const andRows = window.__andTypesRowsAll || [];
+          const sumTotals = rows => rows.map(r => Object.values(r.counts || {}).reduce((s,v)=>s+Number(v||0),0));
+          const iosSeries = sumTotals(iosRows);
+          const andSeries = sumTotals(andRows);
+          const iosAnom = anomalyFromSeries(iosSeries, 'Types iOS Total', { pct: 35, z: 2, minAbs: 5 });
+          const andAnom = anomalyFromSeries(andSeries, 'Types Android Total', { pct: 35, z: 2, minAbs: 5 });
+          if(iosAnom) out.push(iosAnom);
+          if(andAnom) out.push(andAnom);
+
+          out.sort((a,b)=> Math.abs(b.delta || 0) - Math.abs(a.delta || 0));
+          return { count: out.length, list: out.slice(0, 4) };
+        }
+        function computeAnomalies(){
+          const release = detectReleaseAnomalies();
+          const type = detectTypeAnomalies();
+          const platform = detectPlatformAnomalies();
+          const score = release.count + type.count + platform.count;
+          return { release, type, platform, score };
+        }
+        function sumSeries(a, b){
+          const arrA = Array.isArray(a) ? a : [];
+          const arrB = Array.isArray(b) ? b : [];
+          const len = Math.max(arrA.length, arrB.length);
+          const out = new Array(len);
+          for(let i=0;i<len;i++){
+            out[i] = (Number(arrA[i]) || 0) + (Number(arrB[i]) || 0);
+          }
+          return out;
+        }
+        function baselineStats(series, mode = 'mean'){
+          const data = (Array.isArray(series) ? series : []).map(v => Number(v)).filter(v => Number.isFinite(v));
+          if(data.length < 2){
+            return { last: data[data.length-1] || 0, base: null, n: 0, mode };
+          }
+          const last = data[data.length - 1];
+          if(mode === 'prev'){
+            const prev = data[data.length - 2];
+            return { last, base: prev, n: 1, mode };
+          }
+          const hist = data.slice(0, -1);
+          const mean = hist.reduce((s,v)=>s+v,0) / hist.length;
+          return { last, base: mean, n: hist.length, mode };
+        }
+        function diffToBase(stat){
+          if(!stat || !Number.isFinite(stat.base)) return { delta: null, deltaPct: null };
+          const delta = stat.last - stat.base;
+          const deltaPct = stat.base !== 0 ? (delta / stat.base * 100) : (stat.last ? 100 : 0);
+          return { delta, deltaPct };
+        }
+        function fmtDelta(delta, digits=0){
+          if(delta == null) return '—';
+          const v = digits ? Number(delta).toFixed(digits) : Math.round(Number(delta));
+          return `${delta >= 0 ? '+' : ''}${v}`;
+        }
+        function fmtDeltaPct(deltaPct){
+          if(deltaPct == null) return '';
+          return `(${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(2)}%)`;
+        }
+        function computeMlFeatures(){
+          if(!tcChart || !Array.isArray(tcChart.data?.labels) || tcChart.data.labels.length === 0){
+            return null;
+          }
+          const tcTotal = seriesStats(findDataset(tcChart, 'всего')?.data || []);
+          const covSwat = seriesStats(findDataset(covChart, 'swat')?.data || []);
+          const covStream = seriesStats(findDataset(covChart, 'stream')?.data || []);
+          const selSwat = seriesStats(findDataset(selChart, 'swat')?.data || []);
+          const selStream = seriesStats(findDataset(selChart, 'stream')?.data || []);
+          const avgTotal = seriesStats(findDataset(avgChart, 'общее')?.data || []);
+          const chpTotal = seriesStats(findDataset(chpChart, 'всего')?.data || []);
+          const chpIos = seriesStats(findDataset(chpChart, 'ios')?.data || []);
+          const chpAndroid = seriesStats(findDataset(chpChart, 'android')?.data || []);
+          const anomalies = computeAnomalies();
+          mlLastAnomalies = anomalies;
+
+          return {
+            tc_total: tcTotal.last,
+            tc_total_delta: tcTotal.delta,
+            tc_total_delta_pct: tcTotal.deltaPct,
+            tc_volatility: tcTotal.vol,
+            tc_slope_pct: tcTotal.slopePct,
+            cov_swat_delta_pct: covSwat.deltaPct,
+            cov_stream_delta_pct: covStream.deltaPct,
+            sel_swat_delta_pct: selSwat.deltaPct,
+            sel_stream_delta_pct: selStream.deltaPct,
+            avg_total_delta: avgTotal.delta,
+            chp_total_delta_pct: chpTotal.deltaPct,
+            chp_ios_delta_pct: chpIos.deltaPct,
+            chp_android_delta_pct: chpAndroid.deltaPct,
+            release_anoms: anomalies.release.count,
+            type_anoms: anomalies.type.count,
+            platform_anoms: anomalies.platform.count,
+            anom_score: anomalies.score
+          };
+        }
+        function trainMlModel(dataset){
+          const labeled = (dataset || []).filter(d => d && (d.label === 'ok' || d.label === 'fail'));
+          const count = labeled.length;
+          if (count < 5){
+            return { trained:false, count, reason:'Нужно минимум 5 размеченных выгрузок' };
+          }
+          const X = labeled.map(d => featureVector(d.features));
+          const y = labeled.map(d => d.label === 'fail' ? 1 : 0);
+          const n = FEATURE_KEYS.length;
+          const mean = new Array(n).fill(0);
+          const std = new Array(n).fill(0);
+          for (let i=0;i<n;i++){
+            mean[i] = X.reduce((s,row)=>s+row[i],0) / count;
+            std[i] = Math.sqrt(X.reduce((s,row)=>s+Math.pow(row[i]-mean[i],2),0) / count) || 1;
+          }
+          const Xn = X.map(row => row.map((v,i)=>(v-mean[i])/std[i]));
+          let w = new Array(n+1).fill(0);
+          const lr = 0.15, iters = 400;
+          for (let it=0; it<iters; it++){
+            let grad = new Array(n+1).fill(0);
+            for (let r=0; r<count; r++){
+              const row = Xn[r];
+              let z = w[0];
+              for (let i=0;i<n;i++) z += w[i+1]*row[i];
+              const p = 1 / (1 + Math.exp(-z));
+              const err = p - y[r];
+              grad[0] += err;
+              for (let i=0;i<n;i++) grad[i+1] += err * row[i];
+            }
+            for (let i=0;i<n+1;i++) w[i] -= lr * (grad[i] / count);
+          }
+          return { trained:true, count, mean, std, w, featureKeys: FEATURE_KEYS };
+        }
+        function predictMl(features, model){
+          if (!model?.trained) return null;
+          const x = featureVector(features).map((v,i)=>(v - model.mean[i]) / model.std[i]);
+          let z = model.w[0];
+          for (let i=0;i<x.length;i++) z += model.w[i+1]*x[i];
+          return 1 / (1 + Math.exp(-z));
+        }
+        function recordMlExport(){
+          const features = computeMlFeatures();
+          if (!features) return null;
+          const entry = {
+            time: new Date().toISOString(),
+            features,
+            label: null
+          };
+          const data = getMlDataset();
+          data.push(entry);
+          setMlDataset(data);
+          return entry;
+        }
+        function labelLastExport(label){
+          const data = getMlDataset();
+          if (!data.length) return;
+          data[data.length-1].label = label;
+          data[data.length-1].labeledAt = new Date().toISOString();
+          setMlDataset(data);
+          renderMlSummary();
+        }
+        function renderMlSummary(){
+          if (!mlSummaryBody) return;
+          const features = computeMlFeatures();
+          if (!features){
+            mlSummaryBody.innerHTML = '<div class="text-slate-500 text-sm">Нет данных для анализа. Сначала запустите сбор.</div>';
+            return;
+          }
+          const data = getMlDataset();
+          const model = trainMlModel(data);
+          const prob = predictMl(features, model);
+          let statusText = 'Нет обучения';
+          let statusClass = 'ml-warn';
+          if (prob != null){
+            if (prob >= 0.7){ statusText = `Регресс (p=${(prob*100).toFixed(1)}%)`; statusClass = 'ml-bad'; }
+            else if (prob >= 0.4){ statusText = `Внимание (p=${(prob*100).toFixed(1)}%)`; statusClass = 'ml-warn'; }
+            else { statusText = `OK (p=${(prob*100).toFixed(1)}%)`; statusClass = 'ml-ok'; }
+          }
+          const tcSeries = findDataset(tcChart, 'всего')?.data || [];
+          const covSwatSeries = findDataset(covChart, 'swat')?.data || [];
+          const covStreamSeries = findDataset(covChart, 'stream')?.data || [];
+          const covSeries = sumSeries(covSwatSeries, covStreamSeries);
+          const selSeries = sumSeries(
+            findDataset(selChart, 'swat')?.data || [],
+            findDataset(selChart, 'stream')?.data || []
+          );
+          const avgSeries = findDataset(avgChart, 'общее')?.data || [];
+          const avgWeightedSeries = buildSeriesFromRows(window.__avgRowsAll || [], r => (Number(r.totalWeighted||0) / 60000));
+          const chpSeries = findDataset(chpChart, 'всего')?.data || [];
+          const chpIosSeries = findDataset(chpChart, 'ios')?.data || [];
+          const chpAndSeries = findDataset(chpChart, 'android')?.data || [];
+          const storeIosSeries = getCutSeriesByLabel('ios store');
+          const storeAndSeries = getCutSeriesByLabel('android store');
+          const cutIosSeries = getCutSeriesByLabel('ios cutoff');
+          const cutAndSeries = getCutSeriesByLabel('android cutoff');
+          const lagIosSeries = buildLagSeries(storeIosSeries, cutIosSeries);
+          const lagAndSeries = buildLagSeries(storeAndSeries, cutAndSeries);
+
+          const compareMode = comparePrevOnly?.checked ? 'prev' : 'mean';
+
+          const tcBase = baselineStats(tcSeries, compareMode);
+          const covBase = baselineStats(covSeries, compareMode);
+          const covSwatBase = baselineStats(covSwatSeries, compareMode);
+          const covStreamBase = baselineStats(covStreamSeries, compareMode);
+          const selBase = baselineStats(selSeries, compareMode);
+          const avgBase = baselineStats(avgSeries, compareMode);
+          const avgWeightedBase = baselineStats(avgWeightedSeries, compareMode);
+          const chpBase = baselineStats(chpSeries, compareMode);
+          const chpIosBase = baselineStats(chpIosSeries, compareMode);
+          const chpAndBase = baselineStats(chpAndSeries, compareMode);
+          const storeIosBase = baselineStats(storeIosSeries, compareMode);
+          const storeAndBase = baselineStats(storeAndSeries, compareMode);
+          const lagIosBase = baselineStats(lagIosSeries, compareMode);
+          const lagAndBase = baselineStats(lagAndSeries, compareMode);
+
+          const compareLabel = compareMode === 'prev' ? 'Δ к предыдущему релизу' : 'Δ к среднему прошлых релизов';
+          const compareNote = tcBase?.n
+            ? (compareMode === 'prev'
+                ? 'Сравнение: предыдущий релиз'
+                : `Сравнение с историей: ${tcBase.n} прошлых релизов`)
+            : 'Истории релизов недостаточно для сравнения';
+
+          const tcDiff = diffToBase(tcBase);
+          const covDiff = diffToBase(covBase);
+          const covSwatDiff = diffToBase(covSwatBase);
+          const covStreamDiff = diffToBase(covStreamBase);
+          const selDiff = diffToBase(selBase);
+          const avgDiff = diffToBase(avgBase);
+          const avgWeightedDiff = diffToBase(avgWeightedBase);
+          const chpDiff = diffToBase(chpBase);
+          const chpIosDiff = diffToBase(chpIosBase);
+          const chpAndDiff = diffToBase(chpAndBase);
+          const storeIosDiff = diffToBase(storeIosBase);
+          const storeAndDiff = diffToBase(storeAndBase);
+          const lagIosDiff = diffToBase(lagIosBase);
+          const lagAndDiff = diffToBase(lagAndBase);
+          const histCount = tcBase.n;
+
+          const anomalies = mlLastAnomalies || computeAnomalies();
+          const escHtml = (s) => String(s || '')
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/\"/g,'&quot;')
+            .replace(/'/g,'&#39;');
+          const tip = (text) => `data-tip="${escHtml(text)}"`;
+          const fmtPct = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+          const insightLine = (label, delta, deltaPct, digits=0, unit='', desc='') => {
+            if(delta == null) return null;
+            const dir = delta > 0 ? 'выросло' : (delta < 0 ? 'снизилось' : 'без изменений');
+            const absVal = digits ? Math.abs(delta).toFixed(digits) : Math.round(Math.abs(delta));
+            const pct = Number.isFinite(deltaPct) ? ` ${fmtDeltaPct(deltaPct)}` : '';
+            const suffix = unit ? ` ${unit}` : '';
+            return `<div class="ml-insight" ${tip(desc)}>${label}: ${dir} на ${absVal}${suffix}${pct}</div>`;
+          };
+          const insightLineTime = (label, delta, deltaPct, unit='мин.', desc='') => {
+            if(delta == null) return null;
+            const dir = delta > 0 ? 'позже' : (delta < 0 ? 'раньше' : 'без изменений');
+            const absVal = Math.abs(delta).toFixed(1);
+            const pct = Number.isFinite(deltaPct) ? ` ${fmtDeltaPct(deltaPct)}` : '';
+            return `<div class="ml-insight" ${tip(desc)}>${label}: ${dir} на ${absVal} ${unit}${pct}</div>`;
+          };
+          const descs = {
+            tc: 'Общее число тест-кейсов по релизу (Smoke + Selective). Показывает объем регресса.',
+            hbSwat: 'High/Blocker кейсы, выполненные SWAT.',
+            hbStream: 'High/Blocker кейсы, выполненные Stream.',
+            hbTotal: 'Сумма High/Blocker SWAT и Stream.',
+            selTotal: 'Сумма Selective SWAT и Stream.',
+            avgTotal: 'Среднее время на кейс (HB), минуты.',
+            avgCaseWeighted: 'Среднее время прохождения одного тест‑кейса (взвешенное по количеству кейсов), минуты.',
+            chpTotal: 'Общее число ЧП (issues) по релизу.',
+            chpIos: 'ЧП по iOS.',
+            chpAnd: 'ЧП по Android.',
+            storeIos: 'Время отправки iOS в Store (минуты от 00:00).',
+            storeAnd: 'Время отправки Android в Store (минуты от 00:00).',
+            lagIos: 'Разница Store−Cutoff для iOS (в минутах).',
+            lagAnd: 'Разница Store−Cutoff для Android (в минутах).',
+            vol: 'Стандартное отклонение TC Total по релизам (разброс значений).',
+            slope: 'Процентное изменение TC Total от первого к последнему релизу.',
+            anoms: 'Количество аномалий: резких изменений по релизам, типам и платформам.'
+          };
+          const anomRuleGeneric = 'Аномалия: резкое изменение последнего релиза. Срабатывает, если |z| ≥ 2 и |Δ| ≥ minAbs, либо |Δ%| ≥ порога и |Δ| ≥ minAbs.';
+          const getAnomDesc = (label) => {
+            const l = String(label || '').toLowerCase();
+            let metric = 'Метрика без описания.';
+            if(l.includes('tc total')) metric = descs.tc;
+            else if(l.includes('high/blocker swat+stream')) metric = descs.hbTotal;
+            else if(l.includes('high/blocker swat')) metric = descs.hbSwat;
+            else if(l.includes('high/blocker stream')) metric = descs.hbStream;
+            else if(l.includes('selective')) metric = descs.selTotal;
+            else if(l.includes('avg time') && (l.includes('weighted') || l.includes('взвеш'))) metric = descs.avgCaseWeighted;
+            else if(l.includes('avg time') || l.includes('avg')) metric = descs.avgTotal;
+            else if(l.includes('cherepiki total') || l.includes('chp total')) metric = descs.chpTotal;
+            else if(l.includes('cherepiki ios') || l.includes('chp ios')) metric = descs.chpIos;
+            else if(l.includes('cherepiki android') || l.includes('chp android')) metric = descs.chpAnd;
+            else if(l.includes('store ios')) metric = descs.storeIos;
+            else if(l.includes('store android')) metric = descs.storeAnd;
+            else if(l.includes('lag store ios') || l.includes('lag ios')) metric = descs.lagIos;
+            else if(l.includes('lag store android') || l.includes('lag android')) metric = descs.lagAnd;
+            else if(l.includes('types ios total')) metric = 'Сумма задач по типам (iOS).';
+            else if(l.includes('types android total')) metric = 'Сумма задач по типам (Android).';
+            else if(l.startsWith('ios:') || l.startsWith('android:')) metric = 'Изменение по конкретному типу задачи (Deploy‑lab).';
+            else if(l.startsWith('чп:') || l.includes('чп:')) metric = 'Изменение по типу ЧП (product / vlet / bug / crash).';
+            return `${metric} ${anomRuleGeneric}`;
+          };
+          const insightRegress = [
+            insightLine('Тест‑кейсы (Всего)', tcDiff.delta, tcDiff.deltaPct, 0, '', descs.tc),
+            insightLine('High/Blocker SWAT', covSwatDiff.delta, covSwatDiff.deltaPct, 0, '', descs.hbSwat),
+            insightLine('High/Blocker STREAM', covStreamDiff.delta, covStreamDiff.deltaPct, 0, '', descs.hbStream),
+            insightLine('High/Blocker SWAT+Stream', covDiff.delta, covDiff.deltaPct, 0, '', descs.hbTotal),
+            insightLine('Selective (Всего)', selDiff.delta, selDiff.deltaPct, 0, '', descs.selTotal),
+            insightLineTime('Среднее время (Общее)', avgDiff.delta, avgDiff.deltaPct, 'мин.', descs.avgTotal),
+            insightLineTime('Среднее время на кейс (взвеш.)', avgWeightedDiff.delta, avgWeightedDiff.deltaPct, 'мин.', descs.avgCaseWeighted)
+          ].filter(Boolean);
+          const insightRelease = [
+            insightLine('ЧП (Всего)', chpDiff.delta, chpDiff.deltaPct, 0, '', descs.chpTotal),
+            insightLine('ЧП iOS', chpIosDiff.delta, chpIosDiff.deltaPct, 0, '', descs.chpIos),
+            insightLine('ЧП Android', chpAndDiff.delta, chpAndDiff.deltaPct, 0, '', descs.chpAnd),
+            insightLineTime('Store iOS', storeIosDiff.delta, storeIosDiff.deltaPct, 'мин.', descs.storeIos),
+            insightLineTime('Store Android', storeAndDiff.delta, storeAndDiff.deltaPct, 'мин.', descs.storeAnd),
+            insightLineTime('Лаг iOS (Store−Cutoff)', lagIosDiff.delta, lagIosDiff.deltaPct, 'мин.', descs.lagIos),
+            insightLineTime('Лаг Android (Store−Cutoff)', lagAndDiff.delta, lagAndDiff.deltaPct, 'мин.', descs.lagAnd)
+          ].filter(Boolean);
+          const tcStatsAll = seriesStats(tcSeries);
+          const tcStatsHist = seriesStats(tcSeries.slice(0, -1));
+          const tcVolNow = tcStatsAll.std;
+          const tcVolBase = Number.isFinite(tcStatsHist.std) ? tcStatsHist.std : null;
+          const tcVolDiff = tcVolBase == null ? null : (tcVolNow - tcVolBase);
+          const tcVolDiffPct = tcVolBase ? (tcVolDiff / tcVolBase * 100) : null;
+          const tcSlopeNow = tcStatsAll.slopePct;
+          const tcSlopeBase = Number.isFinite(tcStatsHist.slopePct) ? tcStatsHist.slopePct : null;
+          const tcSlopeDiff = tcSlopeBase == null ? null : (tcSlopeNow - tcSlopeBase);
+
+          const metrics = [
+            { label:'Тест‑кейсы (Всего)', group:'regress', delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'up', absTh: 100, pctTh: 2 },
+            { label:'High/Blocker SWAT', group:'regress', delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', absTh: 20, pctTh: 2 },
+            { label:'High/Blocker STREAM', group:'regress', delta: covStreamDiff.delta, pct: covStreamDiff.deltaPct, better:'up', absTh: 20, pctTh: 2 },
+            { label:'High/Blocker SWAT+Stream', group:'regress', delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', absTh: 30, pctTh: 2 },
+            { label:'Selective (Всего)', group:'regress', delta: selDiff.delta, pct: selDiff.deltaPct, better:'up', absTh: 20, pctTh: 3 },
+            { label:'Avg time (Общее, мин.)', group:'regress', delta: avgDiff.delta, pct: avgDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2 },
+            { label:'Avg time на кейс (взвеш., мин.)', group:'regress', delta: avgWeightedDiff.delta, pct: avgWeightedDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2 },
+            { label:'ЧП (Всего)', group:'release', delta: chpDiff.delta, pct: chpDiff.deltaPct, better:'down', absTh: 2, pctTh: 5 },
+            { label:'ЧП iOS', group:'release', delta: chpIosDiff.delta, pct: chpIosDiff.deltaPct, better:'down', absTh: 2, pctTh: 5 },
+            { label:'ЧП Android', group:'release', delta: chpAndDiff.delta, pct: chpAndDiff.deltaPct, better:'down', absTh: 2, pctTh: 5 },
+            { label:'Store iOS (мин. от 00:00)', group:'release', delta: storeIosDiff.delta, pct: storeIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1 },
+            { label:'Store Android (мин. от 00:00)', group:'release', delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1 },
+            { label:'Лаг iOS (Store−Cutoff, мин.)', group:'release', delta: lagIosDiff.delta, pct: lagIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1 },
+            { label:'Лаг Android (Store−Cutoff, мин.)', group:'release', delta: lagAndDiff.delta, pct: lagAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1 },
+            { label:'Разброс тест‑кейсов (TC Total)', group:'stability', delta: tcVolDiff, pct: tcVolDiffPct, better:'down', absTh: 10, pctTh: 5 },
+            { label:'Тренд тест‑кейсов (TC Total, п.п.)', group:'stability', delta: tcSlopeDiff, pct: null, better:'up', absTh: 2, pctTh: null }
+          ];
+          const fmtChange = (m) => {
+            if(m.delta == null || !Number.isFinite(m.delta)) return null;
+            const abs = Math.abs(m.delta);
+            const pct = Number.isFinite(m.pct) ? ` ${fmtDeltaPct(m.pct)}` : '';
+            const val = abs >= 1 ? Math.round(abs) : abs.toFixed(2);
+            return `${m.label}: ${m.delta >= 0 ? '+' : '−'}${val}${pct}`;
+          };
+          const isSignificant = (m) => {
+            if(m.delta == null || !Number.isFinite(m.delta)) return false;
+            const abs = Math.abs(m.delta);
+            if(Number.isFinite(m.pct)) return Math.abs(m.pct) >= (m.pctTh ?? 3) || abs >= (m.absTh ?? 1);
+            return abs >= (m.absTh ?? 1);
+          };
+          const improvements = { regress: [], release: [], stability: [] };
+          const declines = { regress: [], release: [], stability: [] };
+          metrics.forEach(m => {
+            if(!isSignificant(m)) return;
+            if(m.better === 'up'){
+              if(m.delta > 0) improvements[m.group].push(fmtChange(m));
+              else if(m.delta < 0) declines[m.group].push(fmtChange(m));
+            }else if(m.better === 'down'){
+              if(m.delta < 0) improvements[m.group].push(fmtChange(m));
+              else if(m.delta > 0) declines[m.group].push(fmtChange(m));
+            }
+          });
+          const renderGroupSummary = (title, imp, dec) => `
+            <div>
+              <div class="ml-summary-sub">${title}</div>
+              <div class="ml-summary-list"><b>Улучшения:</b> ${imp.length ? imp.join(' • ') : 'нет заметных'}</div>
+              <div class="ml-summary-list"><b>Просадки:</b> ${dec.length ? dec.join(' • ') : 'нет заметных'}</div>
+            </div>
+          `;
+          const summaryText = `
+            <div class="ml-summary-text">
+              <div class="ml-summary-title">Итог по изменениям</div>
+              <div class="ml-summary-cols">
+                ${renderGroupSummary('Регресс', improvements.regress, declines.regress)}
+                ${renderGroupSummary('Релиз', improvements.release, declines.release)}
+                ${renderGroupSummary('Стабильность', improvements.stability, declines.stability)}
+              </div>
+            </div>
+          `;
+          const row = (label, valueHtml, deltaHtml, desc) =>
+            `<tr><td ${tip(desc)}>${label}</td><td>${valueHtml}</td><td>${deltaHtml}</td></tr>`;
+          const renderAnomList = (list) => {
+            if(!list || !list.length){
+              return '<div class="ml-anoms-empty">Нет аномалий</div>';
+            }
+            return list.map(a => `
+              <div class="ml-anoms-item">
+                <span class="ml-anoms-name" ${tip(getAnomDesc(a.label || ''))}>${escHtml(a.label || '')}</span>
+                <span class="ml-anoms-delta">${fmtDelta(a.delta || 0)} ${Number.isFinite(a.deltaPct) ? `(${fmtPct(a.deltaPct)})` : ''}</span>
+                ${Number.isFinite(a.z) ? `<span class="ml-anoms-z">z=${a.z.toFixed(2)}</span>` : ''}
+              </div>
+            `).join('');
+          };
+
+          mlSummaryBody.innerHTML = `
+            <div class="ml-status ${statusClass}">Статус: ${statusText}</div>
+            <div class="text-slate-500 text-sm">Выгрузок: ${data.length} • Меток: ${model.count || 0} • Обучение: ${model.trained ? 'готово' : (model.reason || '—')}</div>
+            <div class="ml-insights">
+              <div class="text-slate-600 text-sm">${compareNote}</div>
+              <div class="ml-insights-block">
+                <div class="ml-insights-title">Регресс</div>
+                ${insightRegress.length ? insightRegress.join('') : '<div class="ml-insight-empty">—</div>'}
+              </div>
+              <div class="ml-insights-block">
+                <div class="ml-insights-title">Релиз (ЧП / Store / Cutoff)</div>
+                ${insightRelease.length ? insightRelease.join('') : '<div class="ml-insight-empty">—</div>'}
+              </div>
+            </div>
+            <table class="ml-table" style="margin-top:10px">
+              <thead>
+                <tr><th>Метрика</th><th>Текущее</th><th>${compareLabel}</th></tr>
+              </thead>
+              <tbody>
+                <tr class="ml-section-row"><td colspan="3">Регресс</td></tr>
+                ${row('Тест‑кейсы (Всего)', Math.round(features.tc_total), `${fmtDelta(tcDiff.delta)} ${fmtDeltaPct(tcDiff.deltaPct)}`, descs.tc)}
+                ${row('High/Blocker SWAT', Math.round(covSwatBase.last), `${fmtDelta(covSwatDiff.delta)} ${fmtDeltaPct(covSwatDiff.deltaPct)}`, descs.hbSwat)}
+                ${row('High/Blocker STREAM', Math.round(covStreamBase.last), `${fmtDelta(covStreamDiff.delta)} ${fmtDeltaPct(covStreamDiff.deltaPct)}`, descs.hbStream)}
+                ${row('High/Blocker SWAT+Stream', Math.round(covBase.last), `${fmtDelta(covDiff.delta)} ${fmtDeltaPct(covDiff.deltaPct)}`, descs.hbTotal)}
+                ${row('Selective (Всего)', Math.round(selBase.last), `${fmtDelta(selDiff.delta)} ${fmtDeltaPct(selDiff.deltaPct)}`, descs.selTotal)}
+                ${row('Avg time (Общее, мин.)', avgBase.last.toFixed(2), `${fmtDelta(avgDiff.delta, 2)} ${fmtDeltaPct(avgDiff.deltaPct)}`, descs.avgTotal)}
+                ${row('Avg time на кейс (взвеш., мин.)', Number.isFinite(avgWeightedBase.last) ? avgWeightedBase.last.toFixed(2) : '—', `${fmtDelta(avgWeightedDiff.delta, 2)} ${fmtDeltaPct(avgWeightedDiff.deltaPct)}`, descs.avgCaseWeighted)}
+                <tr class="ml-section-row"><td colspan="3">Релиз</td></tr>
+                ${row('ЧП (Всего)', Math.round(chpBase.last), `${fmtDelta(chpDiff.delta)} ${fmtDeltaPct(chpDiff.deltaPct)}`, descs.chpTotal)}
+                ${row('ЧП iOS', Math.round(chpIosBase.last), `${fmtDelta(chpIosDiff.delta)} ${fmtDeltaPct(chpIosDiff.deltaPct)}`, descs.chpIos)}
+                ${row('ЧП Android', Math.round(chpAndBase.last), `${fmtDelta(chpAndDiff.delta)} ${fmtDeltaPct(chpAndDiff.deltaPct)}`, descs.chpAnd)}
+                ${row('Store iOS (мин. от 00:00)', Number.isFinite(storeIosBase.last) ? storeIosBase.last.toFixed(1) : '—', `${fmtDelta(storeIosDiff.delta, 1)} ${fmtDeltaPct(storeIosDiff.deltaPct)}`, descs.storeIos)}
+                ${row('Store Android (мин. от 00:00)', Number.isFinite(storeAndBase.last) ? storeAndBase.last.toFixed(1) : '—', `${fmtDelta(storeAndDiff.delta, 1)} ${fmtDeltaPct(storeAndDiff.deltaPct)}`, descs.storeAnd)}
+                ${row('Лаг iOS (Store−Cutoff, мин.)', Number.isFinite(lagIosBase.last) ? lagIosBase.last.toFixed(1) : '—', `${fmtDelta(lagIosDiff.delta, 1)} ${fmtDeltaPct(lagIosDiff.deltaPct)}`, descs.lagIos)}
+                ${row('Лаг Android (Store−Cutoff, мин.)', Number.isFinite(lagAndBase.last) ? lagAndBase.last.toFixed(1) : '—', `${fmtDelta(lagAndDiff.delta, 1)} ${fmtDeltaPct(lagAndDiff.deltaPct)}`, descs.lagAnd)}
+                <tr class="ml-section-row"><td colspan="3">Стабильность</td></tr>
+                <tr><td ${tip(descs.vol)}>Разброс тест‑кейсов (TC Total, σ от среднего)</td><td>${features.tc_volatility.toFixed(1)}</td><td>—</td></tr>
+                <tr><td ${tip(descs.slope)}>Тренд тест‑кейсов (TC Total, % от первого к последнему)</td><td>${features.tc_slope_pct.toFixed(2)}%</td><td>—</td></tr>
+                <tr class="ml-section-row"><td colspan="3">Аномалии</td></tr>
+                <tr><td ${tip(descs.anoms)}>Аномалии (релизы / типы / платформы)</td><td>${features.release_anoms} / ${features.type_anoms} / ${features.platform_anoms}</td><td>Score: ${features.anom_score}</td></tr>
+              </tbody>
+            </table>
+            <div class="ml-anoms">
+              <div class="ml-anoms-title">Аномалии (топ по значимости)</div>
+              <div class="ml-anoms-grid">
+                <div>Релизы: <b>${anomalies.release.count}</b></div>
+                <div>Типы: <b>${anomalies.type.count}</b></div>
+                <div>Платформы: <b>${anomalies.platform.count}</b></div>
+              </div>
+              <div class="ml-anoms-section">
+                <div class="ml-anoms-sub">Релизы</div>
+                <div class="ml-anoms-list">${renderAnomList(anomalies.release.list)}</div>
+              </div>
+              <div class="ml-anoms-section">
+                <div class="ml-anoms-sub">Типы</div>
+                <div class="ml-anoms-list">${renderAnomList(anomalies.type.list)}</div>
+              </div>
+              <div class="ml-anoms-section">
+                <div class="ml-anoms-sub">Платформы</div>
+                <div class="ml-anoms-list">${renderAnomList(anomalies.platform.list)}</div>
+              </div>
+            </div>
+            ${summaryText}
+          `;
         }
 
           // Sections: TC
@@ -1255,6 +2018,12 @@
             return s.trim().toLowerCase();
           }
 
+          function getDeployToken(){
+            const raw = (inpDeployToken?.value || '').trim();
+            if(!raw) return '';
+            return raw.replace(/^Bearer\s+/i, '').trim();
+          }
+
           function authHeaders(){
             const tok = (inpAllureToken?.value || '').trim();
             return {
@@ -1265,11 +2034,18 @@
 
           // ВАЖНО: тут должны быть минимально нужные заголовки
           function deployHeaders(){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
+            if(!tok) return {
+              'accept': '*/*',
+              'accept-language': 'ru,en;q=0.9'
+            };
+            const bearer = `Bearer ${tok}`;
             return {
               'accept': '*/*',
               'accept-language': 'ru,en;q=0.9',
-              'authorization-deploy-lab': `Bearer ${tok}`
+              'authorization-deploy-lab': bearer,
+              'Authorization': bearer,
+              'X-Authorization': bearer
             };
           }
 
@@ -1305,24 +2081,42 @@
             throw lastErr;
           }
 
-          async function proxyGetJson(targetUrl, headers, signal){
-            const p = new URL(PROXY_BASE + '/proxy');
+          function buildProxyRequestUrl(targetUrl){
+            const p = new URL(PROXY_BASE);
+            if (!/\/proxy$/i.test(p.pathname)) {
+              p.pathname = p.pathname.replace(/\/+$/, '') + '/proxy';
+            }
             p.searchParams.set('url', targetUrl);
+            return p.toString();
+          }
+
+          function buildProxyHealthUrl(){
+            const p = new URL(PROXY_BASE);
+            if (/\/proxy$/i.test(p.pathname)) {
+              p.pathname = p.pathname.replace(/\/proxy$/i, '/health');
+            } else {
+              p.pathname = p.pathname.replace(/\/+$/, '') + '/health';
+            }
+            return p.toString();
+          }
+
+          async function proxyGetJson(targetUrl, headers, signal){
+            const proxiedUrl = buildProxyRequestUrl(targetUrl);
             return fetchWithRetry(async () => {
-              const r = await fetch(p.toString(), { headers, signal });
+              const r = await fetch(proxiedUrl, { headers, signal });
               if(!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
               return r.json();
             });
           }
 
           async function fetchLastCherepik(prefix, release, signal){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
             if(!tok) return null;
 
             const url = `https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/${prefix}_${release}/notification_history`;
             try {
               const headers = {
-                'authorization-deploy-lab': `Bearer ${tok}`,
+                ...deployHeaders(),
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
               };
               const response = await proxyGetJson(url, headers, signal);
@@ -1349,7 +2143,7 @@
           }
 
           async function fetchDeployIssueCount(prefix, release, signal){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
             if(!tok) return 0;
             const url = DEPLOY_ISSUES_URL_TMPL
               .replace('{prefix}', prefix)
@@ -1364,7 +2158,7 @@
           }
 
           async function fetchDeployIssuesList(prefix, release, signal){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
             if(!tok) return [];
 
             const url = DEPLOY_ISSUES_URL_TMPL
@@ -2113,7 +2907,7 @@
           }
 
           async function fetchDeployDates(prefix, release, signal){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
             if(!tok) return { cutoff: null, store: null };
 
             const baseUrl = DEPLOY_BASE_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
@@ -4494,10 +5288,16 @@
             const covRowsData = [];
             const selRowsData = [];
             const avgRowsData = [];
+            const chpRowsData = [];
             const tcStreamByRelease = [];
             let tcStreamDeltaRowsAll = [];
 
             let firstRow = true;
+            window.__iosTypesRowsAll = [];
+            window.__andTypesRowsAll = [];
+            window.__chpTypesRowsAll = [];
+            window.__chpTypesRowsIosAll = [];
+            window.__chpTypesRowsAndAll = [];
 
             for(const rel of releases){
               if(signal?.aborted) break;
@@ -4573,6 +5373,9 @@
               let swatAvgMsSum = 0, swatAvgCount = 0;
               let streamAvgMsSum = 0, streamAvgCount = 0;
               let totalAvgMsSum = 0, totalAvgCount = 0;
+              let swatDurAll = 0, swatCasesAll = 0;
+              let streamDurAll = 0, streamCasesAll = 0;
+              let totalDurAll = 0, totalCasesAll = 0;
 
               for(const [login, agg] of avgByLogin.entries()){
                 const cases = Number(agg?.cases || 0);
@@ -4580,27 +5383,46 @@
                 const dur = Number(agg?.dur || 0);
                 const avgMs = dur / cases;
 
+                totalDurAll += dur;
+                totalCasesAll += cases;
+
                 totalAvgMsSum += avgMs;
                 totalAvgCount += 1;
 
                 if(swatSet.has(login)){
                   swatAvgMsSum += avgMs;
                   swatAvgCount += 1;
+                  swatDurAll += dur;
+                  swatCasesAll += cases;
                 }else{
                   streamAvgMsSum += avgMs;
                   streamAvgCount += 1;
+                  streamDurAll += dur;
+                  streamCasesAll += cases;
                 }
               }
 
               const swatMsPerCase = swatAvgCount ? (swatAvgMsSum / swatAvgCount) : 0;
               const streamMsPerCase = streamAvgCount ? (streamAvgMsSum / streamAvgCount) : 0;
               const totalMsPerCase = totalAvgCount ? (totalAvgMsSum / totalAvgCount) : 0;
+              const swatMsPerCaseWeighted = swatCasesAll ? (swatDurAll / swatCasesAll) : 0;
+              const streamMsPerCaseWeighted = streamCasesAll ? (streamDurAll / streamCasesAll) : 0;
+              const totalMsPerCaseWeighted = totalCasesAll ? (totalDurAll / totalCasesAll) : 0;
 
               addAvgPoint(rel, swatMsPerCase/60000, streamMsPerCase/60000, totalMsPerCase/60000);
               if(avgTbody){
                 renderAvgRow({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase });
               }
-              avgRowsData.push({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase, total: totalMsPerCase });
+              avgRowsData.push({
+                release: rel,
+                swatMs: swatMsPerCase,
+                streamMs: streamMsPerCase,
+                totalMs: totalMsPerCase,
+                total: totalMsPerCase,
+                swatWeighted: swatMsPerCaseWeighted,
+                streamWeighted: streamMsPerCaseWeighted,
+                totalWeighted: totalMsPerCaseWeighted
+              });
 
               // 2) SWAT/STREAM ХБ: только HB лаунчи, memberstats
               let swatCount = 0;
@@ -4721,6 +5543,7 @@
                 chpTbody.appendChild(tr);
               }
               addChpPoint(rel, chpIos, chpAndroid, chpTotal);
+              chpRowsData.push({ release: rel, ios: chpIos, android: chpAndroid, total: chpTotal });
 
               // Cutoff/Store (deploy-lab base+deploy)
               let iosCutLbl = null, iosStoreLbl = null, andCutLbl = null, andStoreLbl = null;
@@ -4817,11 +5640,15 @@
 
             window.__tcRowsAll = tcRowsData.slice();
             window.__tcDeltaRowsAll = tcStreamDeltaRowsAll.slice();
+            window.__covRowsAll = covRowsData.slice();
+            window.__selRowsAll = selRowsData.slice();
+            window.__avgRowsAll = avgRowsData.slice();
+            window.__chpRowsAll = chpRowsData.slice();
             populateAllReleaseFilters(releases);
             applyAllReleaseFilters();
 
             // Типы задач (Deploy-lab issues): iOS + Android
-            const deployTok = (inpDeployToken?.value || '').trim();
+            const deployTok = getDeployToken();
             const ytTok = (inpYtToken?.value || '').trim();
             if(!deployTok){
               showIosTypesEmpty('Вставьте токен Deploy-lab');
@@ -4922,6 +5749,11 @@
 
               const iosTypes = sortTypesByCanon(iosSet);
               const andTypes = sortTypesByCanon(andSet);
+              window.__iosTypesRowsAll = iosRows.slice();
+              window.__andTypesRowsAll = andRows.slice();
+              window.__chpTypesRowsAll = chpTypesRows.slice();
+              window.__chpTypesRowsIosAll = chpTypesRowsIos.slice();
+              window.__chpTypesRowsAndAll = chpTypesRowsAnd.slice();
 
               if(!iosTypes.length){
                 showIosTypesEmpty('Нет данных по типам задач (iOS) в Deploy-lab');
@@ -5013,6 +5845,7 @@
 
             if(!tcRowsData.length) showEmpty('Данные появятся после получения из источника');
             if(!selRowsData.length) showSelEmpty('Данные появятся после получения из источника');
+            renderMlSummary();
           }
 
           // init
@@ -5023,6 +5856,7 @@
           showEmpty('Данные появятся после получения из источника');
           showCovEmpty('Данные появятся после получения из источника');
           showSelEmpty('Данные появятся после получения из источника');
+          renderMlSummary();
           showAvgEmpty('Данные появятся после получения из источника');
           showChpEmpty('Данные появятся после получения из источника');
           showChpTypesEmpty('Данные появятся после получения из источника');
@@ -5053,10 +5887,13 @@
 
           proxyBtn?.addEventListener('click', async () => {
             try{
-              const r = await fetch(PROXY_BASE + '/health', { cache: 'no-store' });
+              const r = await fetch(buildProxyHealthUrl(), { cache: 'no-store' });
               const j = await r.json();
-              const ok = !!(j && j.ok === true && Number(j.port) === 8787);
-              showToast(ok ? `Прокси OK (порт ${j.port})` : 'Прокси не отвечает', ok);
+              const ok = !!(j && j.ok === true);
+              const label = ok
+                ? `Прокси OK${j && j.port ? ` (порт ${j.port})` : ''}`
+                : 'Прокси не отвечает';
+              showToast(label, ok);
             }catch(e){
               showToast('Прокси не отвечает', false);
             }
@@ -5081,6 +5918,69 @@
           stopBtn?.addEventListener('click', () => {
             setRunning(false);
           });
+
+          mlSaveBtn?.addEventListener('click', () => {
+            const entry = recordMlExport();
+            if(entry){
+              renderMlSummary();
+              showToast('Выгрузка сохранена', true);
+            }else{
+              showToast('Нет данных для сохранения', false);
+            }
+          });
+
+          // custom tooltip for data-tip
+          if(mlTooltip){
+            let tipTarget = null;
+            const placeTip = (x, y) => {
+              const pad = 12;
+              const rect = mlTooltip.getBoundingClientRect();
+              let nx = x + pad;
+              let ny = y + pad;
+              if(nx + rect.width > window.innerWidth - 8) nx = x - rect.width - pad;
+              if(ny + rect.height > window.innerHeight - 8) ny = y - rect.height - pad;
+              mlTooltip.style.left = `${nx}px`;
+              mlTooltip.style.top = `${ny}px`;
+            };
+            const showTip = (el, evt) => {
+              const text = el?.getAttribute('data-tip') || '';
+              if(!text) return;
+              mlTooltip.textContent = text;
+              mlTooltip.style.opacity = '1';
+              mlTooltip.style.display = 'block';
+              tipTarget = el;
+              if(evt) placeTip(evt.clientX, evt.clientY);
+            };
+            const hideTip = () => {
+              mlTooltip.style.opacity = '0';
+              mlTooltip.style.display = 'none';
+              tipTarget = null;
+            };
+            const getTipEl = (target) => {
+              if(!target) return null;
+              const base = target.nodeType === 1 ? target : target.parentElement;
+              return base?.closest ? base.closest('[data-tip]') : null;
+            };
+            document.addEventListener('mouseover', (e) => {
+              const el = getTipEl(e.target);
+              if(!el || document.body.classList.contains('pdf-export')) return;
+              showTip(el, e);
+            });
+            document.addEventListener('mousemove', (e) => {
+              if(!tipTarget) return;
+              placeTip(e.clientX, e.clientY);
+            });
+            document.addEventListener('mouseout', (e) => {
+              if(!tipTarget) return;
+              const rel = getTipEl(e.relatedTarget);
+              if(rel) return;
+              hideTip();
+            });
+          }
+
+          mlLabelOkBtn?.addEventListener('click', () => labelLastExport('ok'));
+          mlLabelFailBtn?.addEventListener('click', () => labelLastExport('fail'));
+          comparePrevOnly?.addEventListener('change', renderMlSummary);
         })();
       </script>
     </main>
@@ -5089,5 +5989,6 @@
   <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 opacity-0 transition-opacity duration-200">
     <div id="toastInner" class="px-4 py-2 rounded-2xl text-sm font-semibold bg-white/90 ring-1 ring-[#ecebff] text-slate-700 shadow"></div>
   </div>
+  <div id="mlTooltip" class="ml-tooltip" aria-hidden="true"></div>
 </body>
 </html>
