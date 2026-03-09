@@ -2358,16 +2358,14 @@ table { font-size: 13.5px; }
   }
 
   function mergeUsers(baseUsers, customUsers = loadCustomUsers()) {
-    const seen = new Set();
-    return [...(Array.isArray(baseUsers) ? baseUsers : []), ...(Array.isArray(customUsers) ? customUsers : [])]
+    const merged = new Map();
+    [...(Array.isArray(baseUsers) ? baseUsers : []), ...(Array.isArray(customUsers) ? customUsers : [])]
       .map(sanitizeUserRecord)
       .filter(Boolean)
-      .filter((user) => {
-        const key = user.login.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
+      .forEach((user) => {
+        merged.set(user.login.toLowerCase(), user);
       });
+    return Array.from(merged.values());
   }
 
   function normalizeConfig(cfg) {
@@ -2423,6 +2421,8 @@ table { font-size: 13.5px; }
     const targetLogin = String(login || '').trim();
     if (!targetLogin) return refreshConfigSnapshot();
     const customUsers = loadCustomUsers();
+    const allUsers = refreshConfigSnapshot().users || [];
+    const baseUser = allUsers.find((user) => user.login.toLowerCase() === targetLogin.toLowerCase()) || null;
     let changed = false;
     const nextUsers = customUsers.map((user) => {
       if (user.login.toLowerCase() !== targetLogin.toLowerCase()) return user;
@@ -2431,6 +2431,15 @@ table { font-size: 13.5px; }
       const nextPass = typeof patch.pass === 'string' && patch.pass.trim() ? patch.pass.trim() : user.pass;
       return sanitizeUserRecord({ ...user, role: nextRole, pass: nextPass }) || user;
     });
+    if (!changed && baseUser) {
+      const nextRole = typeof patch.role === 'string' && patch.role.trim() ? patch.role.trim() : baseUser.role;
+      const nextPass = typeof patch.pass === 'string' && patch.pass.trim() ? patch.pass.trim() : baseUser.pass;
+      const overrideUser = sanitizeUserRecord({ ...baseUser, role: nextRole, pass: nextPass });
+      if (overrideUser) {
+        nextUsers.push(overrideUser);
+        changed = true;
+      }
+    }
     if (changed) saveCustomUsers(nextUsers);
     return refreshConfigSnapshot();
   };
@@ -2744,6 +2753,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <label>Роль пользователя</label>
                 <select id="userRoleSelect"></select>
               </div>
+              <div class="field" style="margin-bottom:10px;">
+                <label>Новый пароль</label>
+                <input id="userPassInput" type="password" placeholder="Оставьте пустым, если менять не нужно" />
+              </div>
               <label class="access-item" style="margin-bottom:10px;">
                 <input type="checkbox" id="userUseRoleAccess" checked />
                 <span>Использовать доступы роли</span>
@@ -2877,6 +2890,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const toastTextEl = document.getElementById('toastText');
   const userListEl = document.getElementById('userList');
   const userRoleSelect = document.getElementById('userRoleSelect');
+  const userPassInput = document.getElementById('userPassInput');
   const userUseRoleAccess = document.getElementById('userUseRoleAccess');
   const userAccessList = document.getElementById('userAccessList');
   const userSelectAllBtn = document.getElementById('userAccessSelectAll');
@@ -3669,12 +3683,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderUserEditor() {
-    if (!userRoleSelect || !userAccessList || !userUseRoleAccess) return;
+    if (!userRoleSelect || !userAccessList || !userUseRoleAccess || !userPassInput) return;
     syncManagedUsers();
     if (!selectedUser) {
       userRoleSelect.innerHTML = '<option value="viewer">Наблюдатель</option>';
       userRoleSelect.value = 'viewer';
       userRoleSelect.disabled = true;
+      userPassInput.value = '';
+      userPassInput.disabled = true;
       userUseRoleAccess.checked = true;
       userUseRoleAccess.disabled = true;
       userAccessList.innerHTML = '<div class="nums">Создайте пользователя, чтобы настроить ему права.</div>';
@@ -3695,6 +3711,8 @@ document.addEventListener('DOMContentLoaded', () => {
       userRoleSelect.disabled = false;
       userUseRoleAccess.checked = userEditUseRole !== null ? userEditUseRole : (userCfg.useRole !== false);
     }
+    userPassInput.value = '';
+    userPassInput.disabled = false;
     userUseRoleAccess.disabled = isNightlays;
 
     const useRole = userUseRoleAccess.checked;
@@ -4095,6 +4113,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!selectedUser) return;
       const isNightlays = selectedUser === 'Nightlays';
       const chosenRole = isNightlays ? 'superadmin' : (userRoleSelect?.value || 'viewer');
+      const nextPass = (userPassInput?.value || '').trim();
       userRoleMap[selectedUser] = chosenRole;
       const useRole = isNightlays ? true : !!userUseRoleAccess.checked;
       const checked = Array.from(userAccessList?.querySelectorAll('input[type="checkbox"]') || [])
@@ -4104,9 +4123,10 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem(USER_ROLE_KEY, JSON.stringify(userRoleMap));
       localStorage.setItem(USER_ACCESS_KEY, JSON.stringify(userAccessMap));
       if (typeof window.updateRbCustomUser === 'function') {
-        window.updateRbCustomUser(selectedUser, { role: chosenRole });
+        window.updateRbCustomUser(selectedUser, { role: chosenRole, pass: nextPass || undefined });
       }
       userEditUseRole = null;
+      if (userPassInput) userPassInput.value = '';
       renderUserList();
       renderUserEditor();
       const currentUser = localStorage.getItem(USER_KEY) || '';
@@ -4115,7 +4135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyRoleAccess(chosenRole, currentUser);
       }
       renderTeamProfile();
-      showToast('Настройки сохранены');
+      showToast(nextPass ? 'Роль, доступы и пароль обновлены' : 'Настройки сохранены');
     });
   }
 
