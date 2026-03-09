@@ -2523,12 +2523,6 @@ document.addEventListener('DOMContentLoaded', () => {
     { id: 'theme-ocean-glass', label: 'Ocean Glass' }
   ];
   const THEME_IDS = THEME_ITEMS.map(item => item.id);
-  const FRAME_THEME_VAR_NAMES = [
-    '--bg', '--card', '--text', '--muted', '--wb', '--wb-deep', '--line', '--line-strong',
-    '--ink', '--btn-bg', '--btn-br', '--btn-hl', '--shadow-lg', '--shadow-md', '--shadow-sm',
-    '--surface-hover', '--accent-soft', '--swatch-border', '--brand-shadow', '--accent-shadow',
-    '--accent-shell-top', '--accent-shell-bottom', '--scrim', '--auth-text', '--card-sheen'
-  ];
   const roleListEl = document.getElementById('roleList');
   const accessListEl = document.getElementById('accessList');
   const roleChipEl = document.getElementById('roleChip');
@@ -2594,7 +2588,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add(nextTheme);
     renderThemeState(nextTheme);
     if (persist) localStorage.setItem(THEME_KEY, nextTheme);
-    applyProxyConfigToFrame(frame, runtimeProxyConfig);
   }
 
   function closeThemeMenu() {
@@ -2737,136 +2730,11 @@ document.addEventListener('DOMContentLoaded', () => {
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  function buildFrameThemeVars() {
-    const styles = getComputedStyle(document.body);
-    return FRAME_THEME_VAR_NAMES.map(name => `${name}:${styles.getPropertyValue(name).trim()};`).join('');
-  }
-
-  function injectFrameLayoutOverrides(doc) {
-    if (!doc || !doc.head) return;
-    let varsStyle = doc.getElementById('rbShellFrameThemeVars');
-    if (!varsStyle) {
-      varsStyle = doc.createElement('style');
-      varsStyle.id = 'rbShellFrameThemeVars';
-      doc.head.appendChild(varsStyle);
-    }
-    varsStyle.textContent = `:root{${buildFrameThemeVars()}}`;
-
-    let style = doc.getElementById('rbShellFrameViewportOverrides');
-    if (!style) {
-      style = doc.createElement('style');
-      style.id = 'rbShellFrameViewportOverrides';
-      style.textContent = `
-        html, body {
-          max-width: none !important;
-          background: var(--bg) !important;
-          color: var(--text) !important;
-          font-family: 'Onest', system-ui, -apple-system, Segoe UI, Roboto, sans-serif !important;
-        }
-        body {
-          background-image:
-            radial-gradient(ellipse 64% 46% at 18% 8%, color-mix(in srgb, var(--wb) 18%, transparent), transparent 72%),
-            linear-gradient(180deg, color-mix(in srgb, var(--bg) 95%, transparent), color-mix(in srgb, var(--bg) 100%, black 0%)) !important;
-        }
-        .topbar {
-          background: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, transparent), color-mix(in srgb, var(--card) 84%, transparent)) !important;
-          border-bottom: 1px solid var(--line) !important;
-          backdrop-filter: blur(16px) saturate(140%);
-          box-shadow: inset 0 -1px 0 var(--line) !important;
-        }
-        .topbar .inner,
-        .wrap {
-          max-width: none !important;
-          width: 100% !important;
-          margin-left: 0 !important;
-          margin-right: 0 !important;
-          padding-left: clamp(10px, 1.1vw, 20px) !important;
-          padding-right: clamp(10px, 1.1vw, 20px) !important;
-        }
-        h1, h2, h3, h4, h5, h6, .brand .title, .title, .release-title, .head, strong {
-          color: var(--text) !important;
-        }
-        p, label, small, .nums, .meta, .release-sub, .field label {
-          color: var(--muted) !important;
-        }
-        .card, .panel, .section, .release-card, .mini-card, .snap, .chart-wrap, .log,
-        .stream-menu, .rr-dd-menu, .kpi, .report, .release-row > *, .split > *, .mini-grid > * {
-          background: linear-gradient(180deg, color-mix(in srgb, var(--card) 97%, transparent), color-mix(in srgb, var(--card) 88%, var(--bg) 12%)) !important;
-          border-color: color-mix(in srgb, var(--line) 92%, transparent) !important;
-          color: var(--text) !important;
-          box-shadow: 0 16px 34px color-mix(in srgb, var(--bg) 64%, transparent), inset 0 1px 0 var(--card-sheen) !important;
-        }
-        .card::before, .section::before, .release-card::before, .mini-card::before {
-          background: linear-gradient(90deg, transparent, var(--wb-deep), transparent) !important;
-          opacity: .6 !important;
-        }
-        input, select, textarea {
-          background: var(--btn-bg) !important;
-          color: var(--text) !important;
-          border: 1px solid var(--line) !important;
-          box-shadow: none !important;
-        }
-        input::placeholder, textarea::placeholder {
-          color: color-mix(in srgb, var(--muted) 88%, white 12%) !important;
-        }
-        input:focus, select:focus, textarea:focus {
-          border-color: var(--line-strong) !important;
-          box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb) 22%, transparent) !important;
-        }
-        button, .btn, .mini, .release-chip, .snap .del, .stream-filter-btn {
-          background: var(--btn-bg) !important;
-          color: var(--text) !important;
-          border-color: var(--line) !important;
-          box-shadow: 0 6px 18px color-mix(in srgb, var(--bg) 68%, transparent) !important;
-        }
-        .btn.primary, .btn.success, .btn.danger, button.primary, button.success, button.danger,
-        .tabs button.active, .subtabs .mini.active {
-          color: #fff !important;
-          border-color: transparent !important;
-        }
-        .btn.primary, button.primary, .tabs button.active, .subtabs .mini.active {
-          background: linear-gradient(135deg, var(--wb), var(--wb-deep)) !important;
-        }
-        .btn.success, button.success {
-          background: linear-gradient(135deg, #14b86e, #0ea65f) !important;
-        }
-        .btn.danger, button.danger {
-          background: linear-gradient(135deg, #ef4444, #db2c2c) !important;
-        }
-        .tabs button, .mini, .pill, .release-chip {
-          border-radius: 12px !important;
-        }
-        table, th, td {
-          border-color: var(--line) !important;
-          color: var(--text) !important;
-        }
-        th {
-          background: color-mix(in srgb, var(--card) 92%, var(--btn-bg) 8%) !important;
-        }
-        td {
-          background: color-mix(in srgb, var(--card) 98%, transparent) !important;
-        }
-        .log, pre {
-          background: color-mix(in srgb, var(--btn-bg) 88%, transparent) !important;
-          color: var(--text) !important;
-        }
-      `;
-      doc.head.appendChild(style);
-    }
-
-    doc.documentElement.dataset.shellTheme = getCurrentThemeId();
-    if (doc.body) {
-      doc.body.dataset.shellTheme = getCurrentThemeId();
-      doc.body.classList.add('rb-shell-themed');
-    }
-  }
-
   function applyProxyConfigToFrame(frameEl, cfg) {
     if (!frameEl) return;
     const win = frameEl.contentWindow;
     const doc = frameEl.contentDocument;
     if (!win || !doc) return;
-    injectFrameLayoutOverrides(doc);
     if (!cfg || !cfg.base) return;
 
     const baseWithSlash = `${cfg.base}/`;
