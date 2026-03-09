@@ -1172,12 +1172,81 @@ table { font-size: 13.5px; }
   body.rb-locked .topbar .actions .btn-logout {
     display: none !important;
   }
-  .profile-directory-card{
-    display:none;
-    margin-bottom:16px;
+  body.modal-open{
+    overflow:hidden;
   }
-  body.profile-open .profile-directory-card{
+  .shell-modal{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:rgba(20, 14, 37, .24);
+    backdrop-filter:blur(12px);
+    z-index:4000;
+    isolation:isolate;
+  }
+  .shell-modal[hidden]{
+    display:none !important;
+  }
+  .shell-modal.open{
+    display:flex;
+  }
+  .shell-modal-dialog{
+    width:min(1120px, calc(100vw - 32px));
+    max-height:calc(100vh - 32px);
+    display:flex;
+    flex-direction:column;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:24px;
+    box-shadow:var(--shadow-lg);
+    overflow:hidden;
+  }
+  .shell-modal-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    padding:22px 24px 18px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%), color-mix(in srgb, var(--card) 100%, transparent));
+  }
+  .shell-modal-title{
+    font-size:22px;
+    font-weight:900;
+    color:var(--text);
+  }
+  .shell-modal-note{
+    margin-top:6px;
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.5;
+  }
+  .shell-modal-close{
+    min-width:44px;
+    min-height:44px;
+    padding:0 14px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:22px;
+    line-height:1;
+  }
+  .shell-modal-body{
+    padding:18px 24px 24px;
+    overflow:auto;
+    display:grid;
+    gap:16px;
+  }
+  .shell-modal-stack{
+    display:grid;
+    gap:16px;
+  }
+  .profile-directory-card{
     display:block;
+    margin:0;
   }
   .profile-user-grid{
     display:grid;
@@ -1371,15 +1440,62 @@ table { font-size: 13.5px; }
     margin-top:12px;
     flex-wrap:wrap;
   }
-  #roleAccessCard, #userAccessCard { display:none; }
-  body.role-superadmin.access-open #roleAccessCard,
-  body.role-superadmin.access-open #userAccessCard { display:block; }
+  .shell-modal-body .role-access-card{
+    margin:0;
+  }
+  #roleAccessCard, #userAccessCard { display:block; }
   body:not(.role-superadmin) #accessToggleBtn{ display:none !important; }
   body:not(.role-superadmin) #roleAccessCard{ display:none !important; }
   body:not(.role-superadmin) #userAccessCard{ display:none !important; }
+  .user-create-card{
+    padding:14px;
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:color-mix(in srgb, var(--btn-bg) 88%, white 12%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  .user-create-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(180px,.8fr) auto;
+    gap:10px;
+    align-items:end;
+  }
+  .user-create-grid .btn-primary{
+    width:auto;
+    min-width:160px;
+    white-space:nowrap;
+  }
+  .user-create-note{
+    margin-top:10px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.5;
+  }
   @media (max-width: 900px){
+    .shell-modal{
+      padding:12px;
+      align-items:stretch;
+    }
+    .shell-modal-dialog{
+      width:100%;
+      max-height:none;
+      min-height:100%;
+      border-radius:22px;
+    }
+    .shell-modal-head{
+      padding:18px 18px 14px;
+    }
+    .shell-modal-body{
+      padding:14px 18px 18px;
+    }
     .role-access-grid{ grid-template-columns: 1fr; }
     .access-list{ grid-template-columns: 1fr; }
+    .user-create-grid{
+      grid-template-columns:1fr;
+    }
+    .user-create-grid .btn-primary{
+      width:100%;
+    }
   }
   .role-access-card select{
     width:100%;
@@ -1417,6 +1533,7 @@ table { font-size: 13.5px; }
 <script>
 (() => {
   const RB_CONFIG_URL = 'rb_roles_access.json';
+  const RB_CUSTOM_USERS_KEY = 'rb_custom_users_v1';
   const RB_FALLBACK_CONFIG = {
     roles: [
       { id: 'superadmin', label: 'Суперадмин' },
@@ -1461,13 +1578,62 @@ table { font-size: 13.5px; }
     userAccess: {}
   };
 
+  let rbConfigSource = null;
+
+  function sanitizeUserRecord(raw) {
+    const login = typeof raw?.login === 'string' ? raw.login.trim() : '';
+    const pass = typeof raw?.pass === 'string' ? raw.pass.trim() : '';
+    if (!login || !pass) return null;
+    let role = typeof raw?.role === 'string' && raw.role.trim() ? raw.role.trim() : 'viewer';
+    if (login !== 'Nightlays' && role === 'superadmin') role = 'admin';
+    return { login, pass, role };
+  }
+
+  function loadCustomUsers() {
+    try {
+      const raw = localStorage.getItem(RB_CUSTOM_USERS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(sanitizeUserRecord).filter(Boolean);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCustomUsers(users) {
+    const normalized = Array.isArray(users) ? users.map(sanitizeUserRecord).filter(Boolean) : [];
+    localStorage.setItem(RB_CUSTOM_USERS_KEY, JSON.stringify(normalized));
+    return normalized;
+  }
+
+  function mergeUsers(baseUsers, customUsers = loadCustomUsers()) {
+    const merged = new Map();
+    [...(Array.isArray(baseUsers) ? baseUsers : []), ...(Array.isArray(customUsers) ? customUsers : [])]
+      .map(sanitizeUserRecord)
+      .filter(Boolean)
+      .forEach((user) => {
+        merged.set(user.login.toLowerCase(), user);
+      });
+    return Array.from(merged.values());
+  }
+
   function normalizeConfig(cfg) {
     const safe = cfg && typeof cfg === 'object' ? cfg : {};
     const roles = Array.isArray(safe.roles) && safe.roles.length ? safe.roles : RB_FALLBACK_CONFIG.roles;
-    const users = Array.isArray(safe.users) && safe.users.length ? safe.users : RB_FALLBACK_CONFIG.users;
+    const baseUsers = Array.isArray(safe.users) && safe.users.length ? safe.users : RB_FALLBACK_CONFIG.users;
+    const users = mergeUsers(baseUsers);
     const roleAccess = { ...RB_FALLBACK_CONFIG.roleAccess, ...(safe.roleAccess || {}) };
     const userAccess = { ...(safe.userAccess || {}) };
     return { roles, users, roleAccess, userAccess };
+  }
+
+  function refreshConfigSnapshot(source = rbConfigSource) {
+    const normalized = normalizeConfig(source);
+    window.RB_CONFIG = normalized;
+    window.RB_CONFIG_PROMISE = Promise.resolve(normalized);
+    window.dispatchEvent(new CustomEvent('rb-users-updated', { detail: { users: normalized.users } }));
+    return normalized;
   }
 
   window.loadRbConfig = function loadRbConfig() {
@@ -1476,11 +1642,56 @@ table { font-size: 13.5px; }
       .then(res => res.ok ? res.json() : null)
       .catch(() => null)
       .then(cfg => {
-        const normalized = normalizeConfig(cfg);
-        window.RB_CONFIG = normalized;
-        return normalized;
+        rbConfigSource = cfg;
+        return refreshConfigSnapshot(cfg);
       });
     return window.RB_CONFIG_PROMISE;
+  };
+
+  window.getRbCustomUsers = loadCustomUsers;
+  window.addRbCustomUser = function addRbCustomUser(rawUser) {
+    const nextUser = sanitizeUserRecord(rawUser);
+    if (!nextUser) {
+      throw new Error('Заполните никнейм и пароль пользователя');
+    }
+    if (nextUser.login === 'Nightlays') {
+      throw new Error('Логин Nightlays зарезервирован');
+    }
+    const existingUsers = refreshConfigSnapshot().users || [];
+    const exists = existingUsers.some(user => user.login.toLowerCase() === nextUser.login.toLowerCase());
+    if (exists) {
+      throw new Error('Пользователь с таким никнеймом уже существует');
+    }
+    const customUsers = loadCustomUsers();
+    customUsers.push(nextUser);
+    saveCustomUsers(customUsers);
+    return refreshConfigSnapshot();
+  };
+  window.updateRbCustomUser = function updateRbCustomUser(login, patch = {}) {
+    const targetLogin = String(login || '').trim();
+    if (!targetLogin) return refreshConfigSnapshot();
+    const customUsers = loadCustomUsers();
+    const allUsers = refreshConfigSnapshot().users || [];
+    const baseUser = allUsers.find((user) => user.login.toLowerCase() === targetLogin.toLowerCase()) || null;
+    let changed = false;
+    const nextUsers = customUsers.map((user) => {
+      if (user.login.toLowerCase() !== targetLogin.toLowerCase()) return user;
+      changed = true;
+      const nextRole = typeof patch.role === 'string' && patch.role.trim() ? patch.role.trim() : user.role;
+      const nextPass = typeof patch.pass === 'string' && patch.pass.trim() ? patch.pass.trim() : user.pass;
+      return sanitizeUserRecord({ ...user, role: nextRole, pass: nextPass }) || user;
+    });
+    if (!changed && baseUser) {
+      const nextRole = typeof patch.role === 'string' && patch.role.trim() ? patch.role.trim() : baseUser.role;
+      const nextPass = typeof patch.pass === 'string' && patch.pass.trim() ? patch.pass.trim() : baseUser.pass;
+      const overrideUser = sanitizeUserRecord({ ...baseUser, role: nextRole, pass: nextPass });
+      if (overrideUser) {
+        nextUsers.push(overrideUser);
+        changed = true;
+      }
+    }
+    if (changed) saveCustomUsers(nextUsers);
+    return refreshConfigSnapshot();
   };
 })();
 </script>
@@ -1488,7 +1699,7 @@ table { font-size: 13.5px; }
 document.addEventListener('DOMContentLoaded', () => {
   const loadConfig = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
   loadConfig.then((cfg) => {
-    const USERS = Array.isArray(cfg?.users) ? cfg.users : [];
+    const INITIAL_USERS = Array.isArray(cfg?.users) ? cfg.users : [];
 
   const AUTH_KEY = 'rb_auth_ok_v1';
   const ROLE_KEY = 'rb_role_v1';
@@ -1539,8 +1750,14 @@ document.addEventListener('DOMContentLoaded', () => {
     window.dispatchEvent(new CustomEvent('rb-role-changed', { detail: { role: roleId, user: loginVal } }));
   }
 
+  function getUsers() {
+    return Array.isArray(window.RB_CONFIG?.users) && window.RB_CONFIG.users.length
+      ? window.RB_CONFIG.users
+      : INITIAL_USERS;
+  }
+
   function checkCredentials(loginVal, passVal) {
-    return USERS.find(u => u.login === loginVal && u.pass === passVal);
+    return getUsers().find(u => u.login === loginVal && u.pass === passVal);
   }
 
   if (form) {
@@ -1639,8 +1856,8 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
         <div class="shell-menu" id="shellMenu">
           <button id="shellModeToggleBtn" class="btn-secondary" type="button">Режим: Стабильный → Экспериментальный</button>
-          <button id="profileToggleBtn" class="btn-secondary" type="button">Профиль команды</button>
-          <button id="accessToggleBtn" class="btn-secondary" type="button">Доступы</button>
+          <button id="profileToggleBtn" class="btn-secondary" type="button" aria-expanded="false">Профиль команды</button>
+          <button id="accessToggleBtn" class="btn-secondary" type="button" aria-expanded="false">Доступы</button>
           <div class="role-chip" id="roleChip">роль</div>
           <button id="rbAuthLogout" class="btn-logout" type="button">Выйти</button>
         </div>
@@ -1649,66 +1866,6 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
   <div class="wrap">
-    <div class="card profile-directory-card" id="teamProfileCard">
-      <div class="head" style="align-items:center;">
-        <div>
-          <div style="font-weight:900; font-size:16px;">Профиль команды</div>
-          <div class="nums">Роли участников и фактические доступы по модулям</div>
-        </div>
-        <div class="nums" id="teamProfileSummary">0 участников</div>
-      </div>
-      <div class="profile-user-grid" id="teamProfileList"></div>
-    </div>
-    <div class="card role-access-card" id="roleAccessCard">
-      <div class="head" style="align-items:center;">
-        <div>
-          <div style="font-weight:900; font-size:16px;">Роли и доступы</div>
-          <div class="nums">Настройка доступа к модулям для каждой роли</div>
-        </div>
-        <div class="nums" id="roleAccessHint">Доступно администратору</div>
-      </div>
-      <div class="role-access-grid" style="margin-top:12px;">
-        <div class="role-list" id="roleList"></div>
-        <div>
-          <div class="access-list" id="accessList"></div>
-          <div class="role-actions">
-            <button class="btn-secondary" id="accessSelectAll" type="button">Выбрать все</button>
-            <button class="btn-secondary" id="accessClearAll" type="button">Очистить</button>
-            <button class="btn-primary" id="accessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить доступы</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card role-access-card" id="userAccessCard">
-      <div class="head" style="align-items:center;">
-        <div>
-          <div style="font-weight:900; font-size:16px;">Пользователи и доступы</div>
-          <div class="nums">Назначение роли и доступа для каждого пользователя</div>
-        </div>
-        <div class="nums">Только для Nightlays (суперадмин)</div>
-      </div>
-      <div class="role-access-grid" style="margin-top:12px;">
-        <div class="role-list" id="userList"></div>
-        <div>
-          <div class="field" style="margin-bottom:10px;">
-            <label>Роль пользователя</label>
-            <select id="userRoleSelect"></select>
-          </div>
-          <label class="access-item" style="margin-bottom:10px;">
-            <input type="checkbox" id="userUseRoleAccess" checked />
-            <span>Использовать доступы роли</span>
-          </label>
-          <div class="access-list" id="userAccessList"></div>
-          <div class="role-actions">
-            <button class="btn-secondary" id="userAccessSelectAll" type="button">Выбрать все</button>
-            <button class="btn-secondary" id="userAccessClearAll" type="button">Очистить</button>
-            <button class="btn-primary" id="userAccessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить пользователя</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Панель вкладок оболочки: сюда можно добавлять кнопки с data-module="file.html" --><!-- Контейнер для подгружаемых HTML-модулей -->
     <div class="card card-shell" style="padding:0; overflow:hidden; background:transparent;">
       <iframe id="rbModuleFrame"
@@ -1718,6 +1875,117 @@ document.addEventListener('DOMContentLoaded', () => {
       </iframe>
     </div>
   </div>
+
+<div class="shell-modal" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle" aria-hidden="true" hidden>
+  <div class="shell-modal-dialog">
+    <div class="shell-modal-head">
+      <div>
+        <div class="shell-modal-title" id="profileModalTitle">Профиль команды</div>
+        <div class="shell-modal-note">Роли участников и фактические доступы по модулям собраны в одном окне.</div>
+      </div>
+      <button id="profileModalClose" class="btn-secondary shell-modal-close" type="button" aria-label="Закрыть профиль команды">×</button>
+    </div>
+    <div class="shell-modal-body">
+      <div class="card profile-directory-card" id="teamProfileCard">
+        <div class="head" style="align-items:center;">
+          <div>
+            <div style="font-weight:900; font-size:16px;">Профиль команды</div>
+            <div class="nums">Роли участников и фактические доступы по модулям</div>
+          </div>
+          <div class="nums" id="teamProfileSummary">0 участников</div>
+        </div>
+        <div class="profile-user-grid" id="teamProfileList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="shell-modal" id="accessModal" role="dialog" aria-modal="true" aria-labelledby="accessModalTitle" aria-hidden="true" hidden>
+  <div class="shell-modal-dialog">
+    <div class="shell-modal-head">
+      <div>
+        <div class="shell-modal-title" id="accessModalTitle">Доступы и роли</div>
+        <div class="shell-modal-note">Управление доступом к модулям и персональными настройками пользователей.</div>
+      </div>
+      <button id="accessModalClose" class="btn-secondary shell-modal-close" type="button" aria-label="Закрыть окно доступов">×</button>
+    </div>
+    <div class="shell-modal-body">
+      <div class="shell-modal-stack">
+        <div class="card role-access-card" id="roleAccessCard">
+          <div class="head" style="align-items:center;">
+            <div>
+              <div style="font-weight:900; font-size:16px;">Роли и доступы</div>
+              <div class="nums">Настройка доступа к модулям для каждой роли</div>
+            </div>
+            <div class="nums" id="roleAccessHint">Доступно администратору</div>
+          </div>
+          <div class="role-access-grid" style="margin-top:12px;">
+            <div class="role-list" id="roleList"></div>
+            <div>
+              <div class="access-list" id="accessList"></div>
+              <div class="role-actions">
+                <button class="btn-secondary" id="accessSelectAll" type="button">Выбрать все</button>
+                <button class="btn-secondary" id="accessClearAll" type="button">Очистить</button>
+                <button class="btn-primary" id="accessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить доступы</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card role-access-card" id="userAccessCard">
+          <div class="head" style="align-items:center;">
+            <div>
+              <div style="font-weight:900; font-size:16px;">Пользователи и доступы</div>
+              <div class="nums">Назначение роли, пароля и доступа для каждого пользователя</div>
+            </div>
+            <div class="nums">Только для Nightlays (суперадмин)</div>
+          </div>
+          <div class="user-create-card" style="margin-top:12px;">
+            <div class="user-create-grid">
+              <div class="field">
+                <label>Никнейм</label>
+                <input id="newUserLogin" type="text" placeholder="Например, Artem" />
+              </div>
+              <div class="field">
+                <label>Пароль</label>
+                <input id="newUserPass" type="password" placeholder="Введите пароль" />
+              </div>
+              <div class="field">
+                <label>Стартовая роль</label>
+                <select id="newUserRoleSelect"></select>
+              </div>
+              <button class="btn-primary" id="createUserBtn" type="button" style="padding:10px 18px;">Создать пользователя</button>
+            </div>
+            <div class="user-create-note">После создания пользователь сразу появится в списке ниже. Дальше можно сохранить ему индивидуальную роль, пароль и доступы, как в настройках `rb_roles_access.json`.</div>
+          </div>
+          <div class="role-access-grid" style="margin-top:12px;">
+            <div class="role-list" id="userList"></div>
+            <div>
+              <div class="field" style="margin-bottom:10px;">
+                <label>Роль пользователя</label>
+                <select id="userRoleSelect"></select>
+              </div>
+              <div class="field" style="margin-bottom:10px;">
+                <label>Новый пароль</label>
+                <input id="userPassInput" type="password" placeholder="Оставьте пустым, если менять не нужно" />
+              </div>
+              <label class="access-item" style="margin-bottom:10px;">
+                <input type="checkbox" id="userUseRoleAccess" checked />
+                <span>Использовать доступы роли</span>
+              </label>
+              <div class="access-list" id="userAccessList"></div>
+              <div class="role-actions">
+                <button class="btn-secondary" id="userAccessSelectAll" type="button">Выбрать все</button>
+                <button class="btn-secondary" id="userAccessClearAll" type="button">Очистить</button>
+                <button class="btn-primary" id="userAccessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить пользователя</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 // Оболочка: переключение модулей по кнопкам data-module + гарды по data-guard
@@ -1737,6 +2005,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const shellModeToggleBtn = document.getElementById('shellModeToggleBtn');
   const profileToggleBtn = document.getElementById('profileToggleBtn');
   const accessToggleBtn = document.getElementById('accessToggleBtn');
+  const profileModal = document.getElementById('profileModal');
+  const accessModal = document.getElementById('accessModal');
+  const profileModalCloseBtn = document.getElementById('profileModalClose');
+  const accessModalCloseBtn = document.getElementById('accessModalClose');
   const ROLE_KEY = 'rb_role_v1';
   const USER_KEY = 'rb_user_v1';
   const ACCESS_KEY = 'rb_role_access_v1';
@@ -1762,11 +2034,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const toastEl = document.getElementById('toast');
   const userListEl = document.getElementById('userList');
   const userRoleSelect = document.getElementById('userRoleSelect');
+  const userPassInput = document.getElementById('userPassInput');
   const userUseRoleAccess = document.getElementById('userUseRoleAccess');
   const userAccessList = document.getElementById('userAccessList');
   const userSelectAllBtn = document.getElementById('userAccessSelectAll');
   const userClearAllBtn = document.getElementById('userAccessClearAll');
   const userSaveBtn = document.getElementById('userAccessSave');
+  const newUserLoginInput = document.getElementById('newUserLogin');
+  const newUserPassInput = document.getElementById('newUserPass');
+  const newUserRoleSelect = document.getElementById('newUserRoleSelect');
+  const createUserBtn = document.getElementById('createUserBtn');
 
   let toastTimer = null;
   function showToast(message) {
@@ -1917,14 +2194,41 @@ document.addEventListener('DOMContentLoaded', () => {
     shellModeToggleBtn.textContent = 'Режим: Стабильный → Экспериментальный';
   }
 
-  function setProfileOpen(open, options = {}) {
+  function syncModalState() {
+    const hasOpenModal =
+      document.body.classList.contains('profile-open') ||
+      document.body.classList.contains('access-open');
+    document.body.classList.toggle('modal-open', hasOpenModal);
+  }
+
+  function syncModalVisibility(modalEl, open) {
+    if (!modalEl) return;
     const next = !!open;
-    document.body.classList.toggle('profile-open', next);
-    if (profileToggleBtn) {
-      profileToggleBtn.textContent = next ? 'Скрыть профиль' : 'Профиль команды';
+    modalEl.hidden = !next;
+    modalEl.style.display = next ? 'flex' : 'none';
+    modalEl.classList.toggle('open', next);
+    modalEl.setAttribute('aria-hidden', next ? 'false' : 'true');
+  }
+
+  function setProfileOpen(open) {
+    const next = !!open;
+    if (next) {
+      document.body.classList.remove('access-open');
+      syncModalVisibility(accessModal, false);
+      if (accessToggleBtn) {
+        accessToggleBtn.textContent = 'Доступы';
+        accessToggleBtn.setAttribute('aria-expanded', 'false');
+      }
     }
-    if (next && teamProfileCard && !options.skipScroll) {
-      teamProfileCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.body.classList.toggle('profile-open', next);
+    syncModalVisibility(profileModal, next);
+    if (profileToggleBtn) {
+      profileToggleBtn.textContent = next ? 'Закрыть профиль' : 'Профиль команды';
+      profileToggleBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
+    }
+    syncModalState();
+    if (next && profileModalCloseBtn) {
+      window.requestAnimationFrame(() => profileModalCloseBtn.focus({ preventScroll: true }));
     }
   }
 
@@ -1939,9 +2243,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadConfig = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
   loadConfig.then((cfg) => {
     const roles = Array.isArray(cfg?.roles) ? cfg.roles : [];
-    const BASE_USERS = Array.isArray(cfg?.users) ? cfg.users.map(u => ({ login: u.login, role: u.role || 'viewer' })) : [];
     const configRoleAccess = cfg?.roleAccess || {};
     const configUserAccess = cfg?.userAccess || {};
+    let managedUsers = [];
 
   function buildDefaultAccess() {
     const all = modules.map(m => m.id);
@@ -1968,8 +2272,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   let accessMap = loadAccessMap();
-  let selectedRole = roles[0].id;
-  let selectedUser = BASE_USERS[0]?.login || '';
+  let selectedRole = roles[0]?.id || 'viewer';
+  let selectedUser = '';
   let userRoleMap = {};
   let userAccessMap = {};
   let userEditUseRole = null;
@@ -1994,9 +2298,30 @@ document.addEventListener('DOMContentLoaded', () => {
     return {};
   }
 
+  function syncManagedUsers() {
+    const sourceUsers = Array.isArray(window.RB_CONFIG?.users) && window.RB_CONFIG.users.length
+      ? window.RB_CONFIG.users
+      : (Array.isArray(cfg?.users) ? cfg.users : []);
+    const seen = new Set();
+    managedUsers = sourceUsers.reduce((acc, user) => {
+      const login = typeof user?.login === 'string' ? user.login.trim() : '';
+      if (!login) return acc;
+      const key = login.toLowerCase();
+      if (seen.has(key)) return acc;
+      seen.add(key);
+      let role = typeof user?.role === 'string' && user.role.trim() ? user.role.trim() : 'viewer';
+      if (login !== 'Nightlays' && role === 'superadmin') role = 'admin';
+      acc.push({ login, role });
+      return acc;
+    }, []);
+    if (!managedUsers.some(user => user.login === selectedUser)) {
+      selectedUser = managedUsers[0]?.login || '';
+    }
+  }
+
   function resolveUserRole(login) {
     if (login === 'Nightlays') return 'superadmin';
-    const role = userRoleMap[login] || BASE_USERS.find(u => u.login === login)?.role || 'viewer';
+    const role = userRoleMap[login] || managedUsers.find(u => u.login === login)?.role || 'viewer';
     return role === 'superadmin' ? 'admin' : role;
   }
 
@@ -2070,9 +2395,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
   }
 
+  function renderCreateUserRoleSelect() {
+    if (!newUserRoleSelect) return;
+    const options = roles
+      .filter(role => role.id !== 'superadmin')
+      .map(role => `<option value="${role.id}">${role.label}</option>`)
+      .join('');
+    newUserRoleSelect.innerHTML = options || '<option value="viewer">Наблюдатель</option>';
+    newUserRoleSelect.value = roles.some(role => role.id === 'viewer')
+      ? 'viewer'
+      : (newUserRoleSelect.options[0]?.value || 'viewer');
+  }
+
   function renderUserList() {
     if (!userListEl) return;
-    userListEl.innerHTML = BASE_USERS.map(u => {
+    syncManagedUsers();
+    userListEl.innerHTML = managedUsers.map(u => {
       const role = resolveUserRole(u.login);
       return `
         <div class="role-item ${u.login === selectedUser ? 'active' : ''}" data-user="${u.login}">
@@ -2092,7 +2430,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderUserEditor() {
-    if (!userRoleSelect || !userAccessList || !userUseRoleAccess) return;
+    if (!userRoleSelect || !userAccessList || !userUseRoleAccess || !userPassInput) return;
+    syncManagedUsers();
+    if (!selectedUser) {
+      userRoleSelect.innerHTML = '<option value="viewer">Наблюдатель</option>';
+      userRoleSelect.value = 'viewer';
+      userRoleSelect.disabled = true;
+      userPassInput.value = '';
+      userPassInput.disabled = true;
+      userUseRoleAccess.checked = true;
+      userUseRoleAccess.disabled = true;
+      userAccessList.innerHTML = '<div class="nums">Создайте пользователя, чтобы настроить ему права.</div>';
+      return;
+    }
     const role = resolveUserRole(selectedUser);
     const isNightlays = selectedUser === 'Nightlays';
     const userCfg = userAccessMap[selectedUser] || { useRole: true, access: [] };
@@ -2108,6 +2458,8 @@ document.addEventListener('DOMContentLoaded', () => {
       userRoleSelect.disabled = false;
       userUseRoleAccess.checked = userEditUseRole !== null ? userEditUseRole : (userCfg.useRole !== false);
     }
+    userPassInput.value = '';
+    userPassInput.disabled = false;
     userUseRoleAccess.disabled = isNightlays;
 
     const useRole = userUseRoleAccess.checked;
@@ -2126,8 +2478,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderTeamProfile() {
     if (!teamProfileList) return;
+    syncManagedUsers();
     const currentUser = localStorage.getItem(USER_KEY) || '';
-    const cards = BASE_USERS.map(user => {
+    const cards = managedUsers.map(user => {
       const roleId = resolveUserRole(user.login);
       const accessLabels = getAllowedModuleLabels(user.login, roleId);
       const accessHtml = accessLabels.length
@@ -2151,7 +2504,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     teamProfileList.innerHTML = cards;
     if (teamProfileSummary) {
-      teamProfileSummary.textContent = `${BASE_USERS.length} участников`;
+      teamProfileSummary.textContent = `${managedUsers.length} участников`;
     }
   }
 
@@ -2161,9 +2514,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setAccessOpen(open) {
-    document.body.classList.toggle('access-open', open);
+    const next = !!open && document.body.classList.contains('role-superadmin');
+    if (next) {
+      document.body.classList.remove('profile-open');
+      syncModalVisibility(profileModal, false);
+      if (profileToggleBtn) {
+        profileToggleBtn.textContent = 'Профиль команды';
+        profileToggleBtn.setAttribute('aria-expanded', 'false');
+      }
+    }
+    document.body.classList.toggle('access-open', next);
+    syncModalVisibility(accessModal, next);
     if (accessToggleBtn) {
-      accessToggleBtn.textContent = open ? 'Скрыть доступы' : 'Доступы';
+      accessToggleBtn.textContent = next ? 'Закрыть доступы' : 'Доступы';
+      accessToggleBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
+    }
+    syncModalState();
+    if (next && accessModalCloseBtn) {
+      window.requestAnimationFrame(() => accessModalCloseBtn.focus({ preventScroll: true }));
     }
   }
 
@@ -2278,7 +2646,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  userRoleMap = { ...BASE_USERS.reduce((acc, u) => { acc[u.login] = u.role; return acc; }, {}), ...loadUserRoleMap() };
+  syncManagedUsers();
+  userRoleMap = { ...managedUsers.reduce((acc, u) => { acc[u.login] = u.role; return acc; }, {}), ...loadUserRoleMap() };
   userAccessMap = { ...configUserAccess, ...loadUserAccessMap() };
   const initialRole = localStorage.getItem(ROLE_KEY) || 'viewer';
   const initialUser = localStorage.getItem(USER_KEY) || '';
@@ -2286,8 +2655,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.classList.toggle('role-admin', initialRole === 'admin');
   document.body.classList.toggle('role-superadmin', initialRole === 'superadmin');
   setAccessOpen(false);
-  setProfileOpen(false, { skipScroll: true });
+  setProfileOpen(false);
   updateRoleChip(initialRole);
+  renderCreateUserRoleSelect();
   renderRoleList();
   renderAccessList();
   renderUserList();
@@ -2306,12 +2676,40 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTeamProfile();
     applyRoleAccess(roleId, login);
   });
+  window.addEventListener('rb-users-updated', () => {
+    syncManagedUsers();
+    renderCreateUserRoleSelect();
+    renderUserList();
+    renderUserEditor();
+    renderTeamProfile();
+  });
 
   if (accessToggleBtn) {
     accessToggleBtn.addEventListener('click', () => {
       const next = !document.body.classList.contains('access-open');
+      renderRoleList();
+      renderAccessList();
+      renderUserList();
+      renderUserEditor();
       setAccessOpen(next);
       closeShellMenu();
+    });
+  }
+
+  if (profileModalCloseBtn) {
+    profileModalCloseBtn.addEventListener('click', () => setProfileOpen(false));
+  }
+  if (accessModalCloseBtn) {
+    accessModalCloseBtn.addEventListener('click', () => setAccessOpen(false));
+  }
+  if (profileModal) {
+    profileModal.addEventListener('click', (e) => {
+      if (e.target === profileModal) setProfileOpen(false);
+    });
+  }
+  if (accessModal) {
+    accessModal.addEventListener('click', (e) => {
+      if (e.target === accessModal) setAccessOpen(false);
     });
   }
 
@@ -2337,11 +2735,46 @@ document.addEventListener('DOMContentLoaded', () => {
       userAccessList.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = false);
     });
   }
+  if (createUserBtn) {
+    createUserBtn.addEventListener('click', () => {
+      if (!document.body.classList.contains('role-superadmin')) {
+        showToast('Создавать пользователей может только суперадмин');
+        return;
+      }
+      const login = (newUserLoginInput?.value || '').trim();
+      const pass = (newUserPassInput?.value || '').trim();
+      const role = (newUserRoleSelect?.value || 'viewer').trim() || 'viewer';
+      if (!login || !pass) {
+        showToast('Заполните никнейм и пароль нового пользователя');
+        return;
+      }
+      try {
+        if (typeof window.addRbCustomUser !== 'function') {
+          throw new Error('Хранилище пользователей недоступно');
+        }
+        window.addRbCustomUser({ login, pass, role });
+        userRoleMap[login] = role;
+        localStorage.setItem(USER_ROLE_KEY, JSON.stringify(userRoleMap));
+        selectedUser = login;
+        userEditUseRole = null;
+        if (newUserLoginInput) newUserLoginInput.value = '';
+        if (newUserPassInput) newUserPassInput.value = '';
+        renderCreateUserRoleSelect();
+        renderUserList();
+        renderUserEditor();
+        renderTeamProfile();
+        showToast(`Пользователь ${login} создан`);
+      } catch (error) {
+        showToast(error?.message || 'Не удалось создать пользователя');
+      }
+    });
+  }
   if (userSaveBtn) {
     userSaveBtn.addEventListener('click', () => {
       if (!selectedUser) return;
       const isNightlays = selectedUser === 'Nightlays';
       const chosenRole = isNightlays ? 'superadmin' : (userRoleSelect?.value || 'viewer');
+      const nextPass = (userPassInput?.value || '').trim();
       userRoleMap[selectedUser] = chosenRole;
       const useRole = isNightlays ? true : !!userUseRoleAccess.checked;
       const checked = Array.from(userAccessList?.querySelectorAll('input[type="checkbox"]') || [])
@@ -2350,7 +2783,11 @@ document.addEventListener('DOMContentLoaded', () => {
       userAccessMap[selectedUser] = { useRole, access: checked };
       localStorage.setItem(USER_ROLE_KEY, JSON.stringify(userRoleMap));
       localStorage.setItem(USER_ACCESS_KEY, JSON.stringify(userAccessMap));
+      if (typeof window.updateRbCustomUser === 'function') {
+        window.updateRbCustomUser(selectedUser, { role: chosenRole, pass: nextPass || undefined });
+      }
       userEditUseRole = null;
+      if (userPassInput) userPassInput.value = '';
       renderUserList();
       renderUserEditor();
       const currentUser = localStorage.getItem(USER_KEY) || '';
@@ -2359,7 +2796,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyRoleAccess(chosenRole, currentUser);
       }
       renderTeamProfile();
-      showToast('Настройки сохранены');
+      showToast(nextPass ? 'Роль, доступы и пароль обновлены' : 'Настройки сохранены');
     });
   }
 
@@ -2374,6 +2811,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (document.body.classList.contains('access-open')) {
+        setAccessOpen(false);
+        return;
+      }
+      if (document.body.classList.contains('profile-open')) {
+        setProfileOpen(false);
+        return;
+      }
       closeShellMenu();
       closeNav();
     }
