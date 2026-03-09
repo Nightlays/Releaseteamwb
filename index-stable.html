@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Дом Питона — Shell</title>
+<link rel="stylesheet" href="dashboard_run.css" />
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- ExcelJS (не используется напрямую, оставляю как было) -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<!-- SheetJS (Excel) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- XlsxPopulate (стили Excel в браузере) -->
+<script src="https://unpkg.com/xlsx-populate/browser/xlsx-populate.min.js"></script>
+<script>
+  (() => {
+    const SHELL_VARIANT_KEY = 'rb_shell_design_mode_v1';
+    const INDEX_SHELL_URL = 'index.html';
+    const VALID_MODES = new Set(['experimental', 'stable']);
+    const params = new URLSearchParams(window.location.search);
+    const queryMode = params.get('mode');
+    let storedMode = null;
+
+    try {
+      storedMode = localStorage.getItem(SHELL_VARIANT_KEY);
+    } catch (e) {}
+
+    const currentMode = VALID_MODES.has(queryMode)
+      ? queryMode
+      : (VALID_MODES.has(storedMode) ? storedMode : 'stable');
+
+    if (currentMode === 'experimental') {
+      try {
+        localStorage.setItem(SHELL_VARIANT_KEY, 'experimental');
+      } catch (e) {}
+      params.set('mode', 'experimental');
+      const query = params.toString();
+      const nextUrl = query ? `${INDEX_SHELL_URL}?${query}` : `${INDEX_SHELL_URL}?mode=experimental`;
+      window.location.replace(nextUrl);
+      return;
+    }
+
+    try {
+      localStorage.setItem(SHELL_VARIANT_KEY, 'stable');
+    } catch (e) {}
+  })();
+</script>
+
+<style>
+  /* ---------------- Wildberries Theme (drop-in) ---------------- */
+  :root{
+    /* Базовая палитра (светлая) */
+    --bg:#faf7fc;            /* фон страницы */
+    --card:#ffffff;          /* фон карточек */
+    --text:#2a1446;          /* основной текст */
+    --muted:#8d77a6;         /* вторичный текст */
+
+    /* Бренд / акценты */
+    --wb:#cb11ab;            /* магента WB */
+    --wb-deep:#6e0bd4;       /* фирм. фиолетовый */
+    --grad:linear-gradient(135deg, var(--wb) 0%, var(--wb-deep) 100%);
+
+    /* Цвета метрик (читает JS) */
+    --c1:#7a3af9;            /* total */
+    --c2:#00c48c;            /* finished */
+    --c3:#ffb020;            /* remaining */
+    --c4:#ff5aad;            /* in_progress */
+
+    /* Контролы/бордеры */
+    --line:#efe5f7;
+    --line-strong:#e7d8f4;
+    --ink:#3a235b;
+    --btn-bg:#ffffff;
+    --btn-br:#e6d9f4;
+    --btn-hl:rgba(203,17,171,.08);
+
+    /* Семантика */
+    --ok:#12b76a;
+    --bad:#ef4444;
+
+    /* Доп. визуал */
+    --shadow-lg:0 14px 44px rgba(103,39,170,.12);
+    --shadow-md:0 10px 30px rgba(103,39,170,.10);
+    --shadow-sm:0 6px 20px rgba(103,39,170,.08);
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1000px 600px at 0% -10%, rgba(110,11,212,.05), transparent 60%) no-repeat,
+      linear-gradient(180deg,#fbf9fe 0%, #faf7fc 45%, #ffffff 100%);
+    color:var(--text);
+    font:14px/1.55 Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+
+  /* ----- Топ-бар с логотипом WB ----- */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.58));
+    backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar .inner{
+    max-width:1600px; margin:0 auto; padding:10px 20px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    font-weight:900; letter-spacing:.2px;
+  }
+  .brand .logo{
+    width:36px; height:28px; display:inline-block;
+    filter: drop-shadow(0 10px 20px rgba(203,17,171,.35));
+  }
+  .brand .title{
+    font-size:16px; color:var(--ink);
+  }
+  .topbar .actions{
+    margin-left:auto; display:flex; gap:8px;
+  }
+  .nav-toggle{
+    display:none;
+    align-items:center;
+    justify-content:center;
+    width:40px;
+    height:40px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--ink);
+    cursor:pointer;
+    box-shadow:var(--shadow-sm);
+    font-size:18px;
+    line-height:1;
+  }
+  .nav-toggle:hover{ border-color:var(--line-strong); }
+  .nav-toggle:active{ transform:translateY(1px); }
+
+  .wrap{max-width:1600px;margin:24px auto;padding:0 20px}
+
+  /* Заголовок страницы */
+  h1{
+    margin:12px 0 14px;
+    font-weight:900; letter-spacing:.2px; font-size:28px;
+    display:flex; align-items:center; gap:12px;
+  }
+  h1::before{
+    content:"";
+    width:28px; height:28px; border-radius:10px;
+    background:var(--grad);
+    box-shadow:0 8px 24px rgba(110,11,212,.25), inset 0 0 0 1px rgba(255,255,255,.5);
+  }
+
+  /* Табы — стеклянные плашки */
+  .tabs{display:flex; gap:10px; margin:10px 0 16px}
+  .tabs button{
+    padding:10px 14px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    color:var(--ink);
+    cursor:pointer;
+    font-weight:800;
+    transition:.15s ease, transform .06s;
+    box-shadow:var(--shadow-sm);
+  }
+  .tabs button:hover{border-color:var(--line-strong); transform:translateY(-1px)}
+  .tabs button.active{
+    color:#fff; background:var(--grad); border-color:transparent;
+    box-shadow:0 10px 24px rgba(203,17,171,.28);
+  }
+
+  /* Mobile header menu */
+  @media (max-width: 900px){
+    .topbar .inner{ position:relative; gap:10px; }
+    .nav-toggle{ display:inline-flex; margin-left:auto; }
+    .topbar .actions{ margin-left:0; }
+    .topbar-tabs{
+      position:absolute;
+      top:calc(100% + 6px);
+      left:0;
+      right:0;
+      background:rgba(255,255,255,.98);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:10px;
+      box-shadow:var(--shadow-lg);
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:8px;
+      max-height: calc(100vh - 84px);
+      overflow:auto;
+      opacity:0;
+      pointer-events:none;
+      transform:translateY(-8px);
+      transition:opacity .2s ease, transform .2s ease;
+      z-index:40;
+    }
+    body.nav-open .topbar-tabs{
+      opacity:1;
+      pointer-events:auto;
+      transform:translateY(0);
+    }
+    body.nav-open::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      background:rgba(20,0,33,.35);
+      backdrop-filter: blur(2px);
+      z-index:25;
+    }
+    .tabs{ margin:0; }
+    .tabs button{ width:100%; justify-content:flex-start; }
+  }
+
+  /* Карточки */
+  .card{
+    background:var(--card);
+    border-radius:18px;
+    border:1px solid var(--line);
+    box-shadow:var(--shadow-md);
+    padding:16px 16px 14px;
+    position:relative;
+    overflow:hidden;
+    transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .card::before{
+    content:"";
+    position:absolute; inset:0 0 auto 0; height:3px;
+    background:linear-gradient(90deg, var(--wb), var(--wb-deep));
+    opacity:.18;
+  }
+  .card:hover{ transform:translateY(-2px); box-shadow:var(--shadow-lg); border-color:var(--line-strong); }
+
+  .head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end}
+  .nums{color:var(--muted);font-variant-numeric:tabular-nums}
+
+  /* Гриды */
+  .panel{display:grid;gap:12px;grid-template-columns:repeat(12, minmax(0,1fr));align-items:end}
+  .grid{display:grid;gap:18px;margin-top:16px;grid-template-columns:repeat(4,minmax(360px,1fr))}
+  @media (max-width:1400px){ .grid{grid-template-columns:repeat(3,minmax(320px,1fr));} }
+  @media (max-width:1100px){ .grid{grid-template-columns:repeat(2,minmax(320px,1fr));} }
+  @media (max-width:700px){ .grid{grid-template-columns:1fr;} }
+
+  /* Формы */
+  .field{display:grid;grid-template-rows:auto auto;gap:8px}
+  .field label{font-size:12px;color:var(--muted)}
+  .panel input,.panel select{
+    height:44px;padding:10px 12px;border-radius:12px;
+    border:1px solid var(--line);
+    background:#fff;color:var(--ink);
+    outline:none; transition:.2s;
+    box-shadow:var(--shadow-sm);
+  }
+  .panel input::placeholder{color:#bda9d4}
+  .panel input:focus,.panel select:focus{
+    border-color:transparent;
+    box-shadow:0 0 0 4px rgba(203,17,171,.22), var(--shadow-md);
+  }
+
+  /* Кнопки */
+  .btn{
+    height:44px;padding:10px 14px;border-radius:12px;
+    border:1px solid var(--btn-br);
+    background:var(--btn-bg); color:var(--ink);
+    font-weight:900; cursor:pointer;
+    transition:transform .06s, background-color .15s, box-shadow .2s, border-color .15s, filter .15s;
+    box-shadow:var(--shadow-sm);
+  }
+  .btn:hover{background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
+  .btn:active{transform:translateY(1px) scale(.995)}
+  .btn:disabled{opacity:.55; cursor:not-allowed}
+
+  .btn.primary{
+    background:var(--grad); color:#fff; border-color:transparent;
+    box-shadow:0 12px 28px rgba(203,17,171,.30);
+  }
+  .btn.success{
+    background:linear-gradient(135deg,#12b76a,#0ea65f); color:#fff; border-color:transparent;
+    box-shadow:0 12px 28px rgba(18,183,106,.22);
+  }
+  .btn.danger{
+    background:linear-gradient(135deg,#ef4444,#db2c2c); color:#fff; border-color:transparent;
+    box-shadow:0 12px 28px rgba(239,68,68,.22);
+  }
+
+  /* Чип-кнопки */
+  .mini{
+    height:28px;padding:6px 10px;border-radius:999px;
+    border:1px solid var(--line);
+    background:#fff;color:var(--ink);
+    font-size:12px;font-weight:800; line-height:1;
+    cursor:pointer; transition:.15s;
+  }
+  .mini:hover{border-color:var(--line-strong); background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
+  .mini:active{transform:translateY(1px)}
+
+  /* Чарты */
+  .chart-wrap{
+    position:relative;height:340px;display:flex;align-items:center;justify-content:center;
+    background:conic-gradient(from 110deg at 80% -40%, rgba(203,17,171,.06), transparent 35%) no-repeat,
+               radial-gradient(800px 400px at 0% -10%, rgba(110,11,212,.06), transparent 60%) no-repeat;
+    border:1px solid var(--line);
+    border-radius:16px;
+  }
+  .chart{width:100%;height:100%}
+
+  /* KPI плитки */
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .kpi{
+    display:grid;grid-template-columns:1fr auto;gap:6px;
+    padding:8px 10px;border:1px solid var(--line);
+    border-radius:12px;background:linear-gradient(180deg, #fff, #fff) padding-box,
+                                    linear-gradient(90deg, rgba(203,17,171,.2), rgba(110,11,212,.2)) border-box;
+    font-size:12px;min-height:42px;min-width:0
+  }
+  .kpi .label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi .val{text-align:right;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* Логи */
+  .log{
+    white-space:pre-wrap;background:#fff;border-radius:12px;padding:12px;
+    color:var(--ink);max-height:300px;min-height:140px;overflow:auto;
+    border:1px solid var(--line);
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    box-shadow:var(--shadow-sm);
+  }
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:900px){ .split{grid-template-columns:1fr} }
+
+  /* Тост */
+  .toast{
+    position:fixed;right:16px;bottom:16px;
+    background:#fff;color:var(--ink);
+    border:1px solid var(--line);padding:10px 14px;border-radius:12px;
+    box-shadow:0 12px 40px rgba(110,11,212,.18);
+    opacity:0;pointer-events:none;transition:.25s;
+  }
+  .toast.show{opacity:1;transform:translateY(-6px)}
+
+  /* Срезы */
+  .snap-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-items:start}
+  .snap{
+    display:flex;align-items:center;gap:10px;
+    border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;min-width:0;
+    box-shadow:var(--shadow-sm);
+  }
+  .snap .title{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .snap .meta{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .snap .del{
+    height:28px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+    background:#fff;color:#a4167e; cursor:pointer
+  }
+  .snap .del:hover{background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
+
+  /* Прогресс */
+  .progress{
+    height:10px;background:#f5ecff;border-radius:999px;overflow:hidden;border:1px solid var(--line)
+  }
+  .progress>div{
+    height:100%;width:0;background:var(--grad); transition:width .25s ease
+  }
+
+  /* Таблицы */
+  table{border-collapse:separate;border-spacing:0;width:100%;font-variant-numeric:tabular-nums}
+  th,td{border:1px solid var(--line);padding:8px 10px;background:#fff}
+  th{
+    background:linear-gradient(180deg,#fcf8ff 0%,#fff 100%);
+    text-align:left;color:var(--ink); font-weight:900
+  }
+  td:first-child, th:first-child{border-top-left-radius:10px; border-bottom-left-radius:10px}
+  td:last-child,  th:last-child{border-top-right-radius:10px; border-bottom-right-radius:10px}
+
+  /* Пилюли / линии статуса */
+  .pill{display:inline-block;padding:3px 8px;border-radius:999px;font-weight:900}
+  .pill-ok{background:rgba(18,183,106,.12);color:#027a48;border:1px solid rgba(18,183,106,.25)}
+  .pill-bad{background:rgba(239,68,68,.12);color:#b42318;border:1px solid rgba(239,68,68,.25)}
+  .line-ok{color:#12b76a;font-weight:900}
+  .line-bad{color:#b42318;font-weight:900}
+
+  /* Фильтры блока РАН */
+  .filters{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;margin-top:10px}
+  .filters .field{grid-column:span 3}
+  .filters .field.small{grid-column:span 2}
+  @media (max-width:900px){ .filters .field{grid-column:span 6} .filters .field.small{grid-column:span 6} }
+
+  /* Ссылки/алерты */
+  .alert-row{margin:6px 0 14px 0}
+  .alert-row a{color:#7a3af9;text-decoration:none;font-weight:900}
+  .alert-row a:hover{text-decoration:underline}
+  .ok{color:var(--ok)}
+  .bad{color:var(--bad)}
+  .warn{color:var(--c3)}
+
+  /* Скроллбар (приятнее) */
+  ::-webkit-scrollbar{height:12px;width:12px}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(180deg, #dcb4ef, #f0bce8); border-radius:10px; border:3px solid #fff}
+
+  /* Readiness cards */
+  .release-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  @media (max-width:900px){ .release-row{grid-template-columns:1fr} }
+  .release-card{
+    border:1px solid var(--line); border-radius:12px; background:#fff; padding:12px;
+    box-shadow:var(--shadow-sm); display:grid; gap:10px;
+  }
+  .mini-grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+    gap:12px; align-items:stretch;
+  }
+  .mini-card{
+    border:1px solid var(--line); border-radius:12px; background:#fff;
+    box-shadow:var(--shadow-sm); padding:10px;
+    display:grid; grid-template-rows:auto 120px auto; align-items:center; text-align:center;
+  }
+  .mini-title{
+    font-weight:900; font-size:12px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .mini-title a{ color: inherit; text-decoration: none; }
+  .mini-title a:hover{ text-decoration: underline; }
+  .mini-fig{ position:relative; height:120px; }
+  .mini-fig canvas{ width:100%; height:100%; }
+  .mini-remaining{ font-size:12px; color:var(--muted); margin-top:6px; }
+  .release-title{display:flex;justify-content:space-between;align-items:center;font-weight:900}
+  .release-sub{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center}
+  .release-chip{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-weight:800;font-size:12px}
+  .release-chip strong{font-variant-numeric:tabular-nums}
+  .release-bar{height:10px;background:#f5ecff;border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+  .release-bar>div{height:100%;width:0;background:var(--grad);transition:width .25s ease}
+  .release-link{font-weight:900;color:#7a3af9;text-decoration:none}
+  .release-link:hover{text-decoration:underline}
+
+  /* Подтабы для срезов */
+  .subtabs{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px}
+  .subtabs .mini.active{ color:#fff; background:var(--grad); border-color:transparent; box-shadow:0 10px 24px rgba(203,17,171,.28); }
+
+.hidden {
+  display: none;
+}
+
+/* ================== Mobile Overrides (added by ChatGPT) ================== */
+@media (max-width: 1024px){
+  .wrap{ padding: 0 16px; }
+  .chart-wrap{ height: 300px; }
+  .kpis{ grid-template-columns: repeat(2,1fr); }
+}
+  @media (max-width: 768px){
+    body{ font-size: 13px; }
+    .topbar .inner{ padding: 8px 12px; }
+    .brand .title{ font-size: 14px; max-width: 50vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tabs:not(.topbar-tabs){ overflow:auto; }
+    .tabs:not(.topbar-tabs) button{ flex: 1 1 auto; }
+    .wrap{ padding: 0 12px; }
+  /* Panels/fields stack to one column */
+  .panel{ grid-template-columns: 1fr !important; }
+  .panel .field{ grid-column: 1 / -1 !important; }
+  /* Buttons row at the end of the panel stacks */
+  .panel > div[style*="display:flex"][style*="align-items:end"]{ flex-wrap: wrap; }
+  /* Auto-run block stacks vertically */
+  .auto{ grid-auto-flow: row !important; justify-items: start; }
+  .chart-wrap{ height: 260px; }
+  .kpis{ grid-template-columns: 1fr; }
+  .grid{ grid-template-columns: 1fr !important; }
+  .mini-grid{ grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); }
+  .release-row{ grid-template-columns: 1fr; }
+  .release-sub{ grid-template-columns: 1fr; }
+  .mini-title{ font-size: 11px; }
+  .mini-fig{ height: 100px; }
+  .log{ min-height: 120px; max-height: 220px; }
+  /* Filters on RUN tab wrap nicely */
+  .filters{ grid-template-columns: 1fr 1fr; }
+  .filters .field, .filters .field.small{ grid-column: span 2 !important; }
+  /* Tables become horizontally scrollable with better spacing */
+  table{ font-size: 12px; }
+  th, td{ padding: 6px 8px; }
+}
+@media (max-width: 480px){
+  body{ font-size: 12.5px; }
+  .brand .logo{ width: 30px; height: 24px; }
+  .brand .title{ display: none; } /* leave just the WB badge on very small screens */
+  h1{ font-size: 22px; gap: 10px; }
+  h1::before{ width: 22px; height: 22px; border-radius: 8px; }
+  .btn, .panel input, .panel select{ height: 42px; }
+  .mini{ height: 28px; }
+  .chart-wrap{ height: 220px; }
+}
+/* Improve tap experience */
+button, .btn, .mini{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+/* iOS safe-area for sticky topbar */
+.topbar{ padding-top: env(safe-area-inset-top); }
+
+</style>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+
+<style id="fullscreen-ui-overrides">
+/* ===== Edge-to-edge fullscreen UI (no extra FS buttons) ===== */
+html, body { height: 100%; }
+body { margin: 0; overflow: auto; }
+.topbar { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid rgba(0,0,0,.04); }
+.topbar .inner { max-width: 100%; padding-left: 20px; padding-right: 20px; }
+.wrap { max-width: 100%; padding-left: 20px; padding-right: 20px; }
+.tabs { flex-wrap: wrap; }
+.card { border-radius: 16px; }
+.panel { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.grid { grid-template-columns: repeat(4, minmax(280px, 1fr)); }
+.chart-wrap { height: 420px; }
+@media (max-width: 1400px){ .grid{ grid-template-columns: repeat(3, minmax(280px,1fr)); } }
+@media (max-width: 1100px){ .grid{ grid-template-columns: repeat(2, minmax(280px,1fr)); } }
+@media (max-width: 780px){
+  .panel{ grid-template-columns: 1fr !important; }
+  .panel .field{ grid-column: 1 / -1 !important; }
+  .grid{ grid-template-columns: 1fr !important; }
+  .chart-wrap{ height: 300px; }
+}
+/* Make charts and tables fill the viewport width nicely */
+#runChartWrap { height: 420px; }
+#runTable { font-size: 13px; }
+</style>
+
+
+<style id="typography-and-controls-normalize">
+/* ===== Readability & Alignment Normalize ===== */
+:root{
+  --font-ui: Inter, "SF Pro Text", -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --fg:#1b1233; --muted:#6d5d86; --soft:#f3ebff;
+  --btn-h: 42px;               /* единая высота кнопок/инпутов */
+  --inp-pad-y: 9px;            /* вертикальный паддинг инпутов */
+  --inp-pad-x: 12px;           /* горизонтальный паддинг инпутов */
+  --radius: 12px;
+}
+html, body { font-family: var(--font-ui); color: var(--fg); }
+body, input, button, select { font-size: 14.5px; line-height: 1.35; letter-spacing: 0; }
+h1,h2,h3 { letter-spacing: -0.01em; }
+small, .muted { color: var(--muted); }
+
+/* Контролы: одинаковая высота, базовая сетка по базовой линии */
+input[type="text"], input[type="number"], input[type="search"], select {
+  height: var(--btn-h);
+  padding: var(--inp-pad-y) var(--inp-pad-x);
+  border-radius: var(--radius);
+  border: 1px solid #eadbff;
+  background: #fcfaff;
+  outline: none;
+  box-shadow: 0 2px 0 rgba(123,31,162,0.02) inset;
+}
+input::placeholder{ color: #a596c7; opacity: .9; }
+
+button, .btn {
+  height: var(--btn-h);
+  padding: 0 14px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  transform: translateZ(0);
+}
+button .icon{ margin-right: 6px; }
+
+/* Согласованные размеры всех «пилюль» кнопок в панелях */
+.panel .btn, .panel button, .tabs .btn, .tabs button,
+.card .btn, .card button {
+  min-height: var(--btn-h);
+  line-height: 1;              /* чтобы не прыгали */
+}
+
+/* Выравнивание групп кнопок и полей по baseline */
+.controls-row, .panel .row, .panel .actions, .tabs, .filters, .card .actions {
+  display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center;
+}
+/* Блоки с подписью левее — подправить вертикальный отступ */
+.label-inline { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+
+/* Читаемость: слегка увеличенный контраст */
+.card, .panel { color: var(--fg); }
+.card p, .panel p, label { font-size: 13px; color: var(--muted); }
+th { font-weight: 600; }
+table { font-size: 13.5px; }
+
+/* Улучшение кликабельности маленьких кнопок в правой части блока */
+.pill, .chip, .mini {
+  height: var(--btn-h);
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* Исправление «дрожи» из-за разных внутренних паддингов */
+.btn, button, .pill, .mini, input, select { vertical-align: middle; }
+
+/* Немного больше воздуха между большими секциями */
+.section + .section, .card + .card { margin-top: 16px; }
+</style>
+
+
+<style id="runreport-rebuild-fix-css">
+/* Снизу не показываем декоративные разделители */
+.report, .card, .section { position: relative; }
+.report hr, .card hr, .section hr { display: none !important; }
+</style>
+
+
+<style id="stream-multiselect-css">
+/* ========== Stream multiselect styles ========== */
+.stream-filter-wrap{ position: relative; display:inline-block; }
+.stream-filter-btn{ height:42px;padding:0 12px;border-radius:12px;border:1px solid #eadbff;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(123,31,162,.08) }
+.stream-filter-btn .count{ background:#6b15d6;color:#fff;border-radius:10px;padding:2px 6px;font-size:12px }
+.stream-menu{ position:absolute; top:calc(100% + 6px); right:0; z-index:60; min-width:240px; max-height:320px; overflow:auto;
+  background:#fff;border:1px solid #eadbff;border-radius:12px; box-shadow:0 16px 40px rgba(14,0,65,.15); padding:8px }
+.stream-menu .row{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; }
+.stream-menu .row:hover{ background:#f7f2ff }
+.stream-menu input{ width:16px; height:16px; }
+.stream-menu .hdr{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 6px 8px; border-bottom:1px solid #f0e7ff; margin-bottom:6px }
+.stream-menu .actions{ display:flex; gap:8px }
+.stream-menu .mini{ height:32px; padding:0 10px; border-radius:10px; }
+.hide{ display:none !important; }
+</style>
+
+
+<style id="stream-multiselect-css-v2">
+.stream-filter-wrap{ position: relative; display:inline-block; margin-left:8px; }
+.stream-filter-btn{ height:42px;padding:0 12px;border-radius:12px;border:1px solid #eadbff;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(123,31,162,.08) }
+.stream-filter-btn .count{ background:#6b15d6;color:#fff;border-radius:10px;padding:2px 6px;font-size:12px }
+.stream-menu{ position:absolute; top:calc(100% + 6px); right:0; z-index:9999; min-width:260px; max-height:320px; overflow:auto;
+  background:#fff;border:1px solid #eadbff;border-radius:12px; box-shadow:0 16px 40px rgba(14,0,65,.15); padding:8px }
+.stream-menu .row{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; }
+.stream-menu .row:hover{ background:#f7f2ff }
+.stream-menu input{ width:16px; height:16px; }
+.stream-menu .hdr{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 6px 8px; border-bottom:1px solid #f0e7ff; margin-bottom:6px }
+.stream-menu .actions{ display:flex; gap:8px }
+.stream-menu .mini{ height:32px; padding:0 10px; border-radius:10px; }
+.hide{ display:none !important; }
+</style>
+
+
+<style id="stream-multiselect-css-v3">
+.stream-filter-wrap{ position: relative; display:inline-block; margin-left:8px; }
+.stream-filter-btn{ height:42px;padding:0 12px;border-radius:12px;border:1px solid #eadbff;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(123,31,162,.08) }
+.stream-filter-btn .count{ background:#6b15d6;color:#fff;border-radius:10px;padding:2px 6px;font-size:12px }
+.stream-menu{ position:absolute; top:calc(100% + 6px); right:0; z-index:9999; min-width:260px; max-height:320px; overflow:auto;
+  background:#fff;border:1px solid #eadbff;border-radius:12px; box-shadow:0 16px 40px rgba(14,0,65,.15); padding:8px }
+.stream-menu .row{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; }
+.stream-menu .row:hover{ background:#f7f2ff }
+.stream-menu input{ width:16px; height:16px; }
+.stream-menu .hdr{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 6px 8px; border-bottom:1px solid #f0e7ff; margin-bottom:6px }
+.stream-menu .actions{ display:flex; gap:8px }
+.stream-menu .mini{ height:32px; padding:0 10px; border-radius:10px; }
+.hide{ display:none !important; }
+</style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style id="rr-stream-select-css">
+  .rr-stream-dd {position: relative; display:inline-flex; align-items:center; gap:8px;}
+  .rr-dd-trigger {
+    height:36px; padding:0 12px; border:1px solid rgba(0,0,0,.12); border-radius:10px;
+    background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.04); cursor:pointer; display:flex; align-items:center; gap:8px;
+  }
+  .rr-dd-trigger .rr-badge {background:#6b15d6; color:#fff; border-radius:999px; padding:2px 8px; font-size:12px}
+  .rr-dd-menu {
+    position:absolute; top:110%; right:0; min-width:260px; max-height:360px; overflow:auto; z-index:9999;
+    background:#fff; border:1px solid rgba(0,0,0,.12); box-shadow:0 8px 24px rgba(0,0,0,.12); border-radius:12px; padding:8px;
+    display:none;
+  }
+  .rr-dd-menu.open {display:block;}
+  .rr-dd-item {display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer;}
+  .rr-dd-item:hover {background:#f7f5ff;}
+  .rr-dd-item input {accent-color:#6b15d6;}
+  .mini-card.hide, .miniCard.hide {display:none !important}
+</style>
+
+
+<!-- INLINE FILTERS OVERRIDE: keep controls on one line -->
+<style id="rr-inline-filters">
+  /* target the mini-launch card toolbar controls */
+  #miniLaunchCard .head .export,
+  #miniLaunchCard .head .controls,
+  .card#miniLaunchCard .head .export {
+    display: flex !important;
+    gap: 10px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  /* ensure each control does not shrink and stays readable */
+  #miniLaunchCard .head .export > *,
+  #miniLaunchCard .head .controls > * {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+  /* keep the stream dropdown visible on the right */
+  .rr-stream-dd { margin-left: 8px !important; }
+  /* small screens: allow scroll and slightly reduce gaps */
+  @media (max-width: 1000px) {
+    #miniLaunchCard .head .export { gap: 8px !important; }
+  }
+</style>
+<style>
+  .dp-top-nav{
+    position:fixed;
+    top:16px;
+    right:16px;
+    z-index:9100;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    font-family:-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif;
+  }
+  .dp-nav-link{
+    padding:6px 12px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.5);
+    background:rgba(0,0,0,.35);
+    backdrop-filter:blur(12px);
+    color:#fff;
+    text-decoration:none;
+    font-size:13px;
+    line-height:1.3;
+    box-shadow:0 6px 18px rgba(0,0,0,.25);
+    white-space:nowrap;
+  }
+  .dp-nav-link:hover{
+    background:rgba(110,11,212,.85);
+    border-color:rgba(255,255,255,.9);
+  }
+  .dp-nav-link--active{
+    background:linear-gradient(90deg,#cb11ab,#6e0bd4);
+  }
+  @media (max-width: 600px){
+    .dp-top-nav{
+      left:8px;
+      right:8px;
+      justify-content:center;
+    }
+    .dp-nav-link{
+      font-size:12px;
+      padding:5px 10px;
+    }
+  }
+</style>
+</head>
+<body class="rb-locked">
+<!-- ===== RB AUTH SCREEN ===== -->
+<style>
+  body.rb-locked .topbar,
+  body.rb-locked .wrap,
+  body.rb-locked .tab-section {
+    display: none !important;
+  }
+
+  .rb-auth-screen {
+    position: fixed;
+    inset: 0;
+    background: url("./dom_pitona_logo1.png") center center / contain no-repeat;
+    background-color: #140021;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    transition: opacity 0.4s ease;
+  }
+
+  /* 🔧 Адаптивность */
+  @media (max-width: 1200px) {
+    .rb-auth-screen { background-size: 85% auto; }
+  }
+  @media (min-aspect-ratio: 21/10) {
+    .rb-auth-screen { background-size: cover; }
+  }
+
+  .rb-auth-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* ✅ Прозрачная карточка */
+  .rb-auth-card {
+    position: relative;
+    background: rgba(10, 10, 20, 0.4);
+    backdrop-filter: blur(18px) saturate(170%) contrast(110%);
+    -webkit-backdrop-filter: blur(18px) saturate(170%) contrast(110%);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 22px;
+    box-shadow: 0 10px 48px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255,255,255,.05) inset;
+    padding: 36px 42px;
+    width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    font-family: "Inter","Segoe UI",Arial,sans-serif;
+    animation: fadeIn .8s ease;
+  }
+  .rb-auth-card::before {
+    content: "";
+    position: absolute; inset: 0; border-radius: inherit;
+    background: radial-gradient(120% 90% at 60% 30%, rgba(0,0,0,.65) 0%, rgba(0,0,0,.4) 80%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .rb-auth-card > * { position: relative; z-index: 1; }
+  .rb-auth-error {
+    display: none;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #ff9b9b;
+    background: rgba(255, 61, 113, 0.12);
+    border: 1px solid rgba(255, 61, 113, 0.5);
+    border-radius: 10px;
+    padding: 8px 10px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.5);
+  }
+
+  /* Текст */
+  .rb-auth-title { font-size: 26px; font-weight: 800; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
+  .rb-auth-note  { font-size: 14px; color: rgba(255,255,255,.85); text-shadow: 0 1px 4px rgba(0,0,0,.7); }
+  .rb-auth-field label { font-size: 13px; font-weight: 600; color: #e5dfff; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+
+  .rb-auth-field input {
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 12px;
+    padding: 10px 14px;
+    outline: none;
+    transition: .2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,.25) inset;
+  }
+  .rb-auth-field input::placeholder { color: rgba(255,255,255,.75); }
+  .rb-auth-field input:focus {
+    border-color: #cb11ab;
+    box-shadow: 0 0 0 3px rgba(203,17,171,.35), 0 1px 2px rgba(0,0,0,.25) inset;
+    background: rgba(255,255,255,.18);
+  }
+
+  /* Кнопки */
+  .rb-auth-btn.primary {
+    background: linear-gradient(90deg, #cb11ab, #6e0bd4);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(155,92,255,.45);
+    cursor: pointer;
+    font-weight: 600;
+    padding: 10px 22px;
+    transition: all .2s ease;
+  }
+  .rb-auth-btn.primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
+  /* Кнопка выхода в шапке */
+  .rb-locked .topbar .btn-logout {
+    display: none !important;
+  }
+  .btn-logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: none;
+    color: #1a0424;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .btn-logout:hover {
+    background: #cb11ab;
+    color: #fff;
+  }
+  .btn-secondary{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px 12px;
+    color:var(--ink);
+    font-weight:700;
+    cursor:pointer;
+    transition:.15s ease;
+  }
+  .btn-secondary:hover{ border-color:var(--line-strong); transform:translateY(-1px); }
+  .btn-primary{
+    background:var(--grad);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:10px 14px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:var(--shadow-sm);
+    transition:.15s ease;
+  }
+  .btn-primary:hover{ filter:brightness(1.05); transform:translateY(-1px); }
+  .role-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    background: var(--grad);
+    color:#fff;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.2px;
+    box-shadow:var(--shadow-sm);
+    white-space:nowrap;
+  }
+  body.rb-locked .role-chip{ display:none !important; }
+
+  body.authed .topbar .actions .btn-logout {
+    display: inline-flex !important;
+  }
+
+  body.rb-locked .topbar .actions .btn-logout {
+    display: none !important;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Роли и доступы */
+  .role-access-card{ margin: 16px 0 18px; }
+  .role-access-grid{
+    display:grid;
+    grid-template-columns: 220px 1fr;
+    gap:14px;
+  }
+  .role-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .role-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    cursor:pointer;
+    font-weight:700;
+    color:var(--ink);
+    transition:.15s ease;
+  }
+  .role-item:hover{ border-color:var(--line-strong); transform:translateY(-1px); }
+  .role-item.active{
+    background:var(--grad);
+    color:#fff;
+    border-color:transparent;
+    box-shadow:0 10px 24px rgba(203,17,171,.28);
+  }
+  .access-list{
+    display:grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap:10px 14px;
+  }
+  .access-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    font-size:13px;
+    color:var(--ink);
+  }
+  .access-item input{ accent-color: #cb11ab; }
+  .role-actions{
+    display:flex;
+    gap:8px;
+    margin-top:12px;
+    flex-wrap:wrap;
+  }
+  #roleAccessCard, #userAccessCard { display:none; }
+  body.role-superadmin.access-open #roleAccessCard,
+  body.role-superadmin.access-open #userAccessCard { display:block; }
+  body:not(.role-superadmin) #accessToggleBtn{ display:none !important; }
+  body:not(.role-superadmin) #roleAccessCard{ display:none !important; }
+  body:not(.role-superadmin) #userAccessCard{ display:none !important; }
+  @media (max-width: 900px){
+    .role-access-grid{ grid-template-columns: 1fr; }
+    .access-list{ grid-template-columns: 1fr; }
+  }
+  .role-access-card select{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:#fff;
+    color:var(--ink);
+    font-weight:700;
+  }
+</style>
+
+<!-- HTML -->
+<div class="rb-auth-screen" id="rbAuthScreen" aria-hidden="true">
+  <form class="rb-auth-card" id="rbAuthForm" autocomplete="off">
+    <div class="rb-auth-title">Вход</div>
+    <div class="rb-auth-note">Доступ к дашборду по логину и паролю</div>
+
+    <div class="rb-auth-field">
+      <label>Логин</label>
+      <input id="rbAuthLogin" placeholder="Введите логин" />
+    </div>
+    <div class="rb-auth-field">
+      <label>Пароль</label>
+      <input id="rbAuthPass" type="password" placeholder="Введите пароль" />
+    </div>
+
+    <div class="rb-auth-error" id="rbAuthError">Неверный логин или пароль</div>
+
+    <div class="rb-auth-actions">
+      <button type="submit" class="rb-auth-btn primary">Войти</button>
+    </div>
+  </form>
+</div>
+<script>
+(() => {
+  const RB_CONFIG_URL = 'rb_roles_access.json';
+  const RB_FALLBACK_CONFIG = {
+    roles: [
+      { id: 'superadmin', label: 'Суперадмин' },
+      { id: 'admin', label: 'Администратор' },
+      { id: 'manager', label: 'Менеджер' },
+      { id: 'analyst', label: 'Аналитик' },
+      { id: 'viewer', label: 'Наблюдатель' },
+    ],
+    users: [
+      { login: 'Nightlays', pass: 'P132868s', role: 'superadmin' },
+      { login: 'Lena', pass: 'qwerty', role: 'manager' },
+      { login: 'Lesha', pass: 'darowa', role: 'analyst' },
+      { login: 'Nadya', pass: 'P132868s', role: 'manager' },
+      { login: 'Viktor', pass: 'qwerty', role: 'viewer' },
+      { login: 'Andrei', pass: 'Pa$$w0rd', role: 'admin' },
+      { login: 'Olesya', pass: 'Pa$$w0rd', role: 'analyst' },
+      { login: 'Daria', pass: 'qwerty', role: 'viewer' }
+    ],
+    roleAccess: {
+      superadmin: ['*'],
+      admin: ['*'],
+      manager: [
+        'dashboard_run_module.html',
+        'Ванговатор.html',
+        'Создание рана.html',
+        'Сбор ЧП.html',
+        'УВУ.html',
+        'BiUser.html',
+        'Популярные устройства.html',
+        'Графики.html',
+        'SWAT релиз.html',
+        'Копирование данных из YT.html'
+      ],
+      analyst: [
+        'dashboard_run_module.html',
+        'Графики.html',
+        'BiUser.html',
+        'Популярные устройства.html'
+      ],
+      viewer: ['dashboard_run_module.html']
+    },
+    userAccess: {}
+  };
+
+  function normalizeConfig(cfg) {
+    const safe = cfg && typeof cfg === 'object' ? cfg : {};
+    const roles = Array.isArray(safe.roles) && safe.roles.length ? safe.roles : RB_FALLBACK_CONFIG.roles;
+    const users = Array.isArray(safe.users) && safe.users.length ? safe.users : RB_FALLBACK_CONFIG.users;
+    const roleAccess = { ...RB_FALLBACK_CONFIG.roleAccess, ...(safe.roleAccess || {}) };
+    const userAccess = { ...(safe.userAccess || {}) };
+    return { roles, users, roleAccess, userAccess };
+  }
+
+  window.loadRbConfig = function loadRbConfig() {
+    if (window.RB_CONFIG_PROMISE) return window.RB_CONFIG_PROMISE;
+    window.RB_CONFIG_PROMISE = fetch(RB_CONFIG_URL, { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : null)
+      .catch(() => null)
+      .then(cfg => {
+        const normalized = normalizeConfig(cfg);
+        window.RB_CONFIG = normalized;
+        return normalized;
+      });
+    return window.RB_CONFIG_PROMISE;
+  };
+})();
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const loadConfig = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
+  loadConfig.then((cfg) => {
+    const USERS = Array.isArray(cfg?.users) ? cfg.users : [];
+
+  const AUTH_KEY = 'rb_auth_ok_v1';
+  const ROLE_KEY = 'rb_role_v1';
+  const USER_KEY = 'rb_user_v1';
+  const USER_ROLE_KEY = 'rb_user_roles_v1';
+
+  const form = document.getElementById('rbAuthForm');
+  const loginInput = document.getElementById('rbAuthLogin');
+  const passInput = document.getElementById('rbAuthPass');
+  const err = document.getElementById('rbAuthError');
+  const screen = document.getElementById('rbAuthScreen');
+  const btnLogout = document.getElementById('rbAuthLogout');
+
+  function isAuthed() {
+    return localStorage.getItem(AUTH_KEY) === '1';
+  }
+
+  function showAuth() {
+    if (screen) screen.classList.remove('hidden');
+    document.body.classList.add('rb-locked');
+    document.body.classList.remove('authed');
+  }
+
+  function hideAuth() {
+    if (screen) screen.classList.add('hidden');
+    document.body.classList.remove('rb-locked');
+    document.body.classList.add('authed');
+  }
+
+  function getStoredUserRole(loginVal) {
+    try {
+      const raw = localStorage.getItem(USER_ROLE_KEY);
+      if (!raw) return null;
+      const map = JSON.parse(raw);
+      return map?.[loginVal] || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setRole(role, loginVal) {
+    const roleId = role || 'viewer';
+    localStorage.setItem(ROLE_KEY, roleId);
+    if (loginVal) localStorage.setItem(USER_KEY, loginVal);
+    document.body.dataset.role = roleId;
+    document.body.classList.toggle('role-admin', roleId === 'admin');
+    document.body.classList.toggle('role-superadmin', roleId === 'superadmin');
+    window.dispatchEvent(new CustomEvent('rb-role-changed', { detail: { role: roleId, user: loginVal } }));
+  }
+
+  function checkCredentials(loginVal, passVal) {
+    return USERS.find(u => u.login === loginVal && u.pass === passVal);
+  }
+
+  if (form) {
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const l = (loginInput?.value || '').trim();
+      const p = (passInput?.value || '').trim();
+
+      if (!l || !p) {
+        if (err) {
+          err.textContent = 'Заполните логин и пароль';
+          err.style.display = 'block';
+        }
+        return;
+      }
+
+      const user = checkCredentials(l, p);
+      if (user) {
+        localStorage.setItem(AUTH_KEY, '1');
+        const storedRole = getStoredUserRole(user.login);
+        let roleToSet = user.login === 'Nightlays' ? 'superadmin' : (storedRole || user.role || 'viewer');
+        if (user.login !== 'Nightlays' && roleToSet === 'superadmin') roleToSet = 'admin';
+        setRole(roleToSet, user.login);
+        if (err) err.style.display = 'none';
+        hideAuth();
+      } else {
+        if (err) {
+          err.textContent = 'Неверный логин или пароль';
+          err.style.display = 'block';
+        }
+      }
+    });
+  }
+
+  if (btnLogout) {
+    btnLogout.addEventListener('click', () => {
+      localStorage.removeItem(AUTH_KEY);
+      localStorage.removeItem(ROLE_KEY);
+      localStorage.removeItem(USER_KEY);
+      document.body.classList.remove('role-admin');
+      document.body.classList.remove('role-superadmin');
+      document.body.dataset.role = 'viewer';
+      showAuth();
+    });
+  }
+
+  // Первичная инициализация после загрузки DOM
+  if (isAuthed()) {
+    hideAuth();
+    const savedRole = localStorage.getItem(ROLE_KEY) || 'viewer';
+    const savedUser = localStorage.getItem(USER_KEY) || '';
+    let roleToSet = savedUser === 'Nightlays' ? 'superadmin' : savedRole;
+    if (savedUser !== 'Nightlays' && roleToSet === 'superadmin') roleToSet = 'admin';
+    setRole(roleToSet, savedUser);
+  } else {
+    showAuth();
+  }
+
+  });
+});
+</script>
+<!-- ======= ШАПКА С ЛОГОТИПОМ WILDBERRIES ======= -->
+<div class="topbar">
+  <div class="inner">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 72 56" xmlns="http://www.w3.org/2000/svg" aria-label="Wildberries">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#CB11AB"/><stop offset="1" stop-color="#6E0BD4"/></linearGradient></defs>
+        <rect x="0" y="4" rx="14" ry="14" width="72" height="48" fill="url(#g)"/>
+        <text x="14" y="38" font-family="Inter, Segoe UI, Arial" font-weight="900" font-size="28" fill="#fff">WB</text>
+      </svg>
+      <div class="title">Дом питона </div>
+    </div>
+    <button class="nav-toggle" aria-label="Открыть меню">☰</button>
+    <div class="tabs rb-shell-tabs topbar-tabs">
+    <button class="active" data-module="dashboard_run_module.html" data-guard="shell--dashboard-run">Дашборд + РАН-отчёт</button>
+    <button data-module="Ванговатор.html"data-guard="shell--vangovator">Ванговатор</button>
+    <button data-module="Создание рана.html"data-guard="shell--createrun">Создание рана</button>
+    <button data-module="Сбор ЧП.html"data-guard="shell--finalchp">Сбор ЧП</button>
+    <button data-module="УВУ.html"data-guard="shell--finalchp">Расчет uWu</button>
+    <button data-module="BiUser.html"data-guard="shell--finalchp">Пользователи по версиям</button>
+    <button data-module="Популярные устройства.html"data-guard="shell--finalchp">Популярные устройства</button>
+    <button data-module="Графики.html"data-guard="shell--finalchp">Графики</button>
+    <button data-module="SWAT релиз.html"data-guard="shell--finalchp">SWAT релиз</button>
+    <button data-module="Копирование данных из YT.html"data-guard="shell--finalchp">Epic / User Story</button>
+    <!-- Пример для будущих модулей:
+    <button data-module="swat_only.html">SWAT-таблица</button>
+    <button data-module="bi_users_calc.html">Статистика BI</button>
+    -->
+    </div>
+    <div class="actions">
+      <button id="shellModeToggleBtn" class="btn-secondary" type="button">Режим: Стабильный → Экспериментальный</button>
+      <button id="accessToggleBtn" class="btn-secondary" type="button">Доступы</button>
+      <div class="role-chip" id="roleChip">роль</div>
+      <button id="rbAuthLogout" class="btn-logout" type="button">Выйти</button>
+    </div>
+  </div>
+</div>
+  <div class="wrap">
+    <div class="card role-access-card" id="roleAccessCard">
+      <div class="head" style="align-items:center;">
+        <div>
+          <div style="font-weight:900; font-size:16px;">Роли и доступы</div>
+          <div class="nums">Настройка доступа к модулям для каждой роли</div>
+        </div>
+        <div class="nums" id="roleAccessHint">Доступно администратору</div>
+      </div>
+      <div class="role-access-grid" style="margin-top:12px;">
+        <div class="role-list" id="roleList"></div>
+        <div>
+          <div class="access-list" id="accessList"></div>
+          <div class="role-actions">
+            <button class="btn-secondary" id="accessSelectAll" type="button">Выбрать все</button>
+            <button class="btn-secondary" id="accessClearAll" type="button">Очистить</button>
+            <button class="btn-primary" id="accessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить доступы</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card role-access-card" id="userAccessCard">
+      <div class="head" style="align-items:center;">
+        <div>
+          <div style="font-weight:900; font-size:16px;">Пользователи и доступы</div>
+          <div class="nums">Назначение роли и доступа для каждого пользователя</div>
+        </div>
+        <div class="nums">Только для Nightlays (суперадмин)</div>
+      </div>
+      <div class="role-access-grid" style="margin-top:12px;">
+        <div class="role-list" id="userList"></div>
+        <div>
+          <div class="field" style="margin-bottom:10px;">
+            <label>Роль пользователя</label>
+            <select id="userRoleSelect"></select>
+          </div>
+          <label class="access-item" style="margin-bottom:10px;">
+            <input type="checkbox" id="userUseRoleAccess" checked />
+            <span>Использовать доступы роли</span>
+          </label>
+          <div class="access-list" id="userAccessList"></div>
+          <div class="role-actions">
+            <button class="btn-secondary" id="userAccessSelectAll" type="button">Выбрать все</button>
+            <button class="btn-secondary" id="userAccessClearAll" type="button">Очистить</button>
+            <button class="btn-primary" id="userAccessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить пользователя</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Панель вкладок оболочки: сюда можно добавлять кнопки с data-module="file.html" --><!-- Контейнер для подгружаемых HTML-модулей -->
+    <div class="card card-shell" style="padding:0; overflow:hidden; background:transparent;">
+      <iframe id="rbModuleFrame"
+              title="Модуль"
+              src="dashboard_run_module.html"
+              style="width:100%; min-height:80vh; border:0; display:block; background:transparent;">
+      </iframe>
+    </div>
+  </div>
+
+<script>
+// Оболочка: переключение модулей по кнопкам data-module + гарды по data-guard
+document.addEventListener('DOMContentLoaded', () => {
+  const frame = document.getElementById('rbModuleFrame');
+  const tabBar = document.querySelector('.rb-shell-tabs');
+  if (!tabBar || !frame) return;
+
+  const buttons = Array.from(tabBar.querySelectorAll('[data-module]'));
+  const guardClasses = buttons
+    .map(b => b.getAttribute('data-guard'))
+    .filter(Boolean);
+
+  const navToggle = document.querySelector('.nav-toggle');
+  const shellModeToggleBtn = document.getElementById('shellModeToggleBtn');
+  const accessToggleBtn = document.getElementById('accessToggleBtn');
+  const ROLE_KEY = 'rb_role_v1';
+  const USER_KEY = 'rb_user_v1';
+  const ACCESS_KEY = 'rb_role_access_v1';
+  const USER_ROLE_KEY = 'rb_user_roles_v1';
+  const USER_ACCESS_KEY = 'rb_user_access_v1';
+  const SHELL_VARIANT_KEY = 'rb_shell_design_mode_v1';
+  const INDEX_SHELL_URL = 'index.html';
+  const roleListEl = document.getElementById('roleList');
+  const accessListEl = document.getElementById('accessList');
+  const roleChipEl = document.getElementById('roleChip');
+  const selectAllBtn = document.getElementById('accessSelectAll');
+  const clearAllBtn = document.getElementById('accessClearAll');
+  const saveBtn = document.getElementById('accessSave');
+  const toastEl = document.getElementById('toast');
+  const userListEl = document.getElementById('userList');
+  const userRoleSelect = document.getElementById('userRoleSelect');
+  const userUseRoleAccess = document.getElementById('userUseRoleAccess');
+  const userAccessList = document.getElementById('userAccessList');
+  const userSelectAllBtn = document.getElementById('userAccessSelectAll');
+  const userClearAllBtn = document.getElementById('userAccessClearAll');
+  const userSaveBtn = document.getElementById('userAccessSave');
+
+  let toastTimer = null;
+  function showToast(message) {
+    if (!toastEl) return;
+    toastEl.textContent = message;
+    toastEl.classList.add('show');
+    if (toastTimer) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      toastEl.classList.remove('show');
+    }, 2200);
+  }
+
+  const modules = buttons.map(btn => ({
+    id: btn.getAttribute('data-module'),
+    label: (btn.textContent || '').trim()
+  }));
+
+  const loadConfig = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
+  loadConfig.then((cfg) => {
+    const roles = Array.isArray(cfg?.roles) ? cfg.roles : [];
+    const BASE_USERS = Array.isArray(cfg?.users) ? cfg.users.map(u => ({ login: u.login, role: u.role || 'viewer' })) : [];
+    const configRoleAccess = cfg?.roleAccess || {};
+    const configUserAccess = cfg?.userAccess || {};
+
+  function buildDefaultAccess() {
+    const all = modules.map(m => m.id);
+    const byLabel = (re) => modules.filter(m => re.test(m.label)).map(m => m.id);
+    const analyst = byLabel(/Дашборд|Графики|Пользователи|Популярные|РАН/i);
+    return {
+      superadmin: ['*'],
+      admin: ['*'],
+      manager: all.slice(),
+      analyst: analyst.length ? analyst : (all[0] ? [all[0]] : []),
+      viewer: all[0] ? [all[0]] : []
+    };
+  }
+
+  function loadAccessMap() {
+    try {
+      const raw = localStorage.getItem(ACCESS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return { ...buildDefaultAccess(), ...configRoleAccess, ...parsed };
+      }
+    } catch (e) {}
+    return { ...buildDefaultAccess(), ...configRoleAccess };
+  }
+
+  let accessMap = loadAccessMap();
+  let selectedRole = roles[0].id;
+  let selectedUser = BASE_USERS[0]?.login || '';
+  let userRoleMap = {};
+  let userAccessMap = {};
+  let userEditUseRole = null;
+
+  function roleLabel(roleId) {
+    return roles.find(r => r.id === roleId)?.label || roleId;
+  }
+
+  function loadUserRoleMap() {
+    try {
+      const raw = localStorage.getItem(USER_ROLE_KEY);
+      if (raw) return JSON.parse(raw) || {};
+    } catch (e) {}
+    return {};
+  }
+
+  function loadUserAccessMap() {
+    try {
+      const raw = localStorage.getItem(USER_ACCESS_KEY);
+      if (raw) return JSON.parse(raw) || {};
+    } catch (e) {}
+    return {};
+  }
+
+  function resolveUserRole(login) {
+    if (login === 'Nightlays') return 'superadmin';
+    const role = userRoleMap[login] || BASE_USERS.find(u => u.login === login)?.role || 'viewer';
+    return role === 'superadmin' ? 'admin' : role;
+  }
+
+  function getAllowedSet(roleId) {
+    const list = accessMap[roleId] || [];
+    if (list.includes('*')) return null; // null => all allowed
+    return new Set(list);
+  }
+
+  function resolveAllowedForUser(login, roleId) {
+    const userCfg = userAccessMap[login];
+    if (userCfg && userCfg.useRole === false) {
+      return new Set(userCfg.access || []);
+    }
+    return getAllowedSet(roleId);
+  }
+
+  function applyRoleAccess(roleId, login) {
+    const allowed = resolveAllowedForUser(login, roleId);
+    buttons.forEach(btn => {
+      const moduleId = btn.getAttribute('data-module');
+      const isAllowed = !allowed || allowed.has(moduleId);
+      btn.style.display = isAllowed ? '' : 'none';
+    });
+
+    const visibleButtons = buttons.filter(b => b.style.display !== 'none');
+    if (!visibleButtons.length) {
+      frame.src = 'about:blank';
+      return;
+    }
+    const activeVisible = visibleButtons.find(b => b.classList.contains('active'));
+    if (!activeVisible) {
+      activateButton(visibleButtons[0]);
+    }
+  }
+
+  function renderRoleList() {
+    if (!roleListEl) return;
+    roleListEl.innerHTML = roles.map(r => `
+      <div class="role-item ${r.id === selectedRole ? 'active' : ''}" data-role="${r.id}">
+        <span>${r.label}</span>
+        <span class="nums">${(accessMap[r.id]?.includes('*') ? 'Все' : (accessMap[r.id]?.length || 0))}</span>
+      </div>
+    `).join('');
+    roleListEl.querySelectorAll('.role-item').forEach(item => {
+      item.addEventListener('click', () => {
+        selectedRole = item.getAttribute('data-role');
+        renderRoleList();
+        renderAccessList();
+      });
+    });
+  }
+
+  function renderAccessList() {
+    if (!accessListEl) return;
+    const allowed = getAllowedSet(selectedRole);
+    accessListEl.innerHTML = modules.map(m => {
+      const checked = !allowed || allowed.has(m.id) ? 'checked' : '';
+      return `
+        <label class="access-item">
+          <input type="checkbox" data-module="${m.id}" ${checked} />
+          <span>${m.label}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  function renderUserList() {
+    if (!userListEl) return;
+    userListEl.innerHTML = BASE_USERS.map(u => {
+      const role = resolveUserRole(u.login);
+      return `
+        <div class="role-item ${u.login === selectedUser ? 'active' : ''}" data-user="${u.login}">
+          <span>${u.login}</span>
+          <span class="nums">${roleLabel(role)}</span>
+        </div>
+      `;
+    }).join('');
+    userListEl.querySelectorAll('.role-item').forEach(item => {
+      item.addEventListener('click', () => {
+        selectedUser = item.getAttribute('data-user');
+        userEditUseRole = null;
+        renderUserList();
+        renderUserEditor();
+      });
+    });
+  }
+
+  function renderUserEditor() {
+    if (!userRoleSelect || !userAccessList || !userUseRoleAccess) return;
+    const role = resolveUserRole(selectedUser);
+    const isNightlays = selectedUser === 'Nightlays';
+    const userCfg = userAccessMap[selectedUser] || { useRole: true, access: [] };
+    if (isNightlays) {
+      userRoleSelect.innerHTML = '<option value="superadmin">Суперадмин</option>';
+      userRoleSelect.value = 'superadmin';
+      userRoleSelect.disabled = true;
+      userUseRoleAccess.checked = true;
+    } else {
+      const roleOptions = roles.filter(r => r.id !== 'superadmin').map(r => `<option value="${r.id}">${r.label}</option>`).join('');
+      userRoleSelect.innerHTML = roleOptions;
+      userRoleSelect.value = role;
+      userRoleSelect.disabled = false;
+      userUseRoleAccess.checked = userEditUseRole !== null ? userEditUseRole : (userCfg.useRole !== false);
+    }
+    userUseRoleAccess.disabled = isNightlays;
+
+    const useRole = userUseRoleAccess.checked;
+    const allowed = useRole ? getAllowedSet(role) : new Set(userCfg.access || []);
+    userAccessList.innerHTML = modules.map(m => {
+      const checked = !allowed || allowed.has(m.id) ? 'checked' : '';
+      const disabled = (isNightlays || useRole) ? 'disabled' : '';
+      return `
+        <label class="access-item">
+          <input type="checkbox" data-module="${m.id}" ${checked} ${disabled} />
+          <span>${m.label}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  function updateRoleChip(roleId) {
+    if (!roleChipEl) return;
+    roleChipEl.textContent = roleLabel(roleId);
+  }
+
+  function setAccessOpen(open) {
+    document.body.classList.toggle('access-open', open);
+    if (accessToggleBtn) {
+      accessToggleBtn.textContent = open ? 'Скрыть доступы' : 'Доступы';
+    }
+  }
+
+  const closeNav = () => {
+    document.body.classList.remove('nav-open');
+    if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+  };
+  const openNav = () => {
+    document.body.classList.add('nav-open');
+    if (navToggle) navToggle.setAttribute('aria-expanded', 'true');
+  };
+
+  if (navToggle) {
+    navToggle.setAttribute('aria-expanded', 'false');
+    navToggle.addEventListener('click', () => {
+      if (document.body.classList.contains('nav-open')) {
+        closeNav();
+      } else {
+        openNav();
+      }
+    });
+  }
+
+  if (shellModeToggleBtn) {
+    shellModeToggleBtn.addEventListener('click', () => {
+      localStorage.setItem(SHELL_VARIANT_KEY, 'experimental');
+      const params = new URLSearchParams(location.search);
+      params.set('mode', 'experimental');
+      const query = params.toString();
+      location.href = query ? `${INDEX_SHELL_URL}?${query}` : `${INDEX_SHELL_URL}?mode=experimental`;
+    });
+  }
+
+  function activateButton(btn) {
+    // визульное состояние
+    buttons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // загрузка модуля
+    const url = btn.getAttribute('data-module');
+    if (url && frame.src !== url) {
+      frame.src = url;
+    }
+
+    // гарды вкладок на body
+    if (guardClasses.length) {
+      document.body.classList.remove(...guardClasses);
+    }
+    const guard = btn.getAttribute('data-guard');
+    if (guard) {
+      document.body.classList.add(guard);
+    }
+    closeNav();
+  }
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => activateButton(btn));
+  });
+
+  // Активируем первую кнопку по умолчанию, если она есть
+  const initiallyActive = buttons.find(b => b.classList.contains('active')) || buttons[0];
+  if (initiallyActive) activateButton(initiallyActive);
+
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', () => {
+      accessMap[selectedRole] = ['*'];
+      renderRoleList();
+      renderAccessList();
+    });
+  }
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', () => {
+      accessMap[selectedRole] = [];
+      renderRoleList();
+      renderAccessList();
+    });
+  }
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      const checked = Array.from(accessListEl?.querySelectorAll('input[type="checkbox"]') || [])
+        .filter(i => i.checked)
+        .map(i => i.getAttribute('data-module'));
+      accessMap[selectedRole] = checked.length ? checked : [];
+      localStorage.setItem(ACCESS_KEY, JSON.stringify(accessMap));
+      renderRoleList();
+      renderAccessList();
+      const roleId = localStorage.getItem(ROLE_KEY) || 'viewer';
+      const login = localStorage.getItem(USER_KEY) || '';
+      applyRoleAccess(roleId, login);
+      showToast('Настройки сохранены');
+    });
+  }
+
+  userRoleMap = { ...BASE_USERS.reduce((acc, u) => { acc[u.login] = u.role; return acc; }, {}), ...loadUserRoleMap() };
+  userAccessMap = { ...configUserAccess, ...loadUserAccessMap() };
+  const initialRole = localStorage.getItem(ROLE_KEY) || 'viewer';
+  const initialUser = localStorage.getItem(USER_KEY) || '';
+  document.body.dataset.role = initialRole;
+  document.body.classList.toggle('role-admin', initialRole === 'admin');
+  document.body.classList.toggle('role-superadmin', initialRole === 'superadmin');
+  setAccessOpen(false);
+  updateRoleChip(initialRole);
+  renderRoleList();
+  renderAccessList();
+  renderUserList();
+  renderUserEditor();
+  applyRoleAccess(initialRole, initialUser);
+
+  window.addEventListener('rb-role-changed', (e) => {
+    const roleId = e.detail?.role || 'viewer';
+    const login = e.detail?.user || localStorage.getItem(USER_KEY) || '';
+    document.body.dataset.role = roleId;
+    document.body.classList.toggle('role-admin', roleId === 'admin');
+    document.body.classList.toggle('role-superadmin', roleId === 'superadmin');
+    if (roleId !== 'superadmin') setAccessOpen(false);
+    updateRoleChip(roleId);
+    applyRoleAccess(roleId, login);
+  });
+
+  if (accessToggleBtn) {
+    accessToggleBtn.addEventListener('click', () => {
+      const next = !document.body.classList.contains('access-open');
+      setAccessOpen(next);
+    });
+  }
+
+  if (userUseRoleAccess) {
+    userUseRoleAccess.addEventListener('change', () => {
+      userEditUseRole = userUseRoleAccess.checked;
+      renderUserEditor();
+    });
+  }
+  if (userSelectAllBtn) {
+    userSelectAllBtn.addEventListener('click', () => {
+      userEditUseRole = false;
+      userUseRoleAccess.checked = false;
+      renderUserEditor();
+      userAccessList.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = true);
+    });
+  }
+  if (userClearAllBtn) {
+    userClearAllBtn.addEventListener('click', () => {
+      userEditUseRole = false;
+      userUseRoleAccess.checked = false;
+      renderUserEditor();
+      userAccessList.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = false);
+    });
+  }
+  if (userSaveBtn) {
+    userSaveBtn.addEventListener('click', () => {
+      if (!selectedUser) return;
+      const isNightlays = selectedUser === 'Nightlays';
+      const chosenRole = isNightlays ? 'superadmin' : (userRoleSelect?.value || 'viewer');
+      userRoleMap[selectedUser] = chosenRole;
+      const useRole = isNightlays ? true : !!userUseRoleAccess.checked;
+      const checked = Array.from(userAccessList?.querySelectorAll('input[type="checkbox"]') || [])
+        .filter(i => i.checked)
+        .map(i => i.getAttribute('data-module'));
+      userAccessMap[selectedUser] = { useRole, access: checked };
+      localStorage.setItem(USER_ROLE_KEY, JSON.stringify(userRoleMap));
+      localStorage.setItem(USER_ACCESS_KEY, JSON.stringify(userAccessMap));
+      userEditUseRole = null;
+      renderUserList();
+      renderUserEditor();
+      const currentUser = localStorage.getItem(USER_KEY) || '';
+      if (currentUser === selectedUser) {
+        updateRoleChip(chosenRole);
+        applyRoleAccess(chosenRole, currentUser);
+      }
+      showToast('Настройки сохранены');
+    });
+  }
+
+  // Close menu on outside click and escape
+  document.addEventListener('click', (e) => {
+    if (!document.body.classList.contains('nav-open')) return;
+    if (e.target.closest('.topbar')) return;
+    closeNav();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeNav();
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 900) closeNav();
+  });
+  });
+});
+</script>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+</body>
+</html>
