@@ -970,7 +970,8 @@
 
             // фиксируем ML-выгрузку и обновляем summary
             try{
-              recordMlExport();
+              const entry = recordMlExport();
+              if(entry) await syncMlDatasetToDrive(false);
               renderMlSummary();
             }catch(e){
               console.error('ML export error', e);
@@ -1065,8 +1066,20 @@
 
         /* ---------- ML Summary ---------- */
         const ML_DATA_KEY = 'wb_graphs_v0_2_9_ml_dataset';
+        const ML_LAST_EXPORT_KEY = 'wb_graphs_v0_2_9_ml_last_export_id';
         const ML_MAX_RECORDS = 200;
+        const ML_DRIVE_URL = 'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec';
+        const ML_DRIVE_FILE = 'wb_graphs_v0_2_9_ml_dataset.json';
         let mlLastAnomalies = null;
+        let mlDatasetCache = null;
+        let mlDatasetLoadPromise = null;
+        let mlDatasetWritePromise = Promise.resolve();
+        let mlDatasetSyncState = {
+          loading: false,
+          remote: false,
+          ready: false,
+          error: ''
+        };
         const FEATURE_KEYS = [
           'tc_total','tc_total_delta','tc_total_delta_pct',
           'tc_volatility','tc_slope_pct',
@@ -1077,12 +1090,171 @@
           'release_anoms','type_anoms','platform_anoms','anom_score'
         ];
 
+        function hashMlText(value){
+          const text = String(value || '');
+          let hash = 0;
+          for(let i = 0; i < text.length; i++){
+            hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+          }
+          return Math.abs(hash).toString(36);
+        }
+        function buildMlEntryId(entry, index = 0){
+          const seed = JSON.stringify({
+            time: entry?.time || '',
+            label: entry?.label || '',
+            labeledAt: entry?.labeledAt || '',
+            features: entry?.features || null,
+            index
+          });
+          return entry?.id || `ml_${hashMlText(seed)}`;
+        }
+        function normalizeMlEntry(entry, index = 0){
+          if(!entry || typeof entry !== 'object') return null;
+          const features = entry.features && typeof entry.features === 'object' ? { ...entry.features } : null;
+          if(!features) return null;
+          const time = entry.time ? String(entry.time) : new Date().toISOString();
+          const label = entry.label === 'ok' || entry.label === 'fail' ? entry.label : null;
+          return {
+            id: buildMlEntryId(entry, index),
+            time,
+            features,
+            label,
+            labeledAt: entry.labeledAt ? String(entry.labeledAt) : null
+          };
+        }
+        function normalizeMlDataset(arr){
+          const safe = Array.isArray(arr) ? arr : [];
+          const map = new Map();
+          safe.forEach((item, index) => {
+            const normalized = normalizeMlEntry(item, index);
+            if(!normalized) return;
+            const prev = map.get(normalized.id);
+            if(!prev){
+              map.set(normalized.id, normalized);
+              return;
+            }
+            map.set(normalized.id, {
+              ...prev,
+              ...normalized,
+              label: normalized.label || prev.label || null,
+              labeledAt: normalized.labeledAt || prev.labeledAt || null
+            });
+          });
+          return Array.from(map.values())
+            .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+            .slice(-ML_MAX_RECORDS);
+        }
+        function readMlDatasetLocal(){
+          try{
+            return normalizeMlDataset(JSON.parse(localStorage.getItem(ML_DATA_KEY) || '[]'));
+          }catch{
+            return [];
+          }
+        }
         function getMlDataset(){
-          try{ return JSON.parse(localStorage.getItem(ML_DATA_KEY) || '[]'); }catch{ return []; }
+          if(Array.isArray(mlDatasetCache)) return mlDatasetCache.slice();
+          mlDatasetCache = readMlDatasetLocal();
+          return mlDatasetCache.slice();
         }
         function setMlDataset(arr){
-          const out = Array.isArray(arr) ? arr.slice(-ML_MAX_RECORDS) : [];
+          const out = normalizeMlDataset(arr);
+          mlDatasetCache = out.slice();
           localStorage.setItem(ML_DATA_KEY, JSON.stringify(out));
+          return out.slice();
+        }
+        function rememberLastMlExportId(id){
+          if(!id) return;
+          try{ localStorage.setItem(ML_LAST_EXPORT_KEY, id); }catch(e){}
+        }
+        function getLastMlExportId(){
+          try{ return localStorage.getItem(ML_LAST_EXPORT_KEY) || ''; }catch(e){ return ''; }
+        }
+        async function mlDriveFetch(rawUrl, opts = {}){
+          const proxiedUrl = buildProxyRequestUrl(rawUrl);
+          const headers = Object.assign({ Accept: 'application/json' }, opts.headers || {});
+          return fetchWithRetry(async () => {
+            const res = await fetch(proxiedUrl, {
+              method: opts.method || 'GET',
+              headers,
+              body: opts.body,
+              redirect: 'follow',
+              cache: 'no-store',
+              credentials: 'omit',
+              mode: 'cors',
+              keepalive: false
+            });
+            const text = await res.text();
+            if(!res.ok && res.status !== 302){
+              throw new Error(`Drive HTTP ${res.status}: ${text.slice(0, 200)}`);
+            }
+            return text;
+          }, { maxTries: 3, baseDelay: 220 });
+        }
+        async function mlDriveGetDataset(){
+          const raw = await mlDriveFetch(`${ML_DRIVE_URL}?op=get&name=${encodeURIComponent(ML_DRIVE_FILE)}`, { method: 'GET' });
+          try{
+            return normalizeMlDataset(JSON.parse(raw || '[]'));
+          }catch(e){
+            return [];
+          }
+        }
+        async function mlDriveSaveDataset(dataset){
+          const payload = JSON.stringify(normalizeMlDataset(dataset));
+          await mlDriveFetch(`${ML_DRIVE_URL}?name=${encodeURIComponent(ML_DRIVE_FILE)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload
+          });
+          return true;
+        }
+        async function ensureMlDatasetLoaded(force = false){
+          if(mlDatasetLoadPromise && !force) return mlDatasetLoadPromise;
+          mlDatasetSyncState.loading = true;
+          mlDatasetLoadPromise = (async () => {
+            const local = readMlDatasetLocal();
+            mlDatasetCache = local.slice();
+            try{
+              const remote = await mlDriveGetDataset();
+              const merged = normalizeMlDataset([...(local || []), ...(remote || [])]);
+              setMlDataset(merged);
+              mlDatasetSyncState.remote = true;
+              mlDatasetSyncState.error = '';
+            }catch(e){
+              mlDatasetSyncState.remote = false;
+              mlDatasetSyncState.error = e?.message || String(e);
+              mlDatasetCache = local.slice();
+            }finally{
+              mlDatasetSyncState.loading = false;
+              mlDatasetSyncState.ready = true;
+              renderMlSummary();
+            }
+            return getMlDataset();
+          })();
+          return mlDatasetLoadPromise;
+        }
+        async function syncMlDatasetToDrive(showErrorToast = false){
+          const snapshot = getMlDataset();
+          mlDatasetWritePromise = mlDatasetWritePromise
+            .catch(() => null)
+            .then(async () => {
+              try{
+                await mlDriveSaveDataset(snapshot);
+                mlDatasetSyncState.remote = true;
+                mlDatasetSyncState.error = '';
+                mlDatasetSyncState.ready = true;
+                return true;
+              }catch(e){
+                mlDatasetSyncState.remote = false;
+                mlDatasetSyncState.error = e?.message || String(e);
+                if(showErrorToast){
+                  showToast('ML-история сохранена локально, но не дошла до Drive', false);
+                }
+                return false;
+              }finally{
+                renderMlSummary();
+              }
+            });
+          return mlDatasetWritePromise;
         }
         function featureVector(f){
           return FEATURE_KEYS.map(k => Number(f?.[k] ?? 0));
@@ -1388,6 +1560,7 @@
           const features = computeMlFeatures();
           if (!features) return null;
           const entry = {
+            id: `ml_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             time: new Date().toISOString(),
             features,
             label: null
@@ -1395,15 +1568,25 @@
           const data = getMlDataset();
           data.push(entry);
           setMlDataset(data);
+          rememberLastMlExportId(entry.id);
           return entry;
         }
-        function labelLastExport(label){
+        async function labelLastExport(label){
           const data = getMlDataset();
-          if (!data.length) return;
-          data[data.length-1].label = label;
-          data[data.length-1].labeledAt = new Date().toISOString();
+          if (!data.length) return { ok:false, reason:'Нет сохраненной ML-выгрузки' };
+          const lastId = getLastMlExportId();
+          const index = lastId
+            ? data.findIndex(item => item && item.id === lastId)
+            : (data.length - 1);
+          const targetIndex = index >= 0 ? index : (data.length - 1);
+          if(targetIndex < 0 || !data[targetIndex]) return { ok:false, reason:'Не удалось найти последнюю выгрузку для разметки' };
+          data[targetIndex].label = label;
+          data[targetIndex].labeledAt = new Date().toISOString();
+          rememberLastMlExportId(data[targetIndex].id);
           setMlDataset(data);
+          const synced = await syncMlDatasetToDrive(false);
           renderMlSummary();
+          return { ok:true, synced };
         }
         function renderMlSummary(){
           if (!mlSummaryBody) return;
@@ -1418,6 +1601,9 @@
           const prob = predictMl(features, model);
           let statusText = 'Нет обучения';
           let statusClass = 'ml-warn';
+          if (mlDatasetSyncState.loading && !model.trained){
+            statusText = 'Загрузка истории ML';
+          }
           if (prob != null){
             if (prob >= 0.7){ statusText = `Регресс (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-bad'; }
             else if (prob >= 0.4){ statusText = `Внимание (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-warn'; }
@@ -2128,9 +2314,9 @@
 
           const regressGroups = [
             renderMetricGroup('Объем регресса', compareLabel, [
-              { label:'Объем регресса', valueText: formatCurrentValue('count', tcBase.last), delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'down', desc: descs.tc, note:'меньше кейсов — быстрее заканчивается регресс', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', tcPrev), formatCurrentValue('count', tcBase.base)) },
+              { label:'Объем регресса', valueText: formatCurrentValue('count', tcBase.last), delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'up', desc: descs.tc, note:'текущий объем регресса', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', tcPrev), formatCurrentValue('count', tcBase.base)) },
               { label:'Критичные проверки SWAT + Stream', valueText: formatCurrentValue('count', covBase.last), delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', desc: descs.hbTotal, note:'общее покрытие критичных сценариев', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covPrev), formatCurrentValue('count', covBase.base)) },
-              { label:'Селективные проверки', valueText: formatCurrentValue('count', selBase.last), delta: selDiff.delta, pct: selDiff.deltaPct, better:'down', desc: descs.selTotal, note:'меньше селектива — ниже нагрузка на регресс', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', selPrev), formatCurrentValue('count', selBase.base)) }
+              { label:'Селективные проверки', valueText: formatCurrentValue('count', selBase.last), delta: selDiff.delta, pct: selDiff.deltaPct, better:'up', desc: descs.selTotal, note:'проверки по селективному контуру', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', selPrev), formatCurrentValue('count', selBase.base)) }
             ]),
             renderMetricGroup('Кто тянет регресс', compareLabel, [
               { label:'Критичные проверки SWAT', valueText: formatCurrentValue('count', covSwatBase.last), delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', desc: descs.hbSwat, note:'вклад команды SWAT', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covSwatPrev), formatCurrentValue('count', covSwatBase.base)) },
@@ -2177,6 +2363,7 @@
                     <span class="ml-meta-pill ml-tip-target" ${tip('Сколько выгрузок уже размечено как OK или Регресс и участвует в обучении.')}>Метки: ${model.count || 0}</span>
                     <span class="ml-meta-pill ml-tip-target" ${tip(model.trained ? 'Модель обучена и использует размеченную историю для оценки риска.' : `Модель пока не обучена. ${model.reason || ''}`)}>Обучение: ${model.trained ? 'готово' : (model.reason || '—')}</span>
                     <span class="ml-meta-pill ml-tip-target" ${tip('Сколько прошлых релизов попало в базу сравнения для текущей оценки.')}>История: ${histCount || 0}</span>
+                    <span class="ml-meta-pill ml-tip-target" ${tip(mlDatasetSyncState.remote ? 'ML-история синхронизируется через Google Apps Script / Drive.' : (mlDatasetSyncState.loading ? 'Идет загрузка истории ML из облака.' : `Облачная синхронизация недоступна. ${mlDatasetSyncState.error || 'Работаем только локально.'}`))}>Источник: ${mlDatasetSyncState.loading ? 'синхр...' : (mlDatasetSyncState.remote ? 'Drive' : 'локально')}</span>
                   </div>
                 </div>
                 <div class="ml-summary-note ml-tip-target" ${tip(compareNote)}>${compareNote}</div>
@@ -6559,11 +6746,12 @@
             setRunning(false);
           });
 
-          mlSaveBtn?.addEventListener('click', () => {
+          mlSaveBtn?.addEventListener('click', async () => {
             const entry = recordMlExport();
             if(entry){
               renderMlSummary();
-              showToast('Выгрузка сохранена', true);
+              const synced = await syncMlDatasetToDrive(false);
+              showToast(synced ? 'Выгрузка сохранена в ML-историю' : 'Выгрузка сохранена локально', synced);
             }else{
               showToast('Нет данных для сохранения', false);
             }
@@ -6618,9 +6806,26 @@
             });
           }
 
-          mlLabelOkBtn?.addEventListener('click', () => labelLastExport('ok'));
-          mlLabelFailBtn?.addEventListener('click', () => labelLastExport('fail'));
+          mlLabelOkBtn?.addEventListener('click', async () => {
+            const result = await labelLastExport('ok');
+            if(!result?.ok){
+              showToast(result?.reason || 'Нет сохраненной ML-выгрузки', false);
+              return;
+            }
+            showToast(result.synced ? 'Выгрузка размечена как OK' : 'Метка OK сохранена локально', result.synced);
+          });
+          mlLabelFailBtn?.addEventListener('click', async () => {
+            const result = await labelLastExport('fail');
+            if(!result?.ok){
+              showToast(result?.reason || 'Нет сохраненной ML-выгрузки', false);
+              return;
+            }
+            showToast(result.synced ? 'Выгрузка размечена как Регресс' : 'Метка Регресс сохранена локально', result.synced);
+          });
           comparePrevOnly?.addEventListener('change', renderMlSummary);
+          ensureMlDatasetLoaded().catch((e) => {
+            console.error('ML dataset load failed', e);
+          });
         })();
       </script>
     </main>
