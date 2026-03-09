@@ -121,6 +121,7 @@ input:focus::placeholder{
 }
 .btn-danger:hover{filter:saturate(1.05);transform:translateY(-1px)}
 
+
 /* ===== TestCases chart/table (manual/auto/total) ===== */
 :root{
   --tc-manual:#f59e0b; /* ярко-оранжевый */
@@ -173,6 +174,7 @@ input:focus::placeholder{
 .bar-fill-manual{background:var(--tc-manual);}
 .bar-fill-auto{background:var(--tc-auto);}
 .bar-fill-total{background:var(--tc-total);}
+
 
 /* Coverage chart colors (SWAT/STREAM) */
 :root{
@@ -679,6 +681,7 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
 }
 .btn-danger:hover{filter:saturate(1.05);transform:translateY(-1px)}
 
+
 /* ===== TestCases chart/table (manual/auto/total) ===== */
 :root{
   --tc-manual:#f59e0b; /* ярко-оранжевый */
@@ -732,6 +735,7 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
 .bar-fill-auto{background:var(--tc-auto);}
 .bar-fill-total{background:var(--tc-total);}
 
+
 /* Coverage chart colors (SWAT/STREAM) */
 :root{
   --cov-swat:#22c55e;
@@ -749,6 +753,7 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
 
 /* На всякий случай, если в style.css нет базового вида точек */
 .legend .dot{width:10px;height:10px;border-radius:9999px;display:inline-block;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
+
 
 /* === BiUser UI styles (moved from BiUser — копия.html) === */
 :root{}
@@ -1176,6 +1181,7 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
 
     .settings-foot{ display:grid; grid-template-columns: 1fr auto auto auto; gap:12px; align-items:center; margin-top:8px; }
     @media (max-width: 780px){ .settings-foot{ grid-template-columns: 1fr; } }
+
 
 /* === BiUser Neo theme === */
 .bi-user{
