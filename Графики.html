@@ -1519,8 +1519,17 @@
         function trainMlModel(dataset){
           const labeled = (dataset || []).filter(d => d && (d.label === 'ok' || d.label === 'fail'));
           const count = labeled.length;
+          const minCount = 5;
           if (count < 5){
-            return { trained:false, count, reason:'Нужно минимум 5 размеченных выгрузок' };
+            return {
+              trained:false,
+              count,
+              minCount,
+              remaining: Math.max(0, minCount - count),
+              reason: count > 0
+                ? `Нужно минимум ${minCount} размеченных выгрузок. Сейчас: ${count}/${minCount}`
+                : `Нужно минимум ${minCount} размеченных выгрузок`
+            };
           }
           const X = labeled.map(d => featureVector(d.features));
           const y = labeled.map(d => d.label === 'fail' ? 1 : 0);
@@ -1547,7 +1556,7 @@
             }
             for (let i=0;i<n+1;i++) w[i] -= lr * (grad[i] / count);
           }
-          return { trained:true, count, mean, std, w, featureKeys: FEATURE_KEYS };
+          return { trained:true, count, minCount, remaining: 0, mean, std, w, featureKeys: FEATURE_KEYS };
         }
         function predictMl(features, model){
           if (!model?.trained) return null;
@@ -1603,6 +1612,10 @@
           let statusClass = 'ml-warn';
           if (mlDatasetSyncState.loading && !model.trained){
             statusText = 'Загрузка истории ML';
+          } else if (!model.trained && model.count > 0) {
+            statusText = `Разметка ${model.count}/${model.minCount || 5}`;
+          } else if (!model.trained && !model.count) {
+            statusText = 'Нет размеченной истории';
           }
           if (prob != null){
             if (prob >= 0.7){ statusText = `Регресс (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-bad'; }
@@ -2361,7 +2374,7 @@
                   <div class="ml-meta-strip">
                     <span class="ml-meta-pill ml-tip-target" ${tip('Сколько раз вы сохраняли ML-выгрузку для этой страницы.')}>Выгрузок: ${data.length}</span>
                     <span class="ml-meta-pill ml-tip-target" ${tip('Сколько выгрузок уже размечено как OK или Регресс и участвует в обучении.')}>Метки: ${model.count || 0}</span>
-                    <span class="ml-meta-pill ml-tip-target" ${tip(model.trained ? 'Модель обучена и использует размеченную историю для оценки риска.' : `Модель пока не обучена. ${model.reason || ''}`)}>Обучение: ${model.trained ? 'готово' : (model.reason || '—')}</span>
+                    <span class="ml-meta-pill ml-tip-target" ${tip(model.trained ? 'Модель обучена и использует размеченную историю для оценки риска.' : `Модель пока не обучена. ${model.reason || ''}`)}>Обучение: ${model.trained ? 'готово' : (model.count ? `${model.count}/${model.minCount || 5} меток` : (model.reason || '—'))}</span>
                     <span class="ml-meta-pill ml-tip-target" ${tip('Сколько прошлых релизов попало в базу сравнения для текущей оценки.')}>История: ${histCount || 0}</span>
                     <span class="ml-meta-pill ml-tip-target" ${tip(mlDatasetSyncState.remote ? 'ML-история синхронизируется через Google Apps Script / Drive.' : (mlDatasetSyncState.loading ? 'Идет загрузка истории ML из облака.' : `Облачная синхронизация недоступна. ${mlDatasetSyncState.error || 'Работаем только локально.'}`))}>Источник: ${mlDatasetSyncState.loading ? 'синхр...' : (mlDatasetSyncState.remote ? 'Drive' : 'локально')}</span>
                   </div>
