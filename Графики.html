@@ -82,10 +82,10 @@
 
       <!-- ===== ML Summary ===== -->
       <section class="card p-5 space-y-4" id="mlSummaryCard">
-        <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div class="flex items-start justify-between gap-4 flex-wrap ml-summary-toolbar">
           <div>
-            <h2 class="text-lg font-semibold">ML Summary — успешность регресса</h2>
-            <div class="hint">Обучается на выгрузках и сравнивает текущую с предыдущей</div>
+            <h2 class="text-lg font-semibold">ML Summary — регресс и релиз</h2>
+            <div class="hint">Разделяет метрики на регресс, релизное качество, стабильность и аномалии</div>
           </div>
           <div class="flex items-center gap-2">
             <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
@@ -572,8 +572,8 @@
                   <select id="cutReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
                 <div class="cutoff-legend px-4 pt-1 text-xs text-slate-600 flex items-center gap-3 flex-wrap">
-                  <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>14:00-14:05 — старт вовремя</span>
-                  <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>после 14:05 — старт позже</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>13:50-14:10 — старт в валидном окне</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>раньше 13:50 или позже 14:10 — вне окна</span>
                   <span class="cutoff-item"><span class="cutoff-dot cutoff-store-late"></span>после 18:00 — отправка позже</span>
                 </div>
                 <div class="table-scroll-x">
@@ -808,6 +808,81 @@
           };
         }
 
+        function resizeChartsForPdf(){
+          const list = [
+            tcChart, covChart, selChart, avgChart, chpChart, chpTypesChart, chpTypesIosChart, chpTypesAndChart,
+            cutChart, iosTypesChart, andTypesChart
+          ].filter(Boolean);
+          for(const ch of list){
+            try{
+              ch.resize();
+              ch.update('none');
+            }catch(e){}
+          }
+        }
+
+        function expandCollapsedForPdf(){
+          const restore = [];
+          const bodies = Array.from(document.querySelectorAll('[data-collapse-body]'));
+          for(const body of bodies){
+            if(!body) continue;
+            const computed = window.getComputedStyle(body);
+            if(computed.display !== 'none') continue;
+            const key = body.getAttribute('data-collapse-body');
+            const btn = key ? document.querySelector(`[data-collapse-btn="${key}"]`) : null;
+            const ico = btn?.querySelector('[data-collapse-ico]') || null;
+            const txt = btn?.querySelector('[data-collapse-text]') || null;
+            restore.push({
+              body,
+              btn,
+              ico,
+              txt,
+              display: body.style.display,
+              height: body.style.height,
+              opacity: body.style.opacity,
+              overflow: body.style.overflow,
+              transition: body.style.transition,
+              aria: btn?.getAttribute('aria-expanded') || null,
+              icoText: ico?.textContent || '',
+              txtText: txt?.textContent || ''
+            });
+            body.style.display = '';
+            body.style.height = '';
+            body.style.opacity = '';
+            body.style.overflow = '';
+            body.style.transition = 'none';
+            if(btn) btn.setAttribute('aria-expanded', 'true');
+            if(ico) ico.textContent = '▾';
+            if(txt) txt.textContent = 'Свернуть';
+          }
+          return () => {
+            for(const item of restore){
+              item.body.style.display = item.display;
+              item.body.style.height = item.height;
+              item.body.style.opacity = item.opacity;
+              item.body.style.overflow = item.overflow;
+              item.body.style.transition = item.transition;
+              if(item.btn && item.aria != null) item.btn.setAttribute('aria-expanded', item.aria);
+              if(item.ico) item.ico.textContent = item.icoText;
+              if(item.txt) item.txt.textContent = item.txtText;
+            }
+          };
+        }
+
+        function waitForLayoutFrames(count = 2){
+          return new Promise(resolve => {
+            const step = () => {
+              if(count <= 0){
+                resolve();
+                return;
+              }
+              count -= 1;
+              requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+          });
+        }
+
         async function renderCardCanvas(card, scale){
           if(!card || !window.html2canvas) return null;
           const cardRestore = {
@@ -902,8 +977,12 @@
             }
 
             const restoreTooltips = disableChartTooltips();
+            const restoreCollapsed = expandCollapsedForPdf();
             document.body.classList.add('pdf-export');
             try{
+              await waitForLayoutFrames(2);
+              resizeChartsForPdf();
+              await waitForLayoutFrames(2);
               const addCanvasToPdf = (canvas) => {
                 if(!canvas) return;
                 const imgW = pageW - margin * 2;
@@ -948,7 +1027,6 @@
                 try{
                   summaryCard.classList.add('pdf-sheet--ml');
                   const summaryCanvas = await renderCardCanvas(summaryCard, 2);
-                  summaryCard.classList.remove('pdf-sheet--ml');
                   addCanvasToPdf(summaryCanvas);
                   const chartCards = Array.from(document.querySelectorAll('section.card'))
                     .filter(card => card.querySelector('canvas'));
@@ -958,6 +1036,8 @@
                   }
                 }catch(e){
                   console.error('ML summary capture error', e);
+                }finally{
+                  summaryCard.classList.remove('pdf-sheet--ml');
                 }
               }
 
@@ -970,6 +1050,8 @@
                 addCanvasToPdf(canvas);
               }
             }finally{
+              restoreCollapsed();
+              resizeChartsForPdf();
               restoreTooltips();
               document.body.classList.remove('pdf-export');
             }
@@ -1090,6 +1172,8 @@
           pushIf('Avg Time (Total)', avgSeries, { pct: 15, z: 2, minAbs: 0.5 });
           pushIf('Avg Time (Weighted)', avgWeightedSeries, { pct: 15, z: 2, minAbs: 0.5 });
           pushIf('Cherepiki Total', chpSeries, { pct: 40, z: 2, minAbs: 3 });
+          pushIf('iOS Cutoff', cutIosSeries, { pct: 3, z: 2, minAbs: 15 });
+          pushIf('Android Cutoff', cutAndSeries, { pct: 3, z: 2, minAbs: 15 });
           pushIf('Store iOS', storeIosSeries, { pct: 3, z: 2, minAbs: 20 });
           pushIf('Store Android', storeAndSeries, { pct: 3, z: 2, minAbs: 20 });
           pushIf('Lag Store iOS', lagIosSeries, { pct: 20, z: 2, minAbs: 15 });
@@ -1328,16 +1412,18 @@
             mlSummaryBody.innerHTML = '<div class="text-slate-500 text-sm">Нет данных для анализа. Сначала запустите сбор.</div>';
             return;
           }
+
           const data = getMlDataset();
           const model = trainMlModel(data);
           const prob = predictMl(features, model);
           let statusText = 'Нет обучения';
           let statusClass = 'ml-warn';
           if (prob != null){
-            if (prob >= 0.7){ statusText = `Регресс (p=${(prob*100).toFixed(1)}%)`; statusClass = 'ml-bad'; }
-            else if (prob >= 0.4){ statusText = `Внимание (p=${(prob*100).toFixed(1)}%)`; statusClass = 'ml-warn'; }
-            else { statusText = `OK (p=${(prob*100).toFixed(1)}%)`; statusClass = 'ml-ok'; }
+            if (prob >= 0.7){ statusText = `Регресс (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-bad'; }
+            else if (prob >= 0.4){ statusText = `Внимание (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-warn'; }
+            else { statusText = `OK (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-ok'; }
           }
+
           const tcSeries = findDataset(tcChart, 'всего')?.data || [];
           const covSwatSeries = findDataset(covChart, 'swat')?.data || [];
           const covStreamSeries = findDataset(covChart, 'stream')?.data || [];
@@ -1347,7 +1433,7 @@
             findDataset(selChart, 'stream')?.data || []
           );
           const avgSeries = findDataset(avgChart, 'общее')?.data || [];
-          const avgWeightedSeries = buildSeriesFromRows(window.__avgRowsAll || [], r => (Number(r.totalWeighted||0) / 60000));
+          const avgWeightedSeries = buildSeriesFromRows(window.__avgRowsAll || [], r => (Number(r.totalWeighted || 0) / 60000));
           const chpSeries = findDataset(chpChart, 'всего')?.data || [];
           const chpIosSeries = findDataset(chpChart, 'ios')?.data || [];
           const chpAndSeries = findDataset(chpChart, 'android')?.data || [];
@@ -1359,6 +1445,15 @@
           const lagAndSeries = buildLagSeries(storeAndSeries, cutAndSeries);
 
           const compareMode = comparePrevOnly?.checked ? 'prev' : 'mean';
+          const compareLabel = compareMode === 'prev' ? 'К предыдущему релизу' : 'К средней истории';
+          const compareDeltaLabel = compareMode === 'prev' ? 'Разница к предыдущему релизу' : 'Разница к средней истории';
+
+          const previousValueFromSeries = (series) => {
+            const data = (Array.isArray(series) ? series : [])
+              .map(v => Number(v))
+              .filter(v => Number.isFinite(v));
+            return data.length >= 2 ? data[data.length - 2] : null;
+          };
 
           const tcBase = baselineStats(tcSeries, compareMode);
           const covBase = baselineStats(covSeries, compareMode);
@@ -1370,16 +1465,34 @@
           const chpBase = baselineStats(chpSeries, compareMode);
           const chpIosBase = baselineStats(chpIosSeries, compareMode);
           const chpAndBase = baselineStats(chpAndSeries, compareMode);
+          const cutIosBase = baselineStats(cutIosSeries, compareMode);
+          const cutAndBase = baselineStats(cutAndSeries, compareMode);
           const storeIosBase = baselineStats(storeIosSeries, compareMode);
           const storeAndBase = baselineStats(storeAndSeries, compareMode);
           const lagIosBase = baselineStats(lagIosSeries, compareMode);
           const lagAndBase = baselineStats(lagAndSeries, compareMode);
 
-          const compareLabel = compareMode === 'prev' ? 'Δ к предыдущему релизу' : 'Δ к среднему прошлых релизов';
+          const tcPrev = previousValueFromSeries(tcSeries);
+          const covPrev = previousValueFromSeries(covSeries);
+          const covSwatPrev = previousValueFromSeries(covSwatSeries);
+          const covStreamPrev = previousValueFromSeries(covStreamSeries);
+          const selPrev = previousValueFromSeries(selSeries);
+          const avgPrev = previousValueFromSeries(avgSeries);
+          const avgWeightedPrev = previousValueFromSeries(avgWeightedSeries);
+          const chpPrev = previousValueFromSeries(chpSeries);
+          const chpIosPrev = previousValueFromSeries(chpIosSeries);
+          const chpAndPrev = previousValueFromSeries(chpAndSeries);
+          const cutIosPrev = previousValueFromSeries(cutIosSeries);
+          const cutAndPrev = previousValueFromSeries(cutAndSeries);
+          const storeIosPrev = previousValueFromSeries(storeIosSeries);
+          const storeAndPrev = previousValueFromSeries(storeAndSeries);
+          const lagIosPrev = previousValueFromSeries(lagIosSeries);
+          const lagAndPrev = previousValueFromSeries(lagAndSeries);
+
           const compareNote = tcBase?.n
             ? (compareMode === 'prev'
-                ? 'Сравнение: предыдущий релиз'
-                : `Сравнение с историей: ${tcBase.n} прошлых релизов`)
+                ? 'Сравнение с предыдущим релизом'
+                : `Сравнение со средней историей по ${tcBase.n} прошлым релизам`)
             : 'Истории релизов недостаточно для сравнения';
 
           const tcDiff = diffToBase(tcBase);
@@ -1392,6 +1505,8 @@
           const chpDiff = diffToBase(chpBase);
           const chpIosDiff = diffToBase(chpIosBase);
           const chpAndDiff = diffToBase(chpAndBase);
+          const cutIosDiff = diffToBase(cutIosBase);
+          const cutAndDiff = diffToBase(cutAndBase);
           const storeIosDiff = diffToBase(storeIosBase);
           const storeAndDiff = diffToBase(storeAndBase);
           const lagIosDiff = diffToBase(lagIosBase);
@@ -1407,82 +1522,249 @@
             .replace(/'/g,'&#39;');
           const tip = (text) => `data-tip="${escHtml(text)}"`;
           const fmtPct = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
-          const insightLine = (label, delta, deltaPct, digits=0, unit='', desc='') => {
-            if(delta == null) return null;
-            const dir = delta > 0 ? 'выросло' : (delta < 0 ? 'снизилось' : 'без изменений');
-            const absVal = digits ? Math.abs(delta).toFixed(digits) : Math.round(Math.abs(delta));
-            const pct = Number.isFinite(deltaPct) ? ` ${fmtDeltaPct(deltaPct)}` : '';
-            const suffix = unit ? ` ${unit}` : '';
-            return `<div class="ml-insight" ${tip(desc)}>${label}: ${dir} на ${absVal}${suffix}${pct}</div>`;
-          };
-          const insightLineTime = (label, delta, deltaPct, unit='мин.', desc='') => {
-            if(delta == null) return null;
-            const dir = delta > 0 ? 'позже' : (delta < 0 ? 'раньше' : 'без изменений');
-            const absVal = Math.abs(delta).toFixed(1);
-            const pct = Number.isFinite(deltaPct) ? ` ${fmtDeltaPct(deltaPct)}` : '';
-            return `<div class="ml-insight" ${tip(desc)}>${label}: ${dir} на ${absVal} ${unit}${pct}</div>`;
-          };
+          const intFmt = new Intl.NumberFormat('ru-RU');
+
           const descs = {
-            tc: 'Общее число тест-кейсов по релизу (Smoke + Selective). Показывает объем регресса.',
-            hbSwat: 'High/Blocker кейсы, выполненные SWAT.',
-            hbStream: 'High/Blocker кейсы, выполненные Stream.',
-            hbTotal: 'Сумма High/Blocker SWAT и Stream.',
-            selTotal: 'Сумма Selective SWAT и Stream.',
-            avgTotal: 'Среднее время на кейс (HB), минуты.',
-            avgCaseWeighted: 'Среднее время прохождения одного тест‑кейса (взвешенное по количеству кейсов), минуты.',
-            chpTotal: 'Общее число ЧП (issues) по релизу.',
-            chpIos: 'ЧП по iOS.',
-            chpAnd: 'ЧП по Android.',
-            storeIos: 'Время отправки iOS в Store (минуты от 00:00).',
-            storeAnd: 'Время отправки Android в Store (минуты от 00:00).',
-            lagIos: 'Разница Store−Cutoff для iOS (в минутах).',
-            lagAnd: 'Разница Store−Cutoff для Android (в минутах).',
-            vol: 'Стандартное отклонение TC Total по релизам (разброс значений).',
-            slope: 'Процентное изменение TC Total от первого к последнему релизу.',
-            anoms: 'Количество аномалий: резких изменений по релизам, типам и платформам.'
+            tc: 'Объем регресса. Считается как сумма всех Smoke и Selective тест-кейсов в релизе.',
+            hbSwat: 'Критичные проверки SWAT. Количество High/Blocker тест-кейсов, которые выполнила команда SWAT.',
+            hbStream: 'Критичные проверки Stream. Количество High/Blocker тест-кейсов, которые выполнили стримы.',
+            hbTotal: 'Общее число критичных проверок. Сумма High/Blocker кейсов SWAT и Stream.',
+            selTotal: 'Селективные проверки. Общее число Selective тест-кейсов по релизу.',
+            avgTotal: 'Среднее время прохождения критичного кейса. Считается как среднее время High/Blocker кейсов в минутах.',
+            avgCaseWeighted: 'Среднее время на один тест-кейс с учетом объема кейсов. Показывает реальную скорость прохождения одного сценария.',
+            chpTotal: 'Общее количество ЧП в релизе. Считается по задачам из Deploy-lab, которые попали после cutoff.',
+            chpIos: 'Количество ЧП, относящихся к iOS-релизу.',
+            chpAnd: 'Количество ЧП, относящихся к Android-релизу.',
+            cutIos: 'Время начала iOS cutoff. Считается в минутах от 00:00 локального дня релиза; валидное окно — 14:00 плюс-минус 10 минут.',
+            cutAnd: 'Время начала Android cutoff. Считается в минутах от 00:00 локального дня релиза; валидное окно — 14:00 плюс-минус 10 минут.',
+            storeIos: 'Время отправки iOS в Store. Считается в минутах от 00:00 локального дня релиза; целевой дедлайн для команды — до 18:00.',
+            storeAnd: 'Время отправки Android в Store. Считается в минутах от 00:00 локального дня релиза; целевой дедлайн для команды — до 18:00.',
+            lagIos: 'Задержка после cutoff для iOS. Формула: время отправки в Store минус время начала cutoff. Рабочий коридор — до 4 часов.',
+            lagAnd: 'Задержка после cutoff для Android. Формула: время отправки в Store минус время начала cutoff. Рабочий коридор — до 4 часов.',
+            vol: 'Разброс объема регресса. Это стандартное отклонение total test cases по истории релизов.',
+            slope: 'Тренд объема регресса. Показывает, как изменился объем проверок от первого релиза диапазона к последнему.',
+            anoms: 'Количество резких отклонений по релизам, типам задач и платформам.'
           };
-          const anomRuleGeneric = 'Аномалия: резкое изменение последнего релиза. Срабатывает, если |z| ≥ 2 и |Δ| ≥ minAbs, либо |Δ%| ≥ порога и |Δ| ≥ minAbs.';
+          const anomRuleGeneric = 'Аномалия: резкое изменение последнего релиза. Срабатывает, если |z| >= 2 и |Δ| >= minAbs, либо |Δ%| >= порога и |Δ| >= minAbs.';
+          const translateTypeName = (value) => {
+            const map = {
+              'bug': 'баги',
+              'task': 'задачи',
+              'analytics': 'аналитика',
+              'release': 'релизы',
+              'epic': 'эпики',
+              'user story': 'user story',
+              'testing': 'тестирование',
+              'documentation': 'документация',
+              'test automation': 'автотесты',
+              'feature': 'фичи',
+              'tech dept': 'техдолг',
+              'product': 'аналитика',
+              'vlet': 'влет',
+              'crash': 'краши'
+            };
+            const key = String(value || '').trim().toLowerCase();
+            return map[key] || value || 'прочее';
+          };
+          const describeTypeAnomaly = (platform, typeName) => `Изменение количества задач типа «${translateTypeName(typeName)}» на платформе ${platform}. Сравнивается последний релиз с выбранной базой.`;
+          const presentMetricInfo = (label) => {
+            const raw = String(label || '').trim();
+            const l = raw.toLowerCase();
+            if(l.includes('tc total')) return { label:'Объем регресса', desc: descs.tc };
+            if(l.includes('high/blocker swat+stream')) return { label:'Критичные проверки SWAT + Stream', desc: descs.hbTotal };
+            if(l.includes('high/blocker swat')) return { label:'Критичные проверки SWAT', desc: descs.hbSwat };
+            if(l.includes('high/blocker stream')) return { label:'Критичные проверки Stream', desc: descs.hbStream };
+            if(l.includes('selective')) return { label:'Селективные проверки', desc: descs.selTotal };
+            if(l.includes('avg time') && (l.includes('weighted') || l.includes('взвеш'))) return { label:'Среднее время на один кейс', desc: descs.avgCaseWeighted };
+            if(l.includes('avg time') || l === 'среднее время') return { label:'Среднее время прохождения', desc: descs.avgTotal };
+            if(l.includes('cherepiki total') || l.includes('чп (всего)') || l === 'чп всего') return { label:'ЧП всего', desc: descs.chpTotal };
+            if(l.includes('cherepiki ios') || l.includes('чп ios')) return { label:'ЧП iOS', desc: descs.chpIos };
+            if(l.includes('cherepiki android') || l.includes('чп android')) return { label:'ЧП Android', desc: descs.chpAnd };
+            if(l.includes('lag store ios') || l.includes('лаг ios') || l.includes('задержка после cutoff ios')) return { label:'Задержка после cutoff iOS', desc: descs.lagIos };
+            if(l.includes('lag store android') || l.includes('лаг android') || l.includes('задержка после cutoff android')) return { label:'Задержка после cutoff Android', desc: descs.lagAnd };
+            if(l.includes('ios cutoff') || l.includes('cutoff ios')) return { label:'Время начала cutoff iOS', desc: descs.cutIos };
+            if(l.includes('android cutoff') || l.includes('cutoff android')) return { label:'Время начала cutoff Android', desc: descs.cutAnd };
+            if(l.includes('store ios')) return { label:'Время отправки в Store iOS', desc: descs.storeIos };
+            if(l.includes('store android')) return { label:'Время отправки в Store Android', desc: descs.storeAnd };
+            if(l.includes('разброс')) return { label:'Разброс объема регресса', desc: descs.vol };
+            if(l.includes('тренд')) return { label:'Тренд объема регресса', desc: descs.slope };
+            if(l.startsWith('android:') || l.startsWith('ios:')){
+              const [platform, typeName] = raw.split(':').map(part => String(part || '').trim());
+              return { label: `${platform}: ${translateTypeName(typeName)}`, desc: describeTypeAnomaly(platform, typeName) };
+            }
+            if(l.startsWith('чп:') || l.includes('чп:')){
+              const typeName = raw.split(':')[1] || raw;
+              return { label: `ЧП: ${translateTypeName(typeName)}`, desc: `Изменение количества ЧП типа «${translateTypeName(typeName)}» между последним релизом и базой сравнения.` };
+            }
+            return { label: raw, desc: 'Показатель из ML-сводки.' };
+          };
           const getAnomDesc = (label) => {
-            const l = String(label || '').toLowerCase();
-            let metric = 'Метрика без описания.';
-            if(l.includes('tc total')) metric = descs.tc;
-            else if(l.includes('high/blocker swat+stream')) metric = descs.hbTotal;
-            else if(l.includes('high/blocker swat')) metric = descs.hbSwat;
-            else if(l.includes('high/blocker stream')) metric = descs.hbStream;
-            else if(l.includes('selective')) metric = descs.selTotal;
-            else if(l.includes('avg time') && (l.includes('weighted') || l.includes('взвеш'))) metric = descs.avgCaseWeighted;
-            else if(l.includes('avg time') || l.includes('avg')) metric = descs.avgTotal;
-            else if(l.includes('cherepiki total') || l.includes('chp total')) metric = descs.chpTotal;
-            else if(l.includes('cherepiki ios') || l.includes('chp ios')) metric = descs.chpIos;
-            else if(l.includes('cherepiki android') || l.includes('chp android')) metric = descs.chpAnd;
-            else if(l.includes('store ios')) metric = descs.storeIos;
-            else if(l.includes('store android')) metric = descs.storeAnd;
-            else if(l.includes('lag store ios') || l.includes('lag ios')) metric = descs.lagIos;
-            else if(l.includes('lag store android') || l.includes('lag android')) metric = descs.lagAnd;
-            else if(l.includes('types ios total')) metric = 'Сумма задач по типам (iOS).';
-            else if(l.includes('types android total')) metric = 'Сумма задач по типам (Android).';
-            else if(l.startsWith('ios:') || l.startsWith('android:')) metric = 'Изменение по конкретному типу задачи (Deploy‑lab).';
-            else if(l.startsWith('чп:') || l.includes('чп:')) metric = 'Изменение по типу ЧП (product / vlet / bug / crash).';
-            return `${metric} ${anomRuleGeneric}`;
+            const info = presentMetricInfo(label);
+            return `${info.desc || 'Метрика без описания.'} ${anomRuleGeneric}`;
           };
-          const insightRegress = [
-            insightLine('Тест‑кейсы (Всего)', tcDiff.delta, tcDiff.deltaPct, 0, '', descs.tc),
-            insightLine('High/Blocker SWAT', covSwatDiff.delta, covSwatDiff.deltaPct, 0, '', descs.hbSwat),
-            insightLine('High/Blocker STREAM', covStreamDiff.delta, covStreamDiff.deltaPct, 0, '', descs.hbStream),
-            insightLine('High/Blocker SWAT+Stream', covDiff.delta, covDiff.deltaPct, 0, '', descs.hbTotal),
-            insightLine('Selective (Всего)', selDiff.delta, selDiff.deltaPct, 0, '', descs.selTotal),
-            insightLineTime('Среднее время (Общее)', avgDiff.delta, avgDiff.deltaPct, 'мин.', descs.avgTotal),
-            insightLineTime('Среднее время на кейс (взвеш.)', avgWeightedDiff.delta, avgWeightedDiff.deltaPct, 'мин.', descs.avgCaseWeighted)
-          ].filter(Boolean);
-          const insightRelease = [
-            insightLine('ЧП (Всего)', chpDiff.delta, chpDiff.deltaPct, 0, '', descs.chpTotal),
-            insightLine('ЧП iOS', chpIosDiff.delta, chpIosDiff.deltaPct, 0, '', descs.chpIos),
-            insightLine('ЧП Android', chpAndDiff.delta, chpAndDiff.deltaPct, 0, '', descs.chpAnd),
-            insightLineTime('Store iOS', storeIosDiff.delta, storeIosDiff.deltaPct, 'мин.', descs.storeIos),
-            insightLineTime('Store Android', storeAndDiff.delta, storeAndDiff.deltaPct, 'мин.', descs.storeAnd),
-            insightLineTime('Лаг iOS (Store−Cutoff)', lagIosDiff.delta, lagIosDiff.deltaPct, 'мин.', descs.lagIos),
-            insightLineTime('Лаг Android (Store−Cutoff)', lagAndDiff.delta, lagAndDiff.deltaPct, 'мин.', descs.lagAnd)
-          ].filter(Boolean);
+
+          const formatClockMinutes = (minutes) => {
+            if(!Number.isFinite(minutes)) return '—';
+            const total = Math.max(0, Math.round(minutes));
+            const hh = String(Math.floor(total / 60)).padStart(2, '0');
+            const mm = String(total % 60).padStart(2, '0');
+            return `${hh}:${mm}`;
+          };
+          const formatCurrentValue = (kind, value, digits = 0) => {
+            if(!Number.isFinite(value)) return '—';
+            if(kind === 'clock') return formatClockMinutes(value);
+            if(kind === 'minutes') return `${Number(value).toFixed(digits)} мин`;
+            if(kind === 'percent') return `${Number(value).toFixed(digits)}%`;
+            return intFmt.format(Math.round(value));
+          };
+          const buildMetricCompareFacts = (previousText, historyText) => {
+            const facts = [
+              { label: 'Предыдущий релиз', value: previousText || '—' }
+            ];
+            if(compareMode !== 'prev'){
+              facts.push({ label: 'Средняя история', value: historyText || '—' });
+            }
+            return facts;
+          };
+          const formatCutoffHint = (minutes, targetMinutes) => {
+            if(!Number.isFinite(minutes)) return 'Нет данных по cutoff';
+            const from = formatClockMinutes(targetMinutes - CUT_TARGET_WINDOW_MIN);
+            const to = formatClockMinutes(targetMinutes + CUT_TARGET_WINDOW_MIN);
+            if(minutes < targetMinutes - CUT_TARGET_WINDOW_MIN) return `раньше окна ${from}–${to} на ${Math.round((targetMinutes - CUT_TARGET_WINDOW_MIN) - minutes)} мин`;
+            if(minutes <= targetMinutes + CUT_TARGET_WINDOW_MIN) return `в целевом окне ${from}–${to}`;
+            return `позже окна ${from}–${to} на ${Math.round(minutes - (targetMinutes + CUT_TARGET_WINDOW_MIN))} мин`;
+          };
+          const formatStoreHint = (minutes) => {
+            if(!Number.isFinite(minutes)) return 'Нет данных по store';
+            if(minutes <= STORE_DEADLINE_MINUTES) return 'до дедлайна 18:00';
+            return `после 18:00 на ${Math.round(minutes - STORE_DEADLINE_MINUTES)} мин`;
+          };
+          const formatLagHint = (minutes) => {
+            if(!Number.isFinite(minutes)) return 'Нет данных по лагу';
+            if(minutes <= 120) return 'быстрый лаг до 2 часов';
+            if(minutes <= LAG_TARGET_MAX_MINUTES) return 'рабочий лаг до 4 часов';
+            return `длинный лаг ${Math.round(minutes)} мин`;
+          };
+          const buildMetricTooltip = (item) => {
+            const bits = [item.desc];
+            bits.push(`Текущее значение: ${item.valueText}.`);
+            if(Array.isArray(item.compareFacts) && item.compareFacts.length){
+              item.compareFacts.forEach(fact => {
+                bits.push(`${fact.label}: ${fact.value}.`);
+              });
+            }
+            bits.push(compareNote);
+            if(item.businessKind === 'cutoff') bits.push('Для cutoff важно попасть в окно 14:00 плюс-минус 10 минут.');
+            else if(item.businessKind === 'store') bits.push('Для Store важно уложиться в дедлайн до 18:00.');
+            else if(item.businessKind === 'lag') bits.push('Для задержки после cutoff рабочий коридор составляет до 4 часов.');
+            else if(item.better === 'down') bits.push('Для этой метрики меньшие значения лучше.');
+            else if(item.better === 'up') bits.push('Для этой метрики большие значения лучше.');
+            if(item.note) bits.push(`Контекст: ${item.note}.`);
+            return bits.filter(Boolean).join(' ');
+          };
+          const classifyMetricTone = (item) => {
+            if(item?.tone) return item.tone;
+            const delta = item?.delta;
+            const better = item?.better;
+            if(delta == null || !Number.isFinite(delta) || delta === 0) return 'neutral';
+            if(better === 'up') return delta > 0 ? 'good' : 'bad';
+            if(better === 'down') return delta < 0 ? 'good' : 'bad';
+            return 'neutral';
+          };
+          const formatDeltaLine = (item) => {
+            if(item.delta == null || !Number.isFinite(item.delta)) return 'Нет базы для сравнения';
+            const suffix = item.deltaUnit ? ` ${item.deltaUnit}` : '';
+            const pct = Number.isFinite(item.pct) ? ` ${fmtDeltaPct(item.pct)}` : '';
+            return `${fmtDelta(item.delta, item.deltaDigits || 0)}${suffix}${pct}`.trim();
+          };
+          const renderMetricCompareFacts = (item, tooltipText) => {
+            if(!Array.isArray(item.compareFacts) || !item.compareFacts.length) return '';
+            return `
+              <div class="ml-metric-compare ml-tip-target" ${tip(tooltipText)}>
+                ${item.compareFacts.map(fact => `
+                  <div class="ml-metric-compare-row">
+                    <span class="ml-metric-compare-label">${fact.label}</span>
+                    <span class="ml-metric-compare-value">${fact.value || '—'}</span>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          };
+          const renderMetricCard = (item) => {
+            const tone = classifyMetricTone(item);
+            const tooltipText = buildMetricTooltip(item);
+            return `
+              <div class="ml-metric-card ml-metric-card--${tone}">
+                <div class="ml-metric-label ml-tip-target" ${tip(tooltipText)}>${item.label}</div>
+                <div class="ml-metric-value ml-tip-target" ${tip(tooltipText)}>${item.valueText}</div>
+                ${renderMetricCompareFacts(item, tooltipText)}
+                <div class="ml-metric-delta-wrap ml-tip-target" ${tip(tooltipText)}>
+                  <div class="ml-metric-delta-caption">${item.deltaLabel || compareDeltaLabel}</div>
+                  <div class="ml-metric-delta">${formatDeltaLine(item)}</div>
+                </div>
+                <div class="ml-metric-note ml-tip-target" ${tip(tooltipText)}>${item.note || compareLabel}</div>
+              </div>
+            `;
+          };
+          const renderMetricGroup = (title, note, items, className = '') => `
+            <div class="ml-metric-group ${className}">
+              <div class="ml-metric-group-head">
+                <div class="ml-metric-group-title">${title}</div>
+                <div class="ml-metric-group-note">${note}</div>
+              </div>
+              <div class="ml-metric-grid">
+                ${items.map(renderMetricCard).join('')}
+              </div>
+            </div>
+          `;
+          const renderOutcomeCard = (title, tone, items) => `
+            <div class="ml-outcome-card ml-outcome-card--${tone}">
+              <div class="ml-outcome-title">${title}</div>
+              ${
+                items.length
+                  ? `<ul class="ml-outcome-list">${items.map(item => `<li class="ml-tip-target" ${tip(item.desc || '')}>${escHtml(item.text || '')}</li>`).join('')}</ul>`
+                  : '<div class="ml-outcome-empty">нет заметных</div>'
+              }
+            </div>
+          `;
+          const summarizeDomain = (imp, dec) => {
+            if(dec.length > imp.length) return { label: `Есть риск: ${dec.length}`, className: 'ml-domain-badge--bad' };
+            if(imp.length > dec.length) return { label: `Позитив: ${imp.length}`, className: 'ml-domain-badge--good' };
+            if(imp.length || dec.length) return { label: `Смешано: ${imp.length}/${dec.length}`, className: 'ml-domain-badge--warn' };
+            return { label: 'Без резких сдвигов', className: 'ml-domain-badge--neutral' };
+          };
+          const renderDomainCard = ({ modifier, eyebrow, title, subtitle, badge, groups, improvements: imp, declines: dec }) => `
+            <section class="ml-domain-card ml-domain-card--${modifier}">
+              <div class="ml-domain-head">
+                <div>
+                  <div class="ml-domain-eyebrow">${eyebrow}</div>
+                  <div class="ml-domain-title">${title}</div>
+                  <div class="ml-domain-subtitle">${subtitle}</div>
+                </div>
+                <div class="ml-domain-badge ${badge.className}">${badge.label}</div>
+              </div>
+              <div class="ml-domain-groups">
+                ${groups.join('')}
+              </div>
+              <div class="ml-outcome-grid">
+                ${renderOutcomeCard('Улучшения', 'good', imp)}
+                ${renderOutcomeCard('Зоны риска', 'bad', dec)}
+              </div>
+            </section>
+          `;
+          const renderAnomList = (list) => {
+            if(!list || !list.length){
+              return '<div class="ml-anoms-empty">Нет аномалий</div>';
+            }
+            return list.map(a => `
+              <div class="ml-anoms-item">
+                <span class="ml-anoms-name ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${escHtml(presentMetricInfo(a.label || '').label || '')}</span>
+                <span class="ml-anoms-delta ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${fmtDelta(a.delta || 0)} ${Number.isFinite(a.deltaPct) ? `(${fmtPct(a.deltaPct)})` : ''}</span>
+                ${Number.isFinite(a.z) ? `<span class="ml-anoms-z">z=${a.z.toFixed(2)}</span>` : ''}
+              </div>
+            `).join('');
+          };
+
           const tcStatsAll = seriesStats(tcSeries);
           const tcStatsHist = seriesStats(tcSeries.slice(0, -1));
           const tcVolNow = tcStatsAll.std;
@@ -1493,144 +1775,498 @@
           const tcSlopeBase = Number.isFinite(tcStatsHist.slopePct) ? tcStatsHist.slopePct : null;
           const tcSlopeDiff = tcSlopeBase == null ? null : (tcSlopeNow - tcSlopeBase);
 
-          const metrics = [
-            { label:'Тест‑кейсы (Всего)', group:'regress', delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'up', absTh: 100, pctTh: 2 },
-            { label:'High/Blocker SWAT', group:'regress', delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', absTh: 20, pctTh: 2 },
-            { label:'High/Blocker STREAM', group:'regress', delta: covStreamDiff.delta, pct: covStreamDiff.deltaPct, better:'up', absTh: 20, pctTh: 2 },
-            { label:'High/Blocker SWAT+Stream', group:'regress', delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', absTh: 30, pctTh: 2 },
-            { label:'Selective (Всего)', group:'regress', delta: selDiff.delta, pct: selDiff.deltaPct, better:'up', absTh: 20, pctTh: 3 },
-            { label:'Avg time (Общее, мин.)', group:'regress', delta: avgDiff.delta, pct: avgDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2 },
-            { label:'Avg time на кейс (взвеш., мин.)', group:'regress', delta: avgWeightedDiff.delta, pct: avgWeightedDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2 },
-            { label:'ЧП (Всего)', group:'release', delta: chpDiff.delta, pct: chpDiff.deltaPct, better:'down', absTh: 2, pctTh: 5 },
-            { label:'ЧП iOS', group:'release', delta: chpIosDiff.delta, pct: chpIosDiff.deltaPct, better:'down', absTh: 2, pctTh: 5 },
-            { label:'ЧП Android', group:'release', delta: chpAndDiff.delta, pct: chpAndDiff.deltaPct, better:'down', absTh: 2, pctTh: 5 },
-            { label:'Store iOS (мин. от 00:00)', group:'release', delta: storeIosDiff.delta, pct: storeIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1 },
-            { label:'Store Android (мин. от 00:00)', group:'release', delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1 },
-            { label:'Лаг iOS (Store−Cutoff, мин.)', group:'release', delta: lagIosDiff.delta, pct: lagIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1 },
-            { label:'Лаг Android (Store−Cutoff, мин.)', group:'release', delta: lagAndDiff.delta, pct: lagAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1 },
-            { label:'Разброс тест‑кейсов (TC Total)', group:'stability', delta: tcVolDiff, pct: tcVolDiffPct, better:'down', absTh: 10, pctTh: 5 },
-            { label:'Тренд тест‑кейсов (TC Total, п.п.)', group:'stability', delta: tcSlopeDiff, pct: null, better:'up', absTh: 2, pctTh: null }
-          ];
-          const fmtChange = (m) => {
-            if(m.delta == null || !Number.isFinite(m.delta)) return null;
-            const abs = Math.abs(m.delta);
-            const pct = Number.isFinite(m.pct) ? ` ${fmtDeltaPct(m.pct)}` : '';
-            const val = abs >= 1 ? Math.round(abs) : abs.toFixed(2);
-            return `${m.label}: ${m.delta >= 0 ? '+' : '−'}${val}${pct}`;
+          const domainLabels = {
+            regress: 'Регресс',
+            release: 'Релиз',
+            stability: 'Стабильность'
           };
+          const cutoffWindowLabel = (targetMinutes) => `${formatClockMinutes(targetMinutes - CUT_TARGET_WINDOW_MIN)}–${formatClockMinutes(targetMinutes + CUT_TARGET_WINDOW_MIN)}`;
+          const cutoffOutsideWindow = (minutes, targetMinutes) => {
+            if(!Number.isFinite(minutes) || !Number.isFinite(targetMinutes)) return null;
+            const start = targetMinutes - CUT_TARGET_WINDOW_MIN;
+            const end = targetMinutes + CUT_TARGET_WINDOW_MIN;
+            if(minutes < start) return start - minutes;
+            if(minutes > end) return minutes - end;
+            return 0;
+          };
+          const storeDelay = (minutes) => Number.isFinite(minutes) ? Math.max(0, minutes - STORE_DEADLINE_MINUTES) : null;
+          const lagOverflow = (minutes) => Number.isFinite(minutes) ? Math.max(0, minutes - LAG_TARGET_MAX_MINUTES) : null;
+          const cutoffTone = (minutes, targetMinutes) => {
+            const outside = cutoffOutsideWindow(minutes, targetMinutes);
+            if(outside == null) return 'neutral';
+            return outside === 0 ? 'good' : 'bad';
+          };
+          const storeTone = (minutes) => {
+            const delay = storeDelay(minutes);
+            if(delay == null) return 'neutral';
+            return delay === 0 ? 'good' : 'bad';
+          };
+          const lagTone = (minutes) => {
+            const overflow = lagOverflow(minutes);
+            if(overflow == null) return 'neutral';
+            return overflow === 0 ? 'good' : 'bad';
+          };
+          const signalWithDomain = (signal) => ({
+            ...signal,
+            summaryText: `${domainLabels[signal.group] || 'Сводка'} — ${signal.text}`
+          });
           const isSignificant = (m) => {
             if(m.delta == null || !Number.isFinite(m.delta)) return false;
             const abs = Math.abs(m.delta);
             if(Number.isFinite(m.pct)) return Math.abs(m.pct) >= (m.pctTh ?? 3) || abs >= (m.absTh ?? 1);
             return abs >= (m.absTh ?? 1);
           };
+          const buildGenericSignal = (m) => {
+            if(m.delta == null || !Number.isFinite(m.delta) || !isSignificant(m)) return null;
+            const direction = m.better === 'up'
+              ? (m.delta > 0 ? 'good' : (m.delta < 0 ? 'bad' : null))
+              : (m.delta < 0 ? 'good' : (m.delta > 0 ? 'bad' : null));
+            if(!direction) return null;
+            const abs = Math.abs(m.delta);
+            const val = m.digits ? abs.toFixed(m.digits) : Math.round(abs);
+            const unit = m.unit ? ` ${m.unit}` : '';
+            const pct = Number.isFinite(m.pct) ? ` ${fmtDeltaPct(m.pct)}` : '';
+            const info = presentMetricInfo(m.label);
+            const scoreBase = (m.absTh ?? 1) ? (abs / (m.absTh ?? 1)) * 8 : abs;
+            const pctBase = Number.isFinite(m.pct) ? Math.abs(m.pct) * 0.6 : 0;
+            return signalWithDomain({
+              label: info.label || m.label,
+              group: m.group,
+              delta: m.delta,
+              pct: m.pct,
+              direction,
+              score: scoreBase + pctBase,
+              text: `${info.label || m.label}: ${m.delta >= 0 ? '+' : '−'}${val}${unit}${pct}`,
+              desc: [m.desc || '', compareNote].filter(Boolean).join(' ')
+            });
+          };
+          const buildCutoffSignal = (m) => {
+            const currentOutside = cutoffOutsideWindow(m.current, m.targetMinutes);
+            const baseOutside = Number.isFinite(m.baseline) ? cutoffOutsideWindow(m.baseline, m.targetMinutes) : null;
+            if(currentOutside == null) return null;
+            const label = presentMetricInfo(m.label).label || m.label;
+            const windowText = cutoffWindowLabel(m.targetMinutes);
+            const currentClock = formatClockMinutes(m.current);
+            const baseClock = Number.isFinite(m.baseline) ? formatClockMinutes(m.baseline) : '—';
+            const desc = [m.desc || '', `Целевое окно: ${windowText}.`, compareNote].join(' ');
+            if(baseOutside == null){
+              if(currentOutside === 0) return null;
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 18 + Math.min(currentOutside, 120) * 0.6,
+                text: `${label}: вне окна ${windowText} на ${Math.round(currentOutside)} мин (${currentClock})`,
+                desc
+              });
+            }
+            if(currentOutside === 0 && baseOutside === 0) return null;
+            if(currentOutside === 0 && baseOutside > 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'good',
+                score: 24 + Math.min(baseOutside, 120) * 0.6,
+                text: `${label}: вошел в окно ${windowText} (${currentClock}, было ${baseClock})`,
+                desc
+              });
+            }
+            if(currentOutside > 0 && baseOutside === 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 28 + Math.min(currentOutside, 120) * 0.6,
+                text: `${label}: вышел из окна ${windowText} на ${Math.round(currentOutside)} мин (${currentClock})`,
+                desc
+              });
+            }
+            const deltaOutside = baseOutside - currentOutside;
+            if(Math.abs(deltaOutside) < 3) return null;
+            return signalWithDomain({
+              label,
+              group: m.group,
+              direction: deltaOutside > 0 ? 'good' : 'bad',
+              score: 12 + Math.min(Math.abs(deltaOutside), 120) * 0.5 + Math.min(currentOutside, 60) * 0.2,
+              text: deltaOutside > 0
+                ? `${label}: ближе к окну ${windowText}, осталось ${Math.round(currentOutside)} мин (${currentClock})`
+                : `${label}: дальше от окна ${windowText}, отклонение ${Math.round(currentOutside)} мин (${currentClock})`,
+              desc
+            });
+          };
+          const buildStoreSignal = (m) => {
+            const currentDelay = storeDelay(m.current);
+            const baseDelay = Number.isFinite(m.baseline) ? storeDelay(m.baseline) : null;
+            if(currentDelay == null) return null;
+            const label = presentMetricInfo(m.label).label || m.label;
+            const currentClock = formatClockMinutes(m.current);
+            const desc = [m.desc || '', 'Бизнес-дедлайн: до 18:00.', compareNote].join(' ');
+            if(baseDelay == null){
+              if(currentDelay === 0) return null;
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 18 + Math.min(currentDelay, 180) * 0.35,
+                text: `${label}: позже дедлайна 18:00 на ${Math.round(currentDelay)} мин (${currentClock})`,
+                desc
+              });
+            }
+            if(currentDelay === 0 && baseDelay === 0) return null;
+            if(currentDelay === 0 && baseDelay > 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'good',
+                score: 22 + Math.min(baseDelay, 180) * 0.35,
+                text: `${label}: вернулось до дедлайна 18:00 (${currentClock})`,
+                desc
+              });
+            }
+            if(currentDelay > 0 && baseDelay === 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 24 + Math.min(currentDelay, 180) * 0.35,
+                text: `${label}: вышло за дедлайн 18:00 на ${Math.round(currentDelay)} мин (${currentClock})`,
+                desc
+              });
+            }
+            const deltaDelay = baseDelay - currentDelay;
+            if(Math.abs(deltaDelay) < 10) return null;
+            return signalWithDomain({
+              label,
+              group: m.group,
+              direction: deltaDelay > 0 ? 'good' : 'bad',
+              score: 10 + Math.min(Math.abs(deltaDelay), 180) * 0.3 + Math.min(currentDelay, 180) * 0.1,
+              text: deltaDelay > 0
+                ? `${label}: ближе к дедлайну 18:00, осталось ${Math.round(currentDelay)} мин опоздания`
+                : `${label}: опоздание до Store выросло до ${Math.round(currentDelay)} мин`,
+              desc
+            });
+          };
+          const buildLagSignal = (m) => {
+            const currentOverflow = lagOverflow(m.current);
+            const baseOverflow = Number.isFinite(m.baseline) ? lagOverflow(m.baseline) : null;
+            if(currentOverflow == null) return null;
+            const label = presentMetricInfo(m.label).label || m.label;
+            const currentText = formatCurrentValue('minutes', m.current, 1);
+            const desc = [m.desc || '', 'Рабочий коридор: задержка до 4 часов.', compareNote].join(' ');
+            if(baseOverflow == null){
+              if(currentOverflow === 0) return null;
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 18 + Math.min(currentOverflow, 240) * 0.25,
+                text: `${label}: выше рабочего коридора до 4 часов на ${Math.round(currentOverflow)} мин (${currentText})`,
+                desc
+              });
+            }
+            if(currentOverflow === 0 && baseOverflow === 0) return null;
+            if(currentOverflow === 0 && baseOverflow > 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'good',
+                score: 22 + Math.min(baseOverflow, 240) * 0.25,
+                text: `${label}: вернулась в рабочий коридор до 4 часов (${currentText})`,
+                desc
+              });
+            }
+            if(currentOverflow > 0 && baseOverflow === 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 24 + Math.min(currentOverflow, 240) * 0.25,
+                text: `${label}: вышла за рабочий коридор до 4 часов на ${Math.round(currentOverflow)} мин (${currentText})`,
+                desc
+              });
+            }
+            const deltaOverflow = baseOverflow - currentOverflow;
+            if(Math.abs(deltaOverflow) < 15) return null;
+            return signalWithDomain({
+              label,
+              group: m.group,
+              direction: deltaOverflow > 0 ? 'good' : 'bad',
+              score: 10 + Math.min(Math.abs(deltaOverflow), 240) * 0.2 + Math.min(currentOverflow, 240) * 0.08,
+              text: deltaOverflow > 0
+                ? `${label}: ближе к рабочему коридору, превышение сократилось до ${Math.round(currentOverflow)} мин`
+                : `${label}: превышение рабочего коридора выросло до ${Math.round(currentOverflow)} мин`,
+              desc
+            });
+          };
+          const metrics = [
+            { label:'Объем регресса', desc: descs.tc, group:'regress', delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'down', absTh: 100, pctTh: 2, digits: 0 },
+            { label:'Критичные проверки SWAT', desc: descs.hbSwat, group:'regress', delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', absTh: 20, pctTh: 2, digits: 0 },
+            { label:'Критичные проверки Stream', desc: descs.hbStream, group:'regress', delta: covStreamDiff.delta, pct: covStreamDiff.deltaPct, better:'up', absTh: 20, pctTh: 2, digits: 0 },
+            { label:'Критичные проверки SWAT + Stream', desc: descs.hbTotal, group:'regress', delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', absTh: 30, pctTh: 2, digits: 0 },
+            { label:'Селективные проверки', desc: descs.selTotal, group:'regress', delta: selDiff.delta, pct: selDiff.deltaPct, better:'down', absTh: 20, pctTh: 3, digits: 0 },
+            { label:'Среднее время прохождения', desc: descs.avgTotal, group:'regress', delta: avgDiff.delta, pct: avgDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2, digits: 2, unit: 'мин' },
+            { label:'Среднее время на один кейс', desc: descs.avgCaseWeighted, group:'regress', delta: avgWeightedDiff.delta, pct: avgWeightedDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2, digits: 2, unit: 'мин' },
+            { label:'ЧП всего', desc: descs.chpTotal, group:'release', delta: chpDiff.delta, pct: chpDiff.deltaPct, better:'down', absTh: 2, pctTh: 5, digits: 0 },
+            { label:'ЧП iOS', desc: descs.chpIos, group:'release', delta: chpIosDiff.delta, pct: chpIosDiff.deltaPct, better:'down', absTh: 2, pctTh: 5, digits: 0 },
+            { label:'ЧП Android', desc: descs.chpAnd, group:'release', delta: chpAndDiff.delta, pct: chpAndDiff.deltaPct, better:'down', absTh: 2, pctTh: 5, digits: 0 },
+            { label:'Время начала cutoff iOS', desc: descs.cutIos, group:'release', businessKind:'cutoff', current: cutIosBase.last, baseline: cutIosBase.base, targetMinutes: CUT_TARGET_MINUTES.ios, delta: cutIosDiff.delta, pct: cutIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Время начала cutoff Android', desc: descs.cutAnd, group:'release', businessKind:'cutoff', current: cutAndBase.last, baseline: cutAndBase.base, targetMinutes: CUT_TARGET_MINUTES.android, delta: cutAndDiff.delta, pct: cutAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Время отправки в Store iOS', desc: descs.storeIos, group:'release', businessKind:'store', current: storeIosBase.last, baseline: storeIosBase.base, delta: storeIosDiff.delta, pct: storeIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Время отправки в Store Android', desc: descs.storeAnd, group:'release', businessKind:'store', current: storeAndBase.last, baseline: storeAndBase.base, delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Задержка после cutoff iOS', desc: descs.lagIos, group:'release', businessKind:'lag', current: lagIosBase.last, baseline: lagIosBase.base, delta: lagIosDiff.delta, pct: lagIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Задержка после cutoff Android', desc: descs.lagAnd, group:'release', businessKind:'lag', current: lagAndBase.last, baseline: lagAndBase.base, delta: lagAndDiff.delta, pct: lagAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Разброс объема регресса', desc: descs.vol, group:'stability', delta: tcVolDiff, pct: tcVolDiffPct, better:'down', absTh: 10, pctTh: 5, digits: 1, unit: 'п.' },
+            { label:'Тренд объема регресса', desc: descs.slope, group:'stability', delta: tcSlopeDiff, pct: null, better:'up', absTh: 2, pctTh: null, digits: 2, unit: 'п.п.' }
+          ];
+          const buildMetricSignal = (m) => {
+            if(m.businessKind === 'cutoff') return buildCutoffSignal(m);
+            if(m.businessKind === 'store') return buildStoreSignal(m);
+            if(m.businessKind === 'lag') return buildLagSignal(m);
+            return buildGenericSignal(m);
+          };
           const improvements = { regress: [], release: [], stability: [] };
           const declines = { regress: [], release: [], stability: [] };
           metrics.forEach(m => {
-            if(!isSignificant(m)) return;
-            if(m.better === 'up'){
-              if(m.delta > 0) improvements[m.group].push(fmtChange(m));
-              else if(m.delta < 0) declines[m.group].push(fmtChange(m));
-            }else if(m.better === 'down'){
-              if(m.delta < 0) improvements[m.group].push(fmtChange(m));
-              else if(m.delta > 0) declines[m.group].push(fmtChange(m));
-            }
+            const signal = buildMetricSignal(m);
+            if(!signal) return;
+            if(signal.direction === 'good') improvements[m.group].push(signal);
+            if(signal.direction === 'bad') declines[m.group].push(signal);
           });
-          const renderGroupSummary = (title, imp, dec) => `
-            <div>
-              <div class="ml-summary-sub">${title}</div>
-              <div class="ml-summary-list"><b>Улучшения:</b> ${imp.length ? imp.join(' • ') : 'нет заметных'}</div>
-              <div class="ml-summary-list"><b>Просадки:</b> ${dec.length ? dec.join(' • ') : 'нет заметных'}</div>
-            </div>
-          `;
-          const summaryText = `
-            <div class="ml-summary-text">
-              <div class="ml-summary-title">Итог по изменениям</div>
-              <div class="ml-summary-cols">
-                ${renderGroupSummary('Регресс', improvements.regress, declines.regress)}
-                ${renderGroupSummary('Релиз', improvements.release, declines.release)}
-                ${renderGroupSummary('Стабильность', improvements.stability, declines.stability)}
-              </div>
-            </div>
-          `;
-          const row = (label, valueHtml, deltaHtml, desc) =>
-            `<tr><td ${tip(desc)}>${label}</td><td>${valueHtml}</td><td>${deltaHtml}</td></tr>`;
-          const renderAnomList = (list) => {
-            if(!list || !list.length){
-              return '<div class="ml-anoms-empty">Нет аномалий</div>';
-            }
-            return list.map(a => `
-              <div class="ml-anoms-item">
-                <span class="ml-anoms-name" ${tip(getAnomDesc(a.label || ''))}>${escHtml(a.label || '')}</span>
-                <span class="ml-anoms-delta">${fmtDelta(a.delta || 0)} ${Number.isFinite(a.deltaPct) ? `(${fmtPct(a.deltaPct)})` : ''}</span>
-                ${Number.isFinite(a.z) ? `<span class="ml-anoms-z">z=${a.z.toFixed(2)}</span>` : ''}
-              </div>
-            `).join('');
+          Object.keys(improvements).forEach(group => {
+            improvements[group].sort((a,b) => (b.score || 0) - (a.score || 0));
+            declines[group].sort((a,b) => (b.score || 0) - (a.score || 0));
+          });
+
+          const flattenSignals = (pool, tone) => Object.entries(pool).flatMap(([group, items]) =>
+            (items || []).map(item => ({ ...item, group, tone }))
+          );
+          const sortSignals = (list) => list.slice().sort((a,b) => (b.score || 0) - (a.score || 0));
+          const topImprovements = sortSignals(flattenSignals(improvements, 'good')).slice(0, 3);
+          const topDeclines = sortSignals(flattenSignals(declines, 'bad')).slice(0, 3);
+          const allAnomalyItems = [
+            ...(anomalies.release?.list || []),
+            ...(anomalies.type?.list || []),
+            ...(anomalies.platform?.list || [])
+          ];
+          const topAnomaly = allAnomalyItems
+            .slice()
+            .sort((a,b) => ((Math.abs(b.z || 0) * 10) + Math.abs(b.deltaPct || 0)) - ((Math.abs(a.z || 0) * 10) + Math.abs(a.deltaPct || 0)))[0] || null;
+          const formatAnomalyBrief = (item) => {
+            if(!item) return 'Явных аномалий не найдено.';
+            const label = presentMetricInfo(item.label || '').label || item.label || 'Аномалия';
+            const pct = Number.isFinite(item.deltaPct) ? ` ${fmtPct(item.deltaPct)}` : '';
+            return `${label}: ${fmtDelta(item.delta || 0)}${pct}`;
           };
+          const summarizeSignals = (items, limit = 2) => items.slice(0, limit).map(item => item.summaryText || item.text).join('; ');
+          const buildExecutiveBrief = () => {
+            const topRisk = topDeclines[0] || null;
+            const topWin = topImprovements[0] || null;
+            const riskText = summarizeSignals(topDeclines, 2);
+            const winText = summarizeSignals(topImprovements, 2);
+            if(topRisk && topWin){
+              if((topRisk.score || 0) >= (topWin.score || 0) + 8){
+                return {
+                  tone: 'bad',
+                  title: 'Есть выраженные риски',
+                  body: `Основные зоны риска сейчас: ${riskText}. Сильные улучшения при этом тоже есть: ${winText}.`,
+                  focus: topAnomaly ? `Самая заметная аномалия: ${formatAnomalyBrief(topAnomaly)}.` : 'Сильных аномалий поверх этого не обнаружено.'
+                };
+              }
+              if((topWin.score || 0) >= (topRisk.score || 0) + 8){
+                return {
+                  tone: 'good',
+                  title: 'Картина скорее позитивная',
+                  body: `Сильнее всего сейчас помогают: ${winText}. Точки риска, которые еще нужно контролировать: ${riskText}.`,
+                  focus: topAnomaly ? `Из аномалий сильнее всего выбивается: ${formatAnomalyBrief(topAnomaly)}.` : 'Крупных аномалий по релизу не найдено.'
+                };
+              }
+              return {
+                tone: 'warn',
+                title: 'Картина смешанная',
+                body: `Есть и сильные улучшения, и заметные риски. Улучшения: ${winText}. Зоны риска: ${riskText}.`,
+                focus: topAnomaly ? `Отдельно стоит проверить аномалию: ${formatAnomalyBrief(topAnomaly)}.` : 'Аномальный фон при этом умеренный.'
+              };
+            }
+            if(topRisk){
+              return {
+                tone: 'bad',
+                title: 'Нужна дополнительная проверка',
+                body: `Главные просадки сейчас: ${riskText}.`,
+                focus: topAnomaly ? `Самая заметная аномалия: ${formatAnomalyBrief(topAnomaly)}.` : 'Дополнительных крупных аномалий не видно.'
+              };
+            }
+            if(topWin){
+              return {
+                tone: 'good',
+                title: 'Есть заметные улучшения',
+                body: `Сильные позитивные сигналы сейчас такие: ${winText}.`,
+                focus: topAnomaly ? `При этом стоит посмотреть на аномалию: ${formatAnomalyBrief(topAnomaly)}.` : 'Крупных аномалий не обнаружено.'
+              };
+            }
+            return {
+              tone: 'neutral',
+              title: 'Сильных сдвигов не найдено',
+              body: 'ML не видит выраженных улучшений или зон риска относительно выбранной базы сравнения.',
+              focus: topAnomaly ? `Единственный заметный фокус внимания: ${formatAnomalyBrief(topAnomaly)}.` : 'Аномалии не выбиваются из общего фона.'
+            };
+          };
+          const executiveBrief = buildExecutiveBrief();
+          const renderBriefList = (title, tone, items, emptyText) => `
+            <section class="ml-brief-card ml-brief-card--${tone}">
+              <div class="ml-brief-eyebrow">${title}</div>
+              ${
+                items.length
+                  ? `<ul class="ml-brief-list">${items.map(item => `<li class="ml-tip-target" ${tip(item.desc || '')}>${escHtml(item.summaryText || item.text || '')}</li>`).join('')}</ul>`
+                  : `<div class="ml-brief-empty">${emptyText}</div>`
+              }
+            </section>
+          `;
+
+          const regressBadge = summarizeDomain(improvements.regress, declines.regress);
+          const releaseBadge = summarizeDomain(improvements.release, declines.release);
+          const stabilityBadge = summarizeDomain(improvements.stability, declines.stability);
+
+          const regressGroups = [
+            renderMetricGroup('Объем регресса', compareLabel, [
+              { label:'Объем регресса', valueText: formatCurrentValue('count', tcBase.last), delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'down', desc: descs.tc, note:'меньше кейсов — быстрее заканчивается регресс', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', tcPrev), formatCurrentValue('count', tcBase.base)) },
+              { label:'Критичные проверки SWAT + Stream', valueText: formatCurrentValue('count', covBase.last), delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', desc: descs.hbTotal, note:'общее покрытие критичных сценариев', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covPrev), formatCurrentValue('count', covBase.base)) },
+              { label:'Селективные проверки', valueText: formatCurrentValue('count', selBase.last), delta: selDiff.delta, pct: selDiff.deltaPct, better:'down', desc: descs.selTotal, note:'меньше селектива — ниже нагрузка на регресс', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', selPrev), formatCurrentValue('count', selBase.base)) }
+            ]),
+            renderMetricGroup('Кто тянет регресс', compareLabel, [
+              { label:'Критичные проверки SWAT', valueText: formatCurrentValue('count', covSwatBase.last), delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', desc: descs.hbSwat, note:'вклад команды SWAT', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covSwatPrev), formatCurrentValue('count', covSwatBase.base)) },
+              { label:'Критичные проверки Stream', valueText: formatCurrentValue('count', covStreamBase.last), delta: covStreamDiff.delta, pct: covStreamDiff.deltaPct, better:'up', desc: descs.hbStream, note:'вклад стримов', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covStreamPrev), formatCurrentValue('count', covStreamBase.base)) }
+            ]),
+            renderMetricGroup('Скорость прохождения', compareLabel, [
+              { label:'Среднее время прохождения', valueText: formatCurrentValue('minutes', avgBase.last, 2), delta: avgDiff.delta, pct: avgDiff.deltaPct, better:'down', desc: descs.avgTotal, note:'чем ниже, тем быстрее идет регресс', deltaDigits: 2, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', avgPrev, 2), formatCurrentValue('minutes', avgBase.base, 2)) },
+              { label:'Среднее время на один кейс', valueText: formatCurrentValue('minutes', avgWeightedBase.last, 2), delta: avgWeightedDiff.delta, pct: avgWeightedDiff.deltaPct, better:'down', desc: descs.avgCaseWeighted, note:'скорость на один тест-кейс', deltaDigits: 2, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', avgWeightedPrev, 2), formatCurrentValue('minutes', avgWeightedBase.base, 2)) }
+            ])
+          ];
+
+          const releaseGroups = [
+            renderMetricGroup('ЧП', compareLabel, [
+              { label:'ЧП всего', valueText: formatCurrentValue('count', chpBase.last), delta: chpDiff.delta, pct: chpDiff.deltaPct, better:'down', desc: descs.chpTotal, note:'меньше — лучше', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', chpPrev), formatCurrentValue('count', chpBase.base)) },
+              { label:'ЧП iOS', valueText: formatCurrentValue('count', chpIosBase.last), delta: chpIosDiff.delta, pct: chpIosDiff.deltaPct, better:'down', desc: descs.chpIos, note:'качество iOS-релиза', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', chpIosPrev), formatCurrentValue('count', chpIosBase.base)) },
+              { label:'ЧП Android', valueText: formatCurrentValue('count', chpAndBase.last), delta: chpAndDiff.delta, pct: chpAndDiff.deltaPct, better:'down', desc: descs.chpAnd, note:'качество Android-релиза', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', chpAndPrev), formatCurrentValue('count', chpAndBase.base)) }
+            ]),
+            renderMetricGroup('Cutoff и публикация в Store', compareLabel, [
+              { label:'Время начала cutoff iOS', valueText: formatCurrentValue('clock', cutIosBase.last), delta: cutIosDiff.delta, pct: cutIosDiff.deltaPct, better:'down', businessKind:'cutoff', tone: cutoffTone(cutIosBase.last, CUT_TARGET_MINUTES.ios), desc: descs.cutIos, note: formatCutoffHint(cutIosBase.last, CUT_TARGET_MINUTES.ios), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', cutIosPrev), formatCurrentValue('clock', cutIosBase.base)) },
+              { label:'Время начала cutoff Android', valueText: formatCurrentValue('clock', cutAndBase.last), delta: cutAndDiff.delta, pct: cutAndDiff.deltaPct, better:'down', businessKind:'cutoff', tone: cutoffTone(cutAndBase.last, CUT_TARGET_MINUTES.android), desc: descs.cutAnd, note: formatCutoffHint(cutAndBase.last, CUT_TARGET_MINUTES.android), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', cutAndPrev), formatCurrentValue('clock', cutAndBase.base)) },
+              { label:'Время отправки в Store iOS', valueText: formatCurrentValue('clock', storeIosBase.last), delta: storeIosDiff.delta, pct: storeIosDiff.deltaPct, better:'down', businessKind:'store', tone: storeTone(storeIosBase.last), desc: descs.storeIos, note: formatStoreHint(storeIosBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', storeIosPrev), formatCurrentValue('clock', storeIosBase.base)) },
+              { label:'Время отправки в Store Android', valueText: formatCurrentValue('clock', storeAndBase.last), delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', businessKind:'store', tone: storeTone(storeAndBase.last), desc: descs.storeAnd, note: formatStoreHint(storeAndBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', storeAndPrev), formatCurrentValue('clock', storeAndBase.base)) }
+            ], 'ml-metric-group--release-timeline'),
+            renderMetricGroup('Задержка после cutoff', compareLabel, [
+              { label:'Задержка после cutoff iOS', valueText: formatCurrentValue('minutes', lagIosBase.last, 1), delta: lagIosDiff.delta, pct: lagIosDiff.deltaPct, better:'down', businessKind:'lag', tone: lagTone(lagIosBase.last), desc: descs.lagIos, note: formatLagHint(lagIosBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', lagIosPrev, 1), formatCurrentValue('minutes', lagIosBase.base, 1)) },
+              { label:'Задержка после cutoff Android', valueText: formatCurrentValue('minutes', lagAndBase.last, 1), delta: lagAndDiff.delta, pct: lagAndDiff.deltaPct, better:'down', businessKind:'lag', tone: lagTone(lagAndBase.last), desc: descs.lagAnd, note: formatLagHint(lagAndBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', lagAndPrev, 1), formatCurrentValue('minutes', lagAndBase.base, 1)) }
+            ])
+          ];
+
+          const stabilityGroups = [
+            renderMetricGroup('Стабильность объема', compareLabel, [
+              { label:'Разброс объема регресса', valueText: formatCurrentValue('minutes', features.tc_volatility, 1).replace(' мин', ''), delta: tcVolDiff, pct: tcVolDiffPct, better:'down', desc: descs.vol, note:'чем ниже, тем ровнее идут релизы', deltaDigits: 1, deltaUnit: 'п.', compareFacts: [{ label: 'История до текущего релиза', value: Number.isFinite(tcVolBase) ? Number(tcVolBase).toFixed(1) : '—' }] },
+              { label:'Тренд объема регресса', valueText: formatCurrentValue('percent', features.tc_slope_pct, 2), delta: tcSlopeDiff, pct: null, better:'up', desc: descs.slope, note:'динамика от первого релиза диапазона к последнему', deltaDigits: 2, deltaUnit: 'п.п.', compareFacts: [{ label: 'История до текущего релиза', value: Number.isFinite(tcSlopeBase) ? `${Number(tcSlopeBase).toFixed(2)}%` : '—' }] }
+            ])
+          ];
 
           mlSummaryBody.innerHTML = `
-            <div class="ml-status ${statusClass}">Статус: ${statusText}</div>
-            <div class="text-slate-500 text-sm">Выгрузок: ${data.length} • Меток: ${model.count || 0} • Обучение: ${model.trained ? 'готово' : (model.reason || '—')}</div>
-            <div class="ml-insights">
-              <div class="text-slate-600 text-sm">${compareNote}</div>
-              <div class="ml-insights-block">
-                <div class="ml-insights-title">Регресс</div>
-                ${insightRegress.length ? insightRegress.join('') : '<div class="ml-insight-empty">—</div>'}
+            <div class="ml-summary-shell">
+              <div class="ml-summary-top">
+                <div class="ml-status-row">
+                  <div class="ml-status ml-tip-target ${statusClass}" ${tip('Общая оценка риска по ML-модели. Она строится по истории ваших предыдущих выгрузок и текущему набору метрик.')}>Статус ML: ${statusText}</div>
+                  <div class="ml-meta-strip">
+                    <span class="ml-meta-pill ml-tip-target" ${tip('Сколько раз вы сохраняли ML-выгрузку для этой страницы.')}>Выгрузок: ${data.length}</span>
+                    <span class="ml-meta-pill ml-tip-target" ${tip('Сколько выгрузок уже размечено как OK или Регресс и участвует в обучении.')}>Метки: ${model.count || 0}</span>
+                    <span class="ml-meta-pill ml-tip-target" ${tip(model.trained ? 'Модель обучена и использует размеченную историю для оценки риска.' : `Модель пока не обучена. ${model.reason || ''}`)}>Обучение: ${model.trained ? 'готово' : (model.reason || '—')}</span>
+                    <span class="ml-meta-pill ml-tip-target" ${tip('Сколько прошлых релизов попало в базу сравнения для текущей оценки.')}>История: ${histCount || 0}</span>
+                  </div>
+                </div>
+                <div class="ml-summary-note ml-tip-target" ${tip(compareNote)}>${compareNote}</div>
               </div>
-              <div class="ml-insights-block">
-                <div class="ml-insights-title">Релиз (ЧП / Store / Cutoff)</div>
-                ${insightRelease.length ? insightRelease.join('') : '<div class="ml-insight-empty">—</div>'}
+
+              <div class="ml-brief-grid">
+                <section class="ml-brief-card ml-brief-card--${executiveBrief.tone}">
+                  <div class="ml-brief-eyebrow">Краткий вывод ML</div>
+                  <div class="ml-brief-title">${escHtml(executiveBrief.title)}</div>
+                  <div class="ml-brief-body">${escHtml(executiveBrief.body)}</div>
+                  <div class="ml-brief-focus">${escHtml(executiveBrief.focus)}</div>
+                </section>
+                ${renderBriefList('Сильные улучшения', 'good', topImprovements, 'Сильных улучшений пока нет.')}
+                ${renderBriefList('Главные риски', 'bad', topDeclines, 'Сильных рисков пока не найдено.')}
+              </div>
+
+              <div class="ml-domain-grid">
+                ${renderDomainCard({
+                  modifier: 'regress',
+                  eyebrow: 'Контур 1',
+                  title: 'Регресс',
+                  subtitle: 'Сколько проверок входит в регресс, кто закрывает критичные сценарии и как меняется скорость прохождения.',
+                  badge: regressBadge,
+                  groups: regressGroups,
+                  improvements: improvements.regress,
+                  declines: declines.regress
+                })}
+                ${renderDomainCard({
+                  modifier: 'release',
+                  eyebrow: 'Контур 2',
+                  title: 'Релиз',
+                  subtitle: 'Релизное качество: число ЧП, время начала cutoff, публикация в Store и задержка после cutoff.',
+                  badge: releaseBadge,
+                  groups: releaseGroups,
+                  improvements: improvements.release,
+                  declines: declines.release
+                })}
+              </div>
+
+              <div class="ml-secondary-grid">
+                ${renderDomainCard({
+                  modifier: 'stability',
+                  eyebrow: 'Поддерживающий слой',
+                  title: 'Стабильность',
+                  subtitle: 'Насколько ровно ведет себя объем регресса на истории релизов и не скачет ли нагрузка.',
+                  badge: stabilityBadge,
+                  groups: stabilityGroups,
+                  improvements: improvements.stability,
+                  declines: declines.stability
+                })}
+                <section class="ml-domain-card ml-domain-card--anoms">
+                  <div class="ml-domain-head">
+                    <div>
+                      <div class="ml-domain-eyebrow">Контроль отклонений</div>
+                      <div class="ml-domain-title">Аномалии</div>
+                      <div class="ml-domain-subtitle">Показываем только самые заметные выбросы по релизам, типам задач и платформам.</div>
+                    </div>
+                    <div class="ml-domain-badge ml-domain-badge--neutral ml-tip-target" ${tip(descs.anoms)}>Индекс риска: ${features.anom_score}</div>
+                  </div>
+                  <div class="ml-anoms-summary">
+                    <div class="ml-anoms-stat">
+                      <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий, найденных на уровне релизных метрик: объем регресса, ЧП, cutoff, Store и задержка после cutoff.')}>Релизы</span>
+                      <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий, найденных на уровне релизных метрик: объем регресса, ЧП, cutoff, Store и задержка после cutoff.')}>${anomalies.release.count}</span>
+                    </div>
+                    <div class="ml-anoms-stat">
+                      <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий по типам задач и типам ЧП: где структура релиза резко изменилась относительно базы сравнения.')}>Типы</span>
+                      <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий по типам задач и типам ЧП: где структура релиза резко изменилась относительно базы сравнения.')}>${anomalies.type.count}</span>
+                    </div>
+                    <div class="ml-anoms-stat">
+                      <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий на уровне платформ: iOS или Android получили резкое отклонение по метрикам относительно базы сравнения.')}>Платформы</span>
+                      <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий на уровне платформ: iOS или Android получили резкое отклонение по метрикам относительно базы сравнения.')}>${anomalies.platform.count}</span>
+                    </div>
+                  </div>
+                  <div class="ml-anoms-columns">
+                    <div class="ml-anoms-section">
+                      <div class="ml-anoms-sub">Релизы</div>
+                      <div class="ml-anoms-list">${renderAnomList(anomalies.release.list)}</div>
+                    </div>
+                    <div class="ml-anoms-section">
+                      <div class="ml-anoms-sub">Типы</div>
+                      <div class="ml-anoms-list">${renderAnomList(anomalies.type.list)}</div>
+                    </div>
+                    <div class="ml-anoms-section">
+                      <div class="ml-anoms-sub">Платформы</div>
+                      <div class="ml-anoms-list">${renderAnomList(anomalies.platform.list)}</div>
+                    </div>
+                  </div>
+                </section>
               </div>
             </div>
-            <table class="ml-table" style="margin-top:10px">
-              <thead>
-                <tr><th>Метрика</th><th>Текущее</th><th>${compareLabel}</th></tr>
-              </thead>
-              <tbody>
-                <tr class="ml-section-row"><td colspan="3">Регресс</td></tr>
-                ${row('Тест‑кейсы (Всего)', Math.round(features.tc_total), `${fmtDelta(tcDiff.delta)} ${fmtDeltaPct(tcDiff.deltaPct)}`, descs.tc)}
-                ${row('High/Blocker SWAT', Math.round(covSwatBase.last), `${fmtDelta(covSwatDiff.delta)} ${fmtDeltaPct(covSwatDiff.deltaPct)}`, descs.hbSwat)}
-                ${row('High/Blocker STREAM', Math.round(covStreamBase.last), `${fmtDelta(covStreamDiff.delta)} ${fmtDeltaPct(covStreamDiff.deltaPct)}`, descs.hbStream)}
-                ${row('High/Blocker SWAT+Stream', Math.round(covBase.last), `${fmtDelta(covDiff.delta)} ${fmtDeltaPct(covDiff.deltaPct)}`, descs.hbTotal)}
-                ${row('Selective (Всего)', Math.round(selBase.last), `${fmtDelta(selDiff.delta)} ${fmtDeltaPct(selDiff.deltaPct)}`, descs.selTotal)}
-                ${row('Avg time (Общее, мин.)', avgBase.last.toFixed(2), `${fmtDelta(avgDiff.delta, 2)} ${fmtDeltaPct(avgDiff.deltaPct)}`, descs.avgTotal)}
-                ${row('Avg time на кейс (взвеш., мин.)', Number.isFinite(avgWeightedBase.last) ? avgWeightedBase.last.toFixed(2) : '—', `${fmtDelta(avgWeightedDiff.delta, 2)} ${fmtDeltaPct(avgWeightedDiff.deltaPct)}`, descs.avgCaseWeighted)}
-                <tr class="ml-section-row"><td colspan="3">Релиз</td></tr>
-                ${row('ЧП (Всего)', Math.round(chpBase.last), `${fmtDelta(chpDiff.delta)} ${fmtDeltaPct(chpDiff.deltaPct)}`, descs.chpTotal)}
-                ${row('ЧП iOS', Math.round(chpIosBase.last), `${fmtDelta(chpIosDiff.delta)} ${fmtDeltaPct(chpIosDiff.deltaPct)}`, descs.chpIos)}
-                ${row('ЧП Android', Math.round(chpAndBase.last), `${fmtDelta(chpAndDiff.delta)} ${fmtDeltaPct(chpAndDiff.deltaPct)}`, descs.chpAnd)}
-                ${row('Store iOS (мин. от 00:00)', Number.isFinite(storeIosBase.last) ? storeIosBase.last.toFixed(1) : '—', `${fmtDelta(storeIosDiff.delta, 1)} ${fmtDeltaPct(storeIosDiff.deltaPct)}`, descs.storeIos)}
-                ${row('Store Android (мин. от 00:00)', Number.isFinite(storeAndBase.last) ? storeAndBase.last.toFixed(1) : '—', `${fmtDelta(storeAndDiff.delta, 1)} ${fmtDeltaPct(storeAndDiff.deltaPct)}`, descs.storeAnd)}
-                ${row('Лаг iOS (Store−Cutoff, мин.)', Number.isFinite(lagIosBase.last) ? lagIosBase.last.toFixed(1) : '—', `${fmtDelta(lagIosDiff.delta, 1)} ${fmtDeltaPct(lagIosDiff.deltaPct)}`, descs.lagIos)}
-                ${row('Лаг Android (Store−Cutoff, мин.)', Number.isFinite(lagAndBase.last) ? lagAndBase.last.toFixed(1) : '—', `${fmtDelta(lagAndDiff.delta, 1)} ${fmtDeltaPct(lagAndDiff.deltaPct)}`, descs.lagAnd)}
-                <tr class="ml-section-row"><td colspan="3">Стабильность</td></tr>
-                <tr><td ${tip(descs.vol)}>Разброс тест‑кейсов (TC Total, σ от среднего)</td><td>${features.tc_volatility.toFixed(1)}</td><td>—</td></tr>
-                <tr><td ${tip(descs.slope)}>Тренд тест‑кейсов (TC Total, % от первого к последнему)</td><td>${features.tc_slope_pct.toFixed(2)}%</td><td>—</td></tr>
-                <tr class="ml-section-row"><td colspan="3">Аномалии</td></tr>
-                <tr><td ${tip(descs.anoms)}>Аномалии (релизы / типы / платформы)</td><td>${features.release_anoms} / ${features.type_anoms} / ${features.platform_anoms}</td><td>Score: ${features.anom_score}</td></tr>
-              </tbody>
-            </table>
-            <div class="ml-anoms">
-              <div class="ml-anoms-title">Аномалии (топ по значимости)</div>
-              <div class="ml-anoms-grid">
-                <div>Релизы: <b>${anomalies.release.count}</b></div>
-                <div>Типы: <b>${anomalies.type.count}</b></div>
-                <div>Платформы: <b>${anomalies.platform.count}</b></div>
-              </div>
-              <div class="ml-anoms-section">
-                <div class="ml-anoms-sub">Релизы</div>
-                <div class="ml-anoms-list">${renderAnomList(anomalies.release.list)}</div>
-              </div>
-              <div class="ml-anoms-section">
-                <div class="ml-anoms-sub">Типы</div>
-                <div class="ml-anoms-list">${renderAnomList(anomalies.type.list)}</div>
-              </div>
-              <div class="ml-anoms-section">
-                <div class="ml-anoms-sub">Платформы</div>
-                <div class="ml-anoms-list">${renderAnomList(anomalies.platform.list)}</div>
-              </div>
-            </div>
-            ${summaryText}
           `;
         }
 
@@ -1943,7 +2579,7 @@
                   const m = String(timeText).match(/(\d{2}):(\d{2})$/);
                   if(!m) continue;
                   const minutes = Number(m[1]) * 60 + Number(m[2]);
-                  const onTime = minutes >= targetMin && minutes <= (targetMin + windowMin);
+                  const onTime = minutes >= (targetMin - windowMin) && minutes <= (targetMin + windowMin);
                   const text = m[0];
                   const padX = 6;
                   const padY = 3;
@@ -5057,7 +5693,9 @@
             ios: 14 * 60,
             android: 14 * 60
           };
-          const CUT_TARGET_WINDOW_MIN = 5;
+          const CUT_TARGET_WINDOW_MIN = 10;
+          const STORE_DEADLINE_MINUTES = 18 * 60;
+          const LAG_TARGET_MAX_MINUTES = 4 * 60;
 
           function parseLabelTimeMinutes(label){
             if(!label) return null;
@@ -5077,12 +5715,14 @@
             let status = null;
             let note = '';
             if(Number.isFinite(minutes)){
-              if(minutes >= targetMinutes && minutes <= targetMinutes + CUT_TARGET_WINDOW_MIN){
+              const start = targetMinutes - CUT_TARGET_WINDOW_MIN;
+              const end = targetMinutes + CUT_TARGET_WINDOW_MIN;
+              if(minutes >= start && minutes <= end){
                 status = 'cut-on';
-                note = ' (старт вовремя)';
+                note = ' (старт в окне)';
               }else{
                 status = 'cut-late';
-                note = ' (старт позже)';
+                note = minutes < start ? ' (старт раньше окна)' : ' (старт позже окна)';
               }
             }
             const timeHtml = status ? `<span class="cut-time ${status}">${timeText}</span>` : `<span class="cut-time">${timeText}</span>`;
