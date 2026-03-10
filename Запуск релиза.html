@@ -16,7 +16,7 @@
           <div class="flex items-center gap-2 flex-wrap">
             <div class="font-extrabold leading-tight">WB All Table</div>
             <span class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v1.0.52</span>
+              <span aria-hidden="true">🏷️</span><span>v1.0.59</span>
             </span>
           </div>
         </div>
@@ -24,107 +24,197 @@
     </header>
 
     <main class="mt-5 grid grid-cols-1 gap-4">
+      <div class="release-launch-mode-standalone" aria-label="Тип запуска">
+        <div class="release-launch-mode-strip">
+          <div class="release-launch-mode-tabs" role="group" aria-label="Тип запуска">
+            <button type="button" class="release-launch-mode-tab" data-run-mode="major" aria-pressed="false">Мажорный релиз</button>
+            <button type="button" class="release-launch-mode-tab" data-run-mode="1" aria-pressed="false">ХФ Android</button>
+            <button type="button" class="release-launch-mode-tab" data-run-mode="2" aria-pressed="false">ХФ iOS</button>
+            <button type="button" class="release-launch-mode-tab" data-run-mode="3" aria-pressed="false">NAPI</button>
+            <button type="button" class="release-launch-mode-tab" data-run-mode="4" aria-pressed="false">Воскресные раны устройств</button>
+            <button type="button" class="release-launch-mode-tab" data-run-mode="5" aria-pressed="false">RuStore / AppGallery (Крит-путь)</button>
+            <button type="button" class="release-launch-mode-tab" data-run-mode="6" aria-pressed="false">RuStore / AppGallery (Smoke)</button>
+          </div>
+          <select id="runModeSelect" hidden aria-hidden="true">
+            <option value="" selected></option>
+            <option value="major">Мажорный релиз</option>
+            <option value="1">ХФ Android</option>
+            <option value="2">ХФ iOS</option>
+            <option value="3">NAPI</option>
+            <option value="4">Воскресные раны устройств</option>
+            <option value="5">RuStore / AppGallery (Крит-путь)</option>
+            <option value="6">RuStore / AppGallery (Smoke)</option>
+          </select>
+        </div>
+      </div>
+
       <section class="card p-3 space-y-3 release-launch-params">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div>
+        <div class="release-launch-params-split">
+          <div class="release-launch-params-left">
             <h2 class="text-lg font-semibold">Параметры запуска</h2>
-          </div>
-          <div class="flex flex-col items-stretch w-full sm:w-56">
-            <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
-            <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Остановить</button>
-            <button id="checkProxyBtn" type="button" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">Проверить прокси</button>
-          </div>
-        </div>
 
-        <div id="bandCookiesDetails">
-          <input id="bandChannelId" type="hidden" />
-          <div class="release-launch-cookies-layout">
-            <label class="release-launch-field">
-              <span class="release-launch-label">Cookies (чтение/поиск users и post)</span>
-              <input id="bandCookiesRead" class="input release-launch-mono-input" type="text" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
+            <div id="bandCookiesDetails">
+              <input id="bandChannelId" type="hidden" />
+              <div class="release-launch-cookies-layout">
+                <label class="release-launch-field">
+                  <span class="release-launch-label">Cookies (чтение/поиск users и post)</span>
+                  <input id="bandCookiesRead" class="input release-launch-mono-input" type="password" autocomplete="new-password" spellcheck="false" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
+                </label>
+                <label class="release-launch-field">
+                  <span class="release-launch-label">Cookies (admin)</span>
+                  <input id="bandCookiesAdmin" class="input release-launch-mono-input" type="password" autocomplete="new-password" spellcheck="false" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
+                </label>
+              </div>
+            </div>
+
+            <label class="release-launch-field release-launch-run-release-field">
+              <span class="release-launch-label">YouTrack token</span>
+              <input id="ytTokenInput" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="Вставьте токен" />
             </label>
-            <label class="release-launch-field">
-              <span class="release-launch-label">Cookies (admin)</span>
-              <input id="bandCookiesAdmin" class="input release-launch-mono-input" type="text" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
-            </label>
+
+            <div id="runExtraControls" class="release-launch-run-main" style="display:none;">
+              <div class="release-launch-run-fields">
+                <label class="release-launch-field release-launch-run-release-field">
+                  <span class="release-launch-label">Номер релиза</span>
+                  <input id="runReleaseInput" class="input" type="text" placeholder="например: 7.3.1000" />
+                </label>
+                <div class="release-launch-field release-launch-run-release-field release-launch-run-shift-field">
+                  <span class="release-launch-label">Старший смены:</span>
+                  <div class="release-launch-check-row" role="group" aria-label="Старший смены">
+                    <label class="release-launch-check-chip">
+                      <input id="swatLeadViktor" type="checkbox" />
+                      <span>Виктор</span>
+                    </label>
+                    <label class="release-launch-check-chip">
+                      <input id="swatLeadRoman" type="checkbox" />
+                      <span>Роман</span>
+                    </label>
+                  </div>
+                </div>
+                <label id="runBuildField" class="release-launch-field release-launch-run-release-field" style="display:none;">
+                  <span class="release-launch-label">Сборка</span>
+                  <input id="runBuildInput" class="input" type="text" placeholder="ссылка или номер сборки" />
+                </label>
+              </div>
+            </div>
+
+            <div class="release-launch-status-row">
+              <div id="baseInfo" class="release-launch-status release-launch-status-muted">База выборки сообщений: не рассчитана</div>
+              <div id="statusInfo" class="release-launch-status release-launch-status-muted">Готов к запуску</div>
+            </div>
           </div>
-        </div>
 
-        <div class="release-launch-status-row">
-          <div id="baseInfo" class="release-launch-status release-launch-status-muted">База выборки сообщений: не рассчитана</div>
-          <div id="statusInfo" class="release-launch-status release-launch-status-muted">Готов к запуску</div>
-        </div>
-      </section>
+          <div class="release-launch-params-right">
+            <div class="release-launch-params-actions">
+              <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить</button>
+              <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Остановить</button>
+              <button id="checkProxyBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">Проверить прокси</button>
 
-      <section class="card p-5 space-y-4">
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-          <h2 class="text-lg font-semibold">Результат сбора</h2>
-	          <div class="flex items-center gap-2 flex-wrap">
-	            <div class="release-launch-kpis">
-	              <span class="chip">Стримов: <b id="kpiStreams">0</b></span>
-	              <span class="chip">Заполнено: <b id="kpiFilled">0</b></span>
-	              <span class="chip">С пропусками: <b id="kpiMissing">0</b></span>
-	            </div>
-	            <button id="resultsCopyBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white">
-	              Копировать
-	            </button>
-	            <button id="resultsCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
-	              <span id="resultsCollapseIco" aria-hidden="true">▾</span>
-	              <span id="resultsCollapseText">Скрыть</span>
-	            </button>
-	          </div>
-        </div>
-
-        <div id="resultsBody" class="space-y-4">
-          <div id="resultsEmpty" class="release-launch-empty">Данные появятся после запуска сбора</div>
-
-          <div id="resultsWrap" class="release-launch-table-wrap" style="display:none;">
-            <table id="resultsTable">
-              <thead>
-                <tr>
-                  <th style="width:58px;">#</th>
-                  <th>Стрим</th>
-                  <th>iOS</th>
-                  <th>Android</th>
-                  <th>Лид</th>
-                  <th style="width:130px;">Статус</th>
-                </tr>
-              </thead>
-              <tbody id="resultsTbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="card p-5 space-y-4">
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-          <h2 class="text-lg font-semibold">Пошаговый запуск</h2>
-          <button id="workflowResetBtn" type="button" class="btn btn-soft">Сбросить шаги</button>
-        </div>
-        <div id="workflowHint" class="release-launch-status release-launch-status-muted">Сначала нажми «Запустить сбор», затем проходи шаги по порядку.</div>
-        <div id="workflowList" class="space-y-2"></div>
-      </section>
-
-      <section class="card p-5 space-y-4">
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-          <h2 class="text-lg font-semibold">Пинги и постинг</h2>
-          <button id="pingCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
-            <span id="pingCollapseIco" aria-hidden="true">▾</span>
-            <span id="pingCollapseText">Скрыть</span>
-          </button>
-        </div>
-        <div id="pingBody" class="space-y-4">
-          <textarea id="pingMessage" class="input release-launch-textarea release-launch-ping" placeholder="Текст пинга сформируется автоматически"></textarea>
-          <div class="release-launch-actions">
-            <button id="copyPingBtn" type="button" class="btn btn-soft">Копировать текст</button>
+              <div id="runPublishControls" class="release-launch-publish-side" style="display:none;">
+                <div class="release-launch-publish-side-row">
+                  <div class="release-launch-publish-side-buttons">
+                    <button id="runPushSwatBtn" type="button" class="btn btn-soft release-launch-run-btn-soft release-launch-run-btn-compact">SWAT Team Only</button>
+                    <button id="runPushReleaseFeedBtn" type="button" class="btn btn-soft release-launch-run-btn-soft release-launch-run-btn-compact">Лента релизов</button>
+                  </div>
+                  <div class="release-launch-publish-side-meta">
+                    <div class="release-launch-publish-side-title">Публикация</div>
+                    <div class="release-launch-publish-side-lines" aria-hidden="true"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="card p-5 space-y-3">
-        <h2 class="text-lg font-semibold">Логи</h2>
-        <div id="logs" class="release-launch-log"></div>
-      </section>
+      <div id="majorReleaseLayout" class="space-y-4">
+        <section class="card p-3 space-y-3">
+          <div class="release-launch-mode-tabs release-launch-major-view-tabs" role="group" aria-label="Раздел мажорного релиза">
+            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="collection" aria-pressed="false">Сбор дежурных</button>
+            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="message" aria-pressed="false">Сообщение</button>
+            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="push" aria-pressed="false">Пуш</button>
+          </div>
+          <div id="majorReleaseEmptyState" class="release-launch-status release-launch-status-muted">Выбери раздел мажорного релиза</div>
+        </section>
+
+        <div id="majorCollectionSection" class="space-y-4" style="display:none;">
+          <section class="card p-5 space-y-4">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <h2 class="text-lg font-semibold">Результат сбора</h2>
+    		          <div class="flex items-center gap-2 flex-wrap">
+    		            <div class="release-launch-kpis">
+    		              <span class="chip">Стримов: <b id="kpiStreams">0</b></span>
+    		              <span class="chip">Заполнено: <b id="kpiFilled">0</b></span>
+    		              <span class="chip">С пропусками: <b id="kpiMissing">0</b></span>
+    		            </div>
+    		            <button id="resultsCopyBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white">
+    		              Копировать
+    		            </button>
+    		            <button id="resultsCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
+    		              <span id="resultsCollapseIco" aria-hidden="true">▾</span>
+    		              <span id="resultsCollapseText">Скрыть</span>
+    		            </button>
+    		          </div>
+            </div>
+
+            <div id="resultsBody" class="space-y-4">
+              <div id="resultsEmpty" class="release-launch-empty">Данные появятся после запуска сбора</div>
+
+              <div id="resultsWrap" class="release-launch-table-wrap" style="display:none;">
+                <table id="resultsTable">
+                  <thead>
+                    <tr>
+                      <th style="width:58px;">#</th>
+                      <th>Стрим</th>
+                      <th>iOS</th>
+                      <th>Android</th>
+                      <th>Лид</th>
+                      <th style="width:130px;">Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="card p-5 space-y-4">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <h2 class="text-lg font-semibold">Пошаговый запуск</h2>
+              <button id="workflowResetBtn" type="button" class="btn btn-soft">Сбросить шаги</button>
+            </div>
+            <div id="workflowHint" class="release-launch-status release-launch-status-muted">Сначала нажми «Запустить», затем проходи шаги по порядку.</div>
+            <div id="workflowList" class="space-y-2"></div>
+          </section>
+
+          <section class="card p-5 space-y-3">
+            <h2 class="text-lg font-semibold">Логи</h2>
+            <div id="logs" class="release-launch-log"></div>
+          </section>
+        </div>
+
+        <div id="majorMessageSection" class="space-y-4" style="display:none;">
+          <section class="card p-5 space-y-3">
+            <h2 class="text-lg font-semibold">Сообщение</h2>
+            <div class="release-launch-status release-launch-status-muted">Пока пусто</div>
+          </section>
+        </div>
+
+        <div id="majorPushSection" class="space-y-4" style="display:none;">
+          <section class="card p-5 space-y-3">
+            <h2 class="text-lg font-semibold">Пуш</h2>
+            <div class="release-launch-status release-launch-status-muted">Пока пусто</div>
+          </section>
+        </div>
+      </div>
+
+      <div id="runCreateLayout" class="space-y-4" style="display:none;">
+        <section class="card p-5 space-y-3">
+          <h2 class="text-lg font-semibold">Результат</h2>
+          <div id="runCreateError" class="release-launch-run-error" style="display:none;"></div>
+          <div id="runCreateResultLog" class="release-launch-log" aria-live="polite" aria-atomic="false"></div>
+        </section>
+      </div>
     </main>
   </div>
 
@@ -137,17 +227,38 @@
       const $ = (id) => document.getElementById(id);
       const LS_SETTINGS_KEY = 'wb_release_launch_settings_v1';
       const LS_DETAILS_STATE_KEY = 'wb_release_launch_details_state_v1';
+      const LS_RUN_RELEASE_KEY = 'wb_release_launch_run_release_v1';
+      const LS_RUN_BUILD_KEY = 'wb_release_launch_run_build_v1';
+      const LS_YT_TOKEN_KEY = 'wb_all_table_yt_token';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
       const PROXY_BASE = 'http://localhost:8787';
       const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
       const BAND_POST_USER_ID = 'nibrb4qs8ty4zp61x1pgyeziqe';
       const BAND_CHANNEL_ID_FIXED = '6sqki85urpbfbqdkcdfen33owh';
+      const SWAT_TEAM_ONLY_CHANNEL_ID = '66nkpor99pbnpbhf4ffswmeqje';
+      const RELEASE_FEED_CHANNEL_ID = 'xofy3mzmijbxxmongme4pke4bc';
       const GROUP_ANDROID_ID_FIXED = 'bbtekcuhfjykmm9awe56gebj9y';
       const GROUP_IOS_ID_FIXED = '6skkxrr3ufrkmy1u3paepd35ar';
+      const YT_BASE_URL = 'https://youtrack.wildberries.ru';
+      const YT_AGILE_ID_IOS = '83-469';
+      const YT_AGILE_ID_ANDROID = '83-2175';
+      const YT_SPRINT_FIELD_IOS = '{Версия релиза (ex. Sprint) iOS}';
+      const YT_SPRINT_FIELD_ANDROID = '{Версия релиза (ex. Sprint) Android}';
 
       const ALLURE_API_TOKEN = 'c60f6235-440d-4657-983a-51dc71c53cf2';
       const ALLURE_TESTPLAN_LEAF_URL = 'https://allure-testops.wb.ru/api/testplan/3918/tree/leaf?treeId=987&projectId=7&path=7904&sort=name%2Casc&size=100';
       const QA_LEADS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxPTT8Gc8rQLKV7tIrtwsUQd_ciUOkESbS7WoQ3JfPEoBtxB0gr6GpOs640uBIaPTCy8A/exec';
+      const RUN_MODE_MAJOR = 'major';
+      const RUN_CREATOR_BASE_URL = 'https://allure-testops.wb.ru';
+      const RUN_TAG_ANDROID = 4115;
+      const RUN_TAG_IOS = 1711;
+      const RUN_TP_CP_ANDROID = 1998;
+      const RUN_TP_CP_IOS = 3258;
+      const RUN_TP_NAPI_BASE = 1036;
+      const RUN_TP_NAPI_IOS = 1869;
+      const RUN_TP_NAPI_ANDROID = 1871;
+      const RUN_TP_SMOKE_RUSTORE = 999;
+      const RUN_TP_SMOKE_APPGALLERY = 1000;
 
       const STREAM_ALIASES = {
         'Core': ['Core Android', 'Core iOS'],
@@ -202,6 +313,27 @@
       const workflowList = $('workflowList');
       const workflowHint = $('workflowHint');
       const workflowResetBtn = $('workflowResetBtn');
+      const majorReleaseLayout = $('majorReleaseLayout');
+      const majorReleaseEmptyState = $('majorReleaseEmptyState');
+      const majorCollectionSection = $('majorCollectionSection');
+      const majorMessageSection = $('majorMessageSection');
+      const majorPushSection = $('majorPushSection');
+      const majorViewButtons = Array.from(document.querySelectorAll('.release-launch-major-view-tab[data-major-view]'));
+      const runCreateLayout = $('runCreateLayout');
+      const runExtraControls = $('runExtraControls');
+      const runPublishControls = $('runPublishControls');
+      const runModeSelect = $('runModeSelect');
+      const runModeButtons = Array.from(document.querySelectorAll('.release-launch-mode-tab[data-run-mode]'));
+      const runReleaseInput = $('runReleaseInput');
+      const runBuildField = $('runBuildField');
+      const runBuildInput = $('runBuildInput');
+      const swatLeadViktor = $('swatLeadViktor');
+      const swatLeadRoman = $('swatLeadRoman');
+      const runPushSwatBtn = $('runPushSwatBtn');
+      const runPushReleaseFeedBtn = $('runPushReleaseFeedBtn');
+      const runCreateError = $('runCreateError');
+      const runCreateResultLog = $('runCreateResultLog');
+      const ytTokenInput = $('ytTokenInput');
 
       const resultsEmpty = $('resultsEmpty');
       const resultsWrap = $('resultsWrap');
@@ -221,7 +353,12 @@
         workflowCurrentIndex: 0,
         workflowStatuses: [],
         workflowRunning: false,
-        workflowPingFound: false
+        workflowPingFound: false,
+        runCreateRunning: false,
+        currentMode: '',
+        majorView: '',
+        majorPingText: '',
+        ytBoardInfoCache: new Map()
       };
 
       const WORKFLOW_STEPS = [
@@ -326,6 +463,408 @@
         showToast._t = setTimeout(() => { box.style.opacity = '0'; }, 1800);
       }
 
+      function isRunModeSupported(mode){
+        return mode === ''
+          || mode === RUN_MODE_MAJOR
+          || mode === '1'
+          || mode === '2'
+          || mode === '3'
+          || mode === '4'
+          || mode === '5'
+          || mode === '6';
+      }
+
+      function getStartButtonLabel(mode){
+        return 'Запустить';
+      }
+
+      function isRunBuildMode(mode){
+        return mode === '1' || mode === '2' || mode === '5' || mode === '6';
+      }
+
+      function getRunBuildValue(){
+        return runBuildInput ? String(runBuildInput.value || '').trim() : '';
+      }
+
+      function getMajorPingText(){
+        return String(appState.majorPingText || '').trim();
+      }
+
+      function setMajorPingText(text){
+        appState.majorPingText = String(text || '');
+        if(pingMessage) pingMessage.value = appState.majorPingText;
+      }
+
+      function getSwatShiftLeadTag(){
+        if(swatLeadViktor && swatLeadViktor.checked) return '@dolgov.viktor7';
+        if(swatLeadRoman && swatLeadRoman.checked) return '@kolosov.roman';
+        return '';
+      }
+
+      function handleSwatShiftLeadChange(kind){
+        if(kind === 'viktor' && swatLeadViktor && swatLeadViktor.checked && swatLeadRoman){
+          swatLeadRoman.checked = false;
+        }
+        if(kind === 'roman' && swatLeadRoman && swatLeadRoman.checked && swatLeadViktor){
+          swatLeadViktor.checked = false;
+        }
+      }
+
+      function syncRunModeTabs(){
+        for(const btn of runModeButtons){
+          const mode = String(btn.getAttribute('data-run-mode') || '');
+          const active = mode === appState.currentMode;
+          btn.classList.toggle('is-active', active);
+          btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        }
+      }
+
+      function syncMajorViewState(){
+        const isMajor = appState.currentMode === RUN_MODE_MAJOR;
+        const majorView = isMajor ? String(appState.majorView || '') : '';
+
+        for(const btn of majorViewButtons){
+          const view = String(btn.getAttribute('data-major-view') || '');
+          const active = majorView && view === majorView;
+          btn.classList.toggle('is-active', !!active);
+          btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        }
+
+        if(majorReleaseEmptyState) majorReleaseEmptyState.style.display = isMajor && !majorView ? '' : 'none';
+        if(majorCollectionSection) majorCollectionSection.style.display = isMajor && majorView === 'collection' ? '' : 'none';
+        if(majorMessageSection) majorMessageSection.style.display = isMajor && majorView === 'message' ? '' : 'none';
+        if(majorPushSection) majorPushSection.style.display = isMajor && majorView === 'push' ? '' : 'none';
+      }
+
+      function setMajorView(view){
+        const value = view === 'collection' || view === 'message' || view === 'push' ? view : '';
+        appState.majorView = value;
+        syncMajorViewState();
+      }
+
+      function setRunMode(mode){
+        const prevMode = appState.currentMode;
+        const value = isRunModeSupported(mode) ? mode : '';
+        appState.currentMode = value;
+        const isMajor = value === RUN_MODE_MAJOR;
+        const isEmpty = value === '';
+        const isNonMajor = !isMajor && !isEmpty;
+        const isBuildMode = isRunBuildMode(value);
+
+        if(runModeSelect) runModeSelect.value = value;
+        syncRunModeTabs();
+        if(runExtraControls) runExtraControls.style.display = isNonMajor ? '' : 'none';
+        if(runBuildField) runBuildField.style.display = isBuildMode ? '' : 'none';
+        if(runPublishControls) runPublishControls.style.display = isNonMajor ? '' : 'none';
+        if(majorReleaseLayout) majorReleaseLayout.style.display = isMajor ? '' : 'none';
+        if(runCreateLayout) runCreateLayout.style.display = isNonMajor ? '' : 'none';
+        if(isMajor){
+          if(prevMode !== RUN_MODE_MAJOR) setMajorView('');
+          else syncMajorViewState();
+        }else{
+          appState.majorView = '';
+          syncMajorViewState();
+        }
+
+        if(checkProxyBtn) checkProxyBtn.style.display = '';
+        if(!isMajor && stopBtn){
+          stopBtn.style.display = 'none';
+        }
+        if(startBtn){
+          startBtn.style.display = '';
+          startBtn.textContent = getStartButtonLabel(value);
+        }
+
+        if(isNonMajor || isEmpty){
+          if(baseInfo) baseInfo.style.display = 'none';
+          if(statusInfo) statusInfo.style.display = 'none';
+        }else{
+          const windowInfo = buildSinceWindow();
+          if(baseInfo){
+            baseInfo.style.display = '';
+            baseInfo.textContent = `База выборки сообщений: ${formatMskHuman(windowInfo.baseUtcDate)}`;
+          }
+          if(statusInfo){
+            statusInfo.style.display = '';
+            if(!appState.running){
+              setStatus('Готов к запуску', 'release-launch-status-muted');
+            }
+          }
+        }
+
+        refreshModeControls();
+      }
+
+      function runCreatorClearError(){
+        if(!runCreateError) return;
+        runCreateError.style.display = 'none';
+        runCreateError.textContent = '';
+      }
+
+      function runCreatorShowError(error){
+        const msg = (error && error.message) ? error.message : String(error || 'Неизвестная ошибка');
+        if(!runCreateError) return;
+        runCreateError.style.display = '';
+        runCreateError.textContent = msg;
+      }
+
+      function runCreatorAppendLog(message, options){
+        if(!runCreateResultLog) return;
+        const cfg = options || {};
+        const line = document.createElement('div');
+        line.className = 'release-launch-log-line' + (cfg.kind ? ` ${cfg.kind}` : '');
+        if(cfg.html){
+          line.innerHTML = String(message || '');
+        }else{
+          line.textContent = String(message || '');
+        }
+        runCreateResultLog.appendChild(line);
+        runCreateResultLog.scrollTop = runCreateResultLog.scrollHeight;
+      }
+
+      function runCreatorResetLog(){
+        if(runCreateResultLog) runCreateResultLog.innerHTML = '';
+      }
+
+      function runCreatorInfo(message, options){
+        const cfg = options || {};
+        runCreatorAppendLog(cfg.html ? message : escHtml(message), { html: true, kind: cfg.kind || '' });
+      }
+
+      function runCreatorAmsNowStr(){
+        const fmt = new Intl.DateTimeFormat('ru-RU', {
+          timeZone: 'Europe/Amsterdam',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        const parts = Object.fromEntries(fmt.formatToParts(new Date()).map((x) => [x.type, x.value]));
+        return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`;
+      }
+
+      function runCreatorHeaders(){
+        return {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Api-Token ${ALLURE_API_TOKEN}`
+        };
+      }
+
+      async function runCreatorPostJson(path, payload, signal){
+        const base = RUN_CREATOR_BASE_URL.replace(/\/+$/, '');
+        const url = `${base}/api${path.startsWith('/') ? path : `/${path}`}`;
+        let resp;
+        try{
+          resp = await fetch(url, {
+            method: 'POST',
+            mode: 'cors',
+            credentials: 'omit',
+            headers: runCreatorHeaders(),
+            body: payload !== undefined && payload !== null ? JSON.stringify(payload) : null,
+            signal
+          });
+        }catch(error){
+          const msg = (error && error.message) ? error.message : String(error);
+          throw new Error(`HTTP ошибка при POST ${url}: ${msg}`);
+        }
+
+        const text = await resp.text();
+        if(Math.floor(resp.status / 100) !== 2){
+          throw new Error(`Запрос ${url} вернул ${resp.status}:\n${text}`);
+        }
+        if(!text.trim()) return null;
+        try{
+          return JSON.parse(text);
+        }catch(_){
+          return text;
+        }
+      }
+
+      async function runCreatorCreateTag(name, signal){
+        const data = await runCreatorPostJson('/launch/tag', { name }, signal);
+        if(!data || typeof data !== 'object' || !('id' in data)){
+          throw new Error(`Не удалось создать тег '${name}'. Ответ: ${JSON.stringify(data)}`);
+        }
+        return Number(data.id);
+      }
+
+      async function runCreatorRunTestplan(tpId, launchName, tagIds, signal){
+        const payload = { launchName, tags: tagIds.map((id) => ({ id })) };
+        const data = await runCreatorPostJson(`/testplan/${tpId}/run`, payload, signal);
+        if(!data || typeof data !== 'object' || !('id' in data)){
+          throw new Error(`Тест-план ${tpId} запустился не как ожидалось. Ответ: ${JSON.stringify(data)}`);
+        }
+        return data;
+      }
+
+      async function runCreatorSyncTestplan(tpId, signal){
+        await runCreatorPostJson(`/testplan/${tpId}/sync`, null, signal);
+      }
+
+      function runCreatorLaunchLink(launchJson){
+        const base = RUN_CREATOR_BASE_URL.replace(/\/+$/, '');
+        const launchId = launchJson.id;
+        const launchName = launchJson.name || `Запуск ${launchId}`;
+        const url = `${base}/launch/${launchId}`;
+        return `Ран: <a href="${url}" target="_blank" rel="noopener noreferrer">${escHtml(launchName)}</a>`;
+      }
+
+      function runCreatorEmitBuildSection(buildValue, runs){
+        const runList = (Array.isArray(runs) ? runs : [runs]).filter(Boolean);
+        const buildText = String(buildValue || '').trim();
+        if(buildText){
+          runCreatorInfo(`Сборка: ${buildText}`);
+          for(const run of runList){
+            if(run) runCreatorInfo(runCreatorLaunchLink(run), { html: true });
+          }
+          return;
+        }
+        if(runList.length){
+          const [firstRun, ...restRuns] = runList;
+          runCreatorInfo(`Сборка: ${runCreatorLaunchLink(firstRun)}`, { html: true });
+          for(const run of restRuns){
+            if(run) runCreatorInfo(runCreatorLaunchLink(run), { html: true });
+          }
+          return;
+        }
+        runCreatorInfo('Сборка:');
+        for(const run of runList){
+          if(run) runCreatorInfo(runCreatorLaunchLink(run), { html: true });
+        }
+      }
+
+      async function runCreatorScenario(mode, release, buildValue, signal){
+        runCreatorClearError();
+        runCreatorResetLog();
+
+        runCreatorInfo('──────── Автозапуск ранов Allure TestOps (WB) ────────');
+        runCreatorInfo(`Время (AMS): ${runCreatorAmsNowStr()}`);
+        runCreatorInfo(`Режим: ${mode} • Релиз: ${release}`);
+        runCreatorInfo('──────────────────────────────────────────────────────');
+
+        runCreatorInfo('Создаю тег релиза...');
+        const tagRelease = await runCreatorCreateTag(release, signal);
+        runCreatorInfo(`Тег релиза создан: id=${tagRelease}`);
+        runCreatorInfo('');
+
+        if(mode === '1'){
+          const ln = `[SWAT][Крит-путь][Android] ${release}`;
+          runCreatorInfo(`Запускаю тест-план ${RUN_TP_CP_ANDROID} → ${ln}`);
+          const run = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, ln, [RUN_TAG_ANDROID, tagRelease], signal);
+          runCreatorInfo('');
+          runCreatorInfo('Готово. Сформировано сообщение:');
+          runCreatorInfo(`Привет, новый крит-путь для ХФ Android, релиз ${release}`);
+          runCreatorEmitBuildSection(buildValue, run);
+          return;
+        }
+
+        if(mode === '2'){
+          const ln = `[SWAT][Крит-путь][iOS] ${release}`;
+          runCreatorInfo(`Запускаю тест-план ${RUN_TP_CP_IOS} → ${ln}`);
+          const run = await runCreatorRunTestplan(RUN_TP_CP_IOS, ln, [tagRelease, RUN_TAG_IOS], signal);
+          runCreatorInfo('');
+          runCreatorInfo('Готово. Сформировано сообщение:');
+          runCreatorInfo(`Привет, новый крит-путь для ХФ iOS, релиз ${release}`);
+          runCreatorEmitBuildSection(buildValue, run);
+          return;
+        }
+
+        if(mode === '3'){
+          runCreatorInfo(`Синхронизирую тест-кейсы NAPI (${RUN_TP_NAPI_BASE}, ${RUN_TP_NAPI_IOS}, ${RUN_TP_NAPI_ANDROID})...`);
+          for(const tp of [RUN_TP_NAPI_BASE, RUN_TP_NAPI_IOS, RUN_TP_NAPI_ANDROID]){
+            runCreatorInfo(`  sync testplan ${tp} ...`);
+            await runCreatorSyncTestplan(tp, signal);
+            await sleep(300);
+          }
+          const tagNapi = await runCreatorCreateTag('napi', signal);
+
+          const ln1 = `[SWAT][Android и iOS] Релиз Napi ${release}`;
+          runCreatorInfo('');
+          runCreatorInfo(`Запускаю ${RUN_TP_NAPI_BASE} → ${ln1}`);
+          const run1 = await runCreatorRunTestplan(RUN_TP_NAPI_BASE, ln1, [RUN_TAG_ANDROID, RUN_TAG_IOS, tagRelease, tagNapi], signal);
+
+          const ln2 = `[SWAT][Финтех + Корзина][iOS] Релиз Napi ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_NAPI_IOS} → ${ln2}`);
+          const run2 = await runCreatorRunTestplan(RUN_TP_NAPI_IOS, ln2, [RUN_TAG_IOS, tagRelease, tagNapi], signal);
+
+          const ln3 = `[SWAT][Финтех + Корзина][Android] Релиз Napi ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_NAPI_ANDROID} → ${ln3}`);
+          const run3 = await runCreatorRunTestplan(RUN_TP_NAPI_ANDROID, ln3, [tagRelease, RUN_TAG_ANDROID, tagNapi], signal);
+
+          runCreatorInfo('');
+          runCreatorInfo('Готово. Сформировано сообщение:');
+          runCreatorInfo(`Привет, новый регресс для NAPI, релиз ${release}`);
+          runCreatorEmitBuildSection(buildValue, [run1, run2, run3]);
+          return;
+        }
+
+        if(mode === '4'){
+          const lnAOld = `[SWAT][Крит-путь][Android] Тест UI Старых устройств ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_CP_ANDROID} → ${lnAOld}`);
+          const runAOld = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnAOld, [RUN_TAG_ANDROID, tagRelease], signal);
+
+          const lnAFold = `[SWAT][Крит-путь][Android] Раскладушки (FOLD) ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_CP_ANDROID} → ${lnAFold}`);
+          const runAFold = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnAFold, [RUN_TAG_ANDROID, tagRelease], signal);
+
+          const lnIOld = `[SWAT][Крит-путь][IOS] Тест UI Старых устройств ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_CP_IOS} → ${lnIOld}`);
+          const runIOld = await runCreatorRunTestplan(RUN_TP_CP_IOS, lnIOld, [RUN_TAG_IOS, tagRelease], signal);
+
+          const lnIpad = `[SWAT][Крит-путь][IOS] iPAD ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_CP_IOS} → ${lnIpad}`);
+          const runIpad = await runCreatorRunTestplan(RUN_TP_CP_IOS, lnIpad, [RUN_TAG_IOS, tagRelease], signal);
+
+          runCreatorInfo('');
+          runCreatorInfo('Готово. Сформировано сообщение:');
+          runCreatorInfo(`Привет, новые воскресные раны устройств, релиз ${release}`);
+          runCreatorEmitBuildSection(buildValue, [runAOld, runAFold, runIOld, runIpad]);
+          return;
+        }
+
+        if(mode === '5'){
+          const tagApp = await runCreatorCreateTag('AppGallery', signal);
+          const tagRu = await runCreatorCreateTag('RuStore', signal);
+
+          const lnApp = `[SWAT][Крит-путь] AppGallery ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_CP_ANDROID} → ${lnApp}`);
+          const runApp = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnApp, [RUN_TAG_ANDROID, tagRelease, tagApp], signal);
+
+          const lnRu = `[SWAT][Крит-путь] RuStore ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_CP_ANDROID} → ${lnRu}`);
+          const runRu = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnRu, [RUN_TAG_ANDROID, tagRelease, tagRu], signal);
+
+          runCreatorInfo('');
+          runCreatorInfo('Готово. Сформировано сообщение:');
+          runCreatorInfo(`Привет, новый крит-путь для RuStore / AppGallery, релиз ${release}`);
+          runCreatorEmitBuildSection(buildValue, [runApp, runRu]);
+          return;
+        }
+
+        if(mode === '6'){
+          const tagApp = await runCreatorCreateTag('AppGallery', signal);
+          const tagRu = await runCreatorCreateTag('RuStore', signal);
+
+          const lnRuSmoke = `[SWAT][Android][Smoke] RuStore ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_SMOKE_RUSTORE} → ${lnRuSmoke}`);
+          const runRuSmoke = await runCreatorRunTestplan(RUN_TP_SMOKE_RUSTORE, lnRuSmoke, [RUN_TAG_ANDROID, tagRelease, tagRu], signal);
+
+          const lnAppSmoke = `[SWAT][Android][Smoke] AppGallery ${release}`;
+          runCreatorInfo(`Запускаю ${RUN_TP_SMOKE_APPGALLERY} → ${lnAppSmoke}`);
+          const runAppSmoke = await runCreatorRunTestplan(RUN_TP_SMOKE_APPGALLERY, lnAppSmoke, [RUN_TAG_ANDROID, tagRelease, tagApp], signal);
+
+          runCreatorInfo('');
+          runCreatorInfo('Готово. Сформировано сообщение:');
+          runCreatorInfo(`Привет, новый Smoke для RuStore / AppGallery, релиз ${release}`);
+          runCreatorEmitBuildSection(buildValue, [runRuSmoke, runAppSmoke]);
+          return;
+        }
+
+        throw new Error('Некорректный режим (1–6).');
+      }
+
       function two(n){
         return String(n).padStart(2, '0');
       }
@@ -359,6 +898,163 @@
           sinceMs,
           baseMskDate: new Date(baseMskMs),
           baseUtcDate: new Date(sinceMs)
+        };
+      }
+
+      function formatMskDateDot(dateObj){
+        const mskDate = new Date(dateObj.getTime() + MSK_OFFSET_MS);
+        const day = two(mskDate.getUTCDate());
+        const month = two(mskDate.getUTCMonth() + 1);
+        const year = mskDate.getUTCFullYear();
+        return `${day}.${month}.${year}`;
+      }
+
+      function asBearer(rawToken){
+        const token = String(rawToken || '').trim();
+        if(!token) return '';
+        return /^bearer\s+/i.test(token) ? token : `Bearer ${token}`;
+      }
+
+      function normalizeReleaseName(value){
+        return String(value || '').trim();
+      }
+
+      function parseDateMs(value){
+        if(typeof value === 'number' && Number.isFinite(value)) return value;
+        if(typeof value === 'string'){
+          const raw = value.trim();
+          if(!raw) return NaN;
+          const asNumber = Number(raw);
+          if(Number.isFinite(asNumber)) return asNumber;
+          const parsed = Date.parse(raw);
+          if(Number.isFinite(parsed)) return parsed;
+        }
+        return NaN;
+      }
+
+      function getYtTokenFromStorage(){
+        const direct = ytTokenInput ? String(ytTokenInput.value || '').trim() : '';
+        if(direct) return direct;
+        try{
+          return String(localStorage.getItem(LS_YT_TOKEN_KEY) || '').trim();
+        }catch(_){
+          return '';
+        }
+      }
+
+      function saveYtToken(){
+        try{
+          localStorage.setItem(LS_YT_TOKEN_KEY, ytTokenInput ? String(ytTokenInput.value || '') : '');
+        }catch(_){ }
+      }
+
+      async function ytProxyGetJson(url, authHeader, signal){
+        return proxyRequestJson('GET', url, {
+          'Accept': 'application/json',
+          'Authorization': authHeader
+        }, undefined, signal);
+      }
+
+      async function fetchAgileSprints(agileId, authHeader, signal){
+        const params = new URLSearchParams();
+        params.set('issuesQuery', '');
+        params.set('$top', '-1');
+        params.set('fields', 'id,name,finish');
+        const url = `${YT_BASE_URL}/api/agiles/${agileId}/sprints/?${params.toString()}`;
+        const data = await ytProxyGetJson(url, authHeader, signal);
+        return Array.isArray(data) ? data : [];
+      }
+
+      async function fetchBoardInfoForRelease(agileId, release, authHeader, signal){
+        const releaseNorm = normalizeReleaseName(release);
+        const cacheKey = `${agileId}::${releaseNorm}`;
+        if(appState.ytBoardInfoCache.has(cacheKey)){
+          return appState.ytBoardInfoCache.get(cacheKey);
+        }
+
+        const sprints = await fetchAgileSprints(agileId, authHeader, signal);
+        const sprint = sprints.find((item) => normalizeReleaseName(item && item.name) === releaseNorm);
+        const url = sprint && sprint.id
+          ? `${YT_BASE_URL}/agiles/${agileId}/${sprint.id}`
+          : `${YT_BASE_URL}/agiles/${agileId}/current`;
+        const finishMs = parseDateMs(sprint && sprint.finish);
+        const info = {
+          url,
+          releaseFinishMs: Number.isFinite(finishMs) ? finishMs : null
+        };
+        appState.ytBoardInfoCache.set(cacheKey, info);
+        return info;
+      }
+
+      function getReleaseBoardAgileId(mode){
+        if(mode === '2') return YT_AGILE_ID_IOS;
+        if(mode === '1' || mode === '5' || mode === '6') return YT_AGILE_ID_ANDROID;
+        return '';
+      }
+
+      function getReleaseTicketMeta(mode, release){
+        if(mode === '2'){
+          return {
+            sprintField: YT_SPRINT_FIELD_IOS,
+            summary: `Релизный тикет IOS ${release}`
+          };
+        }
+        if(mode === '1' || mode === '5' || mode === '6'){
+          return {
+            sprintField: YT_SPRINT_FIELD_ANDROID,
+            summary: `Релизный тикет ANDROID ${release}`
+          };
+        }
+        return null;
+      }
+
+      function issueLink(key){
+        return `${YT_BASE_URL}/issue/${encodeURIComponent(key)}`;
+      }
+
+      async function fetchYtIssuesByQuery(query, authHeader, signal){
+        const params = new URLSearchParams();
+        params.set('query', query);
+        params.set('$top', '10');
+        params.set('fields', 'id,idReadable,summary');
+        const url = `${YT_BASE_URL}/api/issues?${params.toString()}`;
+        const data = await ytProxyGetJson(url, authHeader, signal);
+        return Array.isArray(data) ? data : [];
+      }
+
+      async function fetchReleaseBoardUrl(mode, release, signal){
+        const agileId = getReleaseBoardAgileId(mode);
+        if(!agileId) return '';
+
+        const authHeader = asBearer(getYtTokenFromStorage());
+        if(!authHeader){
+          throw new Error('Не найден YouTrack token из модуля Epic / User Story.');
+        }
+
+        const info = await fetchBoardInfoForRelease(agileId, release, authHeader, signal);
+        return String((info && info.url) || '').trim();
+      }
+
+      async function fetchReleaseTicketRef(mode, release, signal){
+        const meta = getReleaseTicketMeta(mode, release);
+        if(!meta) return null;
+
+        const authHeader = asBearer(getYtTokenFromStorage());
+        if(!authHeader){
+          throw new Error('Укажи YouTrack token.');
+        }
+
+        const query = `(${meta.sprintField}: ${release}) AND summary: "${meta.summary}" AND State: -Rejected`;
+        const issues = await fetchYtIssuesByQuery(query, authHeader, signal);
+        const exact = issues.find((item) => String((item && item.summary) || '').trim().toUpperCase() === meta.summary.toUpperCase()) || issues[0];
+        if(!exact || !exact.idReadable){
+          throw new Error(`Не найден ${meta.summary} в YouTrack.`);
+        }
+
+        return {
+          key: String(exact.idReadable || '').trim(),
+          summary: String(exact.summary || '').trim(),
+          url: issueLink(String(exact.idReadable || '').trim())
         };
       }
 
@@ -521,7 +1217,7 @@
       async function runWorkflowStepAction(action){
         if(action === 'publishPing'){
           if(!appState.lastRun) throw new Error('Сначала запусти сбор');
-          if(!String(pingMessage.value || '').trim()){
+          if(!getMajorPingText()){
             log('[Шаг 1] Публикация запроса не требуется: все дежурные найдены.', 'ok');
             showToast('Шаг 1: публикация не требуется');
             return;
@@ -1335,8 +2031,10 @@
         return { android, ios };
       }
 
-      async function bandCreatePost(message, cfg, signal){
-        const channelId = String(cfg.bandChannelId || '').trim();
+      async function bandCreatePost(message, cfg, signal, options){
+        const opts = options || {};
+        const channelId = String(opts.channelId || cfg.bandChannelId || '').trim();
+        const rootId = String(opts.rootId || '').trim();
         const userId = BAND_POST_USER_ID;
         if(!channelId) throw new Error('Заполни Канал SWAT QA');
         if(!userId) throw new Error('Не задан BAND_POST_USER_ID');
@@ -1347,7 +2045,7 @@
           file_ids: [],
           message,
           channel_id: channelId,
-          root_id: '',
+          root_id: rootId,
           pending_post_id: `${userId}:${nowMs}`,
           user_id: userId,
           create_at: 0,
@@ -1366,7 +2064,7 @@
           ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
           [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
         };
-        await proxyRequestJson('POST', 'https://band.wb.ru/api/v4/posts', headers, payload, signal);
+        return proxyRequestJson('POST', 'https://band.wb.ru/api/v4/posts', headers, payload, signal);
       }
 
       async function bandSearchUserIds(handles, cfg, signal){
@@ -1577,6 +2275,36 @@
           resultsCopyBtn.disabled = appState.running || !hasRows;
         }
         renderWorkflow();
+        refreshModeControls();
+      }
+
+      function refreshModeControls(){
+        const isMajor = appState.currentMode === RUN_MODE_MAJOR;
+        const hasMode = String(appState.currentMode || '').length > 0;
+        const locked = appState.running || appState.workflowRunning || appState.runCreateRunning;
+        const isNonMajor = hasMode && !isMajor;
+        const isReleaseFeedBlockedMode = appState.currentMode === '3' || appState.currentMode === '4';
+        const isBuildMode = isRunBuildMode(appState.currentMode);
+        if(runModeSelect) runModeSelect.disabled = locked;
+        for(const btn of runModeButtons){
+          btn.disabled = locked;
+        }
+        if(startBtn) startBtn.disabled = locked || !hasMode;
+        if(checkProxyBtn) checkProxyBtn.disabled = locked;
+        if(runReleaseInput) runReleaseInput.disabled = locked || isMajor || !hasMode;
+        if(runBuildInput) runBuildInput.disabled = locked || !isBuildMode || !hasMode;
+        if(swatLeadViktor) swatLeadViktor.disabled = locked || !isNonMajor;
+        if(swatLeadRoman) swatLeadRoman.disabled = locked || !isNonMajor;
+        if(runPushSwatBtn) runPushSwatBtn.disabled = locked || !isNonMajor;
+        if(runPushReleaseFeedBtn) runPushReleaseFeedBtn.disabled = locked || !isNonMajor || isReleaseFeedBlockedMode;
+      }
+
+      function setRunCreateRunning(running){
+        appState.runCreateRunning = !!running;
+        if(startBtn){
+          startBtn.textContent = running ? 'Запускаю...' : getStartButtonLabel(appState.currentMode);
+        }
+        refreshModeControls();
       }
 
       function applyWorkflowAutoDoneForFoundDuties(rows, options){
@@ -1642,7 +2370,7 @@
         kpiFilled.textContent = '0';
         kpiMissing.textContent = '0';
 
-        pingMessage.value = '';
+        setMajorPingText('');
         appState.lastRun = null;
         appState.androidIdMap = {};
         appState.iosIdMap = {};
@@ -1652,7 +2380,10 @@
 
       function setRunning(running){
         appState.running = !!running;
-        startBtn.style.display = running ? 'none' : '';
+        if(startBtn){
+          startBtn.style.display = running ? 'none' : '';
+          startBtn.textContent = getStartButtonLabel(appState.currentMode);
+        }
         stopBtn.style.display = running ? '' : 'none';
         if(checkProxyBtn) checkProxyBtn.disabled = running;
 
@@ -1661,9 +2392,10 @@
           if(el) el.disabled = running;
         }
 
-        copyPingBtn.disabled = running;
+        if(copyPingBtn) copyPingBtn.disabled = running;
         if(resultsCopyBtn) resultsCopyBtn.disabled = running;
         renderWorkflow();
+        refreshModeControls();
       }
 
       async function withButtonBusy(button, busyText, task){
@@ -1735,7 +2467,7 @@
           renderResults(rows);
 
           const pingText = buildPingRequestMessageForMissing(rows);
-          pingMessage.value = pingText;
+          setMajorPingText(pingText);
 
           const handles = extractHandles(duties);
           renderCandidates(handles);
@@ -1783,8 +2515,38 @@
         }
       }
 
+      async function runCreateLaunch(){
+        const mode = String(appState.currentMode || '');
+        if(!isRunModeSupported(mode) || !mode || mode === RUN_MODE_MAJOR){
+          return;
+        }
+
+        const release = runReleaseInput ? String(runReleaseInput.value || '').trim() : '';
+        const buildValue = getRunBuildValue();
+        if(!release){
+          throw new Error('Номер релиза не должен быть пустым.');
+        }
+
+        try{
+          localStorage.setItem(LS_RUN_RELEASE_KEY, release);
+          localStorage.setItem(LS_RUN_BUILD_KEY, buildValue);
+        }catch(_){ }
+
+        setRunCreateRunning(true);
+        runCreatorClearError();
+        try{
+          await runCreatorScenario(mode, release, buildValue);
+          showToast('Раны созданы');
+        }catch(error){
+          runCreatorShowError(error);
+          throw error;
+        }finally{
+          setRunCreateRunning(false);
+        }
+      }
+
       async function copyPingMessage(){
-        const text = String(pingMessage.value || '').trim();
+        const text = getMajorPingText();
         if(!text){
           showToast('Текст пинга пуст', false);
           return;
@@ -1794,9 +2556,16 @@
           await navigator.clipboard.writeText(text);
           showToast('Текст скопирован');
         }catch(_){
-          pingMessage.focus();
-          pingMessage.select();
+          const area = document.createElement('textarea');
+          area.value = text;
+          area.setAttribute('readonly', 'readonly');
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          document.body.appendChild(area);
+          area.focus();
+          area.select();
           document.execCommand('copy');
+          area.remove();
           showToast('Текст скопирован');
         }
       }
@@ -1833,12 +2602,218 @@
         if(!String(cfg.bandChannelId || '').trim()) throw new Error('Заполни Канал SWAT QA');
       }
 
+      function ensureReleaseFeedFields(cfg){
+        if(!String(cfg.bandCookiesRead || '').length) throw new Error('Заполни Cookies (чтение/поиск users и post)');
+      }
+
       function ensureAdminFields(cfg){
         if(!String(cfg.bandCookiesAdmin || '').length) throw new Error('Заполни Cookies (admin)');
       }
 
+      function collectRunCreatorLinks(){
+        if(!runCreateResultLog) return [];
+        return Array.from(runCreateResultLog.querySelectorAll('a[href]'))
+          .map((node) => ({
+            name: String(node.textContent || '').trim(),
+            url: String(node.getAttribute('href') || '').trim()
+          }))
+          .filter((item) => item.name && item.url);
+      }
+
+      function runCreatorNodeToMarkdown(node){
+        if(!node) return '';
+        if(node.nodeType === Node.TEXT_NODE){
+          return String(node.textContent || '');
+        }
+        if(node.nodeType !== Node.ELEMENT_NODE){
+          return '';
+        }
+
+        const el = node;
+        const tag = String(el.tagName || '').toUpperCase();
+        if(tag === 'A'){
+          const text = String(el.textContent || '').trim();
+          const href = String(el.getAttribute('href') || '').trim();
+          return text && href ? `[${text}](${href})` : text;
+        }
+        if(tag === 'BR'){
+          return '\n';
+        }
+
+        let out = '';
+        for(const child of Array.from(el.childNodes || [])){
+          out += runCreatorNodeToMarkdown(child);
+        }
+        return out;
+      }
+
+      function collectRunCreatorCopyMessage(){
+        if(!runCreateResultLog) return '';
+        const lines = Array.from(runCreateResultLog.children || []).map((line) => runCreatorNodeToMarkdown(line).trim());
+        const markerIdx = lines.lastIndexOf('Готово. Сформировано сообщение:');
+        if(markerIdx < 0) return '';
+
+        const out = [];
+        let pendingBuildPrefix = false;
+        for(let i = markerIdx + 1; i < lines.length; i += 1){
+          const line = String(lines[i] || '').trim();
+          if(/^Лента релизов:/.test(line) || /^SWAT Team Only:/.test(line)){
+            break;
+          }
+          if(line === 'Сборка:'){
+            pendingBuildPrefix = true;
+            continue;
+          }
+          if(!line){
+            if(pendingBuildPrefix){
+              continue;
+            }
+            if(out.length && out[out.length - 1] !== ''){
+              out.push('');
+            }
+            continue;
+          }
+          if(pendingBuildPrefix){
+            out.push(`Сборка: ${line}`);
+            pendingBuildPrefix = false;
+            continue;
+          }
+          out.push(line);
+        }
+        if(pendingBuildPrefix){
+          out.push('Сборка:');
+        }
+
+        return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+      }
+
+      function buildReleaseFeedThreadMessage(release, runRef, boardUrl, releaseTaskRef, buildValue){
+        const today = formatMskDateDot(new Date());
+        const buildText = String(buildValue || '').trim();
+        const lines = [
+          `OS версия: ${release}`,
+          `Ссылка на доску: ${String(boardUrl || '').trim()}`,
+          '',
+          `Релизный таск: ${releaseTaskRef ? `[${releaseTaskRef.key}](${releaseTaskRef.url})` : ''}`,
+          '',
+          `Сроки готовности сборок: ${today}`,
+          `Сроки выкатки: ${today}`,
+          `Ориентировочное время старта регресса: ${today}`,
+          `Ожидаемое время окончания проверки: ${today}`,
+          buildText ? `Сборка: ${buildText}` : 'Сборка:'
+        ];
+        lines.push(`Ран: [${runRef.name}](${runRef.url})`);
+        return lines.join('\n');
+      }
+
+      function buildReleaseFeedPosts(mode, release, runRefs, boardUrl, releaseTaskRef, buildValue){
+        const refs = Array.isArray(runRefs) ? runRefs : [];
+        const findBy = (predicate) => refs.find((item) => predicate(String(item.name || '')));
+        const out = [];
+
+        if(mode === '1'){
+          const androidRun = findBy((name) => name.includes('[Android]')) || refs[0];
+          if(!androidRun) throw new Error('Не нашёл ссылку на ран Android в текущем логе.');
+          out.push({
+            rootMessage: `#Android #Hotfix ${release}`,
+            threadMessage: buildReleaseFeedThreadMessage(release, androidRun, boardUrl, releaseTaskRef, buildValue)
+          });
+          return out;
+        }
+
+        if(mode === '2'){
+          const iosRun = findBy((name) => name.includes('[iOS]') || name.includes('[IOS]')) || refs[0];
+          if(!iosRun) throw new Error('Не нашёл ссылку на ран iOS в текущем логе.');
+          out.push({
+            rootMessage: `#iOS #Hotfix ${release}`,
+            threadMessage: buildReleaseFeedThreadMessage(release, iosRun, boardUrl, releaseTaskRef, buildValue)
+          });
+          return out;
+        }
+
+        if(mode === '5' || mode === '6'){
+          const huaweiRun = findBy((name) => name.includes('AppGallery'));
+          const rustoreRun = findBy((name) => name.includes('RuStore') || name.includes('Rustore'));
+          if(!huaweiRun || !rustoreRun){
+            throw new Error('Не нашёл ссылки на раны AppGallery/RuStore в текущем логе.');
+          }
+          out.push({
+            rootMessage: `#Android #Release #Huawei ${release}`,
+            threadMessage: buildReleaseFeedThreadMessage(release, huaweiRun, boardUrl, releaseTaskRef, buildValue)
+          });
+          out.push({
+            rootMessage: `#Android #Release #Rustore ${release}`,
+            threadMessage: buildReleaseFeedThreadMessage(release, rustoreRun, boardUrl, releaseTaskRef, buildValue)
+          });
+          return out;
+        }
+
+        throw new Error('Для выбранного типа запуска публикация в ленту релизов не поддерживается.');
+      }
+
+      async function publishReleaseFeedPosts(){
+        const mode = String(appState.currentMode || '');
+        const release = runReleaseInput ? String(runReleaseInput.value || '').trim() : '';
+        if(!release){
+          throw new Error('Номер релиза не должен быть пустым.');
+        }
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+        const buildValue = getRunBuildValue();
+
+        const [boardUrl, releaseTaskRef] = await Promise.all([
+          fetchReleaseBoardUrl(mode, release, null),
+          fetchReleaseTicketRef(mode, release, null)
+        ]);
+        const posts = buildReleaseFeedPosts(mode, release, collectRunCreatorLinks(), boardUrl, releaseTaskRef, buildValue);
+        if(!posts.length){
+          throw new Error('Нет данных для публикации в ленту релизов.');
+        }
+
+        for(const item of posts){
+          const rootPost = await bandCreatePost(item.rootMessage, cfg, null, {
+            channelId: RELEASE_FEED_CHANNEL_ID
+          });
+          const rootId = String((rootPost && rootPost.id) || '');
+          if(!rootId){
+            throw new Error(`Не удалось получить id root-поста для '${item.rootMessage}'.`);
+          }
+
+          await sleep(120);
+          await bandCreatePost(item.threadMessage, cfg, null, {
+            channelId: RELEASE_FEED_CHANNEL_ID,
+            rootId
+          });
+
+          runCreatorInfo(`Лента релизов: опубликован тред <b>${escHtml(item.rootMessage)}</b>`, { html: true, kind: 'ok' });
+          await sleep(120);
+        }
+
+        showToast(posts.length > 1 ? `Опубликовано тредов: ${posts.length}` : 'Опубликовано в ленту релизов');
+      }
+
+      async function publishSwatTeamOnlyPost(){
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+
+        const baseText = collectRunCreatorCopyMessage();
+        const leadTag = getSwatShiftLeadTag();
+        const text = `${baseText}\n\nSWAT${leadTag ? `\n${leadTag}` : ''}`.trim();
+        if(!text){
+          throw new Error('Не найден текст для копирования после создания рана.');
+        }
+
+        await bandCreatePost(text, cfg, null, {
+          channelId: SWAT_TEAM_ONLY_CHANNEL_ID
+        });
+
+        runCreatorInfo('SWAT Team Only: сообщение опубликовано', { kind: 'ok' });
+        showToast('Опубликовано в SWAT Team Only');
+      }
+
       async function publishPing(){
-        const text = String(pingMessage.value || '').trim();
+        const text = getMajorPingText();
         if(!text) throw new Error('Текст пинга пуст');
 
         const cfg = collectSettings();
@@ -1909,7 +2884,7 @@
         const rows = buildRows(streams, duties, leadIndex, excludeSet);
 
         renderResults(rows);
-        pingMessage.value = buildPingRequestMessageForMissing(rows);
+        setMajorPingText(buildPingRequestMessageForMissing(rows));
 
         const handles = extractHandles(duties);
         renderCandidates(handles);
@@ -2012,6 +2987,24 @@
       function init(){
         applySettings(loadSettings());
         applyDetailsState(loadDetailsState());
+        if(ytTokenInput){
+          ytTokenInput.value = getYtTokenFromStorage();
+        }
+        if(runReleaseInput){
+          try{
+            runReleaseInput.value = String(localStorage.getItem(LS_RUN_RELEASE_KEY) || '');
+          }catch(_){
+            runReleaseInput.value = '';
+          }
+        }
+        if(runBuildInput){
+          try{
+            runBuildInput.value = String(localStorage.getItem(LS_RUN_BUILD_KEY) || '');
+          }catch(_){
+            runBuildInput.value = '';
+          }
+        }
+        setRunMode('');
 
         for(const key of SETTINGS_FIELDS){
           const el = $(key);
@@ -2019,6 +3012,8 @@
           el.addEventListener('input', scheduleSave);
           el.addEventListener('change', saveSettings);
         }
+        ytTokenInput?.addEventListener('input', saveYtToken);
+        ytTokenInput?.addEventListener('change', saveYtToken);
 
         resultsCollapseBtn?.addEventListener('click', () => {
           appState.resultsCollapsed = !appState.resultsCollapsed;
@@ -2054,21 +3049,72 @@
         refreshButtons();
 
         startBtn?.addEventListener('click', () => {
-          runCollection().catch((err) => {
-            log(`Ошибка запуска: ${err.message || err}`, 'err');
-            setStatus('Ошибка запуска', 'release-launch-status-err');
+          const mode = String(appState.currentMode || '');
+          if(!mode){
+            showToast('Выбери тип запуска', false);
+            return;
+          }
+          if(mode === RUN_MODE_MAJOR){
+            runCollection().catch((err) => {
+              log(`Ошибка запуска: ${err.message || err}`, 'err');
+              setStatus('Ошибка запуска', 'release-launch-status-err');
+            });
+            return;
+          }
+          runCreateLaunch().catch((err) => {
+            runCreatorInfo(`Ошибка: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
+            showToast('Ошибка создания рана', false);
           });
         });
         checkProxyBtn?.addEventListener('click', () => withButtonBusy(checkProxyBtn, 'Проверяю...', checkProxy).catch((err) => {
           log(`Проверка proxy: ${err.message || err}`, 'err');
           showToast('Прокси не отвечает', false);
         }));
+        runPushSwatBtn?.addEventListener('click', () => withButtonBusy(runPushSwatBtn, 'Публикую...', publishSwatTeamOnlyPost).catch((err) => {
+          runCreatorInfo(`SWAT Team Only: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
+          showToast(err.message || 'Ошибка публикации', false);
+        }));
+        runPushReleaseFeedBtn?.addEventListener('click', () => withButtonBusy(runPushReleaseFeedBtn, 'Публикую...', publishReleaseFeedPosts).catch((err) => {
+          runCreatorInfo(`Лента релизов: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
+          showToast(err.message || 'Ошибка публикации', false);
+        }));
         stopBtn?.addEventListener('click', () => {
           if(appState.abortController){
             appState.abortController.abort();
           }
         });
-
+        for(const btn of runModeButtons){
+          btn.addEventListener('click', () => {
+            if(btn.disabled) return;
+            setRunMode(String(btn.getAttribute('data-run-mode') || ''));
+          });
+        }
+        for(const btn of majorViewButtons){
+          btn.addEventListener('click', () => {
+            if(appState.currentMode !== RUN_MODE_MAJOR) return;
+            const value = String(btn.getAttribute('data-major-view') || '');
+            setMajorView(appState.majorView === value ? '' : value);
+          });
+        }
+        runModeSelect?.addEventListener('change', () => {
+          setRunMode(runModeSelect.value);
+        });
+        runReleaseInput?.addEventListener('input', () => {
+          try{
+            localStorage.setItem(LS_RUN_RELEASE_KEY, String(runReleaseInput.value || '').trim());
+          }catch(_){ }
+        });
+        runBuildInput?.addEventListener('input', () => {
+          try{
+            localStorage.setItem(LS_RUN_BUILD_KEY, String(runBuildInput.value || '').trim());
+          }catch(_){ }
+        });
+        swatLeadViktor?.addEventListener('change', () => {
+          handleSwatShiftLeadChange('viktor');
+        });
+        swatLeadRoman?.addEventListener('change', () => {
+          handleSwatShiftLeadChange('roman');
+        });
         pingMessage?.addEventListener('input', refreshButtons);
         resultsCopyBtn?.addEventListener('click', copyCurrentDutiesMessage);
         copyPingBtn?.addEventListener('click', copyPingMessage);
