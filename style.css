@@ -2847,6 +2847,13 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   border-color:transparent;
   box-shadow:0 10px 24px rgba(203,17,171,.24);
 }
+.release-launch .release-launch-mode-tab.is-active:disabled{
+  color:#fff;
+  background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+  border-color:transparent;
+  box-shadow:0 10px 24px rgba(203,17,171,.24);
+  opacity:1;
+}
 .release-launch .release-launch-mode-tab:disabled{
   background:#f8fafc;
   color:#94a3b8;
@@ -2903,15 +2910,61 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   display:block;
   width:100%;
 }
+.release-launch .release-launch-run-fields{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:10px;
+  width:100%;
+  max-width:1040px;
+}
 .release-launch .release-launch-run-release-field{
   width:100%;
   max-width:340px;
+}
+.release-launch .release-launch-run-fields .release-launch-run-release-field{
+  max-width:none;
+}
+.release-launch .release-launch-run-shift-field{
+  min-width:0;
 }
 .release-launch .release-launch-run-release-field .input{
   height:34px;
   padding:.38rem .58rem;
   border-radius:10px;
   font-size:12px;
+}
+.release-launch .release-launch-check-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  min-height:34px;
+}
+.release-launch .release-launch-check-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  min-height:34px;
+  padding:.38rem .66rem;
+  border-radius:10px;
+  border:1px solid #e2e8f0;
+  background:#fff;
+  color:#334155;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.release-launch .release-launch-check-chip input{
+  margin:0;
+  accent-color:#2563eb;
+}
+.release-launch .release-launch-check-chip input:disabled{
+  cursor:not-allowed;
+}
+.release-launch .release-launch-check-chip:has(input:disabled){
+  background:#f8fafc;
+  color:#94a3b8;
+  cursor:not-allowed;
 }
 .release-launch .release-launch-run-btn{
   min-width:120px;
@@ -3015,6 +3068,10 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   }
   .release-launch .release-launch-run-release-field{
     width:100%;
+    max-width:100%;
+  }
+  .release-launch .release-launch-run-fields{
+    grid-template-columns:1fr;
     max-width:100%;
   }
   .release-launch .release-launch-publish-side{

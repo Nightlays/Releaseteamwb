@@ -73,10 +73,29 @@
             </label>
 
             <div id="runExtraControls" class="release-launch-run-main" style="display:none;">
-              <label class="release-launch-field release-launch-run-release-field">
-                <span class="release-launch-label">Номер релиза</span>
-                <input id="runReleaseInput" class="input" type="text" placeholder="например: 7.3.1000" />
-              </label>
+              <div class="release-launch-run-fields">
+                <label class="release-launch-field release-launch-run-release-field">
+                  <span class="release-launch-label">Номер релиза</span>
+                  <input id="runReleaseInput" class="input" type="text" placeholder="например: 7.3.1000" />
+                </label>
+                <div class="release-launch-field release-launch-run-release-field release-launch-run-shift-field">
+                  <span class="release-launch-label">Старший смены:</span>
+                  <div class="release-launch-check-row" role="group" aria-label="Старший смены">
+                    <label class="release-launch-check-chip">
+                      <input id="swatLeadViktor" type="checkbox" />
+                      <span>Виктор</span>
+                    </label>
+                    <label class="release-launch-check-chip">
+                      <input id="swatLeadRoman" type="checkbox" />
+                      <span>Роман</span>
+                    </label>
+                  </div>
+                </div>
+                <label id="runBuildField" class="release-launch-field release-launch-run-release-field" style="display:none;">
+                  <span class="release-launch-label">Сборка</span>
+                  <input id="runBuildInput" class="input" type="text" placeholder="ссылка или номер сборки" />
+                </label>
+              </div>
             </div>
 
             <div class="release-launch-status-row">
@@ -87,9 +106,9 @@
 
           <div class="release-launch-params-right">
             <div class="release-launch-params-actions">
-              <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
-              <button id="checkProxyBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">Проверить прокси</button>
+              <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить</button>
               <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Остановить</button>
+              <button id="checkProxyBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">Проверить прокси</button>
 
               <div id="runPublishControls" class="release-launch-publish-side" style="display:none;">
                 <div class="release-launch-publish-side-row">
@@ -109,76 +128,84 @@
       </section>
 
       <div id="majorReleaseLayout" class="space-y-4">
-
-        <section class="card p-5 space-y-4">
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <h2 class="text-lg font-semibold">Результат сбора</h2>
-  		          <div class="flex items-center gap-2 flex-wrap">
-  		            <div class="release-launch-kpis">
-  		              <span class="chip">Стримов: <b id="kpiStreams">0</b></span>
-  		              <span class="chip">Заполнено: <b id="kpiFilled">0</b></span>
-  		              <span class="chip">С пропусками: <b id="kpiMissing">0</b></span>
-  		            </div>
-  		            <button id="resultsCopyBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white">
-  		              Копировать
-  		            </button>
-  		            <button id="resultsCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
-  		              <span id="resultsCollapseIco" aria-hidden="true">▾</span>
-  		              <span id="resultsCollapseText">Скрыть</span>
-  		            </button>
-  		          </div>
+        <section class="card p-3 space-y-3">
+          <div class="release-launch-mode-tabs release-launch-major-view-tabs" role="group" aria-label="Раздел мажорного релиза">
+            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="collection" aria-pressed="false">Сбор дежурных</button>
+            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="message" aria-pressed="false">Сообщение</button>
+            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="push" aria-pressed="false">Пуш</button>
           </div>
+          <div id="majorReleaseEmptyState" class="release-launch-status release-launch-status-muted">Выбери раздел мажорного релиза</div>
+        </section>
 
-          <div id="resultsBody" class="space-y-4">
-            <div id="resultsEmpty" class="release-launch-empty">Данные появятся после запуска сбора</div>
-
-            <div id="resultsWrap" class="release-launch-table-wrap" style="display:none;">
-              <table id="resultsTable">
-                <thead>
-                  <tr>
-                    <th style="width:58px;">#</th>
-                    <th>Стрим</th>
-                    <th>iOS</th>
-                    <th>Android</th>
-                    <th>Лид</th>
-                    <th style="width:130px;">Статус</th>
-                  </tr>
-                </thead>
-                <tbody id="resultsTbody"></tbody>
-              </table>
+        <div id="majorCollectionSection" class="space-y-4" style="display:none;">
+          <section class="card p-5 space-y-4">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <h2 class="text-lg font-semibold">Результат сбора</h2>
+    		          <div class="flex items-center gap-2 flex-wrap">
+    		            <div class="release-launch-kpis">
+    		              <span class="chip">Стримов: <b id="kpiStreams">0</b></span>
+    		              <span class="chip">Заполнено: <b id="kpiFilled">0</b></span>
+    		              <span class="chip">С пропусками: <b id="kpiMissing">0</b></span>
+    		            </div>
+    		            <button id="resultsCopyBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white">
+    		              Копировать
+    		            </button>
+    		            <button id="resultsCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
+    		              <span id="resultsCollapseIco" aria-hidden="true">▾</span>
+    		              <span id="resultsCollapseText">Скрыть</span>
+    		            </button>
+    		          </div>
             </div>
-          </div>
-        </section>
 
-        <section class="card p-5 space-y-4">
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <h2 class="text-lg font-semibold">Пошаговый запуск</h2>
-            <button id="workflowResetBtn" type="button" class="btn btn-soft">Сбросить шаги</button>
-          </div>
-          <div id="workflowHint" class="release-launch-status release-launch-status-muted">Сначала нажми «Запустить», затем проходи шаги по порядку.</div>
-          <div id="workflowList" class="space-y-2"></div>
-        </section>
+            <div id="resultsBody" class="space-y-4">
+              <div id="resultsEmpty" class="release-launch-empty">Данные появятся после запуска сбора</div>
 
-        <section class="card p-5 space-y-4">
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <h2 class="text-lg font-semibold">Пинги и постинг</h2>
-            <button id="pingCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
-              <span id="pingCollapseIco" aria-hidden="true">▾</span>
-              <span id="pingCollapseText">Скрыть</span>
-            </button>
-          </div>
-          <div id="pingBody" class="space-y-4">
-            <textarea id="pingMessage" class="input release-launch-textarea release-launch-ping" placeholder="Текст пинга сформируется автоматически"></textarea>
-            <div class="release-launch-actions">
-              <button id="copyPingBtn" type="button" class="btn btn-soft">Копировать текст</button>
+              <div id="resultsWrap" class="release-launch-table-wrap" style="display:none;">
+                <table id="resultsTable">
+                  <thead>
+                    <tr>
+                      <th style="width:58px;">#</th>
+                      <th>Стрим</th>
+                      <th>iOS</th>
+                      <th>Android</th>
+                      <th>Лид</th>
+                      <th style="width:130px;">Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultsTbody"></tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="card p-5 space-y-3">
-          <h2 class="text-lg font-semibold">Логи</h2>
-          <div id="logs" class="release-launch-log"></div>
-        </section>
+          <section class="card p-5 space-y-4">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <h2 class="text-lg font-semibold">Пошаговый запуск</h2>
+              <button id="workflowResetBtn" type="button" class="btn btn-soft">Сбросить шаги</button>
+            </div>
+            <div id="workflowHint" class="release-launch-status release-launch-status-muted">Сначала нажми «Запустить», затем проходи шаги по порядку.</div>
+            <div id="workflowList" class="space-y-2"></div>
+          </section>
+
+          <section class="card p-5 space-y-3">
+            <h2 class="text-lg font-semibold">Логи</h2>
+            <div id="logs" class="release-launch-log"></div>
+          </section>
+        </div>
+
+        <div id="majorMessageSection" class="space-y-4" style="display:none;">
+          <section class="card p-5 space-y-3">
+            <h2 class="text-lg font-semibold">Сообщение</h2>
+            <div class="release-launch-status release-launch-status-muted">Пока пусто</div>
+          </section>
+        </div>
+
+        <div id="majorPushSection" class="space-y-4" style="display:none;">
+          <section class="card p-5 space-y-3">
+            <h2 class="text-lg font-semibold">Пуш</h2>
+            <div class="release-launch-status release-launch-status-muted">Пока пусто</div>
+          </section>
+        </div>
       </div>
 
       <div id="runCreateLayout" class="space-y-4" style="display:none;">
@@ -201,6 +228,7 @@
       const LS_SETTINGS_KEY = 'wb_release_launch_settings_v1';
       const LS_DETAILS_STATE_KEY = 'wb_release_launch_details_state_v1';
       const LS_RUN_RELEASE_KEY = 'wb_release_launch_run_release_v1';
+      const LS_RUN_BUILD_KEY = 'wb_release_launch_run_build_v1';
       const LS_YT_TOKEN_KEY = 'wb_all_table_yt_token';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
       const PROXY_BASE = 'http://localhost:8787';
@@ -286,12 +314,21 @@
       const workflowHint = $('workflowHint');
       const workflowResetBtn = $('workflowResetBtn');
       const majorReleaseLayout = $('majorReleaseLayout');
+      const majorReleaseEmptyState = $('majorReleaseEmptyState');
+      const majorCollectionSection = $('majorCollectionSection');
+      const majorMessageSection = $('majorMessageSection');
+      const majorPushSection = $('majorPushSection');
+      const majorViewButtons = Array.from(document.querySelectorAll('.release-launch-major-view-tab[data-major-view]'));
       const runCreateLayout = $('runCreateLayout');
       const runExtraControls = $('runExtraControls');
       const runPublishControls = $('runPublishControls');
       const runModeSelect = $('runModeSelect');
       const runModeButtons = Array.from(document.querySelectorAll('.release-launch-mode-tab[data-run-mode]'));
       const runReleaseInput = $('runReleaseInput');
+      const runBuildField = $('runBuildField');
+      const runBuildInput = $('runBuildInput');
+      const swatLeadViktor = $('swatLeadViktor');
+      const swatLeadRoman = $('swatLeadRoman');
       const runPushSwatBtn = $('runPushSwatBtn');
       const runPushReleaseFeedBtn = $('runPushReleaseFeedBtn');
       const runCreateError = $('runCreateError');
@@ -319,6 +356,8 @@
         workflowPingFound: false,
         runCreateRunning: false,
         currentMode: '',
+        majorView: '',
+        majorPingText: '',
         ytBoardInfoCache: new Map()
       };
 
@@ -436,7 +475,39 @@
       }
 
       function getStartButtonLabel(mode){
-        return mode === RUN_MODE_MAJOR ? 'Запустить сбор' : 'Запустить';
+        return 'Запустить';
+      }
+
+      function isRunBuildMode(mode){
+        return mode === '1' || mode === '2' || mode === '5' || mode === '6';
+      }
+
+      function getRunBuildValue(){
+        return runBuildInput ? String(runBuildInput.value || '').trim() : '';
+      }
+
+      function getMajorPingText(){
+        return String(appState.majorPingText || '').trim();
+      }
+
+      function setMajorPingText(text){
+        appState.majorPingText = String(text || '');
+        if(pingMessage) pingMessage.value = appState.majorPingText;
+      }
+
+      function getSwatShiftLeadTag(){
+        if(swatLeadViktor && swatLeadViktor.checked) return '@dolgov.viktor7';
+        if(swatLeadRoman && swatLeadRoman.checked) return '@kolosov.roman';
+        return '';
+      }
+
+      function handleSwatShiftLeadChange(kind){
+        if(kind === 'viktor' && swatLeadViktor && swatLeadViktor.checked && swatLeadRoman){
+          swatLeadRoman.checked = false;
+        }
+        if(kind === 'roman' && swatLeadRoman && swatLeadRoman.checked && swatLeadViktor){
+          swatLeadViktor.checked = false;
+        }
       }
 
       function syncRunModeTabs(){
@@ -448,19 +519,52 @@
         }
       }
 
+      function syncMajorViewState(){
+        const isMajor = appState.currentMode === RUN_MODE_MAJOR;
+        const majorView = isMajor ? String(appState.majorView || '') : '';
+
+        for(const btn of majorViewButtons){
+          const view = String(btn.getAttribute('data-major-view') || '');
+          const active = majorView && view === majorView;
+          btn.classList.toggle('is-active', !!active);
+          btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        }
+
+        if(majorReleaseEmptyState) majorReleaseEmptyState.style.display = isMajor && !majorView ? '' : 'none';
+        if(majorCollectionSection) majorCollectionSection.style.display = isMajor && majorView === 'collection' ? '' : 'none';
+        if(majorMessageSection) majorMessageSection.style.display = isMajor && majorView === 'message' ? '' : 'none';
+        if(majorPushSection) majorPushSection.style.display = isMajor && majorView === 'push' ? '' : 'none';
+      }
+
+      function setMajorView(view){
+        const value = view === 'collection' || view === 'message' || view === 'push' ? view : '';
+        appState.majorView = value;
+        syncMajorViewState();
+      }
+
       function setRunMode(mode){
+        const prevMode = appState.currentMode;
         const value = isRunModeSupported(mode) ? mode : '';
         appState.currentMode = value;
         const isMajor = value === RUN_MODE_MAJOR;
         const isEmpty = value === '';
         const isNonMajor = !isMajor && !isEmpty;
+        const isBuildMode = isRunBuildMode(value);
 
         if(runModeSelect) runModeSelect.value = value;
         syncRunModeTabs();
         if(runExtraControls) runExtraControls.style.display = isNonMajor ? '' : 'none';
+        if(runBuildField) runBuildField.style.display = isBuildMode ? '' : 'none';
         if(runPublishControls) runPublishControls.style.display = isNonMajor ? '' : 'none';
         if(majorReleaseLayout) majorReleaseLayout.style.display = isMajor ? '' : 'none';
         if(runCreateLayout) runCreateLayout.style.display = isNonMajor ? '' : 'none';
+        if(isMajor){
+          if(prevMode !== RUN_MODE_MAJOR) setMajorView('');
+          else syncMajorViewState();
+        }else{
+          appState.majorView = '';
+          syncMajorViewState();
+        }
 
         if(checkProxyBtn) checkProxyBtn.style.display = '';
         if(!isMajor && stopBtn){
@@ -607,7 +711,31 @@
         return `Ран: <a href="${url}" target="_blank" rel="noopener noreferrer">${escHtml(launchName)}</a>`;
       }
 
-      async function runCreatorScenario(mode, release, signal){
+      function runCreatorEmitBuildSection(buildValue, runs){
+        const runList = (Array.isArray(runs) ? runs : [runs]).filter(Boolean);
+        const buildText = String(buildValue || '').trim();
+        if(buildText){
+          runCreatorInfo(`Сборка: ${buildText}`);
+          for(const run of runList){
+            if(run) runCreatorInfo(runCreatorLaunchLink(run), { html: true });
+          }
+          return;
+        }
+        if(runList.length){
+          const [firstRun, ...restRuns] = runList;
+          runCreatorInfo(`Сборка: ${runCreatorLaunchLink(firstRun)}`, { html: true });
+          for(const run of restRuns){
+            if(run) runCreatorInfo(runCreatorLaunchLink(run), { html: true });
+          }
+          return;
+        }
+        runCreatorInfo('Сборка:');
+        for(const run of runList){
+          if(run) runCreatorInfo(runCreatorLaunchLink(run), { html: true });
+        }
+      }
+
+      async function runCreatorScenario(mode, release, buildValue, signal){
         runCreatorClearError();
         runCreatorResetLog();
 
@@ -628,8 +756,7 @@
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
           runCreatorInfo(`Привет, новый крит-путь для ХФ Android, релиз ${release}`);
-          runCreatorInfo('Сборка:');
-          runCreatorInfo(runCreatorLaunchLink(run), { html: true });
+          runCreatorEmitBuildSection(buildValue, run);
           return;
         }
 
@@ -640,8 +767,7 @@
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
           runCreatorInfo(`Привет, новый крит-путь для ХФ iOS, релиз ${release}`);
-          runCreatorInfo('Сборка:');
-          runCreatorInfo(runCreatorLaunchLink(run), { html: true });
+          runCreatorEmitBuildSection(buildValue, run);
           return;
         }
 
@@ -670,10 +796,7 @@
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
           runCreatorInfo(`Привет, новый регресс для NAPI, релиз ${release}`);
-          runCreatorInfo('Сборка:');
-          runCreatorInfo(runCreatorLaunchLink(run1), { html: true });
-          runCreatorInfo(runCreatorLaunchLink(run2), { html: true });
-          runCreatorInfo(runCreatorLaunchLink(run3), { html: true });
+          runCreatorEmitBuildSection(buildValue, [run1, run2, run3]);
           return;
         }
 
@@ -697,11 +820,7 @@
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
           runCreatorInfo(`Привет, новые воскресные раны устройств, релиз ${release}`);
-          runCreatorInfo('Сборка:');
-          runCreatorInfo(runCreatorLaunchLink(runAOld), { html: true });
-          runCreatorInfo(runCreatorLaunchLink(runAFold), { html: true });
-          runCreatorInfo(runCreatorLaunchLink(runIOld), { html: true });
-          runCreatorInfo(runCreatorLaunchLink(runIpad), { html: true });
+          runCreatorEmitBuildSection(buildValue, [runAOld, runAFold, runIOld, runIpad]);
           return;
         }
 
@@ -719,10 +838,8 @@
 
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
-          runCreatorInfo(`Привет, новый крит-путь для ХФ Android, релиз ${release}`);
-          runCreatorInfo('Сборка:');
-          runCreatorInfo(runCreatorLaunchLink(runApp), { html: true });
-          runCreatorInfo(runCreatorLaunchLink(runRu), { html: true });
+          runCreatorInfo(`Привет, новый крит-путь для RuStore / AppGallery, релиз ${release}`);
+          runCreatorEmitBuildSection(buildValue, [runApp, runRu]);
           return;
         }
 
@@ -740,10 +857,8 @@
 
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
-          runCreatorInfo(`Привет, новый Smoke для ХФ Android, релиз ${release}`);
-          runCreatorInfo('Сборка:');
-          runCreatorInfo(runCreatorLaunchLink(runRuSmoke), { html: true });
-          runCreatorInfo(runCreatorLaunchLink(runAppSmoke), { html: true });
+          runCreatorInfo(`Привет, новый Smoke для RuStore / AppGallery, релиз ${release}`);
+          runCreatorEmitBuildSection(buildValue, [runRuSmoke, runAppSmoke]);
           return;
         }
 
@@ -1102,7 +1217,7 @@
       async function runWorkflowStepAction(action){
         if(action === 'publishPing'){
           if(!appState.lastRun) throw new Error('Сначала запусти сбор');
-          if(!String(pingMessage.value || '').trim()){
+          if(!getMajorPingText()){
             log('[Шаг 1] Публикация запроса не требуется: все дежурные найдены.', 'ok');
             showToast('Шаг 1: публикация не требуется');
             return;
@@ -2169,6 +2284,7 @@
         const locked = appState.running || appState.workflowRunning || appState.runCreateRunning;
         const isNonMajor = hasMode && !isMajor;
         const isReleaseFeedBlockedMode = appState.currentMode === '3' || appState.currentMode === '4';
+        const isBuildMode = isRunBuildMode(appState.currentMode);
         if(runModeSelect) runModeSelect.disabled = locked;
         for(const btn of runModeButtons){
           btn.disabled = locked;
@@ -2176,6 +2292,9 @@
         if(startBtn) startBtn.disabled = locked || !hasMode;
         if(checkProxyBtn) checkProxyBtn.disabled = locked;
         if(runReleaseInput) runReleaseInput.disabled = locked || isMajor || !hasMode;
+        if(runBuildInput) runBuildInput.disabled = locked || !isBuildMode || !hasMode;
+        if(swatLeadViktor) swatLeadViktor.disabled = locked || !isNonMajor;
+        if(swatLeadRoman) swatLeadRoman.disabled = locked || !isNonMajor;
         if(runPushSwatBtn) runPushSwatBtn.disabled = locked || !isNonMajor;
         if(runPushReleaseFeedBtn) runPushReleaseFeedBtn.disabled = locked || !isNonMajor || isReleaseFeedBlockedMode;
       }
@@ -2251,7 +2370,7 @@
         kpiFilled.textContent = '0';
         kpiMissing.textContent = '0';
 
-        pingMessage.value = '';
+        setMajorPingText('');
         appState.lastRun = null;
         appState.androidIdMap = {};
         appState.iosIdMap = {};
@@ -2262,12 +2381,8 @@
       function setRunning(running){
         appState.running = !!running;
         if(startBtn){
-          startBtn.style.display = '';
-          if(running){
-            startBtn.textContent = 'Сбор запущен';
-          }else{
-            startBtn.textContent = getStartButtonLabel(appState.currentMode);
-          }
+          startBtn.style.display = running ? 'none' : '';
+          startBtn.textContent = getStartButtonLabel(appState.currentMode);
         }
         stopBtn.style.display = running ? '' : 'none';
         if(checkProxyBtn) checkProxyBtn.disabled = running;
@@ -2277,7 +2392,7 @@
           if(el) el.disabled = running;
         }
 
-        copyPingBtn.disabled = running;
+        if(copyPingBtn) copyPingBtn.disabled = running;
         if(resultsCopyBtn) resultsCopyBtn.disabled = running;
         renderWorkflow();
         refreshModeControls();
@@ -2352,7 +2467,7 @@
           renderResults(rows);
 
           const pingText = buildPingRequestMessageForMissing(rows);
-          pingMessage.value = pingText;
+          setMajorPingText(pingText);
 
           const handles = extractHandles(duties);
           renderCandidates(handles);
@@ -2407,18 +2522,20 @@
         }
 
         const release = runReleaseInput ? String(runReleaseInput.value || '').trim() : '';
+        const buildValue = getRunBuildValue();
         if(!release){
           throw new Error('Номер релиза не должен быть пустым.');
         }
 
         try{
           localStorage.setItem(LS_RUN_RELEASE_KEY, release);
+          localStorage.setItem(LS_RUN_BUILD_KEY, buildValue);
         }catch(_){ }
 
         setRunCreateRunning(true);
         runCreatorClearError();
         try{
-          await runCreatorScenario(mode, release);
+          await runCreatorScenario(mode, release, buildValue);
           showToast('Раны созданы');
         }catch(error){
           runCreatorShowError(error);
@@ -2429,7 +2546,7 @@
       }
 
       async function copyPingMessage(){
-        const text = String(pingMessage.value || '').trim();
+        const text = getMajorPingText();
         if(!text){
           showToast('Текст пинга пуст', false);
           return;
@@ -2439,9 +2556,16 @@
           await navigator.clipboard.writeText(text);
           showToast('Текст скопирован');
         }catch(_){
-          pingMessage.focus();
-          pingMessage.select();
+          const area = document.createElement('textarea');
+          area.value = text;
+          area.setAttribute('readonly', 'readonly');
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          document.body.appendChild(area);
+          area.focus();
+          area.select();
           document.execCommand('copy');
+          area.remove();
           showToast('Текст скопирован');
         }
       }
@@ -2530,29 +2654,43 @@
         if(markerIdx < 0) return '';
 
         const out = [];
+        let pendingBuildPrefix = false;
         for(let i = markerIdx + 1; i < lines.length; i += 1){
           const line = String(lines[i] || '').trim();
+          if(/^Лента релизов:/.test(line) || /^SWAT Team Only:/.test(line)){
+            break;
+          }
+          if(line === 'Сборка:'){
+            pendingBuildPrefix = true;
+            continue;
+          }
           if(!line){
+            if(pendingBuildPrefix){
+              continue;
+            }
             if(out.length && out[out.length - 1] !== ''){
               out.push('');
             }
             continue;
           }
-          if(line === 'Сборка:'){
+          if(pendingBuildPrefix){
+            out.push(`Сборка: ${line}`);
+            pendingBuildPrefix = false;
             continue;
           }
-          if(/^Лента релизов:/.test(line) || /^SWAT Team Only:/.test(line)){
-            break;
-          }
           out.push(line);
+        }
+        if(pendingBuildPrefix){
+          out.push('Сборка:');
         }
 
         return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
       }
 
-      function buildReleaseFeedThreadMessage(release, runRef, boardUrl, releaseTaskRef){
+      function buildReleaseFeedThreadMessage(release, runRef, boardUrl, releaseTaskRef, buildValue){
         const today = formatMskDateDot(new Date());
-        return [
+        const buildText = String(buildValue || '').trim();
+        const lines = [
           `OS версия: ${release}`,
           `Ссылка на доску: ${String(boardUrl || '').trim()}`,
           '',
@@ -2562,12 +2700,13 @@
           `Сроки выкатки: ${today}`,
           `Ориентировочное время старта регресса: ${today}`,
           `Ожидаемое время окончания проверки: ${today}`,
-          'Сборка:',
-          `Ран: [${runRef.name}](${runRef.url})`
-        ].join('\n');
+          buildText ? `Сборка: ${buildText}` : 'Сборка:'
+        ];
+        lines.push(`Ран: [${runRef.name}](${runRef.url})`);
+        return lines.join('\n');
       }
 
-      function buildReleaseFeedPosts(mode, release, runRefs, boardUrl, releaseTaskRef){
+      function buildReleaseFeedPosts(mode, release, runRefs, boardUrl, releaseTaskRef, buildValue){
         const refs = Array.isArray(runRefs) ? runRefs : [];
         const findBy = (predicate) => refs.find((item) => predicate(String(item.name || '')));
         const out = [];
@@ -2577,7 +2716,7 @@
           if(!androidRun) throw new Error('Не нашёл ссылку на ран Android в текущем логе.');
           out.push({
             rootMessage: `#Android #Hotfix ${release}`,
-            threadMessage: buildReleaseFeedThreadMessage(release, androidRun, boardUrl, releaseTaskRef)
+            threadMessage: buildReleaseFeedThreadMessage(release, androidRun, boardUrl, releaseTaskRef, buildValue)
           });
           return out;
         }
@@ -2587,7 +2726,7 @@
           if(!iosRun) throw new Error('Не нашёл ссылку на ран iOS в текущем логе.');
           out.push({
             rootMessage: `#iOS #Hotfix ${release}`,
-            threadMessage: buildReleaseFeedThreadMessage(release, iosRun, boardUrl, releaseTaskRef)
+            threadMessage: buildReleaseFeedThreadMessage(release, iosRun, boardUrl, releaseTaskRef, buildValue)
           });
           return out;
         }
@@ -2600,11 +2739,11 @@
           }
           out.push({
             rootMessage: `#Android #Release #Huawei ${release}`,
-            threadMessage: buildReleaseFeedThreadMessage(release, huaweiRun, boardUrl, releaseTaskRef)
+            threadMessage: buildReleaseFeedThreadMessage(release, huaweiRun, boardUrl, releaseTaskRef, buildValue)
           });
           out.push({
             rootMessage: `#Android #Release #Rustore ${release}`,
-            threadMessage: buildReleaseFeedThreadMessage(release, rustoreRun, boardUrl, releaseTaskRef)
+            threadMessage: buildReleaseFeedThreadMessage(release, rustoreRun, boardUrl, releaseTaskRef, buildValue)
           });
           return out;
         }
@@ -2621,12 +2760,13 @@
 
         const cfg = collectSettings();
         ensureReleaseFeedFields(cfg);
+        const buildValue = getRunBuildValue();
 
         const [boardUrl, releaseTaskRef] = await Promise.all([
           fetchReleaseBoardUrl(mode, release, null),
           fetchReleaseTicketRef(mode, release, null)
         ]);
-        const posts = buildReleaseFeedPosts(mode, release, collectRunCreatorLinks(), boardUrl, releaseTaskRef);
+        const posts = buildReleaseFeedPosts(mode, release, collectRunCreatorLinks(), boardUrl, releaseTaskRef, buildValue);
         if(!posts.length){
           throw new Error('Нет данных для публикации в ленту релизов.');
         }
@@ -2658,7 +2798,8 @@
         ensureReleaseFeedFields(cfg);
 
         const baseText = collectRunCreatorCopyMessage();
-        const text = `${baseText}\n\nSWAT`.trim();
+        const leadTag = getSwatShiftLeadTag();
+        const text = `${baseText}\n\nSWAT${leadTag ? `\n${leadTag}` : ''}`.trim();
         if(!text){
           throw new Error('Не найден текст для копирования после создания рана.');
         }
@@ -2672,7 +2813,7 @@
       }
 
       async function publishPing(){
-        const text = String(pingMessage.value || '').trim();
+        const text = getMajorPingText();
         if(!text) throw new Error('Текст пинга пуст');
 
         const cfg = collectSettings();
@@ -2743,7 +2884,7 @@
         const rows = buildRows(streams, duties, leadIndex, excludeSet);
 
         renderResults(rows);
-        pingMessage.value = buildPingRequestMessageForMissing(rows);
+        setMajorPingText(buildPingRequestMessageForMissing(rows));
 
         const handles = extractHandles(duties);
         renderCandidates(handles);
@@ -2856,6 +2997,13 @@
             runReleaseInput.value = '';
           }
         }
+        if(runBuildInput){
+          try{
+            runBuildInput.value = String(localStorage.getItem(LS_RUN_BUILD_KEY) || '');
+          }catch(_){
+            runBuildInput.value = '';
+          }
+        }
         setRunMode('');
 
         for(const key of SETTINGS_FIELDS){
@@ -2941,6 +3089,13 @@
             setRunMode(String(btn.getAttribute('data-run-mode') || ''));
           });
         }
+        for(const btn of majorViewButtons){
+          btn.addEventListener('click', () => {
+            if(appState.currentMode !== RUN_MODE_MAJOR) return;
+            const value = String(btn.getAttribute('data-major-view') || '');
+            setMajorView(appState.majorView === value ? '' : value);
+          });
+        }
         runModeSelect?.addEventListener('change', () => {
           setRunMode(runModeSelect.value);
         });
@@ -2948,6 +3103,17 @@
           try{
             localStorage.setItem(LS_RUN_RELEASE_KEY, String(runReleaseInput.value || '').trim());
           }catch(_){ }
+        });
+        runBuildInput?.addEventListener('input', () => {
+          try{
+            localStorage.setItem(LS_RUN_BUILD_KEY, String(runBuildInput.value || '').trim());
+          }catch(_){ }
+        });
+        swatLeadViktor?.addEventListener('change', () => {
+          handleSwatShiftLeadChange('viktor');
+        });
+        swatLeadRoman?.addEventListener('change', () => {
+          handleSwatShiftLeadChange('roman');
         });
         pingMessage?.addEventListener('input', refreshButtons);
         resultsCopyBtn?.addEventListener('click', copyCurrentDutiesMessage);
