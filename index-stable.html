@@ -1179,11 +1179,14 @@ table { font-size: 13.5px; }
     position:fixed;
     inset:0;
     display:none;
-    align-items:center;
+    align-items:flex-start;
     justify-content:center;
     padding:24px;
     background:rgba(20, 14, 37, .24);
     backdrop-filter:blur(12px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
     z-index:4000;
     isolation:isolate;
   }
@@ -1198,6 +1201,7 @@ table { font-size: 13.5px; }
     max-height:calc(100vh - 32px);
     display:flex;
     flex-direction:column;
+    min-height:0;
     background:var(--card);
     border:1px solid var(--line);
     border-radius:24px;
@@ -1235,9 +1239,15 @@ table { font-size: 13.5px; }
     line-height:1;
   }
   .shell-modal-body{
+    flex:1 1 auto;
+    min-height:0;
     padding:18px 24px 24px;
     overflow:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
     display:grid;
+    align-items:start;
+    align-content:start;
     gap:16px;
   }
   .shell-modal-stack{
@@ -1247,6 +1257,8 @@ table { font-size: 13.5px; }
   .profile-directory-card{
     display:block;
     margin:0;
+    align-self:start;
+    overflow:visible;
   }
   .profile-user-grid{
     display:grid;
