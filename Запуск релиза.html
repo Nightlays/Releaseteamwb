@@ -106,7 +106,7 @@
 
           <div class="release-launch-params-right">
             <div class="release-launch-params-actions">
-              <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить</button>
+              <button id="startBtn" type="button" class="btn btn-grad w-full" style="display:none;">Запустить</button>
               <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Остановить</button>
               <button id="checkProxyBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">Проверить прокси</button>
 
@@ -235,8 +235,8 @@
       const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
       const BAND_POST_USER_ID = 'nibrb4qs8ty4zp61x1pgyeziqe';
       const BAND_CHANNEL_ID_FIXED = '6sqki85urpbfbqdkcdfen33owh';
-      const SWAT_TEAM_ONLY_CHANNEL_ID = '66nkpor99pbnpbhf4ffswmeqje';
-      const RELEASE_FEED_CHANNEL_ID = 'xofy3mzmijbxxmongme4pke4bc';
+      const SWAT_TEAM_ONLY_CHANNEL_ID = 'nq1amqo347gy9d46oe14zgs44w';
+      const RELEASE_FEED_CHANNEL_ID = 'tdj9ns46eprx8n5neupw8ejw9c';
       const GROUP_ANDROID_ID_FIXED = 'bbtekcuhfjykmm9awe56gebj9y';
       const GROUP_IOS_ID_FIXED = '6skkxrr3ufrkmy1u3paepd35ar';
       const YT_BASE_URL = 'https://youtrack.wildberries.ru';
@@ -571,7 +571,7 @@
           stopBtn.style.display = 'none';
         }
         if(startBtn){
-          startBtn.style.display = '';
+          startBtn.style.display = isEmpty ? 'none' : '';
           startBtn.textContent = getStartButtonLabel(value);
         }
 
@@ -2381,7 +2381,7 @@
       function setRunning(running){
         appState.running = !!running;
         if(startBtn){
-          startBtn.style.display = running ? 'none' : '';
+          startBtn.style.display = running ? 'none' : (String(appState.currentMode || '') ? '' : 'none');
           startBtn.textContent = getStartButtonLabel(appState.currentMode);
         }
         stopBtn.style.display = running ? '' : 'none';
