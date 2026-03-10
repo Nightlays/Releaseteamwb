@@ -2302,6 +2302,10 @@ table { font-size: 13.5px; }
 <script>
 (() => {
   const RB_CONFIG_URL = 'rb_roles_access.json';
+  const RB_REMOTE_CONFIG_URL = 'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec';
+  const RB_REMOTE_CONFIG_NAME = 'rb_roles_access.json';
+  const RB_PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
+  const RB_DEFAULT_PROXY_BASE = 'http://localhost:8787';
   const RB_CUSTOM_USERS_KEY = 'rb_custom_users_v1';
   const RB_FALLBACK_CONFIG = {
     roles: [
@@ -2521,6 +2525,123 @@ table { font-size: 13.5px; }
     return res.json();
   }
 
+  function normalizeRbacProxyBase(raw) {
+    try {
+      const abs = new URL(String(raw || '').trim(), window.location.href);
+      return abs.toString().replace(/\/+$/, '');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function readRbacRemoteProxyConfig() {
+    if (window.__RB_PROXY_CONFIG?.base) {
+      return {
+        base: normalizeRbacProxyBase(window.__RB_PROXY_CONFIG.base),
+        mode: window.__RB_PROXY_CONFIG.mode === 'prefix' ? 'prefix' : 'query',
+        useProxy: window.__RB_PROXY_CONFIG.useProxy !== false
+      };
+    }
+    try {
+      const raw = localStorage.getItem(RB_PROXY_RUNTIME_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const base = normalizeRbacProxyBase(parsed?.base || '');
+        if (base) {
+          return {
+            base,
+            mode: parsed?.mode === 'prefix' ? 'prefix' : 'query',
+            useProxy: parsed?.useProxy !== false
+          };
+        }
+      }
+    } catch (e) {}
+    return {
+      base: normalizeRbacProxyBase(RB_DEFAULT_PROXY_BASE),
+      mode: 'query',
+      useProxy: true
+    };
+  }
+
+  function buildRbacProxiedUrl(rawUrl) {
+    const cfg = readRbacRemoteProxyConfig();
+    if (!cfg?.useProxy || !cfg.base) return '';
+    const base = `${cfg.base}/`;
+    const clean = String(rawUrl || '').replace(/^https?:\/\//, '');
+    const isGAS = /^https:\/\/script\.google\.com\/macros\//i.test(String(rawUrl || ''));
+    if (isGAS || cfg.mode === 'prefix') {
+      return `${base}prefix/https://${clean}`;
+    }
+    return `${base}?url=${encodeURIComponent(rawUrl)}`;
+  }
+
+  async function rbacRemoteFetch(rawUrl, options = {}) {
+    const init = {
+      method: options.method || 'GET',
+      headers: {
+        Accept: 'application/json',
+        ...(options.headers || {})
+      },
+      body: options.body,
+      cache: 'no-store',
+      credentials: 'omit',
+      redirect: 'follow',
+      mode: 'cors'
+    };
+    try {
+      return await fetch(rawUrl, init);
+    } catch (directError) {
+      const proxiedUrl = buildRbacProxiedUrl(rawUrl);
+      if (!proxiedUrl) throw directError;
+      return fetch(proxiedUrl, init);
+    }
+  }
+
+  async function fetchConfigFromAppScript() {
+    const url = `${RB_REMOTE_CONFIG_URL}?op=get&name=${encodeURIComponent(RB_REMOTE_CONFIG_NAME)}`;
+    const res = await rbacRemoteFetch(url, { method: 'GET' });
+    const text = await res.text();
+    if (!res.ok && res.status !== 302) {
+      throw new Error(`Apps Script GET HTTP ${res.status}`);
+    }
+    if (!text.trim()) return null;
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      throw new Error('Apps Script вернул невалидный JSON');
+    }
+    if (Array.isArray(parsed)) return parsed.length ? parsed : null;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  }
+
+  async function persistConfigViaAppScript(payload) {
+    const url = `${RB_REMOTE_CONFIG_URL}?name=${encodeURIComponent(RB_REMOTE_CONFIG_NAME)}`;
+    const body = JSON.stringify(payload ?? {}, null, 2);
+    const res = await rbacRemoteFetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body
+    });
+    const text = await res.text();
+    if (!res.ok && res.status !== 302) {
+      throw new Error(`Apps Script SAVE HTTP ${res.status}: ${text.slice(0, 180)}`);
+    }
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && parsed.ok === false) {
+        throw new Error(parsed.error || 'Apps Script save error');
+      }
+    } catch (e) {
+      if (text.trim() && !/<!DOCTYPE html/i.test(text)) {
+        throw e;
+      }
+    }
+    return payload;
+  }
+
   async function pickExistingConfigFileHandle() {
     if (typeof window.showOpenFilePicker !== 'function') return null;
     const handles = await window.showOpenFilePicker({
@@ -2578,6 +2699,19 @@ table { font-size: 13.5px; }
     if (window.RB_CONFIG_PROMISE) return window.RB_CONFIG_PROMISE;
     window.RB_CONFIG_PROMISE = (async () => {
       try {
+        const remoteCfg = await fetchConfigFromAppScript();
+        if (remoteCfg) {
+          rbConfigSource = remoteCfg;
+          updateConfigMeta({
+            mode: 'apps-script',
+            canPersist: true,
+            sourceUrl: RB_REMOTE_CONFIG_URL
+          });
+          return refreshConfigSnapshot(remoteCfg);
+        }
+      } catch (e) {}
+
+      try {
         const fileCfg = await fetchConfigFrom(RB_CONFIG_URL);
         rbConfigSource = fileCfg;
         updateConfigMeta({
@@ -2609,17 +2743,30 @@ table { font-size: 13.5px; }
     let lastError = null;
 
     try {
+      savedPayload = await persistConfigViaAppScript(payload);
+      updateConfigMeta({
+        mode: 'apps-script',
+        canPersist: true,
+        sourceUrl: RB_REMOTE_CONFIG_URL
+      });
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (!savedPayload) {
+      try {
       savedPayload = await persistConfigViaFile(payload);
       updateConfigMeta({
         mode: 'shared-file',
         canPersist: true,
         sourceUrl: RB_CONFIG_URL
       });
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        throw new Error('Сохранение общего `rb_roles_access.json` отменено. Изменения остались только в текущем браузере.');
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          throw new Error('Сохранение общего `rb_roles_access.json` отменено. Изменения остались только в текущем браузере.');
+        }
+        lastError = error;
       }
-      lastError = error;
     }
 
     if (!savedPayload) {
@@ -2983,7 +3130,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
               <button class="btn-primary" id="createUserBtn" type="button" style="padding:10px 18px;">Создать пользователя</button>
             </div>
-            <div class="user-create-note">После создания пользователь сразу появится в списке ниже. Дальше можно сохранить ему индивидуальную роль и доступы, как в настройках `rb_roles_access.json`.</div>
+            <div class="user-create-note">После создания пользователь сразу появится в списке ниже. Дальше можно сохранить ему индивидуальную роль и доступы в App Script, с fallback на локальный `rb_roles_access.json`.</div>
           </div>
           <div class="role-access-grid" style="margin-top:12px;">
             <div class="role-list" id="userList"></div>
@@ -4300,7 +4447,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderUserList();
         renderUserEditor();
         renderTeamProfile();
-        const target = 'в `rb_roles_access.json`';
+        const target = persisted?.meta?.mode === 'apps-script' ? 'в App Script' : 'в `rb_roles_access.json`';
         showToast(`Настройки сохранены ${target}`);
       } catch (error) {
         showToast(error?.message || 'Настройки сохранены только локально', 'warning', { title: 'RBAC' });
@@ -4437,7 +4584,7 @@ document.addEventListener('DOMContentLoaded', () => {
           renderUserList();
           renderUserEditor();
           renderTeamProfile();
-          const suffix = 'и записан в `rb_roles_access.json`';
+          const suffix = persisted?.meta?.mode === 'apps-script' ? 'и сохранён в App Script' : 'и записан в `rb_roles_access.json`';
           showToast(`Пользователь ${login} создан ${suffix}`, 'success', { title: 'Пользователи' });
         } catch (persistError) {
           showToast(`Пользователь ${login} создан только локально. ${persistError?.message || ''}`.trim(), 'warning', { title: 'Пользователи' });
@@ -4487,7 +4634,7 @@ document.addEventListener('DOMContentLoaded', () => {
           applyRoleAccess(effectiveRole, currentUser);
         }
         const baseMessage = nextPass ? 'Роль, доступы и пароль обновлены' : 'Настройки сохранены';
-        const target = 'в `rb_roles_access.json`';
+        const target = persisted?.meta?.mode === 'apps-script' ? 'в App Script' : 'в `rb_roles_access.json`';
         showToast(`${baseMessage} ${target}`);
       } catch (error) {
         const baseMessage = nextPass ? 'Роль, доступы и пароль обновлены только локально' : 'Настройки сохранены только локально';
