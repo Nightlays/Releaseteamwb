@@ -1591,6 +1591,12 @@ table { font-size: 13.5px; }
   };
 
   let rbConfigSource = null;
+  let rbConfigFileHandle = null;
+  let rbConfigMeta = {
+    mode: 'fallback',
+    canPersist: typeof window.showSaveFilePicker === 'function',
+    sourceUrl: RB_CONFIG_URL
+  };
 
   function sanitizeUserRecord(raw) {
     const login = typeof raw?.login === 'string' ? raw.login.trim() : '';
@@ -1599,6 +1605,80 @@ table { font-size: 13.5px; }
     let role = typeof raw?.role === 'string' && raw.role.trim() ? raw.role.trim() : 'viewer';
     if (login !== 'Nightlays' && role === 'superadmin') role = 'admin';
     return { login, pass, role };
+  }
+
+  function sanitizeRoleRecord(raw) {
+    const id = typeof raw?.id === 'string' ? raw.id.trim() : '';
+    if (!id) return null;
+    const label = typeof raw?.label === 'string' && raw.label.trim() ? raw.label.trim() : id;
+    return { id, label };
+  }
+
+  function sanitizeRoleList(list) {
+    const source = Array.isArray(list) && list.length ? list : RB_FALLBACK_CONFIG.roles;
+    const seen = new Set();
+    const normalized = source
+      .map(sanitizeRoleRecord)
+      .filter(Boolean)
+      .filter((role) => {
+        const key = role.id.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    return normalized.length ? normalized : RB_FALLBACK_CONFIG.roles.map(role => ({ ...role }));
+  }
+
+  function sanitizeAccessList(list) {
+    if (!Array.isArray(list)) return [];
+    const normalized = Array.from(
+      new Set(
+        list
+          .map((entry) => String(entry || '').trim())
+          .filter(Boolean)
+      )
+    );
+    return normalized.includes('*') ? ['*'] : normalized;
+  }
+
+  function sanitizeRoleAccessMap(raw = {}, roles = RB_FALLBACK_CONFIG.roles) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const defaults = { ...RB_FALLBACK_CONFIG.roleAccess };
+    const normalized = {};
+    roles.forEach((role) => {
+      normalized[role.id] = sanitizeAccessList(source[role.id] ?? defaults[role.id] ?? []);
+    });
+    Object.entries(source).forEach(([roleId, list]) => {
+      const key = String(roleId || '').trim();
+      if (!key) return;
+      normalized[key] = sanitizeAccessList(list);
+    });
+    return normalized;
+  }
+
+  function sanitizeUserAccessMap(raw = {}) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    return Object.entries(source).reduce((acc, [login, cfg]) => {
+      const safeLogin = String(login || '').trim();
+      if (!safeLogin) return acc;
+      acc[safeLogin] = {
+        useRole: cfg?.useRole !== false,
+        access: sanitizeAccessList(cfg?.access)
+      };
+      return acc;
+    }, {});
+  }
+
+  function sanitizeUsersArray(list, fallback = RB_FALLBACK_CONFIG.users) {
+    const source = Array.isArray(list) && list.length ? list : fallback;
+    const normalized = new Map();
+    source
+      .map(sanitizeUserRecord)
+      .filter(Boolean)
+      .forEach((user) => {
+        normalized.set(user.login.toLowerCase(), user);
+      });
+    return Array.from(normalized.values());
   }
 
   function loadCustomUsers() {
@@ -1619,7 +1699,7 @@ table { font-size: 13.5px; }
     return normalized;
   }
 
-  function mergeUsers(baseUsers, customUsers = loadCustomUsers()) {
+  function mergeUsers(baseUsers, customUsers = []) {
     const merged = new Map();
     [...(Array.isArray(baseUsers) ? baseUsers : []), ...(Array.isArray(customUsers) ? customUsers : [])]
       .map(sanitizeUserRecord)
@@ -1630,37 +1710,175 @@ table { font-size: 13.5px; }
     return Array.from(merged.values());
   }
 
-  function normalizeConfig(cfg) {
+  function buildSerializableConfig(cfg) {
     const safe = cfg && typeof cfg === 'object' ? cfg : {};
-    const roles = Array.isArray(safe.roles) && safe.roles.length ? safe.roles : RB_FALLBACK_CONFIG.roles;
-    const baseUsers = Array.isArray(safe.users) && safe.users.length ? safe.users : RB_FALLBACK_CONFIG.users;
-    const users = mergeUsers(baseUsers);
-    const roleAccess = { ...RB_FALLBACK_CONFIG.roleAccess, ...(safe.roleAccess || {}) };
-    const userAccess = { ...(safe.userAccess || {}) };
+    const roles = sanitizeRoleList(safe.roles);
+    const users = sanitizeUsersArray(safe.users, RB_FALLBACK_CONFIG.users);
+    const roleAccess = sanitizeRoleAccessMap(safe.roleAccess || {}, roles);
+    const userAccess = sanitizeUserAccessMap(safe.userAccess || {});
     return { roles, users, roleAccess, userAccess };
   }
 
-  function refreshConfigSnapshot(source = rbConfigSource) {
-    const normalized = normalizeConfig(source);
+  function normalizeConfig(cfg, { includeLocalDrafts = true } = {}) {
+    const safe = buildSerializableConfig(cfg);
+    const roles = safe.roles;
+    const users = includeLocalDrafts
+      ? mergeUsers(safe.users, loadCustomUsers())
+      : safe.users;
+    const roleAccess = { ...RB_FALLBACK_CONFIG.roleAccess, ...safe.roleAccess };
+    const userAccess = { ...safe.userAccess };
+    return { roles, users, roleAccess, userAccess };
+  }
+
+  function updateConfigMeta(patch = {}) {
+    rbConfigMeta = {
+      ...rbConfigMeta,
+      ...patch
+    };
+    window.RB_CONFIG_META = { ...rbConfigMeta };
+    return window.RB_CONFIG_META;
+  }
+
+  function refreshConfigSnapshot(source = rbConfigSource, options = {}) {
+    const normalized = normalizeConfig(source, options);
     window.RB_CONFIG = normalized;
     window.RB_CONFIG_PROMISE = Promise.resolve(normalized);
     window.dispatchEvent(new CustomEvent('rb-users-updated', { detail: { users: normalized.users } }));
     return normalized;
   }
 
+  function downloadConfigFile(payload) {
+    const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = RB_CONFIG_URL;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 0);
+  }
+
+  async function fetchConfigFrom(url) {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  async function pickExistingConfigFileHandle() {
+    if (typeof window.showOpenFilePicker !== 'function') return null;
+    const handles = await window.showOpenFilePicker({
+      multiple: false,
+      types: [{
+        description: 'RBAC JSON',
+        accept: { 'application/json': ['.json'] }
+      }]
+    });
+    return Array.isArray(handles) ? handles[0] || null : null;
+  }
+
+  async function ensureConfigFileHandle() {
+    if (rbConfigFileHandle) return rbConfigFileHandle;
+    try {
+      rbConfigFileHandle = await pickExistingConfigFileHandle();
+    } catch (error) {
+      if (error?.name !== 'AbortError') throw error;
+    }
+    if (rbConfigFileHandle) return rbConfigFileHandle;
+    if (typeof window.showSaveFilePicker !== 'function') return null;
+    rbConfigFileHandle = await window.showSaveFilePicker({
+      suggestedName: RB_CONFIG_URL,
+      types: [{
+        description: 'RBAC JSON',
+        accept: { 'application/json': ['.json'] }
+      }]
+    });
+    return rbConfigFileHandle;
+  }
+
+  async function persistConfigViaFile(payload) {
+    const handle = await ensureConfigFileHandle();
+    if (!handle) {
+      throw new Error('Браузер не поддерживает запись общего JSON-файла');
+    }
+    const permission = await (typeof handle.queryPermission === 'function'
+      ? handle.queryPermission({ mode: 'readwrite' })
+      : Promise.resolve('granted'));
+    const granted = permission === 'granted'
+      ? permission
+      : (typeof handle.requestPermission === 'function'
+        ? await handle.requestPermission({ mode: 'readwrite' })
+        : permission);
+    if (granted !== 'granted') {
+      throw new Error('Нет доступа на запись в `rb_roles_access.json`');
+    }
+    const writable = await handle.createWritable();
+    await writable.write(`${JSON.stringify(payload, null, 2)}\n`);
+    await writable.close();
+    return payload;
+  }
+
   window.loadRbConfig = function loadRbConfig() {
     if (window.RB_CONFIG_PROMISE) return window.RB_CONFIG_PROMISE;
-    window.RB_CONFIG_PROMISE = fetch(RB_CONFIG_URL, { cache: 'no-store' })
-      .then(res => res.ok ? res.json() : null)
-      .catch(() => null)
-      .then(cfg => {
-        rbConfigSource = cfg;
-        return refreshConfigSnapshot(cfg);
+    window.RB_CONFIG_PROMISE = (async () => {
+      try {
+        const fileCfg = await fetchConfigFrom(RB_CONFIG_URL);
+        rbConfigSource = fileCfg;
+        updateConfigMeta({
+          mode: 'shared-file',
+          canPersist: typeof window.showSaveFilePicker === 'function',
+          sourceUrl: RB_CONFIG_URL
+        });
+        return refreshConfigSnapshot(fileCfg);
+      } catch (e) {}
+
+      rbConfigSource = null;
+      updateConfigMeta({
+        mode: 'fallback',
+        canPersist: typeof window.showSaveFilePicker === 'function',
+        sourceUrl: RB_CONFIG_URL
       });
+      return refreshConfigSnapshot(null);
+    })();
     return window.RB_CONFIG_PROMISE;
   };
 
   window.getRbCustomUsers = loadCustomUsers;
+  window.getRbConfigMeta = function getRbConfigMeta() {
+    return { ...rbConfigMeta };
+  };
+  window.saveRbConfigSource = async function saveRbConfigSource(nextConfig) {
+    const payload = buildSerializableConfig(nextConfig);
+    let savedPayload = null;
+    let lastError = null;
+
+    try {
+      savedPayload = await persistConfigViaFile(payload);
+      updateConfigMeta({
+        mode: 'shared-file',
+        canPersist: true,
+        sourceUrl: RB_CONFIG_URL
+      });
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        throw new Error('Сохранение общего `rb_roles_access.json` отменено. Изменения остались только в текущем браузере.');
+      }
+      lastError = error;
+    }
+
+    if (!savedPayload) {
+      downloadConfigFile(payload);
+      const message = lastError?.message
+        || 'Не удалось сохранить общий RBAC-конфиг автоматически';
+      throw new Error(`${message}. Я скачал новый \`rb_roles_access.json\`, замените им текущий файл.`);
+    }
+
+    rbConfigSource = savedPayload;
+    const config = refreshConfigSnapshot(savedPayload, { includeLocalDrafts: false });
+    return {
+      config,
+      meta: { ...rbConfigMeta }
+    };
+  };
   window.addRbCustomUser = function addRbCustomUser(rawUser) {
     const nextUser = sanitizeUserRecord(rawUser);
     if (!nextUser) {
@@ -1742,6 +1960,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getStoredUserRole(loginVal) {
+    const configRole = getUsers().find((user) => user.login === loginVal)?.role || null;
+    if (configRole) return configRole;
     try {
       const raw = localStorage.getItem(USER_ROLE_KEY);
       if (!raw) return null;
@@ -1819,9 +2039,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Первичная инициализация после загрузки DOM
   if (isAuthed()) {
     hideAuth();
-    const savedRole = localStorage.getItem(ROLE_KEY) || 'viewer';
     const savedUser = localStorage.getItem(USER_KEY) || '';
-    let roleToSet = savedUser === 'Nightlays' ? 'superadmin' : savedRole;
+    const configuredRole = getStoredUserRole(savedUser) || localStorage.getItem(ROLE_KEY) || 'viewer';
+    let roleToSet = savedUser === 'Nightlays' ? 'superadmin' : configuredRole;
     if (savedUser !== 'Nightlays' && roleToSet === 'superadmin') roleToSet = 'admin';
     setRole(roleToSet, savedUser);
   } else {
@@ -2310,6 +2530,83 @@ document.addEventListener('DOMContentLoaded', () => {
     return {};
   }
 
+  function buildRoleAccessForPersist() {
+    return Object.entries(accessMap || {}).reduce((acc, [roleId, list]) => {
+      const safeRoleId = String(roleId || '').trim();
+      if (!safeRoleId) return acc;
+      const normalized = Array.from(new Set(
+        (Array.isArray(list) ? list : [])
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+      ));
+      acc[safeRoleId] = normalized.includes('*') ? ['*'] : normalized;
+      return acc;
+    }, {});
+  }
+
+  function buildUserAccessForPersist() {
+    return Object.entries(userAccessMap || {}).reduce((acc, [login, cfg]) => {
+      const safeLogin = String(login || '').trim();
+      if (!safeLogin) return acc;
+      const access = Array.from(new Set(
+        (Array.isArray(cfg?.access) ? cfg.access : [])
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+      ));
+      acc[safeLogin] = {
+        useRole: cfg?.useRole !== false,
+        access
+      };
+      return acc;
+    }, {});
+  }
+
+  function buildUsersForPersist() {
+    const sourceUsers = Array.isArray(window.RB_CONFIG?.users) && window.RB_CONFIG.users.length
+      ? window.RB_CONFIG.users
+      : (Array.isArray(cfg?.users) ? cfg.users : []);
+    const seen = new Set();
+    return sourceUsers.reduce((acc, user) => {
+      const login = typeof user?.login === 'string' ? user.login.trim() : '';
+      const pass = typeof user?.pass === 'string' ? user.pass.trim() : '';
+      if (!login || !pass) return acc;
+      const key = login.toLowerCase();
+      if (seen.has(key)) return acc;
+      seen.add(key);
+      const role = login === 'Nightlays' ? 'superadmin' : resolveUserRole(login);
+      acc.push({ login, pass, role });
+      return acc;
+    }, []);
+  }
+
+  function clearLocalRbacDrafts() {
+    try {
+      localStorage.removeItem(ACCESS_KEY);
+      localStorage.removeItem(USER_ROLE_KEY);
+      localStorage.removeItem(USER_ACCESS_KEY);
+      localStorage.removeItem('rb_custom_users_v1');
+    } catch (e) {}
+  }
+
+  async function persistSharedRbacConfig() {
+    if (typeof window.saveRbConfigSource !== 'function') {
+      return { config: window.RB_CONFIG || null, meta: window.getRbConfigMeta?.() || null };
+    }
+    const payload = {
+      roles: roles.map(role => ({ ...role })),
+      users: buildUsersForPersist(),
+      roleAccess: buildRoleAccessForPersist(),
+      userAccess: buildUserAccessForPersist()
+    };
+    const result = await window.saveRbConfigSource(payload);
+    clearLocalRbacDrafts();
+    accessMap = { ...buildDefaultAccess(), ...(result?.config?.roleAccess || payload.roleAccess) };
+    syncManagedUsers();
+    userRoleMap = { ...managedUsers.reduce((acc, user) => { acc[user.login] = user.role; return acc; }, {}) };
+    userAccessMap = { ...(result?.config?.userAccess || payload.userAccess) };
+    return result;
+  }
+
   function syncManagedUsers() {
     const sourceUsers = Array.isArray(window.RB_CONFIG?.users) && window.RB_CONFIG.users.length
       ? window.RB_CONFIG.users
@@ -2642,7 +2939,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   if (saveBtn) {
-    saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener('click', async () => {
       const checked = Array.from(accessListEl?.querySelectorAll('input[type="checkbox"]') || [])
         .filter(i => i.checked)
         .map(i => i.getAttribute('data-module'));
@@ -2654,7 +2951,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const login = localStorage.getItem(USER_KEY) || '';
       applyRoleAccess(roleId, login);
       renderTeamProfile();
-      showToast('Настройки сохранены');
+      try {
+        const persisted = await persistSharedRbacConfig();
+        renderRoleList();
+        renderAccessList();
+        renderUserList();
+        renderUserEditor();
+        renderTeamProfile();
+        const target = 'в `rb_roles_access.json`';
+        showToast(`Настройки сохранены ${target}`);
+      } catch (error) {
+        showToast(error?.message || 'Настройки сохранены только локально');
+      }
     });
   }
 
@@ -2690,6 +2998,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   window.addEventListener('rb-users-updated', () => {
     syncManagedUsers();
+    userRoleMap = { ...managedUsers.reduce((acc, user) => { acc[user.login] = user.role; return acc; }, {}), ...loadUserRoleMap() };
     renderCreateUserRoleSelect();
     renderUserList();
     renderUserEditor();
@@ -2748,7 +3057,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   if (createUserBtn) {
-    createUserBtn.addEventListener('click', () => {
+    createUserBtn.addEventListener('click', async () => {
       if (!document.body.classList.contains('role-superadmin')) {
         showToast('Создавать пользователей может только суперадмин');
         return;
@@ -2775,14 +3084,25 @@ document.addEventListener('DOMContentLoaded', () => {
         renderUserList();
         renderUserEditor();
         renderTeamProfile();
-        showToast(`Пользователь ${login} создан`);
+        try {
+          const persisted = await persistSharedRbacConfig();
+          renderRoleList();
+          renderAccessList();
+          renderUserList();
+          renderUserEditor();
+          renderTeamProfile();
+          const suffix = 'и записан в `rb_roles_access.json`';
+          showToast(`Пользователь ${login} создан ${suffix}`);
+        } catch (persistError) {
+          showToast(`Пользователь ${login} создан только локально. ${persistError?.message || ''}`.trim());
+        }
       } catch (error) {
         showToast(error?.message || 'Не удалось создать пользователя');
       }
     });
   }
   if (userSaveBtn) {
-    userSaveBtn.addEventListener('click', () => {
+    userSaveBtn.addEventListener('click', async () => {
       if (!selectedUser) return;
       const isNightlays = selectedUser === 'Nightlays';
       const chosenRole = isNightlays ? 'superadmin' : (userRoleSelect?.value || 'viewer');
@@ -2808,7 +3128,25 @@ document.addEventListener('DOMContentLoaded', () => {
         applyRoleAccess(chosenRole, currentUser);
       }
       renderTeamProfile();
-      showToast(nextPass ? 'Роль, доступы и пароль обновлены' : 'Настройки сохранены');
+      try {
+        const persisted = await persistSharedRbacConfig();
+        renderRoleList();
+        renderAccessList();
+        renderUserList();
+        renderUserEditor();
+        renderTeamProfile();
+        if (currentUser === selectedUser) {
+          const effectiveRole = selectedUser === 'Nightlays' ? 'superadmin' : resolveUserRole(selectedUser);
+          updateRoleChip(effectiveRole);
+          applyRoleAccess(effectiveRole, currentUser);
+        }
+        const baseMessage = nextPass ? 'Роль, доступы и пароль обновлены' : 'Настройки сохранены';
+        const target = 'в `rb_roles_access.json`';
+        showToast(`${baseMessage} ${target}`);
+      } catch (error) {
+        const baseMessage = nextPass ? 'Роль, доступы и пароль обновлены только локально' : 'Настройки сохранены только локально';
+        showToast(`${baseMessage}. ${error?.message || ''}`.trim());
+      }
     });
   }
 
