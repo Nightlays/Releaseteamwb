@@ -67,6 +67,11 @@
               </div>
             </div>
 
+            <label class="release-launch-field release-launch-run-release-field">
+              <span class="release-launch-label">YouTrack token</span>
+              <input id="ytTokenInput" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="Вставьте токен" />
+            </label>
+
             <div id="runExtraControls" class="release-launch-run-main" style="display:none;">
               <label class="release-launch-field release-launch-run-release-field">
                 <span class="release-launch-label">Номер релиза</span>
@@ -196,13 +201,21 @@
       const LS_SETTINGS_KEY = 'wb_release_launch_settings_v1';
       const LS_DETAILS_STATE_KEY = 'wb_release_launch_details_state_v1';
       const LS_RUN_RELEASE_KEY = 'wb_release_launch_run_release_v1';
+      const LS_YT_TOKEN_KEY = 'wb_all_table_yt_token';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
       const PROXY_BASE = 'http://localhost:8787';
       const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
       const BAND_POST_USER_ID = 'nibrb4qs8ty4zp61x1pgyeziqe';
       const BAND_CHANNEL_ID_FIXED = '6sqki85urpbfbqdkcdfen33owh';
+      const SWAT_TEAM_ONLY_CHANNEL_ID = '66nkpor99pbnpbhf4ffswmeqje';
+      const RELEASE_FEED_CHANNEL_ID = 'xofy3mzmijbxxmongme4pke4bc';
       const GROUP_ANDROID_ID_FIXED = 'bbtekcuhfjykmm9awe56gebj9y';
       const GROUP_IOS_ID_FIXED = '6skkxrr3ufrkmy1u3paepd35ar';
+      const YT_BASE_URL = 'https://youtrack.wildberries.ru';
+      const YT_AGILE_ID_IOS = '83-469';
+      const YT_AGILE_ID_ANDROID = '83-2175';
+      const YT_SPRINT_FIELD_IOS = '{Версия релиза (ex. Sprint) iOS}';
+      const YT_SPRINT_FIELD_ANDROID = '{Версия релиза (ex. Sprint) Android}';
 
       const ALLURE_API_TOKEN = 'c60f6235-440d-4657-983a-51dc71c53cf2';
       const ALLURE_TESTPLAN_LEAF_URL = 'https://allure-testops.wb.ru/api/testplan/3918/tree/leaf?treeId=987&projectId=7&path=7904&sort=name%2Casc&size=100';
@@ -283,6 +296,7 @@
       const runPushReleaseFeedBtn = $('runPushReleaseFeedBtn');
       const runCreateError = $('runCreateError');
       const runCreateResultLog = $('runCreateResultLog');
+      const ytTokenInput = $('ytTokenInput');
 
       const resultsEmpty = $('resultsEmpty');
       const resultsWrap = $('resultsWrap');
@@ -304,7 +318,8 @@
         workflowRunning: false,
         workflowPingFound: false,
         runCreateRunning: false,
-        currentMode: ''
+        currentMode: '',
+        ytBoardInfoCache: new Map()
       };
 
       const WORKFLOW_STEPS = [
@@ -456,7 +471,7 @@
           startBtn.textContent = getStartButtonLabel(value);
         }
 
-        if(isNonMajor){
+        if(isNonMajor || isEmpty){
           if(baseInfo) baseInfo.style.display = 'none';
           if(statusInfo) statusInfo.style.display = 'none';
         }else{
@@ -768,6 +783,163 @@
           sinceMs,
           baseMskDate: new Date(baseMskMs),
           baseUtcDate: new Date(sinceMs)
+        };
+      }
+
+      function formatMskDateDot(dateObj){
+        const mskDate = new Date(dateObj.getTime() + MSK_OFFSET_MS);
+        const day = two(mskDate.getUTCDate());
+        const month = two(mskDate.getUTCMonth() + 1);
+        const year = mskDate.getUTCFullYear();
+        return `${day}.${month}.${year}`;
+      }
+
+      function asBearer(rawToken){
+        const token = String(rawToken || '').trim();
+        if(!token) return '';
+        return /^bearer\s+/i.test(token) ? token : `Bearer ${token}`;
+      }
+
+      function normalizeReleaseName(value){
+        return String(value || '').trim();
+      }
+
+      function parseDateMs(value){
+        if(typeof value === 'number' && Number.isFinite(value)) return value;
+        if(typeof value === 'string'){
+          const raw = value.trim();
+          if(!raw) return NaN;
+          const asNumber = Number(raw);
+          if(Number.isFinite(asNumber)) return asNumber;
+          const parsed = Date.parse(raw);
+          if(Number.isFinite(parsed)) return parsed;
+        }
+        return NaN;
+      }
+
+      function getYtTokenFromStorage(){
+        const direct = ytTokenInput ? String(ytTokenInput.value || '').trim() : '';
+        if(direct) return direct;
+        try{
+          return String(localStorage.getItem(LS_YT_TOKEN_KEY) || '').trim();
+        }catch(_){
+          return '';
+        }
+      }
+
+      function saveYtToken(){
+        try{
+          localStorage.setItem(LS_YT_TOKEN_KEY, ytTokenInput ? String(ytTokenInput.value || '') : '');
+        }catch(_){ }
+      }
+
+      async function ytProxyGetJson(url, authHeader, signal){
+        return proxyRequestJson('GET', url, {
+          'Accept': 'application/json',
+          'Authorization': authHeader
+        }, undefined, signal);
+      }
+
+      async function fetchAgileSprints(agileId, authHeader, signal){
+        const params = new URLSearchParams();
+        params.set('issuesQuery', '');
+        params.set('$top', '-1');
+        params.set('fields', 'id,name,finish');
+        const url = `${YT_BASE_URL}/api/agiles/${agileId}/sprints/?${params.toString()}`;
+        const data = await ytProxyGetJson(url, authHeader, signal);
+        return Array.isArray(data) ? data : [];
+      }
+
+      async function fetchBoardInfoForRelease(agileId, release, authHeader, signal){
+        const releaseNorm = normalizeReleaseName(release);
+        const cacheKey = `${agileId}::${releaseNorm}`;
+        if(appState.ytBoardInfoCache.has(cacheKey)){
+          return appState.ytBoardInfoCache.get(cacheKey);
+        }
+
+        const sprints = await fetchAgileSprints(agileId, authHeader, signal);
+        const sprint = sprints.find((item) => normalizeReleaseName(item && item.name) === releaseNorm);
+        const url = sprint && sprint.id
+          ? `${YT_BASE_URL}/agiles/${agileId}/${sprint.id}`
+          : `${YT_BASE_URL}/agiles/${agileId}/current`;
+        const finishMs = parseDateMs(sprint && sprint.finish);
+        const info = {
+          url,
+          releaseFinishMs: Number.isFinite(finishMs) ? finishMs : null
+        };
+        appState.ytBoardInfoCache.set(cacheKey, info);
+        return info;
+      }
+
+      function getReleaseBoardAgileId(mode){
+        if(mode === '2') return YT_AGILE_ID_IOS;
+        if(mode === '1' || mode === '5' || mode === '6') return YT_AGILE_ID_ANDROID;
+        return '';
+      }
+
+      function getReleaseTicketMeta(mode, release){
+        if(mode === '2'){
+          return {
+            sprintField: YT_SPRINT_FIELD_IOS,
+            summary: `Релизный тикет IOS ${release}`
+          };
+        }
+        if(mode === '1' || mode === '5' || mode === '6'){
+          return {
+            sprintField: YT_SPRINT_FIELD_ANDROID,
+            summary: `Релизный тикет ANDROID ${release}`
+          };
+        }
+        return null;
+      }
+
+      function issueLink(key){
+        return `${YT_BASE_URL}/issue/${encodeURIComponent(key)}`;
+      }
+
+      async function fetchYtIssuesByQuery(query, authHeader, signal){
+        const params = new URLSearchParams();
+        params.set('query', query);
+        params.set('$top', '10');
+        params.set('fields', 'id,idReadable,summary');
+        const url = `${YT_BASE_URL}/api/issues?${params.toString()}`;
+        const data = await ytProxyGetJson(url, authHeader, signal);
+        return Array.isArray(data) ? data : [];
+      }
+
+      async function fetchReleaseBoardUrl(mode, release, signal){
+        const agileId = getReleaseBoardAgileId(mode);
+        if(!agileId) return '';
+
+        const authHeader = asBearer(getYtTokenFromStorage());
+        if(!authHeader){
+          throw new Error('Не найден YouTrack token из модуля Epic / User Story.');
+        }
+
+        const info = await fetchBoardInfoForRelease(agileId, release, authHeader, signal);
+        return String((info && info.url) || '').trim();
+      }
+
+      async function fetchReleaseTicketRef(mode, release, signal){
+        const meta = getReleaseTicketMeta(mode, release);
+        if(!meta) return null;
+
+        const authHeader = asBearer(getYtTokenFromStorage());
+        if(!authHeader){
+          throw new Error('Укажи YouTrack token.');
+        }
+
+        const query = `(${meta.sprintField}: ${release}) AND summary: "${meta.summary}" AND State: -Rejected`;
+        const issues = await fetchYtIssuesByQuery(query, authHeader, signal);
+        const exact = issues.find((item) => String((item && item.summary) || '').trim().toUpperCase() === meta.summary.toUpperCase()) || issues[0];
+        if(!exact || !exact.idReadable){
+          throw new Error(`Не найден ${meta.summary} в YouTrack.`);
+        }
+
+        return {
+          key: String(exact.idReadable || '').trim(),
+          summary: String(exact.summary || '').trim(),
+          url: issueLink(String(exact.idReadable || '').trim())
         };
       }
 
@@ -1744,8 +1916,10 @@
         return { android, ios };
       }
 
-      async function bandCreatePost(message, cfg, signal){
-        const channelId = String(cfg.bandChannelId || '').trim();
+      async function bandCreatePost(message, cfg, signal, options){
+        const opts = options || {};
+        const channelId = String(opts.channelId || cfg.bandChannelId || '').trim();
+        const rootId = String(opts.rootId || '').trim();
         const userId = BAND_POST_USER_ID;
         if(!channelId) throw new Error('Заполни Канал SWAT QA');
         if(!userId) throw new Error('Не задан BAND_POST_USER_ID');
@@ -1756,7 +1930,7 @@
           file_ids: [],
           message,
           channel_id: channelId,
-          root_id: '',
+          root_id: rootId,
           pending_post_id: `${userId}:${nowMs}`,
           user_id: userId,
           create_at: 0,
@@ -1775,7 +1949,7 @@
           ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
           [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
         };
-        await proxyRequestJson('POST', 'https://band.wb.ru/api/v4/posts', headers, payload, signal);
+        return proxyRequestJson('POST', 'https://band.wb.ru/api/v4/posts', headers, payload, signal);
       }
 
       async function bandSearchUserIds(handles, cfg, signal){
@@ -2304,8 +2478,197 @@
         if(!String(cfg.bandChannelId || '').trim()) throw new Error('Заполни Канал SWAT QA');
       }
 
+      function ensureReleaseFeedFields(cfg){
+        if(!String(cfg.bandCookiesRead || '').length) throw new Error('Заполни Cookies (чтение/поиск users и post)');
+      }
+
       function ensureAdminFields(cfg){
         if(!String(cfg.bandCookiesAdmin || '').length) throw new Error('Заполни Cookies (admin)');
+      }
+
+      function collectRunCreatorLinks(){
+        if(!runCreateResultLog) return [];
+        return Array.from(runCreateResultLog.querySelectorAll('a[href]'))
+          .map((node) => ({
+            name: String(node.textContent || '').trim(),
+            url: String(node.getAttribute('href') || '').trim()
+          }))
+          .filter((item) => item.name && item.url);
+      }
+
+      function runCreatorNodeToMarkdown(node){
+        if(!node) return '';
+        if(node.nodeType === Node.TEXT_NODE){
+          return String(node.textContent || '');
+        }
+        if(node.nodeType !== Node.ELEMENT_NODE){
+          return '';
+        }
+
+        const el = node;
+        const tag = String(el.tagName || '').toUpperCase();
+        if(tag === 'A'){
+          const text = String(el.textContent || '').trim();
+          const href = String(el.getAttribute('href') || '').trim();
+          return text && href ? `[${text}](${href})` : text;
+        }
+        if(tag === 'BR'){
+          return '\n';
+        }
+
+        let out = '';
+        for(const child of Array.from(el.childNodes || [])){
+          out += runCreatorNodeToMarkdown(child);
+        }
+        return out;
+      }
+
+      function collectRunCreatorCopyMessage(){
+        if(!runCreateResultLog) return '';
+        const lines = Array.from(runCreateResultLog.children || []).map((line) => runCreatorNodeToMarkdown(line).trim());
+        const markerIdx = lines.lastIndexOf('Готово. Сформировано сообщение:');
+        if(markerIdx < 0) return '';
+
+        const out = [];
+        for(let i = markerIdx + 1; i < lines.length; i += 1){
+          const line = String(lines[i] || '').trim();
+          if(!line){
+            if(out.length && out[out.length - 1] !== ''){
+              out.push('');
+            }
+            continue;
+          }
+          if(line === 'Сборка:'){
+            continue;
+          }
+          if(/^Лента релизов:/.test(line) || /^SWAT Team Only:/.test(line)){
+            break;
+          }
+          out.push(line);
+        }
+
+        return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+      }
+
+      function buildReleaseFeedThreadMessage(release, runRef, boardUrl, releaseTaskRef){
+        const today = formatMskDateDot(new Date());
+        return [
+          `OS версия: ${release}`,
+          `Ссылка на доску: ${String(boardUrl || '').trim()}`,
+          '',
+          `Релизный таск: ${releaseTaskRef ? `[${releaseTaskRef.key}](${releaseTaskRef.url})` : ''}`,
+          '',
+          `Сроки готовности сборок: ${today}`,
+          `Сроки выкатки: ${today}`,
+          `Ориентировочное время старта регресса: ${today}`,
+          `Ожидаемое время окончания проверки: ${today}`,
+          'Сборка:',
+          `Ран: [${runRef.name}](${runRef.url})`
+        ].join('\n');
+      }
+
+      function buildReleaseFeedPosts(mode, release, runRefs, boardUrl, releaseTaskRef){
+        const refs = Array.isArray(runRefs) ? runRefs : [];
+        const findBy = (predicate) => refs.find((item) => predicate(String(item.name || '')));
+        const out = [];
+
+        if(mode === '1'){
+          const androidRun = findBy((name) => name.includes('[Android]')) || refs[0];
+          if(!androidRun) throw new Error('Не нашёл ссылку на ран Android в текущем логе.');
+          out.push({
+            rootMessage: `#Android #Hotfix ${release}`,
+            threadMessage: buildReleaseFeedThreadMessage(release, androidRun, boardUrl, releaseTaskRef)
+          });
+          return out;
+        }
+
+        if(mode === '2'){
+          const iosRun = findBy((name) => name.includes('[iOS]') || name.includes('[IOS]')) || refs[0];
+          if(!iosRun) throw new Error('Не нашёл ссылку на ран iOS в текущем логе.');
+          out.push({
+            rootMessage: `#iOS #Hotfix ${release}`,
+            threadMessage: buildReleaseFeedThreadMessage(release, iosRun, boardUrl, releaseTaskRef)
+          });
+          return out;
+        }
+
+        if(mode === '5' || mode === '6'){
+          const huaweiRun = findBy((name) => name.includes('AppGallery'));
+          const rustoreRun = findBy((name) => name.includes('RuStore') || name.includes('Rustore'));
+          if(!huaweiRun || !rustoreRun){
+            throw new Error('Не нашёл ссылки на раны AppGallery/RuStore в текущем логе.');
+          }
+          out.push({
+            rootMessage: `#Android #Release #Huawei ${release}`,
+            threadMessage: buildReleaseFeedThreadMessage(release, huaweiRun, boardUrl, releaseTaskRef)
+          });
+          out.push({
+            rootMessage: `#Android #Release #Rustore ${release}`,
+            threadMessage: buildReleaseFeedThreadMessage(release, rustoreRun, boardUrl, releaseTaskRef)
+          });
+          return out;
+        }
+
+        throw new Error('Для выбранного типа запуска публикация в ленту релизов не поддерживается.');
+      }
+
+      async function publishReleaseFeedPosts(){
+        const mode = String(appState.currentMode || '');
+        const release = runReleaseInput ? String(runReleaseInput.value || '').trim() : '';
+        if(!release){
+          throw new Error('Номер релиза не должен быть пустым.');
+        }
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+
+        const [boardUrl, releaseTaskRef] = await Promise.all([
+          fetchReleaseBoardUrl(mode, release, null),
+          fetchReleaseTicketRef(mode, release, null)
+        ]);
+        const posts = buildReleaseFeedPosts(mode, release, collectRunCreatorLinks(), boardUrl, releaseTaskRef);
+        if(!posts.length){
+          throw new Error('Нет данных для публикации в ленту релизов.');
+        }
+
+        for(const item of posts){
+          const rootPost = await bandCreatePost(item.rootMessage, cfg, null, {
+            channelId: RELEASE_FEED_CHANNEL_ID
+          });
+          const rootId = String((rootPost && rootPost.id) || '');
+          if(!rootId){
+            throw new Error(`Не удалось получить id root-поста для '${item.rootMessage}'.`);
+          }
+
+          await sleep(120);
+          await bandCreatePost(item.threadMessage, cfg, null, {
+            channelId: RELEASE_FEED_CHANNEL_ID,
+            rootId
+          });
+
+          runCreatorInfo(`Лента релизов: опубликован тред <b>${escHtml(item.rootMessage)}</b>`, { html: true, kind: 'ok' });
+          await sleep(120);
+        }
+
+        showToast(posts.length > 1 ? `Опубликовано тредов: ${posts.length}` : 'Опубликовано в ленту релизов');
+      }
+
+      async function publishSwatTeamOnlyPost(){
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+
+        const baseText = collectRunCreatorCopyMessage();
+        const text = `${baseText}\n\nSWAT`.trim();
+        if(!text){
+          throw new Error('Не найден текст для копирования после создания рана.');
+        }
+
+        await bandCreatePost(text, cfg, null, {
+          channelId: SWAT_TEAM_ONLY_CHANNEL_ID
+        });
+
+        runCreatorInfo('SWAT Team Only: сообщение опубликовано', { kind: 'ok' });
+        showToast('Опубликовано в SWAT Team Only');
       }
 
       async function publishPing(){
@@ -2483,6 +2846,9 @@
       function init(){
         applySettings(loadSettings());
         applyDetailsState(loadDetailsState());
+        if(ytTokenInput){
+          ytTokenInput.value = getYtTokenFromStorage();
+        }
         if(runReleaseInput){
           try{
             runReleaseInput.value = String(localStorage.getItem(LS_RUN_RELEASE_KEY) || '');
@@ -2498,6 +2864,8 @@
           el.addEventListener('input', scheduleSave);
           el.addEventListener('change', saveSettings);
         }
+        ytTokenInput?.addEventListener('input', saveYtToken);
+        ytTokenInput?.addEventListener('change', saveYtToken);
 
         resultsCollapseBtn?.addEventListener('click', () => {
           appState.resultsCollapsed = !appState.resultsCollapsed;
@@ -2553,6 +2921,14 @@
         checkProxyBtn?.addEventListener('click', () => withButtonBusy(checkProxyBtn, 'Проверяю...', checkProxy).catch((err) => {
           log(`Проверка proxy: ${err.message || err}`, 'err');
           showToast('Прокси не отвечает', false);
+        }));
+        runPushSwatBtn?.addEventListener('click', () => withButtonBusy(runPushSwatBtn, 'Публикую...', publishSwatTeamOnlyPost).catch((err) => {
+          runCreatorInfo(`SWAT Team Only: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
+          showToast(err.message || 'Ошибка публикации', false);
+        }));
+        runPushReleaseFeedBtn?.addEventListener('click', () => withButtonBusy(runPushReleaseFeedBtn, 'Публикую...', publishReleaseFeedPosts).catch((err) => {
+          runCreatorInfo(`Лента релизов: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
+          showToast(err.message || 'Ошибка публикации', false);
         }));
         stopBtn?.addEventListener('click', () => {
           if(appState.abortController){
