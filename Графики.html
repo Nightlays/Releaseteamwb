@@ -80,6 +80,26 @@
         </form>
       </section>
 
+      <!-- ===== ML Summary ===== -->
+      <section class="card p-5 space-y-4" id="mlSummaryCard">
+        <div class="flex items-start justify-between gap-4 flex-wrap ml-summary-toolbar">
+          <div>
+            <h2 class="text-lg font-semibold">ML Summary — регресс и релиз</h2>
+            <div class="hint">Разделяет метрики на регресс, релизное качество, стабильность и аномалии</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+              <input type="checkbox" id="comparePrevOnly" />
+              Только сравнение с предыдущим
+            </label>
+            <button type="button" class="btn btn-ghost" id="mlSaveBtn">Сохранить выгрузку</button>
+            <button type="button" class="btn btn-ghost" id="mlLabelOk">Пометить OK</button>
+            <button type="button" class="btn btn-ghost" id="mlLabelFail">Пометить Регресс</button>
+          </div>
+        </div>
+        <div id="mlSummaryBody" class="ml-summary-body">—</div>
+      </section>
+
       <!-- 1) Тест кейсы -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -552,8 +572,8 @@
                   <select id="cutReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
                 <div class="cutoff-legend px-4 pt-1 text-xs text-slate-600 flex items-center gap-3 flex-wrap">
-                  <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>14:00-14:05 — старт вовремя</span>
-                  <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>после 14:05 — старт позже</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>13:50-14:10 — старт в валидном окне</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>раньше 13:50 или позже 14:10 — вне окна</span>
                   <span class="cutoff-item"><span class="cutoff-dot cutoff-store-late"></span>после 18:00 — отправка позже</span>
                 </div>
                 <div class="table-scroll-x">
@@ -691,7 +711,27 @@
           const PAGE_SIZE = 1000;
           const KINDS = ['Smoke', 'Selective'];
           const SWAT_LIST_URL = 'https://script.google.com/macros/s/AKfycbzLmb5ATmHOip7REPsl_iSLH2GuEHui0W_czyrPgW_8G1Wl-RY8CiM2UeAdqQQEwoNx-Q/exec';
-          const PROXY_BASE = 'http://localhost:8787';
+          const LS_PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
+          function readRuntimeProxyBase(){
+            try {
+              const q = new URLSearchParams(window.location.search);
+              const fromQuery = q.get('rbProxyBase');
+              if (fromQuery) return String(fromQuery).trim();
+            } catch (e) {}
+            try {
+              const fromTop = window.top && window.top.__RB_PROXY_CONFIG && window.top.__RB_PROXY_CONFIG.base;
+              if (fromTop) return String(fromTop).trim();
+            } catch (e) {}
+            try {
+              const raw = localStorage.getItem(LS_PROXY_RUNTIME_KEY);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.base) return String(parsed.base).trim();
+              }
+            } catch (e) {}
+            return 'http://localhost:8787';
+          }
+          const PROXY_BASE = readRuntimeProxyBase().replace(/\/+$/, '');
           const LS_COLLAPSE_KEY = 'wb_all_table_collapsed';
 
           const DEPLOY_BASE_URL_TMPL   = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
@@ -707,12 +747,39 @@
           const startBtn = document.getElementById('startBtn');
           const stopBtn  = document.getElementById('stopBtn');
           const proxyBtn = document.getElementById('proxyBtn');
+          let mlTooltip = document.getElementById('mlTooltip');
+          if(!mlTooltip && document.body){
+            mlTooltip = document.createElement('div');
+            mlTooltip.id = 'mlTooltip';
+            mlTooltip.className = 'ml-tooltip';
+            mlTooltip.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(mlTooltip);
+          }
+          const comparePrevOnly = document.getElementById('comparePrevOnly');
 
           const inpFrom  = document.getElementById('releaseFrom');
           const inpTo    = document.getElementById('releaseTo');
           const inpAllureToken = document.getElementById('allureToken');
           const inpDeployToken = document.getElementById('deployToken');
           const inpYtToken = document.getElementById('ytToken');
+          const mlSummaryBody = document.getElementById('mlSummaryBody');
+          const mlSaveBtn = document.getElementById('mlSaveBtn');
+          const mlLabelOkBtn = document.getElementById('mlLabelOk');
+          const mlLabelFailBtn = document.getElementById('mlLabelFail');
+
+          if(window.Chart){
+            Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
+            Chart.defaults.plugins.tooltip = Chart.defaults.plugins.tooltip || {};
+            Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,23,42,0.95)';
+            Chart.defaults.plugins.tooltip.titleColor = '#f8fafc';
+            Chart.defaults.plugins.tooltip.bodyColor = '#e2e8f0';
+            Chart.defaults.plugins.tooltip.titleFont = { size: 12, weight: '700' };
+            Chart.defaults.plugins.tooltip.bodyFont = { size: 12 };
+            Chart.defaults.plugins.tooltip.padding = 8;
+            Chart.defaults.plugins.tooltip.cornerRadius = 8;
+            Chart.defaults.plugins.tooltip.boxPadding = 4;
+            Chart.defaults.plugins.tooltip.displayColors = true;
+          }
 
           document.getElementById('exportPdfBtn')
             ?.addEventListener('click', exportAllChartsToPDF);
@@ -741,134 +808,1666 @@
           };
         }
 
-        async function exportAllChartsToPDF(){
-          if (!window.jspdf || !window.html2canvas) return;
+        function resizeChartsForPdf(){
+          const list = [
+            tcChart, covChart, selChart, avgChart, chpChart, chpTypesChart, chpTypesIosChart, chpTypesAndChart,
+            cutChart, iosTypesChart, andTypesChart
+          ].filter(Boolean);
+          for(const ch of list){
+            try{
+              ch.resize();
+              ch.update('none');
+            }catch(e){}
+          }
+        }
 
-          const { jsPDF } = window.jspdf;
-          const pdf = new jsPDF('p', 'mm', 'a4');
-
-          const pageW = pdf.internal.pageSize.getWidth();
-          const pageH = pdf.internal.pageSize.getHeight();
-          const margin = 10;
-          const contentH = pageH - margin * 2;
-          let y = margin;
-
-          const restoreTooltips = disableChartTooltips();
-          document.body.classList.add('pdf-export');
-          try{
-            // Берём именно карточки графиков целиком
-            const cards = Array.from(document.querySelectorAll('section.card'))
-              .filter(card => card.querySelector('canvas'));
-
-            for (const card of cards) {
-              const scale = 2;
-              const cardRestore = {
-                overflow: card.style.overflow,
-                width: card.style.width,
-                height: card.style.height,
-                maxHeight: card.style.maxHeight,
-                maxWidth: card.style.maxWidth
-              };
-              card.style.overflow = 'visible';
-              card.style.maxHeight = 'none';
-              card.style.maxWidth = 'none';
-
-              const viewports = Array.from(card.querySelectorAll('.chart-viewport'));
-              const viewportRestore = viewports.map(el => ({ el, overflow: el.style.overflow }));
-              for(const v of viewports){
-                v.style.overflow = 'visible';
-              }
-
-              const scrollables = Array.from(card.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
-              const restore = [];
-              for(const el of scrollables){
-                restore.push({
-                  el,
-                  overflow: el.style.overflow,
-                  overflowX: el.style.overflowX,
-                  overflowY: el.style.overflowY,
-                  height: el.style.height,
-                  maxHeight: el.style.maxHeight
-                });
-                el.style.overflow = 'visible';
-                el.style.overflowX = 'visible';
-                el.style.overflowY = 'visible';
-                el.style.height = el.scrollHeight + 'px';
-                el.style.maxHeight = 'none';
-              }
-
-              card.style.width = card.scrollWidth + 'px';
-              card.style.height = card.scrollHeight + 'px';
-
-              // Рендер DOM карточки в canvas
-              const canvas = await html2canvas(card, {
-                backgroundColor: '#ffffff',
-                scale: scale,
-                useCORS: true,
-                scrollX: 0,
-                scrollY: 0,
-                windowWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, card.scrollWidth),
-                windowHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, card.scrollHeight)
-              });
-
-              for(const r of restore){
-                r.el.style.overflow = r.overflow;
-                r.el.style.overflowX = r.overflowX;
-                r.el.style.overflowY = r.overflowY;
-                r.el.style.height = r.height;
-                r.el.style.maxHeight = r.maxHeight;
-              }
-              for(const v of viewportRestore){
-                v.el.style.overflow = v.overflow;
-              }
-              card.style.overflow = cardRestore.overflow;
-              card.style.width = cardRestore.width;
-              card.style.height = cardRestore.height;
-              card.style.maxHeight = cardRestore.maxHeight;
-              card.style.maxWidth = cardRestore.maxWidth;
-
-              const imgW = pageW - margin * 2;
-              const imgH = imgW * (canvas.height / canvas.width);
-
-              if (imgH <= contentH) {
-                if (y + imgH > pageH - margin && y !== margin) {
-                  pdf.addPage();
-                  y = margin;
-                }
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, imgW, imgH);
-                y += imgH + 10;
-              } else {
-                if (y !== margin) {
-                  pdf.addPage();
-                  y = margin;
-                }
-                const pxPerMm = canvas.width / imgW;
-                const pagePx = Math.floor(contentH * pxPerMm);
-                let sy = 0;
-                while (sy < canvas.height) {
-                  const sliceH = Math.min(pagePx, canvas.height - sy);
-                  const slice = document.createElement('canvas');
-                  slice.width = canvas.width;
-                  slice.height = sliceH;
-                  const sctx = slice.getContext('2d');
-                  sctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-
-                  const sliceH_mm = sliceH / pxPerMm;
-                  pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceH_mm);
-                  sy += sliceH;
-                  if (sy < canvas.height) {
-                    pdf.addPage();
-                  }
-                }
-                y = margin;
-              }
+        function expandCollapsedForPdf(){
+          const restore = [];
+          const bodies = Array.from(document.querySelectorAll('[data-collapse-body]'));
+          for(const body of bodies){
+            if(!body) continue;
+            const computed = window.getComputedStyle(body);
+            if(computed.display !== 'none') continue;
+            const key = body.getAttribute('data-collapse-body');
+            const btn = key ? document.querySelector(`[data-collapse-btn="${key}"]`) : null;
+            const ico = btn?.querySelector('[data-collapse-ico]') || null;
+            const txt = btn?.querySelector('[data-collapse-text]') || null;
+            restore.push({
+              body,
+              btn,
+              ico,
+              txt,
+              display: body.style.display,
+              height: body.style.height,
+              opacity: body.style.opacity,
+              overflow: body.style.overflow,
+              transition: body.style.transition,
+              aria: btn?.getAttribute('aria-expanded') || null,
+              icoText: ico?.textContent || '',
+              txtText: txt?.textContent || ''
+            });
+            body.style.display = '';
+            body.style.height = '';
+            body.style.opacity = '';
+            body.style.overflow = '';
+            body.style.transition = 'none';
+            if(btn) btn.setAttribute('aria-expanded', 'true');
+            if(ico) ico.textContent = '▾';
+            if(txt) txt.textContent = 'Свернуть';
+          }
+          return () => {
+            for(const item of restore){
+              item.body.style.display = item.display;
+              item.body.style.height = item.height;
+              item.body.style.opacity = item.opacity;
+              item.body.style.overflow = item.overflow;
+              item.body.style.transition = item.transition;
+              if(item.btn && item.aria != null) item.btn.setAttribute('aria-expanded', item.aria);
+              if(item.ico) item.ico.textContent = item.icoText;
+              if(item.txt) item.txt.textContent = item.txtText;
             }
-          }finally{
-            restoreTooltips();
-            document.body.classList.remove('pdf-export');
+          };
+        }
+
+        function waitForLayoutFrames(count = 2){
+          return new Promise(resolve => {
+            const step = () => {
+              if(count <= 0){
+                resolve();
+                return;
+              }
+              count -= 1;
+              requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+          });
+        }
+
+        async function renderCardCanvas(card, scale){
+          if(!card || !window.html2canvas) return null;
+          const cardRestore = {
+            overflow: card.style.overflow,
+            width: card.style.width,
+            height: card.style.height,
+            maxHeight: card.style.maxHeight,
+            maxWidth: card.style.maxWidth
+          };
+          card.style.overflow = 'visible';
+          card.style.maxHeight = 'none';
+          card.style.maxWidth = 'none';
+
+          const viewports = Array.from(card.querySelectorAll('.chart-viewport'));
+          const viewportRestore = viewports.map(el => ({ el, overflow: el.style.overflow }));
+          for(const v of viewports){
+            v.style.overflow = 'visible';
           }
 
-          pdf.save('WB_All_Charts.pdf');
+          const scrollables = Array.from(card.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
+          const restore = [];
+          for(const el of scrollables){
+            restore.push({
+              el,
+              overflow: el.style.overflow,
+              overflowX: el.style.overflowX,
+              overflowY: el.style.overflowY,
+              height: el.style.height,
+              maxHeight: el.style.maxHeight
+            });
+            el.style.overflow = 'visible';
+            el.style.overflowX = 'visible';
+            el.style.overflowY = 'visible';
+            el.style.height = el.scrollHeight + 'px';
+            el.style.maxHeight = 'none';
+          }
+
+          card.style.width = card.scrollWidth + 'px';
+          card.style.height = card.scrollHeight + 'px';
+
+          const canvas = await html2canvas(card, {
+            backgroundColor: '#ffffff',
+            scale: scale,
+            useCORS: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, card.scrollWidth),
+            windowHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, card.scrollHeight)
+          });
+
+          for(const r of restore){
+            r.el.style.overflow = r.overflow;
+            r.el.style.overflowX = r.overflowX;
+            r.el.style.overflowY = r.overflowY;
+            r.el.style.height = r.height;
+            r.el.style.maxHeight = r.maxHeight;
+          }
+          for(const v of viewportRestore){
+            v.el.style.overflow = v.overflow;
+          }
+          card.style.overflow = cardRestore.overflow;
+          card.style.width = cardRestore.width;
+          card.style.height = cardRestore.height;
+          card.style.maxHeight = cardRestore.maxHeight;
+          card.style.maxWidth = cardRestore.maxWidth;
+
+          return canvas;
+        }
+
+        async function exportAllChartsToPDF(){
+          try{
+            if (!window.jspdf || !window.html2canvas){
+              showToast('PDF библиотеки не загрузились', false);
+              return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = pdf.internal.pageSize.getHeight();
+            const margin = 10;
+            const contentH = pageH - margin * 2;
+            let y = margin;
+
+            // фиксируем ML-выгрузку и обновляем summary
+            try{
+              const entry = recordMlExport();
+              if(entry) await syncMlDatasetToDrive(false);
+              renderMlSummary();
+            }catch(e){
+              console.error('ML export error', e);
+            }
+
+            const restoreTooltips = disableChartTooltips();
+            const restoreCollapsed = expandCollapsedForPdf();
+            document.body.classList.add('pdf-export');
+            try{
+              await waitForLayoutFrames(2);
+              resizeChartsForPdf();
+              await waitForLayoutFrames(2);
+              const addCanvasToPdf = (canvas) => {
+                if(!canvas) return;
+                const imgW = pageW - margin * 2;
+                const imgH = imgW * (canvas.height / canvas.width);
+
+                if (imgH <= contentH) {
+                  if (y + imgH > pageH - margin && y !== margin) {
+                    pdf.addPage();
+                    y = margin;
+                  }
+                  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, imgW, imgH);
+                  y += imgH + 10;
+                } else {
+                  if (y !== margin) {
+                    pdf.addPage();
+                    y = margin;
+                  }
+                  const pxPerMm = canvas.width / imgW;
+                  const pagePx = Math.floor(contentH * pxPerMm);
+                  let sy = 0;
+                  while (sy < canvas.height) {
+                    const sliceH = Math.min(pagePx, canvas.height - sy);
+                    const slice = document.createElement('canvas');
+                    slice.width = canvas.width;
+                    slice.height = sliceH;
+                    const sctx = slice.getContext('2d');
+                    sctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+
+                    const sliceH_mm = sliceH / pxPerMm;
+                    pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceH_mm);
+                    sy += sliceH;
+                    if (sy < canvas.height) {
+                      pdf.addPage();
+                    }
+                  }
+                  y = margin;
+                }
+              };
+
+              const summaryCard = document.getElementById('mlSummaryCard');
+              if(summaryCard){
+                try{
+                  summaryCard.classList.add('pdf-sheet--ml');
+                  const summaryCanvas = await renderCardCanvas(summaryCard, 2);
+                  addCanvasToPdf(summaryCanvas);
+                  const chartCards = Array.from(document.querySelectorAll('section.card'))
+                    .filter(card => card.querySelector('canvas'));
+                  if(chartCards.length){
+                    pdf.addPage();
+                    y = margin;
+                  }
+                }catch(e){
+                  console.error('ML summary capture error', e);
+                }finally{
+                  summaryCard.classList.remove('pdf-sheet--ml');
+                }
+              }
+
+              // Берём именно карточки графиков целиком
+              const cards = Array.from(document.querySelectorAll('section.card'))
+                .filter(card => card.querySelector('canvas'));
+
+              for (const card of cards) {
+                const canvas = await renderCardCanvas(card, 2);
+                addCanvasToPdf(canvas);
+              }
+            }finally{
+              restoreCollapsed();
+              resizeChartsForPdf();
+              restoreTooltips();
+              document.body.classList.remove('pdf-export');
+            }
+
+            pdf.save('WB_All_Charts.pdf');
+          }catch(e){
+            console.error('PDF export failed', e);
+            showToast(`PDF ошибка: ${e?.message || e}`, false);
+          }
+        }
+
+        /* ---------- ML Summary ---------- */
+        const ML_DATA_KEY = 'wb_graphs_v0_2_9_ml_dataset';
+        const ML_LAST_EXPORT_KEY = 'wb_graphs_v0_2_9_ml_last_export_id';
+        const ML_MAX_RECORDS = 200;
+        const ML_DRIVE_URL = 'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec';
+        const ML_DRIVE_FILE = 'wb_graphs_v0_2_9_ml_dataset.json';
+        let mlLastAnomalies = null;
+        let mlDatasetCache = null;
+        let mlDatasetLoadPromise = null;
+        let mlDatasetWritePromise = Promise.resolve();
+        let mlDatasetSyncState = {
+          loading: false,
+          remote: false,
+          ready: false,
+          error: ''
+        };
+        const FEATURE_KEYS = [
+          'tc_total','tc_total_delta','tc_total_delta_pct',
+          'tc_volatility','tc_slope_pct',
+          'cov_swat_delta_pct','cov_stream_delta_pct',
+          'sel_swat_delta_pct','sel_stream_delta_pct',
+          'avg_total_delta',
+          'chp_total_delta_pct','chp_ios_delta_pct','chp_android_delta_pct',
+          'release_anoms','type_anoms','platform_anoms','anom_score'
+        ];
+
+        function hashMlText(value){
+          const text = String(value || '');
+          let hash = 0;
+          for(let i = 0; i < text.length; i++){
+            hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+          }
+          return Math.abs(hash).toString(36);
+        }
+        function buildMlEntryId(entry, index = 0){
+          const seed = JSON.stringify({
+            time: entry?.time || '',
+            label: entry?.label || '',
+            labeledAt: entry?.labeledAt || '',
+            features: entry?.features || null,
+            index
+          });
+          return entry?.id || `ml_${hashMlText(seed)}`;
+        }
+        function normalizeMlEntry(entry, index = 0){
+          if(!entry || typeof entry !== 'object') return null;
+          const features = entry.features && typeof entry.features === 'object' ? { ...entry.features } : null;
+          if(!features) return null;
+          const time = entry.time ? String(entry.time) : new Date().toISOString();
+          const label = entry.label === 'ok' || entry.label === 'fail' ? entry.label : null;
+          return {
+            id: buildMlEntryId(entry, index),
+            time,
+            features,
+            label,
+            labeledAt: entry.labeledAt ? String(entry.labeledAt) : null
+          };
+        }
+        function normalizeMlDataset(arr){
+          const safe = Array.isArray(arr) ? arr : [];
+          const map = new Map();
+          safe.forEach((item, index) => {
+            const normalized = normalizeMlEntry(item, index);
+            if(!normalized) return;
+            const prev = map.get(normalized.id);
+            if(!prev){
+              map.set(normalized.id, normalized);
+              return;
+            }
+            map.set(normalized.id, {
+              ...prev,
+              ...normalized,
+              label: normalized.label || prev.label || null,
+              labeledAt: normalized.labeledAt || prev.labeledAt || null
+            });
+          });
+          return Array.from(map.values())
+            .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+            .slice(-ML_MAX_RECORDS);
+        }
+        function readMlDatasetLocal(){
+          try{
+            return normalizeMlDataset(JSON.parse(localStorage.getItem(ML_DATA_KEY) || '[]'));
+          }catch{
+            return [];
+          }
+        }
+        function getMlDataset(){
+          if(Array.isArray(mlDatasetCache)) return mlDatasetCache.slice();
+          mlDatasetCache = readMlDatasetLocal();
+          return mlDatasetCache.slice();
+        }
+        function setMlDataset(arr){
+          const out = normalizeMlDataset(arr);
+          mlDatasetCache = out.slice();
+          localStorage.setItem(ML_DATA_KEY, JSON.stringify(out));
+          return out.slice();
+        }
+        function rememberLastMlExportId(id){
+          if(!id) return;
+          try{ localStorage.setItem(ML_LAST_EXPORT_KEY, id); }catch(e){}
+        }
+        function getLastMlExportId(){
+          try{ return localStorage.getItem(ML_LAST_EXPORT_KEY) || ''; }catch(e){ return ''; }
+        }
+        async function mlDriveFetch(rawUrl, opts = {}){
+          const proxiedUrl = buildProxyRequestUrl(rawUrl);
+          const headers = Object.assign({ Accept: 'application/json' }, opts.headers || {});
+          return fetchWithRetry(async () => {
+            const res = await fetch(proxiedUrl, {
+              method: opts.method || 'GET',
+              headers,
+              body: opts.body,
+              redirect: 'follow',
+              cache: 'no-store',
+              credentials: 'omit',
+              mode: 'cors',
+              keepalive: false
+            });
+            const text = await res.text();
+            if(!res.ok && res.status !== 302){
+              throw new Error(`Drive HTTP ${res.status}: ${text.slice(0, 200)}`);
+            }
+            return text;
+          }, { maxTries: 3, baseDelay: 220 });
+        }
+        async function mlDriveGetDataset(){
+          const raw = await mlDriveFetch(`${ML_DRIVE_URL}?op=get&name=${encodeURIComponent(ML_DRIVE_FILE)}`, { method: 'GET' });
+          try{
+            return normalizeMlDataset(JSON.parse(raw || '[]'));
+          }catch(e){
+            return [];
+          }
+        }
+        async function mlDriveSaveDataset(dataset){
+          const payload = JSON.stringify(normalizeMlDataset(dataset));
+          await mlDriveFetch(`${ML_DRIVE_URL}?name=${encodeURIComponent(ML_DRIVE_FILE)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload
+          });
+          return true;
+        }
+        async function ensureMlDatasetLoaded(force = false){
+          if(mlDatasetLoadPromise && !force) return mlDatasetLoadPromise;
+          mlDatasetSyncState.loading = true;
+          mlDatasetLoadPromise = (async () => {
+            const local = readMlDatasetLocal();
+            mlDatasetCache = local.slice();
+            try{
+              const remote = await mlDriveGetDataset();
+              const merged = normalizeMlDataset([...(local || []), ...(remote || [])]);
+              setMlDataset(merged);
+              mlDatasetSyncState.remote = true;
+              mlDatasetSyncState.error = '';
+            }catch(e){
+              mlDatasetSyncState.remote = false;
+              mlDatasetSyncState.error = e?.message || String(e);
+              mlDatasetCache = local.slice();
+            }finally{
+              mlDatasetSyncState.loading = false;
+              mlDatasetSyncState.ready = true;
+              renderMlSummary();
+            }
+            return getMlDataset();
+          })();
+          return mlDatasetLoadPromise;
+        }
+        async function syncMlDatasetToDrive(showErrorToast = false){
+          const snapshot = getMlDataset();
+          mlDatasetWritePromise = mlDatasetWritePromise
+            .catch(() => null)
+            .then(async () => {
+              try{
+                await mlDriveSaveDataset(snapshot);
+                mlDatasetSyncState.remote = true;
+                mlDatasetSyncState.error = '';
+                mlDatasetSyncState.ready = true;
+                return true;
+              }catch(e){
+                mlDatasetSyncState.remote = false;
+                mlDatasetSyncState.error = e?.message || String(e);
+                if(showErrorToast){
+                  showToast('ML-история сохранена локально, но не дошла до Drive', false);
+                }
+                return false;
+              }finally{
+                renderMlSummary();
+              }
+            });
+          return mlDatasetWritePromise;
+        }
+        function featureVector(f){
+          return FEATURE_KEYS.map(k => Number(f?.[k] ?? 0));
+        }
+        function findDataset(chart, label){
+          if(!chart?.data?.datasets) return null;
+          const l = String(label || '').toLowerCase();
+          return chart.data.datasets.find(d => String(d.label || '').toLowerCase().includes(l)) || null;
+        }
+        function seriesStats(arr){
+          const data = (Array.isArray(arr) ? arr : []).map(v => Number(v) || 0);
+          const n = data.length;
+          const last = n ? data[n-1] : 0;
+          const prev = n > 1 ? data[n-2] : 0;
+          const delta = last - prev;
+          const deltaPct = prev !== 0 ? (delta / prev * 100) : (last !== 0 ? 100 : 0);
+          const mean = n ? data.reduce((s,v)=>s+v,0) / n : 0;
+          const std = n ? Math.sqrt(data.reduce((s,v)=>s+Math.pow(v-mean,2),0) / n) : 0;
+          const slopePct = n > 1 ? ((last - data[0]) / (data[0] || 1) * 100) : 0;
+          return { last, prev, delta, deltaPct, mean, std, vol: std, slopePct, data };
+        }
+        function anomalyFromSeries(series, label, opts = {}){
+          const stat = seriesStats(series);
+          if(!stat.data.length || stat.data.length < 2) return null;
+          const z = stat.std ? ((stat.last - stat.mean) / stat.std) : 0;
+          const minAbs = Number(opts.minAbs ?? 5);
+          const pct = Number(opts.pct ?? 30);
+          const zTh = Number(opts.z ?? 2);
+          const deltaAbs = Math.abs(stat.delta);
+          const deltaPctAbs = Math.abs(stat.deltaPct);
+          const isAnom = (Math.abs(z) >= zTh && deltaAbs >= minAbs) ||
+            (deltaPctAbs >= pct && deltaAbs >= minAbs);
+          if(!isAnom) return null;
+          return { label, delta: stat.delta, deltaPct: stat.deltaPct, last: stat.last, prev: stat.prev, z };
+        }
+        function buildSeriesFromRows(rows, pick){
+          return (Array.isArray(rows) ? rows : []).map(r => Number(pick(r)) || 0);
+        }
+        function getCutSeriesByLabel(part){
+          if(!cutChart?.data?.datasets) return [];
+          const key = String(part || '').toLowerCase();
+          const ds = cutChart.data.datasets.find(d => String(d.label || '').toLowerCase().includes(key));
+          return Array.isArray(ds?.data) ? ds.data.slice() : [];
+        }
+        function buildLagSeries(storeSeries, cutSeries){
+          const len = Math.max(storeSeries.length, cutSeries.length);
+          const out = [];
+          for(let i=0;i<len;i++){
+            const s = Number(storeSeries[i]);
+            const c = Number(cutSeries[i]);
+            if(Number.isFinite(s) && Number.isFinite(c)) out.push(s - c);
+          }
+          return out;
+        }
+        function detectReleaseAnomalies(){
+          const out = [];
+          const tcRows = window.__tcRowsAll || [];
+          const covRows = window.__covRowsAll || [];
+          const selRows = window.__selRowsAll || [];
+          const avgRows = window.__avgRowsAll || [];
+          const chpRows = window.__chpRowsAll || [];
+
+          const tcSeries = buildSeriesFromRows(tcRows, r => r.total);
+          const covSwatSeries = buildSeriesFromRows(covRows, r => Number(r.swatCount||0));
+          const covStreamSeries = buildSeriesFromRows(covRows, r => Number(r.streamCount||0));
+          const covSeries = buildSeriesFromRows(covRows, r => (Number(r.swatCount||0) + Number(r.streamCount||0)));
+          const selSeries = buildSeriesFromRows(selRows, r => (Number(r.swatCount||0) + Number(r.streamCount||0)));
+          const avgSeries = buildSeriesFromRows(avgRows, r => (Number(r.total||0) / 60000));
+          const avgWeightedSeries = buildSeriesFromRows(avgRows, r => (Number(r.totalWeighted||0) / 60000));
+          const chpSeries = buildSeriesFromRows(chpRows, r => Number(r.total||0));
+          const storeIosSeries = getCutSeriesByLabel('ios store');
+          const storeAndSeries = getCutSeriesByLabel('android store');
+          const cutIosSeries = getCutSeriesByLabel('ios cutoff');
+          const cutAndSeries = getCutSeriesByLabel('android cutoff');
+          const lagIosSeries = buildLagSeries(storeIosSeries, cutIosSeries);
+          const lagAndSeries = buildLagSeries(storeAndSeries, cutAndSeries);
+
+          const pushIf = (label, series, opts) => {
+            const a = anomalyFromSeries(series, label, opts);
+            if(a) out.push(a);
+          };
+          pushIf('TC Total', tcSeries, { pct: 25, z: 2 });
+          pushIf('High/Blocker SWAT', covSwatSeries, { pct: 30, z: 2 });
+          pushIf('High/Blocker STREAM', covStreamSeries, { pct: 30, z: 2 });
+          pushIf('High/Blocker SWAT+Stream', covSeries, { pct: 30, z: 2 });
+          pushIf('Selective Total', selSeries, { pct: 30, z: 2 });
+          pushIf('Avg Time (Total)', avgSeries, { pct: 15, z: 2, minAbs: 0.5 });
+          pushIf('Avg Time (Weighted)', avgWeightedSeries, { pct: 15, z: 2, minAbs: 0.5 });
+          pushIf('Cherepiki Total', chpSeries, { pct: 40, z: 2, minAbs: 3 });
+          pushIf('iOS Cutoff', cutIosSeries, { pct: 3, z: 2, minAbs: 15 });
+          pushIf('Android Cutoff', cutAndSeries, { pct: 3, z: 2, minAbs: 15 });
+          pushIf('Store iOS', storeIosSeries, { pct: 3, z: 2, minAbs: 20 });
+          pushIf('Store Android', storeAndSeries, { pct: 3, z: 2, minAbs: 20 });
+          pushIf('Lag Store iOS', lagIosSeries, { pct: 20, z: 2, minAbs: 15 });
+          pushIf('Lag Store Android', lagAndSeries, { pct: 20, z: 2, minAbs: 15 });
+
+          out.sort((a,b)=> (Math.abs(b.z||0) + Math.abs(b.deltaPct||0)/100) - (Math.abs(a.z||0) + Math.abs(a.deltaPct||0)/100));
+          return { count: out.length, list: out.slice(0, 4) };
+        }
+        function typeAnomsFromRows(rows, platformLabel){
+          if(!Array.isArray(rows) || rows.length < 2) return [];
+          const last = rows[rows.length-1] || {};
+          const prev = rows[rows.length-2] || {};
+          const keys = new Set([...(Object.keys(last.counts || {})), ...(Object.keys(prev.counts || {}))]);
+          const out = [];
+          keys.forEach(k => {
+            const lastVal = Number(last.counts?.[k] || 0);
+            const prevVal = Number(prev.counts?.[k] || 0);
+            const delta = lastVal - prevVal;
+            const deltaAbs = Math.abs(delta);
+            const deltaPct = prevVal ? (delta / prevVal * 100) : (lastVal ? 100 : 0);
+            if(deltaAbs >= 20 || (deltaAbs >= 5 && Math.abs(deltaPct) >= 60)){
+              out.push({ label: `${platformLabel}: ${k}`, delta, deltaPct, last: lastVal, prev: prevVal });
+            }
+          });
+          return out;
+        }
+        function typeAnomsFromChp(rows, labelPrefix){
+          if(!Array.isArray(rows) || rows.length < 2) return [];
+          const last = rows[rows.length-1] || {};
+          const prev = rows[rows.length-2] || {};
+          const keys = ['product','vlet','bug','crash'];
+          const out = [];
+          for(const k of keys){
+            const lastVal = Number(last[k] || 0);
+            const prevVal = Number(prev[k] || 0);
+            const delta = lastVal - prevVal;
+            const deltaAbs = Math.abs(delta);
+            const deltaPct = prevVal ? (delta / prevVal * 100) : (lastVal ? 100 : 0);
+            if(deltaAbs >= 10 || (deltaAbs >= 3 && Math.abs(deltaPct) >= 60)){
+              out.push({ label: `${labelPrefix}: ${k.toUpperCase()}`, delta, deltaPct, last: lastVal, prev: prevVal });
+            }
+          }
+          return out;
+        }
+        function detectTypeAnomalies(){
+          const out = [];
+          const iosRows = window.__iosTypesRowsAll || [];
+          const andRows = window.__andTypesRowsAll || [];
+          const chpRows = window.__chpTypesRowsAll || [];
+          out.push(...typeAnomsFromRows(iosRows, 'iOS'));
+          out.push(...typeAnomsFromRows(andRows, 'Android'));
+          out.push(...typeAnomsFromChp(chpRows, 'ЧП'));
+          out.sort((a,b)=> Math.abs(b.delta) - Math.abs(a.delta));
+          return { count: out.length, list: out.slice(0, 6) };
+        }
+        function detectPlatformAnomalies(){
+          const out = [];
+          const chpRows = window.__chpRowsAll || [];
+          if(chpRows.length >= 2){
+            const last = chpRows[chpRows.length-1];
+            const prev = chpRows[chpRows.length-2];
+            const metrics = [
+              { label: 'Cherepiki iOS', last: Number(last.ios||0), prev: Number(prev.ios||0) },
+              { label: 'Cherepiki Android', last: Number(last.android||0), prev: Number(prev.android||0) }
+            ];
+            for(const m of metrics){
+              const delta = m.last - m.prev;
+              const deltaAbs = Math.abs(delta);
+              const deltaPct = m.prev ? (delta / m.prev * 100) : (m.last ? 100 : 0);
+              if(deltaAbs >= 5 && Math.abs(deltaPct) >= 40){
+                out.push({ label: m.label, delta, deltaPct, last: m.last, prev: m.prev });
+              }
+            }
+          }
+
+          const iosRows = window.__iosTypesRowsAll || [];
+          const andRows = window.__andTypesRowsAll || [];
+          const sumTotals = rows => rows.map(r => Object.values(r.counts || {}).reduce((s,v)=>s+Number(v||0),0));
+          const iosSeries = sumTotals(iosRows);
+          const andSeries = sumTotals(andRows);
+          const iosAnom = anomalyFromSeries(iosSeries, 'Types iOS Total', { pct: 35, z: 2, minAbs: 5 });
+          const andAnom = anomalyFromSeries(andSeries, 'Types Android Total', { pct: 35, z: 2, minAbs: 5 });
+          if(iosAnom) out.push(iosAnom);
+          if(andAnom) out.push(andAnom);
+
+          out.sort((a,b)=> Math.abs(b.delta || 0) - Math.abs(a.delta || 0));
+          return { count: out.length, list: out.slice(0, 4) };
+        }
+        function computeAnomalies(){
+          const release = detectReleaseAnomalies();
+          const type = detectTypeAnomalies();
+          const platform = detectPlatformAnomalies();
+          const score = release.count + type.count + platform.count;
+          return { release, type, platform, score };
+        }
+        function sumSeries(a, b){
+          const arrA = Array.isArray(a) ? a : [];
+          const arrB = Array.isArray(b) ? b : [];
+          const len = Math.max(arrA.length, arrB.length);
+          const out = new Array(len);
+          for(let i=0;i<len;i++){
+            out[i] = (Number(arrA[i]) || 0) + (Number(arrB[i]) || 0);
+          }
+          return out;
+        }
+        function baselineStats(series, mode = 'mean'){
+          const data = (Array.isArray(series) ? series : []).map(v => Number(v)).filter(v => Number.isFinite(v));
+          if(data.length < 2){
+            return { last: data[data.length-1] || 0, base: null, n: 0, mode };
+          }
+          const last = data[data.length - 1];
+          if(mode === 'prev'){
+            const prev = data[data.length - 2];
+            return { last, base: prev, n: 1, mode };
+          }
+          const hist = data.slice(0, -1);
+          const mean = hist.reduce((s,v)=>s+v,0) / hist.length;
+          return { last, base: mean, n: hist.length, mode };
+        }
+        function diffToBase(stat){
+          if(!stat || !Number.isFinite(stat.base)) return { delta: null, deltaPct: null };
+          const delta = stat.last - stat.base;
+          const deltaPct = stat.base !== 0 ? (delta / stat.base * 100) : (stat.last ? 100 : 0);
+          return { delta, deltaPct };
+        }
+        function fmtDelta(delta, digits=0){
+          if(delta == null) return '—';
+          const v = digits ? Number(delta).toFixed(digits) : Math.round(Number(delta));
+          return `${delta >= 0 ? '+' : ''}${v}`;
+        }
+        function fmtDeltaPct(deltaPct){
+          if(deltaPct == null) return '';
+          return `(${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(2)}%)`;
+        }
+        function computeMlFeatures(){
+          if(!tcChart || !Array.isArray(tcChart.data?.labels) || tcChart.data.labels.length === 0){
+            return null;
+          }
+          const tcTotal = seriesStats(findDataset(tcChart, 'всего')?.data || []);
+          const covSwat = seriesStats(findDataset(covChart, 'swat')?.data || []);
+          const covStream = seriesStats(findDataset(covChart, 'stream')?.data || []);
+          const selSwat = seriesStats(findDataset(selChart, 'swat')?.data || []);
+          const selStream = seriesStats(findDataset(selChart, 'stream')?.data || []);
+          const avgTotal = seriesStats(findDataset(avgChart, 'общее')?.data || []);
+          const chpTotal = seriesStats(findDataset(chpChart, 'всего')?.data || []);
+          const chpIos = seriesStats(findDataset(chpChart, 'ios')?.data || []);
+          const chpAndroid = seriesStats(findDataset(chpChart, 'android')?.data || []);
+          const anomalies = computeAnomalies();
+          mlLastAnomalies = anomalies;
+
+          return {
+            tc_total: tcTotal.last,
+            tc_total_delta: tcTotal.delta,
+            tc_total_delta_pct: tcTotal.deltaPct,
+            tc_volatility: tcTotal.vol,
+            tc_slope_pct: tcTotal.slopePct,
+            cov_swat_delta_pct: covSwat.deltaPct,
+            cov_stream_delta_pct: covStream.deltaPct,
+            sel_swat_delta_pct: selSwat.deltaPct,
+            sel_stream_delta_pct: selStream.deltaPct,
+            avg_total_delta: avgTotal.delta,
+            chp_total_delta_pct: chpTotal.deltaPct,
+            chp_ios_delta_pct: chpIos.deltaPct,
+            chp_android_delta_pct: chpAndroid.deltaPct,
+            release_anoms: anomalies.release.count,
+            type_anoms: anomalies.type.count,
+            platform_anoms: anomalies.platform.count,
+            anom_score: anomalies.score
+          };
+        }
+        function trainMlModel(dataset){
+          const labeled = (dataset || []).filter(d => d && (d.label === 'ok' || d.label === 'fail'));
+          const count = labeled.length;
+          const minCount = 5;
+          if (count < 5){
+            return {
+              trained:false,
+              count,
+              minCount,
+              remaining: Math.max(0, minCount - count),
+              reason: count > 0
+                ? `Нужно минимум ${minCount} размеченных выгрузок. Сейчас: ${count}/${minCount}`
+                : `Нужно минимум ${minCount} размеченных выгрузок`
+            };
+          }
+          const X = labeled.map(d => featureVector(d.features));
+          const y = labeled.map(d => d.label === 'fail' ? 1 : 0);
+          const n = FEATURE_KEYS.length;
+          const mean = new Array(n).fill(0);
+          const std = new Array(n).fill(0);
+          for (let i=0;i<n;i++){
+            mean[i] = X.reduce((s,row)=>s+row[i],0) / count;
+            std[i] = Math.sqrt(X.reduce((s,row)=>s+Math.pow(row[i]-mean[i],2),0) / count) || 1;
+          }
+          const Xn = X.map(row => row.map((v,i)=>(v-mean[i])/std[i]));
+          let w = new Array(n+1).fill(0);
+          const lr = 0.15, iters = 400;
+          for (let it=0; it<iters; it++){
+            let grad = new Array(n+1).fill(0);
+            for (let r=0; r<count; r++){
+              const row = Xn[r];
+              let z = w[0];
+              for (let i=0;i<n;i++) z += w[i+1]*row[i];
+              const p = 1 / (1 + Math.exp(-z));
+              const err = p - y[r];
+              grad[0] += err;
+              for (let i=0;i<n;i++) grad[i+1] += err * row[i];
+            }
+            for (let i=0;i<n+1;i++) w[i] -= lr * (grad[i] / count);
+          }
+          return { trained:true, count, minCount, remaining: 0, mean, std, w, featureKeys: FEATURE_KEYS };
+        }
+        function predictMl(features, model){
+          if (!model?.trained) return null;
+          const x = featureVector(features).map((v,i)=>(v - model.mean[i]) / model.std[i]);
+          let z = model.w[0];
+          for (let i=0;i<x.length;i++) z += model.w[i+1]*x[i];
+          return 1 / (1 + Math.exp(-z));
+        }
+        function recordMlExport(){
+          const features = computeMlFeatures();
+          if (!features) return null;
+          const entry = {
+            id: `ml_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            time: new Date().toISOString(),
+            features,
+            label: null
+          };
+          const data = getMlDataset();
+          data.push(entry);
+          setMlDataset(data);
+          rememberLastMlExportId(entry.id);
+          return entry;
+        }
+        async function labelLastExport(label){
+          const data = getMlDataset();
+          if (!data.length) return { ok:false, reason:'Нет сохраненной ML-выгрузки' };
+          const lastId = getLastMlExportId();
+          const index = lastId
+            ? data.findIndex(item => item && item.id === lastId)
+            : (data.length - 1);
+          const targetIndex = index >= 0 ? index : (data.length - 1);
+          if(targetIndex < 0 || !data[targetIndex]) return { ok:false, reason:'Не удалось найти последнюю выгрузку для разметки' };
+          data[targetIndex].label = label;
+          data[targetIndex].labeledAt = new Date().toISOString();
+          rememberLastMlExportId(data[targetIndex].id);
+          setMlDataset(data);
+          const synced = await syncMlDatasetToDrive(false);
+          renderMlSummary();
+          return { ok:true, synced };
+        }
+        function renderMlSummary(){
+          if (!mlSummaryBody) return;
+          const features = computeMlFeatures();
+          if (!features){
+            mlSummaryBody.innerHTML = '<div class="text-slate-500 text-sm">Нет данных для анализа. Сначала запустите сбор.</div>';
+            return;
+          }
+
+          const data = getMlDataset();
+          const model = trainMlModel(data);
+          const prob = predictMl(features, model);
+          let statusText = 'Нет обучения';
+          let statusClass = 'ml-warn';
+          if (mlDatasetSyncState.loading && !model.trained){
+            statusText = 'Загрузка истории ML';
+          } else if (!model.trained && model.count > 0) {
+            statusText = `Разметка ${model.count}/${model.minCount || 5}`;
+          } else if (!model.trained && !model.count) {
+            statusText = 'Нет размеченной истории';
+          }
+          if (prob != null){
+            if (prob >= 0.7){ statusText = `Регресс (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-bad'; }
+            else if (prob >= 0.4){ statusText = `Внимание (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-warn'; }
+            else { statusText = `OK (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-ok'; }
+          }
+
+          const tcSeries = findDataset(tcChart, 'всего')?.data || [];
+          const covSwatSeries = findDataset(covChart, 'swat')?.data || [];
+          const covStreamSeries = findDataset(covChart, 'stream')?.data || [];
+          const covSeries = sumSeries(covSwatSeries, covStreamSeries);
+          const selSeries = sumSeries(
+            findDataset(selChart, 'swat')?.data || [],
+            findDataset(selChart, 'stream')?.data || []
+          );
+          const avgSeries = findDataset(avgChart, 'общее')?.data || [];
+          const avgWeightedSeries = buildSeriesFromRows(window.__avgRowsAll || [], r => (Number(r.totalWeighted || 0) / 60000));
+          const chpSeries = findDataset(chpChart, 'всего')?.data || [];
+          const chpIosSeries = findDataset(chpChart, 'ios')?.data || [];
+          const chpAndSeries = findDataset(chpChart, 'android')?.data || [];
+          const storeIosSeries = getCutSeriesByLabel('ios store');
+          const storeAndSeries = getCutSeriesByLabel('android store');
+          const cutIosSeries = getCutSeriesByLabel('ios cutoff');
+          const cutAndSeries = getCutSeriesByLabel('android cutoff');
+          const lagIosSeries = buildLagSeries(storeIosSeries, cutIosSeries);
+          const lagAndSeries = buildLagSeries(storeAndSeries, cutAndSeries);
+
+          const compareMode = comparePrevOnly?.checked ? 'prev' : 'mean';
+          const compareLabel = compareMode === 'prev' ? 'К предыдущему релизу' : 'К средней истории';
+          const compareDeltaLabel = compareMode === 'prev' ? 'Разница к предыдущему релизу' : 'Разница к средней истории';
+
+          const previousValueFromSeries = (series) => {
+            const data = (Array.isArray(series) ? series : [])
+              .map(v => Number(v))
+              .filter(v => Number.isFinite(v));
+            return data.length >= 2 ? data[data.length - 2] : null;
+          };
+
+          const tcBase = baselineStats(tcSeries, compareMode);
+          const covBase = baselineStats(covSeries, compareMode);
+          const covSwatBase = baselineStats(covSwatSeries, compareMode);
+          const covStreamBase = baselineStats(covStreamSeries, compareMode);
+          const selBase = baselineStats(selSeries, compareMode);
+          const avgBase = baselineStats(avgSeries, compareMode);
+          const avgWeightedBase = baselineStats(avgWeightedSeries, compareMode);
+          const chpBase = baselineStats(chpSeries, compareMode);
+          const chpIosBase = baselineStats(chpIosSeries, compareMode);
+          const chpAndBase = baselineStats(chpAndSeries, compareMode);
+          const cutIosBase = baselineStats(cutIosSeries, compareMode);
+          const cutAndBase = baselineStats(cutAndSeries, compareMode);
+          const storeIosBase = baselineStats(storeIosSeries, compareMode);
+          const storeAndBase = baselineStats(storeAndSeries, compareMode);
+          const lagIosBase = baselineStats(lagIosSeries, compareMode);
+          const lagAndBase = baselineStats(lagAndSeries, compareMode);
+
+          const tcPrev = previousValueFromSeries(tcSeries);
+          const covPrev = previousValueFromSeries(covSeries);
+          const covSwatPrev = previousValueFromSeries(covSwatSeries);
+          const covStreamPrev = previousValueFromSeries(covStreamSeries);
+          const selPrev = previousValueFromSeries(selSeries);
+          const avgPrev = previousValueFromSeries(avgSeries);
+          const avgWeightedPrev = previousValueFromSeries(avgWeightedSeries);
+          const chpPrev = previousValueFromSeries(chpSeries);
+          const chpIosPrev = previousValueFromSeries(chpIosSeries);
+          const chpAndPrev = previousValueFromSeries(chpAndSeries);
+          const cutIosPrev = previousValueFromSeries(cutIosSeries);
+          const cutAndPrev = previousValueFromSeries(cutAndSeries);
+          const storeIosPrev = previousValueFromSeries(storeIosSeries);
+          const storeAndPrev = previousValueFromSeries(storeAndSeries);
+          const lagIosPrev = previousValueFromSeries(lagIosSeries);
+          const lagAndPrev = previousValueFromSeries(lagAndSeries);
+
+          const compareNote = tcBase?.n
+            ? (compareMode === 'prev'
+                ? 'Сравнение с предыдущим релизом'
+                : `Сравнение со средней историей по ${tcBase.n} прошлым релизам`)
+            : 'Истории релизов недостаточно для сравнения';
+
+          const tcDiff = diffToBase(tcBase);
+          const covDiff = diffToBase(covBase);
+          const covSwatDiff = diffToBase(covSwatBase);
+          const covStreamDiff = diffToBase(covStreamBase);
+          const selDiff = diffToBase(selBase);
+          const avgDiff = diffToBase(avgBase);
+          const avgWeightedDiff = diffToBase(avgWeightedBase);
+          const chpDiff = diffToBase(chpBase);
+          const chpIosDiff = diffToBase(chpIosBase);
+          const chpAndDiff = diffToBase(chpAndBase);
+          const cutIosDiff = diffToBase(cutIosBase);
+          const cutAndDiff = diffToBase(cutAndBase);
+          const storeIosDiff = diffToBase(storeIosBase);
+          const storeAndDiff = diffToBase(storeAndBase);
+          const lagIosDiff = diffToBase(lagIosBase);
+          const lagAndDiff = diffToBase(lagAndBase);
+          const histCount = tcBase.n;
+
+          const anomalies = mlLastAnomalies || computeAnomalies();
+          const escHtml = (s) => String(s || '')
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/\"/g,'&quot;')
+            .replace(/'/g,'&#39;');
+          const tip = (text) => `data-tip="${escHtml(text)}"`;
+          const fmtPct = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+          const intFmt = new Intl.NumberFormat('ru-RU');
+
+          const descs = {
+            tc: 'Объем регресса. Считается как сумма всех Smoke и Selective тест-кейсов в релизе.',
+            hbSwat: 'Критичные проверки SWAT. Количество High/Blocker тест-кейсов, которые выполнила команда SWAT.',
+            hbStream: 'Критичные проверки Stream. Количество High/Blocker тест-кейсов, которые выполнили стримы.',
+            hbTotal: 'Общее число критичных проверок. Сумма High/Blocker кейсов SWAT и Stream.',
+            selTotal: 'Селективные проверки. Общее число Selective тест-кейсов по релизу.',
+            avgTotal: 'Среднее время прохождения критичного кейса. Считается как среднее время High/Blocker кейсов в минутах.',
+            avgCaseWeighted: 'Среднее время на один тест-кейс с учетом объема кейсов. Показывает реальную скорость прохождения одного сценария.',
+            chpTotal: 'Общее количество ЧП в релизе. Считается по задачам из Deploy-lab, которые попали после cutoff.',
+            chpIos: 'Количество ЧП, относящихся к iOS-релизу.',
+            chpAnd: 'Количество ЧП, относящихся к Android-релизу.',
+            cutIos: 'Время начала iOS cutoff. Считается в минутах от 00:00 локального дня релиза; валидное окно — 14:00 плюс-минус 10 минут.',
+            cutAnd: 'Время начала Android cutoff. Считается в минутах от 00:00 локального дня релиза; валидное окно — 14:00 плюс-минус 10 минут.',
+            storeIos: 'Время отправки iOS в Store. Считается в минутах от 00:00 локального дня релиза; целевой дедлайн для команды — до 18:00.',
+            storeAnd: 'Время отправки Android в Store. Считается в минутах от 00:00 локального дня релиза; целевой дедлайн для команды — до 18:00.',
+            lagIos: 'Задержка после cutoff для iOS. Формула: время отправки в Store минус время начала cutoff. Рабочий коридор — до 4 часов.',
+            lagAnd: 'Задержка после cutoff для Android. Формула: время отправки в Store минус время начала cutoff. Рабочий коридор — до 4 часов.',
+            vol: 'Разброс объема регресса. Это стандартное отклонение total test cases по истории релизов.',
+            slope: 'Тренд объема регресса. Показывает, как изменился объем проверок от первого релиза диапазона к последнему.',
+            anoms: 'Количество резких отклонений по релизам, типам задач и платформам.'
+          };
+          const anomRuleGeneric = 'Аномалия: резкое изменение последнего релиза. Срабатывает, если |z| >= 2 и |Δ| >= minAbs, либо |Δ%| >= порога и |Δ| >= minAbs.';
+          const translateTypeName = (value) => {
+            const map = {
+              'bug': 'баги',
+              'task': 'задачи',
+              'analytics': 'аналитика',
+              'release': 'релизы',
+              'epic': 'эпики',
+              'user story': 'user story',
+              'testing': 'тестирование',
+              'documentation': 'документация',
+              'test automation': 'автотесты',
+              'feature': 'фичи',
+              'tech dept': 'техдолг',
+              'product': 'аналитика',
+              'vlet': 'влет',
+              'crash': 'краши'
+            };
+            const key = String(value || '').trim().toLowerCase();
+            return map[key] || value || 'прочее';
+          };
+          const describeTypeAnomaly = (platform, typeName) => `Изменение количества задач типа «${translateTypeName(typeName)}» на платформе ${platform}. Сравнивается последний релиз с выбранной базой.`;
+          const presentMetricInfo = (label) => {
+            const raw = String(label || '').trim();
+            const l = raw.toLowerCase();
+            if(l.includes('tc total')) return { label:'Объем регресса', desc: descs.tc };
+            if(l.includes('high/blocker swat+stream')) return { label:'Критичные проверки SWAT + Stream', desc: descs.hbTotal };
+            if(l.includes('high/blocker swat')) return { label:'Критичные проверки SWAT', desc: descs.hbSwat };
+            if(l.includes('high/blocker stream')) return { label:'Критичные проверки Stream', desc: descs.hbStream };
+            if(l.includes('selective')) return { label:'Селективные проверки', desc: descs.selTotal };
+            if(l.includes('avg time') && (l.includes('weighted') || l.includes('взвеш'))) return { label:'Среднее время на один кейс', desc: descs.avgCaseWeighted };
+            if(l.includes('avg time') || l === 'среднее время') return { label:'Среднее время прохождения', desc: descs.avgTotal };
+            if(l.includes('cherepiki total') || l.includes('чп (всего)') || l === 'чп всего') return { label:'ЧП всего', desc: descs.chpTotal };
+            if(l.includes('cherepiki ios') || l.includes('чп ios')) return { label:'ЧП iOS', desc: descs.chpIos };
+            if(l.includes('cherepiki android') || l.includes('чп android')) return { label:'ЧП Android', desc: descs.chpAnd };
+            if(l.includes('lag store ios') || l.includes('лаг ios') || l.includes('задержка после cutoff ios')) return { label:'Задержка после cutoff iOS', desc: descs.lagIos };
+            if(l.includes('lag store android') || l.includes('лаг android') || l.includes('задержка после cutoff android')) return { label:'Задержка после cutoff Android', desc: descs.lagAnd };
+            if(l.includes('ios cutoff') || l.includes('cutoff ios')) return { label:'Время начала cutoff iOS', desc: descs.cutIos };
+            if(l.includes('android cutoff') || l.includes('cutoff android')) return { label:'Время начала cutoff Android', desc: descs.cutAnd };
+            if(l.includes('store ios')) return { label:'Время отправки в Store iOS', desc: descs.storeIos };
+            if(l.includes('store android')) return { label:'Время отправки в Store Android', desc: descs.storeAnd };
+            if(l.includes('разброс')) return { label:'Разброс объема регресса', desc: descs.vol };
+            if(l.includes('тренд')) return { label:'Тренд объема регресса', desc: descs.slope };
+            if(l.startsWith('android:') || l.startsWith('ios:')){
+              const [platform, typeName] = raw.split(':').map(part => String(part || '').trim());
+              return { label: `${platform}: ${translateTypeName(typeName)}`, desc: describeTypeAnomaly(platform, typeName) };
+            }
+            if(l.startsWith('чп:') || l.includes('чп:')){
+              const typeName = raw.split(':')[1] || raw;
+              return { label: `ЧП: ${translateTypeName(typeName)}`, desc: `Изменение количества ЧП типа «${translateTypeName(typeName)}» между последним релизом и базой сравнения.` };
+            }
+            return { label: raw, desc: 'Показатель из ML-сводки.' };
+          };
+          const getAnomDesc = (label) => {
+            const info = presentMetricInfo(label);
+            return `${info.desc || 'Метрика без описания.'} ${anomRuleGeneric}`;
+          };
+
+          const formatClockMinutes = (minutes) => {
+            if(!Number.isFinite(minutes)) return '—';
+            const total = Math.max(0, Math.round(minutes));
+            const hh = String(Math.floor(total / 60)).padStart(2, '0');
+            const mm = String(total % 60).padStart(2, '0');
+            return `${hh}:${mm}`;
+          };
+          const formatCurrentValue = (kind, value, digits = 0) => {
+            if(!Number.isFinite(value)) return '—';
+            if(kind === 'clock') return formatClockMinutes(value);
+            if(kind === 'minutes') return `${Number(value).toFixed(digits)} мин`;
+            if(kind === 'percent') return `${Number(value).toFixed(digits)}%`;
+            return intFmt.format(Math.round(value));
+          };
+          const buildMetricCompareFacts = (previousText, historyText) => {
+            const facts = [
+              { label: 'Предыдущий релиз', value: previousText || '—' }
+            ];
+            if(compareMode !== 'prev'){
+              facts.push({ label: 'Средняя история', value: historyText || '—' });
+            }
+            return facts;
+          };
+          const formatCutoffHint = (minutes, targetMinutes) => {
+            if(!Number.isFinite(minutes)) return 'Нет данных по cutoff';
+            const from = formatClockMinutes(targetMinutes - CUT_TARGET_WINDOW_MIN);
+            const to = formatClockMinutes(targetMinutes + CUT_TARGET_WINDOW_MIN);
+            if(minutes < targetMinutes - CUT_TARGET_WINDOW_MIN) return `раньше окна ${from}–${to} на ${Math.round((targetMinutes - CUT_TARGET_WINDOW_MIN) - minutes)} мин`;
+            if(minutes <= targetMinutes + CUT_TARGET_WINDOW_MIN) return `в целевом окне ${from}–${to}`;
+            return `позже окна ${from}–${to} на ${Math.round(minutes - (targetMinutes + CUT_TARGET_WINDOW_MIN))} мин`;
+          };
+          const formatStoreHint = (minutes) => {
+            if(!Number.isFinite(minutes)) return 'Нет данных по store';
+            if(minutes <= STORE_DEADLINE_MINUTES) return 'до дедлайна 18:00';
+            return `после 18:00 на ${Math.round(minutes - STORE_DEADLINE_MINUTES)} мин`;
+          };
+          const formatLagHint = (minutes) => {
+            if(!Number.isFinite(minutes)) return 'Нет данных по лагу';
+            if(minutes <= 120) return 'быстрый лаг до 2 часов';
+            if(minutes <= LAG_TARGET_MAX_MINUTES) return 'рабочий лаг до 4 часов';
+            return `длинный лаг ${Math.round(minutes)} мин`;
+          };
+          const buildMetricTooltip = (item) => {
+            const bits = [item.desc];
+            bits.push(`Текущее значение: ${item.valueText}.`);
+            if(Array.isArray(item.compareFacts) && item.compareFacts.length){
+              item.compareFacts.forEach(fact => {
+                bits.push(`${fact.label}: ${fact.value}.`);
+              });
+            }
+            bits.push(compareNote);
+            if(item.businessKind === 'cutoff') bits.push('Для cutoff важно попасть в окно 14:00 плюс-минус 10 минут.');
+            else if(item.businessKind === 'store') bits.push('Для Store важно уложиться в дедлайн до 18:00.');
+            else if(item.businessKind === 'lag') bits.push('Для задержки после cutoff рабочий коридор составляет до 4 часов.');
+            else if(item.better === 'down') bits.push('Для этой метрики меньшие значения лучше.');
+            else if(item.better === 'up') bits.push('Для этой метрики большие значения лучше.');
+            if(item.note) bits.push(`Контекст: ${item.note}.`);
+            return bits.filter(Boolean).join(' ');
+          };
+          const classifyMetricTone = (item) => {
+            if(item?.tone) return item.tone;
+            const delta = item?.delta;
+            const better = item?.better;
+            if(delta == null || !Number.isFinite(delta) || delta === 0) return 'neutral';
+            if(better === 'up') return delta > 0 ? 'good' : 'bad';
+            if(better === 'down') return delta < 0 ? 'good' : 'bad';
+            return 'neutral';
+          };
+          const formatDeltaLine = (item) => {
+            if(item.delta == null || !Number.isFinite(item.delta)) return 'Нет базы для сравнения';
+            const suffix = item.deltaUnit ? ` ${item.deltaUnit}` : '';
+            const pct = Number.isFinite(item.pct) ? ` ${fmtDeltaPct(item.pct)}` : '';
+            return `${fmtDelta(item.delta, item.deltaDigits || 0)}${suffix}${pct}`.trim();
+          };
+          const renderMetricCompareFacts = (item, tooltipText) => {
+            if(!Array.isArray(item.compareFacts) || !item.compareFacts.length) return '';
+            return `
+              <div class="ml-metric-compare ml-tip-target" ${tip(tooltipText)}>
+                ${item.compareFacts.map(fact => `
+                  <div class="ml-metric-compare-row">
+                    <span class="ml-metric-compare-label">${fact.label}</span>
+                    <span class="ml-metric-compare-value">${fact.value || '—'}</span>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          };
+          const renderMetricCard = (item) => {
+            const tone = classifyMetricTone(item);
+            const tooltipText = buildMetricTooltip(item);
+            return `
+              <div class="ml-metric-card ml-metric-card--${tone}">
+                <div class="ml-metric-label ml-tip-target" ${tip(tooltipText)}>${item.label}</div>
+                <div class="ml-metric-value ml-tip-target" ${tip(tooltipText)}>${item.valueText}</div>
+                ${renderMetricCompareFacts(item, tooltipText)}
+                <div class="ml-metric-delta-wrap ml-tip-target" ${tip(tooltipText)}>
+                  <div class="ml-metric-delta-caption">${item.deltaLabel || compareDeltaLabel}</div>
+                  <div class="ml-metric-delta">${formatDeltaLine(item)}</div>
+                </div>
+                <div class="ml-metric-note ml-tip-target" ${tip(tooltipText)}>${item.note || compareLabel}</div>
+              </div>
+            `;
+          };
+          const renderMetricGroup = (title, note, items, className = '') => `
+            <div class="ml-metric-group ${className}">
+              <div class="ml-metric-group-head">
+                <div class="ml-metric-group-title">${title}</div>
+                <div class="ml-metric-group-note">${note}</div>
+              </div>
+              <div class="ml-metric-grid">
+                ${items.map(renderMetricCard).join('')}
+              </div>
+            </div>
+          `;
+          const renderOutcomeCard = (title, tone, items) => `
+            <div class="ml-outcome-card ml-outcome-card--${tone}">
+              <div class="ml-outcome-title">${title}</div>
+              ${
+                items.length
+                  ? `<ul class="ml-outcome-list">${items.map(item => `<li class="ml-tip-target" ${tip(item.desc || '')}>${escHtml(item.text || '')}</li>`).join('')}</ul>`
+                  : '<div class="ml-outcome-empty">нет заметных</div>'
+              }
+            </div>
+          `;
+          const summarizeDomain = (imp, dec) => {
+            if(dec.length > imp.length) return { label: `Есть риск: ${dec.length}`, className: 'ml-domain-badge--bad' };
+            if(imp.length > dec.length) return { label: `Позитив: ${imp.length}`, className: 'ml-domain-badge--good' };
+            if(imp.length || dec.length) return { label: `Смешано: ${imp.length}/${dec.length}`, className: 'ml-domain-badge--warn' };
+            return { label: 'Без резких сдвигов', className: 'ml-domain-badge--neutral' };
+          };
+          const renderDomainCard = ({ modifier, eyebrow, title, subtitle, badge, groups, improvements: imp, declines: dec }) => `
+            <section class="ml-domain-card ml-domain-card--${modifier}">
+              <div class="ml-domain-head">
+                <div>
+                  <div class="ml-domain-eyebrow">${eyebrow}</div>
+                  <div class="ml-domain-title">${title}</div>
+                  <div class="ml-domain-subtitle">${subtitle}</div>
+                </div>
+                <div class="ml-domain-badge ${badge.className}">${badge.label}</div>
+              </div>
+              <div class="ml-domain-groups">
+                ${groups.join('')}
+              </div>
+              <div class="ml-outcome-grid">
+                ${renderOutcomeCard('Улучшения', 'good', imp)}
+                ${renderOutcomeCard('Зоны риска', 'bad', dec)}
+              </div>
+            </section>
+          `;
+          const renderAnomList = (list) => {
+            if(!list || !list.length){
+              return '<div class="ml-anoms-empty">Нет аномалий</div>';
+            }
+            return list.map(a => `
+              <div class="ml-anoms-item">
+                <span class="ml-anoms-name ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${escHtml(presentMetricInfo(a.label || '').label || '')}</span>
+                <span class="ml-anoms-delta ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${fmtDelta(a.delta || 0)} ${Number.isFinite(a.deltaPct) ? `(${fmtPct(a.deltaPct)})` : ''}</span>
+                ${Number.isFinite(a.z) ? `<span class="ml-anoms-z">z=${a.z.toFixed(2)}</span>` : ''}
+              </div>
+            `).join('');
+          };
+
+          const tcStatsAll = seriesStats(tcSeries);
+          const tcStatsHist = seriesStats(tcSeries.slice(0, -1));
+          const tcVolNow = tcStatsAll.std;
+          const tcVolBase = Number.isFinite(tcStatsHist.std) ? tcStatsHist.std : null;
+          const tcVolDiff = tcVolBase == null ? null : (tcVolNow - tcVolBase);
+          const tcVolDiffPct = tcVolBase ? (tcVolDiff / tcVolBase * 100) : null;
+          const tcSlopeNow = tcStatsAll.slopePct;
+          const tcSlopeBase = Number.isFinite(tcStatsHist.slopePct) ? tcStatsHist.slopePct : null;
+          const tcSlopeDiff = tcSlopeBase == null ? null : (tcSlopeNow - tcSlopeBase);
+
+          const domainLabels = {
+            regress: 'Регресс',
+            release: 'Релиз',
+            stability: 'Стабильность'
+          };
+          const cutoffWindowLabel = (targetMinutes) => `${formatClockMinutes(targetMinutes - CUT_TARGET_WINDOW_MIN)}–${formatClockMinutes(targetMinutes + CUT_TARGET_WINDOW_MIN)}`;
+          const cutoffOutsideWindow = (minutes, targetMinutes) => {
+            if(!Number.isFinite(minutes) || !Number.isFinite(targetMinutes)) return null;
+            const start = targetMinutes - CUT_TARGET_WINDOW_MIN;
+            const end = targetMinutes + CUT_TARGET_WINDOW_MIN;
+            if(minutes < start) return start - minutes;
+            if(minutes > end) return minutes - end;
+            return 0;
+          };
+          const storeDelay = (minutes) => Number.isFinite(minutes) ? Math.max(0, minutes - STORE_DEADLINE_MINUTES) : null;
+          const lagOverflow = (minutes) => Number.isFinite(minutes) ? Math.max(0, minutes - LAG_TARGET_MAX_MINUTES) : null;
+          const cutoffTone = (minutes, targetMinutes) => {
+            const outside = cutoffOutsideWindow(minutes, targetMinutes);
+            if(outside == null) return 'neutral';
+            return outside === 0 ? 'good' : 'bad';
+          };
+          const storeTone = (minutes) => {
+            const delay = storeDelay(minutes);
+            if(delay == null) return 'neutral';
+            return delay === 0 ? 'good' : 'bad';
+          };
+          const lagTone = (minutes) => {
+            const overflow = lagOverflow(minutes);
+            if(overflow == null) return 'neutral';
+            return overflow === 0 ? 'good' : 'bad';
+          };
+          const signalWithDomain = (signal) => ({
+            ...signal,
+            summaryText: `${domainLabels[signal.group] || 'Сводка'} — ${signal.text}`
+          });
+          const isSignificant = (m) => {
+            if(m.delta == null || !Number.isFinite(m.delta)) return false;
+            const abs = Math.abs(m.delta);
+            if(Number.isFinite(m.pct)) return Math.abs(m.pct) >= (m.pctTh ?? 3) || abs >= (m.absTh ?? 1);
+            return abs >= (m.absTh ?? 1);
+          };
+          const buildGenericSignal = (m) => {
+            if(m.delta == null || !Number.isFinite(m.delta) || !isSignificant(m)) return null;
+            const direction = m.better === 'up'
+              ? (m.delta > 0 ? 'good' : (m.delta < 0 ? 'bad' : null))
+              : (m.delta < 0 ? 'good' : (m.delta > 0 ? 'bad' : null));
+            if(!direction) return null;
+            const abs = Math.abs(m.delta);
+            const val = m.digits ? abs.toFixed(m.digits) : Math.round(abs);
+            const unit = m.unit ? ` ${m.unit}` : '';
+            const pct = Number.isFinite(m.pct) ? ` ${fmtDeltaPct(m.pct)}` : '';
+            const info = presentMetricInfo(m.label);
+            const scoreBase = (m.absTh ?? 1) ? (abs / (m.absTh ?? 1)) * 8 : abs;
+            const pctBase = Number.isFinite(m.pct) ? Math.abs(m.pct) * 0.6 : 0;
+            return signalWithDomain({
+              label: info.label || m.label,
+              group: m.group,
+              delta: m.delta,
+              pct: m.pct,
+              direction,
+              score: scoreBase + pctBase,
+              text: `${info.label || m.label}: ${m.delta >= 0 ? '+' : '−'}${val}${unit}${pct}`,
+              desc: [m.desc || '', compareNote].filter(Boolean).join(' ')
+            });
+          };
+          const buildCutoffSignal = (m) => {
+            const currentOutside = cutoffOutsideWindow(m.current, m.targetMinutes);
+            const baseOutside = Number.isFinite(m.baseline) ? cutoffOutsideWindow(m.baseline, m.targetMinutes) : null;
+            if(currentOutside == null) return null;
+            const label = presentMetricInfo(m.label).label || m.label;
+            const windowText = cutoffWindowLabel(m.targetMinutes);
+            const currentClock = formatClockMinutes(m.current);
+            const baseClock = Number.isFinite(m.baseline) ? formatClockMinutes(m.baseline) : '—';
+            const desc = [m.desc || '', `Целевое окно: ${windowText}.`, compareNote].join(' ');
+            if(baseOutside == null){
+              if(currentOutside === 0) return null;
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 18 + Math.min(currentOutside, 120) * 0.6,
+                text: `${label}: вне окна ${windowText} на ${Math.round(currentOutside)} мин (${currentClock})`,
+                desc
+              });
+            }
+            if(currentOutside === 0 && baseOutside === 0) return null;
+            if(currentOutside === 0 && baseOutside > 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'good',
+                score: 24 + Math.min(baseOutside, 120) * 0.6,
+                text: `${label}: вошел в окно ${windowText} (${currentClock}, было ${baseClock})`,
+                desc
+              });
+            }
+            if(currentOutside > 0 && baseOutside === 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 28 + Math.min(currentOutside, 120) * 0.6,
+                text: `${label}: вышел из окна ${windowText} на ${Math.round(currentOutside)} мин (${currentClock})`,
+                desc
+              });
+            }
+            const deltaOutside = baseOutside - currentOutside;
+            if(Math.abs(deltaOutside) < 3) return null;
+            return signalWithDomain({
+              label,
+              group: m.group,
+              direction: deltaOutside > 0 ? 'good' : 'bad',
+              score: 12 + Math.min(Math.abs(deltaOutside), 120) * 0.5 + Math.min(currentOutside, 60) * 0.2,
+              text: deltaOutside > 0
+                ? `${label}: ближе к окну ${windowText}, осталось ${Math.round(currentOutside)} мин (${currentClock})`
+                : `${label}: дальше от окна ${windowText}, отклонение ${Math.round(currentOutside)} мин (${currentClock})`,
+              desc
+            });
+          };
+          const buildStoreSignal = (m) => {
+            const currentDelay = storeDelay(m.current);
+            const baseDelay = Number.isFinite(m.baseline) ? storeDelay(m.baseline) : null;
+            if(currentDelay == null) return null;
+            const label = presentMetricInfo(m.label).label || m.label;
+            const currentClock = formatClockMinutes(m.current);
+            const desc = [m.desc || '', 'Бизнес-дедлайн: до 18:00.', compareNote].join(' ');
+            if(baseDelay == null){
+              if(currentDelay === 0) return null;
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 18 + Math.min(currentDelay, 180) * 0.35,
+                text: `${label}: позже дедлайна 18:00 на ${Math.round(currentDelay)} мин (${currentClock})`,
+                desc
+              });
+            }
+            if(currentDelay === 0 && baseDelay === 0) return null;
+            if(currentDelay === 0 && baseDelay > 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'good',
+                score: 22 + Math.min(baseDelay, 180) * 0.35,
+                text: `${label}: вернулось до дедлайна 18:00 (${currentClock})`,
+                desc
+              });
+            }
+            if(currentDelay > 0 && baseDelay === 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 24 + Math.min(currentDelay, 180) * 0.35,
+                text: `${label}: вышло за дедлайн 18:00 на ${Math.round(currentDelay)} мин (${currentClock})`,
+                desc
+              });
+            }
+            const deltaDelay = baseDelay - currentDelay;
+            if(Math.abs(deltaDelay) < 10) return null;
+            return signalWithDomain({
+              label,
+              group: m.group,
+              direction: deltaDelay > 0 ? 'good' : 'bad',
+              score: 10 + Math.min(Math.abs(deltaDelay), 180) * 0.3 + Math.min(currentDelay, 180) * 0.1,
+              text: deltaDelay > 0
+                ? `${label}: ближе к дедлайну 18:00, осталось ${Math.round(currentDelay)} мин опоздания`
+                : `${label}: опоздание до Store выросло до ${Math.round(currentDelay)} мин`,
+              desc
+            });
+          };
+          const buildLagSignal = (m) => {
+            const currentOverflow = lagOverflow(m.current);
+            const baseOverflow = Number.isFinite(m.baseline) ? lagOverflow(m.baseline) : null;
+            if(currentOverflow == null) return null;
+            const label = presentMetricInfo(m.label).label || m.label;
+            const currentText = formatCurrentValue('minutes', m.current, 1);
+            const desc = [m.desc || '', 'Рабочий коридор: задержка до 4 часов.', compareNote].join(' ');
+            if(baseOverflow == null){
+              if(currentOverflow === 0) return null;
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 18 + Math.min(currentOverflow, 240) * 0.25,
+                text: `${label}: выше рабочего коридора до 4 часов на ${Math.round(currentOverflow)} мин (${currentText})`,
+                desc
+              });
+            }
+            if(currentOverflow === 0 && baseOverflow === 0) return null;
+            if(currentOverflow === 0 && baseOverflow > 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'good',
+                score: 22 + Math.min(baseOverflow, 240) * 0.25,
+                text: `${label}: вернулась в рабочий коридор до 4 часов (${currentText})`,
+                desc
+              });
+            }
+            if(currentOverflow > 0 && baseOverflow === 0){
+              return signalWithDomain({
+                label,
+                group: m.group,
+                direction: 'bad',
+                score: 24 + Math.min(currentOverflow, 240) * 0.25,
+                text: `${label}: вышла за рабочий коридор до 4 часов на ${Math.round(currentOverflow)} мин (${currentText})`,
+                desc
+              });
+            }
+            const deltaOverflow = baseOverflow - currentOverflow;
+            if(Math.abs(deltaOverflow) < 15) return null;
+            return signalWithDomain({
+              label,
+              group: m.group,
+              direction: deltaOverflow > 0 ? 'good' : 'bad',
+              score: 10 + Math.min(Math.abs(deltaOverflow), 240) * 0.2 + Math.min(currentOverflow, 240) * 0.08,
+              text: deltaOverflow > 0
+                ? `${label}: ближе к рабочему коридору, превышение сократилось до ${Math.round(currentOverflow)} мин`
+                : `${label}: превышение рабочего коридора выросло до ${Math.round(currentOverflow)} мин`,
+              desc
+            });
+          };
+          const metrics = [
+            { label:'Объем регресса', desc: descs.tc, group:'regress', delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'down', absTh: 100, pctTh: 2, digits: 0 },
+            { label:'Критичные проверки SWAT', desc: descs.hbSwat, group:'regress', delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', absTh: 20, pctTh: 2, digits: 0 },
+            { label:'Критичные проверки Stream', desc: descs.hbStream, group:'regress', delta: covStreamDiff.delta, pct: covStreamDiff.deltaPct, better:'up', absTh: 20, pctTh: 2, digits: 0 },
+            { label:'Критичные проверки SWAT + Stream', desc: descs.hbTotal, group:'regress', delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', absTh: 30, pctTh: 2, digits: 0 },
+            { label:'Селективные проверки', desc: descs.selTotal, group:'regress', delta: selDiff.delta, pct: selDiff.deltaPct, better:'down', absTh: 20, pctTh: 3, digits: 0 },
+            { label:'Среднее время прохождения', desc: descs.avgTotal, group:'regress', delta: avgDiff.delta, pct: avgDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2, digits: 2, unit: 'мин' },
+            { label:'Среднее время на один кейс', desc: descs.avgCaseWeighted, group:'regress', delta: avgWeightedDiff.delta, pct: avgWeightedDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2, digits: 2, unit: 'мин' },
+            { label:'ЧП всего', desc: descs.chpTotal, group:'release', delta: chpDiff.delta, pct: chpDiff.deltaPct, better:'down', absTh: 2, pctTh: 5, digits: 0 },
+            { label:'ЧП iOS', desc: descs.chpIos, group:'release', delta: chpIosDiff.delta, pct: chpIosDiff.deltaPct, better:'down', absTh: 2, pctTh: 5, digits: 0 },
+            { label:'ЧП Android', desc: descs.chpAnd, group:'release', delta: chpAndDiff.delta, pct: chpAndDiff.deltaPct, better:'down', absTh: 2, pctTh: 5, digits: 0 },
+            { label:'Время начала cutoff iOS', desc: descs.cutIos, group:'release', businessKind:'cutoff', current: cutIosBase.last, baseline: cutIosBase.base, targetMinutes: CUT_TARGET_MINUTES.ios, delta: cutIosDiff.delta, pct: cutIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Время начала cutoff Android', desc: descs.cutAnd, group:'release', businessKind:'cutoff', current: cutAndBase.last, baseline: cutAndBase.base, targetMinutes: CUT_TARGET_MINUTES.android, delta: cutAndDiff.delta, pct: cutAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Время отправки в Store iOS', desc: descs.storeIos, group:'release', businessKind:'store', current: storeIosBase.last, baseline: storeIosBase.base, delta: storeIosDiff.delta, pct: storeIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Время отправки в Store Android', desc: descs.storeAnd, group:'release', businessKind:'store', current: storeAndBase.last, baseline: storeAndBase.base, delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Задержка после cutoff iOS', desc: descs.lagIos, group:'release', businessKind:'lag', current: lagIosBase.last, baseline: lagIosBase.base, delta: lagIosDiff.delta, pct: lagIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Задержка после cutoff Android', desc: descs.lagAnd, group:'release', businessKind:'lag', current: lagAndBase.last, baseline: lagAndBase.base, delta: lagAndDiff.delta, pct: lagAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Разброс объема регресса', desc: descs.vol, group:'stability', delta: tcVolDiff, pct: tcVolDiffPct, better:'down', absTh: 10, pctTh: 5, digits: 1, unit: 'п.' },
+            { label:'Тренд объема регресса', desc: descs.slope, group:'stability', delta: tcSlopeDiff, pct: null, better:'up', absTh: 2, pctTh: null, digits: 2, unit: 'п.п.' }
+          ];
+          const buildMetricSignal = (m) => {
+            if(m.businessKind === 'cutoff') return buildCutoffSignal(m);
+            if(m.businessKind === 'store') return buildStoreSignal(m);
+            if(m.businessKind === 'lag') return buildLagSignal(m);
+            return buildGenericSignal(m);
+          };
+          const improvements = { regress: [], release: [], stability: [] };
+          const declines = { regress: [], release: [], stability: [] };
+          metrics.forEach(m => {
+            const signal = buildMetricSignal(m);
+            if(!signal) return;
+            if(signal.direction === 'good') improvements[m.group].push(signal);
+            if(signal.direction === 'bad') declines[m.group].push(signal);
+          });
+          Object.keys(improvements).forEach(group => {
+            improvements[group].sort((a,b) => (b.score || 0) - (a.score || 0));
+            declines[group].sort((a,b) => (b.score || 0) - (a.score || 0));
+          });
+
+          const flattenSignals = (pool, tone) => Object.entries(pool).flatMap(([group, items]) =>
+            (items || []).map(item => ({ ...item, group, tone }))
+          );
+          const sortSignals = (list) => list.slice().sort((a,b) => (b.score || 0) - (a.score || 0));
+          const topImprovements = sortSignals(flattenSignals(improvements, 'good')).slice(0, 3);
+          const topDeclines = sortSignals(flattenSignals(declines, 'bad')).slice(0, 3);
+          const allAnomalyItems = [
+            ...(anomalies.release?.list || []),
+            ...(anomalies.type?.list || []),
+            ...(anomalies.platform?.list || [])
+          ];
+          const topAnomaly = allAnomalyItems
+            .slice()
+            .sort((a,b) => ((Math.abs(b.z || 0) * 10) + Math.abs(b.deltaPct || 0)) - ((Math.abs(a.z || 0) * 10) + Math.abs(a.deltaPct || 0)))[0] || null;
+          const formatAnomalyBrief = (item) => {
+            if(!item) return 'Явных аномалий не найдено.';
+            const label = presentMetricInfo(item.label || '').label || item.label || 'Аномалия';
+            const pct = Number.isFinite(item.deltaPct) ? ` ${fmtPct(item.deltaPct)}` : '';
+            return `${label}: ${fmtDelta(item.delta || 0)}${pct}`;
+          };
+          const summarizeSignals = (items, limit = 2) => items.slice(0, limit).map(item => item.summaryText || item.text).join('; ');
+          const buildExecutiveBrief = () => {
+            const topRisk = topDeclines[0] || null;
+            const topWin = topImprovements[0] || null;
+            const riskText = summarizeSignals(topDeclines, 2);
+            const winText = summarizeSignals(topImprovements, 2);
+            if(topRisk && topWin){
+              if((topRisk.score || 0) >= (topWin.score || 0) + 8){
+                return {
+                  tone: 'bad',
+                  title: 'Есть выраженные риски',
+                  body: `Основные зоны риска сейчас: ${riskText}. Сильные улучшения при этом тоже есть: ${winText}.`,
+                  focus: topAnomaly ? `Самая заметная аномалия: ${formatAnomalyBrief(topAnomaly)}.` : 'Сильных аномалий поверх этого не обнаружено.'
+                };
+              }
+              if((topWin.score || 0) >= (topRisk.score || 0) + 8){
+                return {
+                  tone: 'good',
+                  title: 'Картина скорее позитивная',
+                  body: `Сильнее всего сейчас помогают: ${winText}. Точки риска, которые еще нужно контролировать: ${riskText}.`,
+                  focus: topAnomaly ? `Из аномалий сильнее всего выбивается: ${formatAnomalyBrief(topAnomaly)}.` : 'Крупных аномалий по релизу не найдено.'
+                };
+              }
+              return {
+                tone: 'warn',
+                title: 'Картина смешанная',
+                body: `Есть и сильные улучшения, и заметные риски. Улучшения: ${winText}. Зоны риска: ${riskText}.`,
+                focus: topAnomaly ? `Отдельно стоит проверить аномалию: ${formatAnomalyBrief(topAnomaly)}.` : 'Аномальный фон при этом умеренный.'
+              };
+            }
+            if(topRisk){
+              return {
+                tone: 'bad',
+                title: 'Нужна дополнительная проверка',
+                body: `Главные просадки сейчас: ${riskText}.`,
+                focus: topAnomaly ? `Самая заметная аномалия: ${formatAnomalyBrief(topAnomaly)}.` : 'Дополнительных крупных аномалий не видно.'
+              };
+            }
+            if(topWin){
+              return {
+                tone: 'good',
+                title: 'Есть заметные улучшения',
+                body: `Сильные позитивные сигналы сейчас такие: ${winText}.`,
+                focus: topAnomaly ? `При этом стоит посмотреть на аномалию: ${formatAnomalyBrief(topAnomaly)}.` : 'Крупных аномалий не обнаружено.'
+              };
+            }
+            return {
+              tone: 'neutral',
+              title: 'Сильных сдвигов не найдено',
+              body: 'ML не видит выраженных улучшений или зон риска относительно выбранной базы сравнения.',
+              focus: topAnomaly ? `Единственный заметный фокус внимания: ${formatAnomalyBrief(topAnomaly)}.` : 'Аномалии не выбиваются из общего фона.'
+            };
+          };
+          const executiveBrief = buildExecutiveBrief();
+          const renderBriefList = (title, tone, items, emptyText) => `
+            <section class="ml-brief-card ml-brief-card--${tone}">
+              <div class="ml-brief-eyebrow">${title}</div>
+              ${
+                items.length
+                  ? `<ul class="ml-brief-list">${items.map(item => `<li class="ml-tip-target" ${tip(item.desc || '')}>${escHtml(item.summaryText || item.text || '')}</li>`).join('')}</ul>`
+                  : `<div class="ml-brief-empty">${emptyText}</div>`
+              }
+            </section>
+          `;
+
+          const regressBadge = summarizeDomain(improvements.regress, declines.regress);
+          const releaseBadge = summarizeDomain(improvements.release, declines.release);
+          const stabilityBadge = summarizeDomain(improvements.stability, declines.stability);
+
+          const regressGroups = [
+            renderMetricGroup('Объем регресса', compareLabel, [
+              { label:'Объем регресса', valueText: formatCurrentValue('count', tcBase.last), delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'down', desc: descs.tc, note:'текущий объем регресса', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', tcPrev), formatCurrentValue('count', tcBase.base)) },
+              { label:'Критичные проверки SWAT + Stream', valueText: formatCurrentValue('count', covBase.last), delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', desc: descs.hbTotal, note:'общее покрытие критичных сценариев', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covPrev), formatCurrentValue('count', covBase.base)) },
+              { label:'Селективные проверки', valueText: formatCurrentValue('count', selBase.last), delta: selDiff.delta, pct: selDiff.deltaPct, better:'down', desc: descs.selTotal, note:'проверки по селективному контуру', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', selPrev), formatCurrentValue('count', selBase.base)) }
+            ]),
+            renderMetricGroup('Кто тянет регресс', compareLabel, [
+              { label:'Критичные проверки SWAT', valueText: formatCurrentValue('count', covSwatBase.last), delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', desc: descs.hbSwat, note:'вклад команды SWAT', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covSwatPrev), formatCurrentValue('count', covSwatBase.base)) },
+              { label:'Критичные проверки Stream', valueText: formatCurrentValue('count', covStreamBase.last), delta: covStreamDiff.delta, pct: covStreamDiff.deltaPct, better:'up', desc: descs.hbStream, note:'вклад стримов', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covStreamPrev), formatCurrentValue('count', covStreamBase.base)) }
+            ]),
+            renderMetricGroup('Скорость прохождения', compareLabel, [
+              { label:'Среднее время прохождения', valueText: formatCurrentValue('minutes', avgBase.last, 2), delta: avgDiff.delta, pct: avgDiff.deltaPct, better:'down', desc: descs.avgTotal, note:'чем ниже, тем быстрее идет регресс', deltaDigits: 2, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', avgPrev, 2), formatCurrentValue('minutes', avgBase.base, 2)) },
+              { label:'Среднее время на один кейс', valueText: formatCurrentValue('minutes', avgWeightedBase.last, 2), delta: avgWeightedDiff.delta, pct: avgWeightedDiff.deltaPct, better:'down', desc: descs.avgCaseWeighted, note:'скорость на один тест-кейс', deltaDigits: 2, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', avgWeightedPrev, 2), formatCurrentValue('minutes', avgWeightedBase.base, 2)) }
+            ])
+          ];
+
+          const releaseGroups = [
+            renderMetricGroup('ЧП', compareLabel, [
+              { label:'ЧП всего', valueText: formatCurrentValue('count', chpBase.last), delta: chpDiff.delta, pct: chpDiff.deltaPct, better:'down', desc: descs.chpTotal, note:'меньше — лучше', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', chpPrev), formatCurrentValue('count', chpBase.base)) },
+              { label:'ЧП iOS', valueText: formatCurrentValue('count', chpIosBase.last), delta: chpIosDiff.delta, pct: chpIosDiff.deltaPct, better:'down', desc: descs.chpIos, note:'качество iOS-релиза', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', chpIosPrev), formatCurrentValue('count', chpIosBase.base)) },
+              { label:'ЧП Android', valueText: formatCurrentValue('count', chpAndBase.last), delta: chpAndDiff.delta, pct: chpAndDiff.deltaPct, better:'down', desc: descs.chpAnd, note:'качество Android-релиза', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', chpAndPrev), formatCurrentValue('count', chpAndBase.base)) }
+            ]),
+            renderMetricGroup('Cutoff и публикация в Store', compareLabel, [
+              { label:'Время начала cutoff iOS', valueText: formatCurrentValue('clock', cutIosBase.last), delta: cutIosDiff.delta, pct: cutIosDiff.deltaPct, better:'down', businessKind:'cutoff', tone: cutoffTone(cutIosBase.last, CUT_TARGET_MINUTES.ios), desc: descs.cutIos, note: formatCutoffHint(cutIosBase.last, CUT_TARGET_MINUTES.ios), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', cutIosPrev), formatCurrentValue('clock', cutIosBase.base)) },
+              { label:'Время начала cutoff Android', valueText: formatCurrentValue('clock', cutAndBase.last), delta: cutAndDiff.delta, pct: cutAndDiff.deltaPct, better:'down', businessKind:'cutoff', tone: cutoffTone(cutAndBase.last, CUT_TARGET_MINUTES.android), desc: descs.cutAnd, note: formatCutoffHint(cutAndBase.last, CUT_TARGET_MINUTES.android), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', cutAndPrev), formatCurrentValue('clock', cutAndBase.base)) },
+              { label:'Время отправки в Store iOS', valueText: formatCurrentValue('clock', storeIosBase.last), delta: storeIosDiff.delta, pct: storeIosDiff.deltaPct, better:'down', businessKind:'store', tone: storeTone(storeIosBase.last), desc: descs.storeIos, note: formatStoreHint(storeIosBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', storeIosPrev), formatCurrentValue('clock', storeIosBase.base)) },
+              { label:'Время отправки в Store Android', valueText: formatCurrentValue('clock', storeAndBase.last), delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', businessKind:'store', tone: storeTone(storeAndBase.last), desc: descs.storeAnd, note: formatStoreHint(storeAndBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', storeAndPrev), formatCurrentValue('clock', storeAndBase.base)) }
+            ], 'ml-metric-group--release-timeline'),
+            renderMetricGroup('Задержка после cutoff', compareLabel, [
+              { label:'Задержка после cutoff iOS', valueText: formatCurrentValue('minutes', lagIosBase.last, 1), delta: lagIosDiff.delta, pct: lagIosDiff.deltaPct, better:'down', businessKind:'lag', tone: lagTone(lagIosBase.last), desc: descs.lagIos, note: formatLagHint(lagIosBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', lagIosPrev, 1), formatCurrentValue('minutes', lagIosBase.base, 1)) },
+              { label:'Задержка после cutoff Android', valueText: formatCurrentValue('minutes', lagAndBase.last, 1), delta: lagAndDiff.delta, pct: lagAndDiff.deltaPct, better:'down', businessKind:'lag', tone: lagTone(lagAndBase.last), desc: descs.lagAnd, note: formatLagHint(lagAndBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', lagAndPrev, 1), formatCurrentValue('minutes', lagAndBase.base, 1)) }
+            ])
+          ];
+
+          const stabilityGroups = [
+            renderMetricGroup('Стабильность объема', compareLabel, [
+              { label:'Разброс объема регресса', valueText: formatCurrentValue('minutes', features.tc_volatility, 1).replace(' мин', ''), delta: tcVolDiff, pct: tcVolDiffPct, better:'down', desc: descs.vol, note:'чем ниже, тем ровнее идут релизы', deltaDigits: 1, deltaUnit: 'п.', compareFacts: [{ label: 'История до текущего релиза', value: Number.isFinite(tcVolBase) ? Number(tcVolBase).toFixed(1) : '—' }] },
+              { label:'Тренд объема регресса', valueText: formatCurrentValue('percent', features.tc_slope_pct, 2), delta: tcSlopeDiff, pct: null, better:'up', desc: descs.slope, note:'динамика от первого релиза диапазона к последнему', deltaDigits: 2, deltaUnit: 'п.п.', compareFacts: [{ label: 'История до текущего релиза', value: Number.isFinite(tcSlopeBase) ? `${Number(tcSlopeBase).toFixed(2)}%` : '—' }] }
+            ])
+          ];
+
+          mlSummaryBody.innerHTML = `
+            <div class="ml-summary-shell">
+              <div class="ml-summary-top">
+                <div class="ml-status-row">
+                  <div class="ml-status ml-tip-target ${statusClass}" ${tip('Общая оценка риска по ML-модели. Она строится по истории ваших предыдущих выгрузок и текущему набору метрик.')}>Статус ML: ${statusText}</div>
+                  <div class="ml-meta-strip">
+                    <span class="ml-meta-pill ml-tip-target" ${tip('Сколько раз вы сохраняли ML-выгрузку для этой страницы.')}>Выгрузок: ${data.length}</span>
+                    <span class="ml-meta-pill ml-tip-target" ${tip('Сколько выгрузок уже размечено как OK или Регресс и участвует в обучении.')}>Метки: ${model.count || 0}</span>
+                    <span class="ml-meta-pill ml-tip-target" ${tip(model.trained ? 'Модель обучена и использует размеченную историю для оценки риска.' : `Модель пока не обучена. ${model.reason || ''}`)}>Обучение: ${model.trained ? 'готово' : (model.count ? `${model.count}/${model.minCount || 5} меток` : (model.reason || '—'))}</span>
+                    <span class="ml-meta-pill ml-tip-target" ${tip('Сколько прошлых релизов попало в базу сравнения для текущей оценки.')}>История: ${histCount || 0}</span>
+                    <span class="ml-meta-pill ml-tip-target" ${tip(mlDatasetSyncState.remote ? 'ML-история синхронизируется через Google Apps Script / Drive.' : (mlDatasetSyncState.loading ? 'Идет загрузка истории ML из облака.' : `Облачная синхронизация недоступна. ${mlDatasetSyncState.error || 'Работаем только локально.'}`))}>Источник: ${mlDatasetSyncState.loading ? 'синхр...' : (mlDatasetSyncState.remote ? 'Drive' : 'локально')}</span>
+                  </div>
+                </div>
+                <div class="ml-summary-note ml-tip-target" ${tip(compareNote)}>${compareNote}</div>
+              </div>
+
+              <div class="ml-brief-grid">
+                <section class="ml-brief-card ml-brief-card--${executiveBrief.tone}">
+                  <div class="ml-brief-eyebrow">Краткий вывод ML</div>
+                  <div class="ml-brief-title">${escHtml(executiveBrief.title)}</div>
+                  <div class="ml-brief-body">${escHtml(executiveBrief.body)}</div>
+                  <div class="ml-brief-focus">${escHtml(executiveBrief.focus)}</div>
+                </section>
+                ${renderBriefList('Сильные улучшения', 'good', topImprovements, 'Сильных улучшений пока нет.')}
+                ${renderBriefList('Главные риски', 'bad', topDeclines, 'Сильных рисков пока не найдено.')}
+              </div>
+
+              <div class="ml-domain-grid">
+                ${renderDomainCard({
+                  modifier: 'regress',
+                  eyebrow: 'Контур 1',
+                  title: 'Регресс',
+                  subtitle: 'Сколько проверок входит в регресс, кто закрывает критичные сценарии и как меняется скорость прохождения.',
+                  badge: regressBadge,
+                  groups: regressGroups,
+                  improvements: improvements.regress,
+                  declines: declines.regress
+                })}
+                ${renderDomainCard({
+                  modifier: 'release',
+                  eyebrow: 'Контур 2',
+                  title: 'Релиз',
+                  subtitle: 'Релизное качество: число ЧП, время начала cutoff, публикация в Store и задержка после cutoff.',
+                  badge: releaseBadge,
+                  groups: releaseGroups,
+                  improvements: improvements.release,
+                  declines: declines.release
+                })}
+              </div>
+
+              <div class="ml-secondary-grid">
+                ${renderDomainCard({
+                  modifier: 'stability',
+                  eyebrow: 'Поддерживающий слой',
+                  title: 'Стабильность',
+                  subtitle: 'Насколько ровно ведет себя объем регресса на истории релизов и не скачет ли нагрузка.',
+                  badge: stabilityBadge,
+                  groups: stabilityGroups,
+                  improvements: improvements.stability,
+                  declines: declines.stability
+                })}
+                <section class="ml-domain-card ml-domain-card--anoms">
+                  <div class="ml-domain-head">
+                    <div>
+                      <div class="ml-domain-eyebrow">Контроль отклонений</div>
+                      <div class="ml-domain-title">Аномалии</div>
+                      <div class="ml-domain-subtitle">Показываем только самые заметные выбросы по релизам, типам задач и платформам.</div>
+                    </div>
+                    <div class="ml-domain-badge ml-domain-badge--neutral ml-tip-target" ${tip(descs.anoms)}>Индекс риска: ${features.anom_score}</div>
+                  </div>
+                  <div class="ml-anoms-summary">
+                    <div class="ml-anoms-stat">
+                      <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий, найденных на уровне релизных метрик: объем регресса, ЧП, cutoff, Store и задержка после cutoff.')}>Релизы</span>
+                      <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий, найденных на уровне релизных метрик: объем регресса, ЧП, cutoff, Store и задержка после cutoff.')}>${anomalies.release.count}</span>
+                    </div>
+                    <div class="ml-anoms-stat">
+                      <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий по типам задач и типам ЧП: где структура релиза резко изменилась относительно базы сравнения.')}>Типы</span>
+                      <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий по типам задач и типам ЧП: где структура релиза резко изменилась относительно базы сравнения.')}>${anomalies.type.count}</span>
+                    </div>
+                    <div class="ml-anoms-stat">
+                      <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий на уровне платформ: iOS или Android получили резкое отклонение по метрикам относительно базы сравнения.')}>Платформы</span>
+                      <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий на уровне платформ: iOS или Android получили резкое отклонение по метрикам относительно базы сравнения.')}>${anomalies.platform.count}</span>
+                    </div>
+                  </div>
+                  <div class="ml-anoms-columns">
+                    <div class="ml-anoms-section">
+                      <div class="ml-anoms-sub">Релизы</div>
+                      <div class="ml-anoms-list">${renderAnomList(anomalies.release.list)}</div>
+                    </div>
+                    <div class="ml-anoms-section">
+                      <div class="ml-anoms-sub">Типы</div>
+                      <div class="ml-anoms-list">${renderAnomList(anomalies.type.list)}</div>
+                    </div>
+                    <div class="ml-anoms-section">
+                      <div class="ml-anoms-sub">Платформы</div>
+                      <div class="ml-anoms-list">${renderAnomList(anomalies.platform.list)}</div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          `;
         }
 
           // Sections: TC
@@ -1180,7 +2779,7 @@
                   const m = String(timeText).match(/(\d{2}):(\d{2})$/);
                   if(!m) continue;
                   const minutes = Number(m[1]) * 60 + Number(m[2]);
-                  const onTime = minutes >= targetMin && minutes <= (targetMin + windowMin);
+                  const onTime = minutes >= (targetMin - windowMin) && minutes <= (targetMin + windowMin);
                   const text = m[0];
                   const padX = 6;
                   const padY = 3;
@@ -1255,6 +2854,12 @@
             return s.trim().toLowerCase();
           }
 
+          function getDeployToken(){
+            const raw = (inpDeployToken?.value || '').trim();
+            if(!raw) return '';
+            return raw.replace(/^Bearer\s+/i, '').trim();
+          }
+
           function authHeaders(){
             const tok = (inpAllureToken?.value || '').trim();
             return {
@@ -1265,11 +2870,18 @@
 
           // ВАЖНО: тут должны быть минимально нужные заголовки
           function deployHeaders(){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
+            if(!tok) return {
+              'accept': '*/*',
+              'accept-language': 'ru,en;q=0.9'
+            };
+            const bearer = `Bearer ${tok}`;
             return {
               'accept': '*/*',
               'accept-language': 'ru,en;q=0.9',
-              'authorization-deploy-lab': `Bearer ${tok}`
+              'authorization-deploy-lab': bearer,
+              'Authorization': bearer,
+              'X-Authorization': bearer
             };
           }
 
@@ -1305,24 +2917,42 @@
             throw lastErr;
           }
 
-          async function proxyGetJson(targetUrl, headers, signal){
-            const p = new URL(PROXY_BASE + '/proxy');
+          function buildProxyRequestUrl(targetUrl){
+            const p = new URL(PROXY_BASE);
+            if (!/\/proxy$/i.test(p.pathname)) {
+              p.pathname = p.pathname.replace(/\/+$/, '') + '/proxy';
+            }
             p.searchParams.set('url', targetUrl);
+            return p.toString();
+          }
+
+          function buildProxyHealthUrl(){
+            const p = new URL(PROXY_BASE);
+            if (/\/proxy$/i.test(p.pathname)) {
+              p.pathname = p.pathname.replace(/\/proxy$/i, '/health');
+            } else {
+              p.pathname = p.pathname.replace(/\/+$/, '') + '/health';
+            }
+            return p.toString();
+          }
+
+          async function proxyGetJson(targetUrl, headers, signal){
+            const proxiedUrl = buildProxyRequestUrl(targetUrl);
             return fetchWithRetry(async () => {
-              const r = await fetch(p.toString(), { headers, signal });
+              const r = await fetch(proxiedUrl, { headers, signal });
               if(!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
               return r.json();
             });
           }
 
           async function fetchLastCherepik(prefix, release, signal){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
             if(!tok) return null;
 
             const url = `https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/${prefix}_${release}/notification_history`;
             try {
               const headers = {
-                'authorization-deploy-lab': `Bearer ${tok}`,
+                ...deployHeaders(),
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
               };
               const response = await proxyGetJson(url, headers, signal);
@@ -1349,7 +2979,7 @@
           }
 
           async function fetchDeployIssueCount(prefix, release, signal){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
             if(!tok) return 0;
             const url = DEPLOY_ISSUES_URL_TMPL
               .replace('{prefix}', prefix)
@@ -1364,7 +2994,7 @@
           }
 
           async function fetchDeployIssuesList(prefix, release, signal){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
             if(!tok) return [];
 
             const url = DEPLOY_ISSUES_URL_TMPL
@@ -2113,7 +3743,7 @@
           }
 
           async function fetchDeployDates(prefix, release, signal){
-            const tok = (inpDeployToken?.value || '').trim();
+            const tok = getDeployToken();
             if(!tok) return { cutoff: null, store: null };
 
             const baseUrl = DEPLOY_BASE_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
@@ -4263,7 +5893,9 @@
             ios: 14 * 60,
             android: 14 * 60
           };
-          const CUT_TARGET_WINDOW_MIN = 5;
+          const CUT_TARGET_WINDOW_MIN = 10;
+          const STORE_DEADLINE_MINUTES = 18 * 60;
+          const LAG_TARGET_MAX_MINUTES = 4 * 60;
 
           function parseLabelTimeMinutes(label){
             if(!label) return null;
@@ -4283,12 +5915,14 @@
             let status = null;
             let note = '';
             if(Number.isFinite(minutes)){
-              if(minutes >= targetMinutes && minutes <= targetMinutes + CUT_TARGET_WINDOW_MIN){
+              const start = targetMinutes - CUT_TARGET_WINDOW_MIN;
+              const end = targetMinutes + CUT_TARGET_WINDOW_MIN;
+              if(minutes >= start && minutes <= end){
                 status = 'cut-on';
-                note = ' (старт вовремя)';
+                note = ' (старт в окне)';
               }else{
                 status = 'cut-late';
-                note = ' (старт позже)';
+                note = minutes < start ? ' (старт раньше окна)' : ' (старт позже окна)';
               }
             }
             const timeHtml = status ? `<span class="cut-time ${status}">${timeText}</span>` : `<span class="cut-time">${timeText}</span>`;
@@ -4494,10 +6128,16 @@
             const covRowsData = [];
             const selRowsData = [];
             const avgRowsData = [];
+            const chpRowsData = [];
             const tcStreamByRelease = [];
             let tcStreamDeltaRowsAll = [];
 
             let firstRow = true;
+            window.__iosTypesRowsAll = [];
+            window.__andTypesRowsAll = [];
+            window.__chpTypesRowsAll = [];
+            window.__chpTypesRowsIosAll = [];
+            window.__chpTypesRowsAndAll = [];
 
             for(const rel of releases){
               if(signal?.aborted) break;
@@ -4573,6 +6213,9 @@
               let swatAvgMsSum = 0, swatAvgCount = 0;
               let streamAvgMsSum = 0, streamAvgCount = 0;
               let totalAvgMsSum = 0, totalAvgCount = 0;
+              let swatDurAll = 0, swatCasesAll = 0;
+              let streamDurAll = 0, streamCasesAll = 0;
+              let totalDurAll = 0, totalCasesAll = 0;
 
               for(const [login, agg] of avgByLogin.entries()){
                 const cases = Number(agg?.cases || 0);
@@ -4580,27 +6223,46 @@
                 const dur = Number(agg?.dur || 0);
                 const avgMs = dur / cases;
 
+                totalDurAll += dur;
+                totalCasesAll += cases;
+
                 totalAvgMsSum += avgMs;
                 totalAvgCount += 1;
 
                 if(swatSet.has(login)){
                   swatAvgMsSum += avgMs;
                   swatAvgCount += 1;
+                  swatDurAll += dur;
+                  swatCasesAll += cases;
                 }else{
                   streamAvgMsSum += avgMs;
                   streamAvgCount += 1;
+                  streamDurAll += dur;
+                  streamCasesAll += cases;
                 }
               }
 
               const swatMsPerCase = swatAvgCount ? (swatAvgMsSum / swatAvgCount) : 0;
               const streamMsPerCase = streamAvgCount ? (streamAvgMsSum / streamAvgCount) : 0;
               const totalMsPerCase = totalAvgCount ? (totalAvgMsSum / totalAvgCount) : 0;
+              const swatMsPerCaseWeighted = swatCasesAll ? (swatDurAll / swatCasesAll) : 0;
+              const streamMsPerCaseWeighted = streamCasesAll ? (streamDurAll / streamCasesAll) : 0;
+              const totalMsPerCaseWeighted = totalCasesAll ? (totalDurAll / totalCasesAll) : 0;
 
               addAvgPoint(rel, swatMsPerCase/60000, streamMsPerCase/60000, totalMsPerCase/60000);
               if(avgTbody){
                 renderAvgRow({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase });
               }
-              avgRowsData.push({ release: rel, swatMs: swatMsPerCase, streamMs: streamMsPerCase, totalMs: totalMsPerCase, total: totalMsPerCase });
+              avgRowsData.push({
+                release: rel,
+                swatMs: swatMsPerCase,
+                streamMs: streamMsPerCase,
+                totalMs: totalMsPerCase,
+                total: totalMsPerCase,
+                swatWeighted: swatMsPerCaseWeighted,
+                streamWeighted: streamMsPerCaseWeighted,
+                totalWeighted: totalMsPerCaseWeighted
+              });
 
               // 2) SWAT/STREAM ХБ: только HB лаунчи, memberstats
               let swatCount = 0;
@@ -4721,6 +6383,7 @@
                 chpTbody.appendChild(tr);
               }
               addChpPoint(rel, chpIos, chpAndroid, chpTotal);
+              chpRowsData.push({ release: rel, ios: chpIos, android: chpAndroid, total: chpTotal });
 
               // Cutoff/Store (deploy-lab base+deploy)
               let iosCutLbl = null, iosStoreLbl = null, andCutLbl = null, andStoreLbl = null;
@@ -4817,11 +6480,15 @@
 
             window.__tcRowsAll = tcRowsData.slice();
             window.__tcDeltaRowsAll = tcStreamDeltaRowsAll.slice();
+            window.__covRowsAll = covRowsData.slice();
+            window.__selRowsAll = selRowsData.slice();
+            window.__avgRowsAll = avgRowsData.slice();
+            window.__chpRowsAll = chpRowsData.slice();
             populateAllReleaseFilters(releases);
             applyAllReleaseFilters();
 
             // Типы задач (Deploy-lab issues): iOS + Android
-            const deployTok = (inpDeployToken?.value || '').trim();
+            const deployTok = getDeployToken();
             const ytTok = (inpYtToken?.value || '').trim();
             if(!deployTok){
               showIosTypesEmpty('Вставьте токен Deploy-lab');
@@ -4922,6 +6589,11 @@
 
               const iosTypes = sortTypesByCanon(iosSet);
               const andTypes = sortTypesByCanon(andSet);
+              window.__iosTypesRowsAll = iosRows.slice();
+              window.__andTypesRowsAll = andRows.slice();
+              window.__chpTypesRowsAll = chpTypesRows.slice();
+              window.__chpTypesRowsIosAll = chpTypesRowsIos.slice();
+              window.__chpTypesRowsAndAll = chpTypesRowsAnd.slice();
 
               if(!iosTypes.length){
                 showIosTypesEmpty('Нет данных по типам задач (iOS) в Deploy-lab');
@@ -5013,6 +6685,7 @@
 
             if(!tcRowsData.length) showEmpty('Данные появятся после получения из источника');
             if(!selRowsData.length) showSelEmpty('Данные появятся после получения из источника');
+            renderMlSummary();
           }
 
           // init
@@ -5023,6 +6696,7 @@
           showEmpty('Данные появятся после получения из источника');
           showCovEmpty('Данные появятся после получения из источника');
           showSelEmpty('Данные появятся после получения из источника');
+          renderMlSummary();
           showAvgEmpty('Данные появятся после получения из источника');
           showChpEmpty('Данные появятся после получения из источника');
           showChpTypesEmpty('Данные появятся после получения из источника');
@@ -5053,10 +6727,13 @@
 
           proxyBtn?.addEventListener('click', async () => {
             try{
-              const r = await fetch(PROXY_BASE + '/health', { cache: 'no-store' });
+              const r = await fetch(buildProxyHealthUrl(), { cache: 'no-store' });
               const j = await r.json();
-              const ok = !!(j && j.ok === true && Number(j.port) === 8787);
-              showToast(ok ? `Прокси OK (порт ${j.port})` : 'Прокси не отвечает', ok);
+              const ok = !!(j && j.ok === true);
+              const label = ok
+                ? `Прокси OK${j && j.port ? ` (порт ${j.port})` : ''}`
+                : 'Прокси не отвечает';
+              showToast(label, ok);
             }catch(e){
               showToast('Прокси не отвечает', false);
             }
@@ -5081,6 +6758,87 @@
           stopBtn?.addEventListener('click', () => {
             setRunning(false);
           });
+
+          mlSaveBtn?.addEventListener('click', async () => {
+            const entry = recordMlExport();
+            if(entry){
+              renderMlSummary();
+              const synced = await syncMlDatasetToDrive(false);
+              showToast(synced ? 'Выгрузка сохранена в ML-историю' : 'Выгрузка сохранена локально', synced);
+            }else{
+              showToast('Нет данных для сохранения', false);
+            }
+          });
+
+          // custom tooltip for data-tip
+          if(mlTooltip){
+            let tipTarget = null;
+            const placeTip = (x, y) => {
+              const pad = 12;
+              const rect = mlTooltip.getBoundingClientRect();
+              let nx = x + pad;
+              let ny = y + pad;
+              if(nx + rect.width > window.innerWidth - 8) nx = x - rect.width - pad;
+              if(ny + rect.height > window.innerHeight - 8) ny = y - rect.height - pad;
+              mlTooltip.style.left = `${nx}px`;
+              mlTooltip.style.top = `${ny}px`;
+            };
+            const showTip = (el, evt) => {
+              const text = el?.getAttribute('data-tip') || '';
+              if(!text) return;
+              mlTooltip.textContent = text;
+              mlTooltip.style.opacity = '1';
+              mlTooltip.style.display = 'block';
+              tipTarget = el;
+              if(evt) placeTip(evt.clientX, evt.clientY);
+            };
+            const hideTip = () => {
+              mlTooltip.style.opacity = '0';
+              mlTooltip.style.display = 'none';
+              tipTarget = null;
+            };
+            const getTipEl = (target) => {
+              if(!target) return null;
+              const base = target.nodeType === 1 ? target : target.parentElement;
+              return base?.closest ? base.closest('[data-tip]') : null;
+            };
+            document.addEventListener('mouseover', (e) => {
+              const el = getTipEl(e.target);
+              if(!el || document.body.classList.contains('pdf-export')) return;
+              showTip(el, e);
+            });
+            document.addEventListener('mousemove', (e) => {
+              if(!tipTarget) return;
+              placeTip(e.clientX, e.clientY);
+            });
+            document.addEventListener('mouseout', (e) => {
+              if(!tipTarget) return;
+              const rel = getTipEl(e.relatedTarget);
+              if(rel) return;
+              hideTip();
+            });
+          }
+
+          mlLabelOkBtn?.addEventListener('click', async () => {
+            const result = await labelLastExport('ok');
+            if(!result?.ok){
+              showToast(result?.reason || 'Нет сохраненной ML-выгрузки', false);
+              return;
+            }
+            showToast(result.synced ? 'Выгрузка размечена как OK' : 'Метка OK сохранена локально', result.synced);
+          });
+          mlLabelFailBtn?.addEventListener('click', async () => {
+            const result = await labelLastExport('fail');
+            if(!result?.ok){
+              showToast(result?.reason || 'Нет сохраненной ML-выгрузки', false);
+              return;
+            }
+            showToast(result.synced ? 'Выгрузка размечена как Регресс' : 'Метка Регресс сохранена локально', result.synced);
+          });
+          comparePrevOnly?.addEventListener('change', renderMlSummary);
+          ensureMlDatasetLoaded().catch((e) => {
+            console.error('ML dataset load failed', e);
+          });
         })();
       </script>
     </main>
@@ -5089,5 +6847,6 @@
   <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 opacity-0 transition-opacity duration-200">
     <div id="toastInner" class="px-4 py-2 rounded-2xl text-sm font-semibold bg-white/90 ring-1 ring-[#ecebff] text-slate-700 shadow"></div>
   </div>
+  <div id="mlTooltip" class="ml-tooltip" aria-hidden="true"></div>
 </body>
 </html>
