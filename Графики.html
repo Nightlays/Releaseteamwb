@@ -10,6 +10,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
+  <script src="./ml/catboost_release_risk.bundle.js"></script>
 
   <!-- Все кастомные стили вынесены в style.css -->
   <link rel="stylesheet" href="./style.css" />
@@ -23,7 +25,7 @@
           <div class="flex items-center gap-2">
             <div class="font-extrabold leading-tight">WB All Table</div>
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v0.2.22</span>
+              <span aria-hidden="true">🏷️</span><span>v0.2.26</span>
             </span>
             <button id="exportPdfBtn"
               class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
@@ -92,9 +94,12 @@
               <input type="checkbox" id="comparePrevOnly" />
               Только сравнение с предыдущим
             </label>
+            <button type="button" class="btn btn-ghost ml-helper-status ml-helper-status--unknown" id="mlHelperStatusBtn">Helper: —</button>
+            <button type="button" class="btn btn-ghost ml-drive-model-status ml-drive-model-status--checking" id="mlDriveModelStatusBtn">Drive model: —</button>
             <button type="button" class="btn btn-ghost" id="mlSaveBtn">Сохранить выгрузку</button>
-            <button type="button" class="btn btn-ghost" id="mlLabelOk">Пометить OK</button>
-            <button type="button" class="btn btn-ghost" id="mlLabelFail">Пометить Регресс</button>
+            <button type="button" class="btn btn-ghost" id="mlLabelOk">OK + переобучить</button>
+            <button type="button" class="btn btn-ghost" id="mlLabelFail">Регресс + переобучить</button>
+            <button type="button" class="btn btn-ghost" id="mlRetrainBtn">Переобучить CatBoost</button>
           </div>
         </div>
         <div id="mlSummaryBody" class="ml-summary-body">—</div>
@@ -572,8 +577,8 @@
                   <select id="cutReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
                 </div>
                 <div class="cutoff-legend px-4 pt-1 text-xs text-slate-600 flex items-center gap-3 flex-wrap">
-                  <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>13:50-14:10 — старт в валидном окне</span>
-                  <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>раньше 13:50 или позже 14:10 — вне окна</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>13:50-14:10 — старт вовремя</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>раньше 13:50 или позже 14:10 — отклонение от целевого времени</span>
                   <span class="cutoff-item"><span class="cutoff-dot cutoff-store-late"></span>после 18:00 — отправка позже</span>
                 </div>
                 <div class="table-scroll-x">
@@ -703,6 +708,24 @@
         </div>
       </section>
 
+      <section id="streamCatalogCard" class="card p-5 space-y-4" data-export-card="true" style="display:none;">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Внутренние и внешние стримы</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="streamCatalog" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="streamCatalog" class="space-y-3">
+          <div id="streamCatalogWrap" class="stream-insights-wrap"></div>
+        </div>
+      </section>
+
 
       <script>
         (function(){
@@ -712,6 +735,7 @@
           const KINDS = ['Smoke', 'Selective'];
           const SWAT_LIST_URL = 'https://script.google.com/macros/s/AKfycbzLmb5ATmHOip7REPsl_iSLH2GuEHui0W_czyrPgW_8G1Wl-RY8CiM2UeAdqQQEwoNx-Q/exec';
           const LS_PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
+          const LS_ML_HELPER_RUNTIME_KEY = 'rb_ml_helper_runtime_v1';
           function readRuntimeProxyBase(){
             try {
               const q = new URLSearchParams(window.location.search);
@@ -731,7 +755,23 @@
             } catch (e) {}
             return 'http://localhost:8787';
           }
+          function readMlHelperBase(){
+            try {
+              const q = new URLSearchParams(window.location.search);
+              const fromQuery = q.get('rbMlHelperBase');
+              if (fromQuery) return String(fromQuery).trim();
+            } catch (e) {}
+            try {
+              const raw = localStorage.getItem(LS_ML_HELPER_RUNTIME_KEY);
+              if(raw){
+                const parsed = JSON.parse(raw);
+                if(parsed && parsed.base) return String(parsed.base).trim();
+              }
+            } catch (e) {}
+            return 'http://127.0.0.1:8788';
+          }
           const PROXY_BASE = readRuntimeProxyBase().replace(/\/+$/, '');
+          const ML_HELPER_BASE = readMlHelperBase().replace(/\/+$/, '');
           const LS_COLLAPSE_KEY = 'wb_all_table_collapsed';
 
           const DEPLOY_BASE_URL_TMPL   = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
@@ -766,6 +806,9 @@
           const mlSaveBtn = document.getElementById('mlSaveBtn');
           const mlLabelOkBtn = document.getElementById('mlLabelOk');
           const mlLabelFailBtn = document.getElementById('mlLabelFail');
+          const mlHelperStatusBtn = document.getElementById('mlHelperStatusBtn');
+          const mlDriveModelStatusBtn = document.getElementById('mlDriveModelStatusBtn');
+          const mlRetrainBtn = document.getElementById('mlRetrainBtn');
 
           if(window.Chart){
             Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
@@ -883,29 +926,78 @@
           });
         }
 
-        async function renderCardCanvas(card, scale){
-          if(!card || !window.html2canvas) return null;
-          const cardRestore = {
-            overflow: card.style.overflow,
-            width: card.style.width,
-            height: card.style.height,
-            maxHeight: card.style.maxHeight,
-            maxWidth: card.style.maxWidth
-          };
-          card.style.overflow = 'visible';
-          card.style.maxHeight = 'none';
-          card.style.maxWidth = 'none';
+        const PDF_MAX_BYTES = 300 * 1024 * 1024;
+        const PDF_EXPORT_PRESETS = [
+          { summaryScale: 1.8, cardScale: 1.6, imageType: 'JPEG', imageQuality: 0.88, imageCompression: 'MEDIUM', summaryWidth: 1200, cardWidth: 1320 },
+          { summaryScale: 1.55, cardScale: 1.35, imageType: 'JPEG', imageQuality: 0.78, imageCompression: 'MEDIUM', summaryWidth: 1120, cardWidth: 1240 },
+          { summaryScale: 1.3, cardScale: 1.15, imageType: 'JPEG', imageQuality: 0.68, imageCompression: 'FAST', summaryWidth: 1040, cardWidth: 1160 },
+          { summaryScale: 1.1, cardScale: 1.0, imageType: 'JPEG', imageQuality: 0.6, imageCompression: 'FAST', summaryWidth: 980, cardWidth: 1080 }
+        ];
 
-          const viewports = Array.from(card.querySelectorAll('.chart-viewport'));
-          const viewportRestore = viewports.map(el => ({ el, overflow: el.style.overflow }));
+        function getPdfCaptureWidth(node, fallback = 1200, min = 920, max = 1400){
+          const rect = node?.getBoundingClientRect?.() || {};
+          const measured = Math.max(
+            Number(node?.scrollWidth) || 0,
+            Number(node?.offsetWidth) || 0,
+            Math.ceil(Number(rect.width) || 0),
+            fallback
+          );
+          return Math.min(max, Math.max(min, measured));
+        }
+
+        function syncCanvasBitmaps(sourceRoot, cloneRoot){
+          if(!sourceRoot || !cloneRoot) return;
+          const sourceCanvases = Array.from(sourceRoot.querySelectorAll('canvas'));
+          const cloneCanvases = Array.from(cloneRoot.querySelectorAll('canvas'));
+          const total = Math.min(sourceCanvases.length, cloneCanvases.length);
+          for(let i = 0; i < total; i += 1){
+            const source = sourceCanvases[i];
+            const clone = cloneCanvases[i];
+            if(!source || !clone) continue;
+            try{
+              clone.width = source.width;
+              clone.height = source.height;
+              clone.style.width = `${source.clientWidth || source.width}px`;
+              clone.style.height = `${source.clientHeight || source.height}px`;
+              const ctx = clone.getContext('2d');
+              ctx?.clearRect(0, 0, clone.width, clone.height);
+              ctx?.drawImage(source, 0, 0);
+            }catch(e){}
+          }
+        }
+
+        function prepareNodeForPdfCapture(node){
+          if(!node) return () => {};
+          const nodeRestore = {
+            overflow: node.style.overflow,
+            width: node.style.width,
+            height: node.style.height,
+            maxHeight: node.style.maxHeight,
+            maxWidth: node.style.maxWidth
+          };
+          node.style.overflow = 'visible';
+          node.style.maxHeight = 'none';
+          node.style.maxWidth = 'none';
+
+          const viewports = Array.from(node.querySelectorAll('.chart-viewport'));
+          const viewportRestore = viewports.map(el => ({
+            el,
+            overflow: el.style.overflow,
+            height: el.style.height,
+            maxHeight: el.style.maxHeight
+          }));
           for(const v of viewports){
             v.style.overflow = 'visible';
+            if(v.scrollHeight > v.clientHeight){
+              v.style.height = `${v.scrollHeight}px`;
+              v.style.maxHeight = 'none';
+            }
           }
 
-          const scrollables = Array.from(card.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
-          const restore = [];
+          const scrollables = Array.from(node.querySelectorAll('[style*="overflow:auto"], [style*="overflow: auto"], .overflow-auto'));
+          const scrollRestore = [];
           for(const el of scrollables){
-            restore.push({
+            scrollRestore.push({
               el,
               overflow: el.style.overflow,
               overflowX: el.style.overflowX,
@@ -916,40 +1008,185 @@
             el.style.overflow = 'visible';
             el.style.overflowX = 'visible';
             el.style.overflowY = 'visible';
-            el.style.height = el.scrollHeight + 'px';
+            if(el.scrollHeight > el.clientHeight){
+              el.style.height = `${el.scrollHeight}px`;
+            }
             el.style.maxHeight = 'none';
           }
 
-          card.style.width = card.scrollWidth + 'px';
-          card.style.height = card.scrollHeight + 'px';
-
-          const canvas = await html2canvas(card, {
-            backgroundColor: '#ffffff',
-            scale: scale,
-            useCORS: true,
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, card.scrollWidth),
-            windowHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, card.scrollHeight)
-          });
-
-          for(const r of restore){
-            r.el.style.overflow = r.overflow;
-            r.el.style.overflowX = r.overflowX;
-            r.el.style.overflowY = r.overflowY;
-            r.el.style.height = r.height;
-            r.el.style.maxHeight = r.maxHeight;
+          const stickyNodes = Array.from(node.querySelectorAll('.sticky, [style*="position:sticky"], [style*="position: sticky"]'));
+          const stickyRestore = stickyNodes.map(el => ({
+            el,
+            position: el.style.position,
+            top: el.style.top,
+            bottom: el.style.bottom
+          }));
+          for(const el of stickyNodes){
+            el.style.position = 'static';
+            el.style.top = 'auto';
+            el.style.bottom = 'auto';
           }
-          for(const v of viewportRestore){
-            v.el.style.overflow = v.overflow;
-          }
-          card.style.overflow = cardRestore.overflow;
-          card.style.width = cardRestore.width;
-          card.style.height = cardRestore.height;
-          card.style.maxHeight = cardRestore.maxHeight;
-          card.style.maxWidth = cardRestore.maxWidth;
 
-          return canvas;
+          node.style.width = `${Math.max(node.scrollWidth, node.offsetWidth, Math.ceil(node.getBoundingClientRect().width || 0))}px`;
+          node.style.height = `${Math.max(node.scrollHeight, node.offsetHeight, Math.ceil(node.getBoundingClientRect().height || 0))}px`;
+
+          return () => {
+            for(const r of scrollRestore){
+              r.el.style.overflow = r.overflow;
+              r.el.style.overflowX = r.overflowX;
+              r.el.style.overflowY = r.overflowY;
+              r.el.style.height = r.height;
+              r.el.style.maxHeight = r.maxHeight;
+            }
+            for(const v of viewportRestore){
+              v.el.style.overflow = v.overflow;
+              v.el.style.height = v.height;
+              v.el.style.maxHeight = v.maxHeight;
+            }
+            for(const s of stickyRestore){
+              s.el.style.position = s.position;
+              s.el.style.top = s.top;
+              s.el.style.bottom = s.bottom;
+            }
+            node.style.overflow = nodeRestore.overflow;
+            node.style.width = nodeRestore.width;
+            node.style.height = nodeRestore.height;
+            node.style.maxHeight = nodeRestore.maxHeight;
+            node.style.maxWidth = nodeRestore.maxWidth;
+          };
+        }
+
+        async function renderCardCanvas(card, scale, options = {}){
+          if(!card || !window.html2canvas) return null;
+          const restore = prepareNodeForPdfCapture(card);
+          try{
+            return await html2canvas(card, {
+              backgroundColor: options.backgroundColor || '#ffffff',
+              scale: Math.max(1, Number(scale) || 1),
+              useCORS: true,
+              logging: false,
+              scrollX: 0,
+              scrollY: 0,
+              onclone: (clonedDoc) => {
+                clonedDoc?.body?.classList?.add('wb-graphs');
+                if(document.body.classList.contains('pdf-export')){
+                  clonedDoc?.body?.classList?.add('pdf-export');
+                }
+                if(typeof options.onclone === 'function'){
+                  options.onclone(clonedDoc);
+                }
+              },
+              windowWidth: Math.max(
+                Number(options.windowWidth) || 0,
+                document.documentElement.scrollWidth,
+                document.body.scrollWidth,
+                card.scrollWidth,
+                Math.ceil(card.getBoundingClientRect().width || 0)
+              ),
+              windowHeight: Math.max(
+                Number(options.windowHeight) || 0,
+                document.documentElement.scrollHeight,
+                document.body.scrollHeight,
+                card.scrollHeight,
+                Math.ceil(card.getBoundingClientRect().height || 0)
+              )
+            });
+          }finally{
+            restore();
+          }
+        }
+
+        async function renderNodeInPdfSandbox(source, scale, options = {}){
+          if(!source || !window.html2canvas) return null;
+          const host = document.createElement('div');
+          host.setAttribute('aria-hidden', 'true');
+          host.style.position = 'fixed';
+          host.style.left = '-20000px';
+          host.style.top = '0';
+          host.style.pointerEvents = 'none';
+          host.style.background = '#ffffff';
+          host.style.margin = '0';
+          host.style.padding = '0';
+
+          const scope = document.createElement('div');
+          scope.className = ['wb-graphs', 'pdf-export', options.scopeClassName || ''].filter(Boolean).join(' ');
+          scope.style.background = '#ffffff';
+          scope.style.margin = '0';
+          scope.style.padding = '0';
+          scope.style.boxSizing = 'border-box';
+          scope.style.width = `${Math.max(320, Number(options.width) || source.scrollWidth || source.offsetWidth || 1200)}px`;
+
+          const clone = source.cloneNode(true);
+          if(typeof options.prepareClone === 'function'){
+            options.prepareClone(clone, scope);
+          }
+
+          scope.appendChild(clone);
+          host.appendChild(scope);
+          document.body.appendChild(host);
+
+          syncCanvasBitmaps(source, clone);
+          await waitForLayoutFrames(2);
+          try{
+            return await renderCardCanvas(clone, scale, {
+              backgroundColor: options.backgroundColor || '#ffffff',
+              windowWidth: Math.max(scope.scrollWidth, clone.scrollWidth, clone.offsetWidth),
+              windowHeight: Math.max(scope.scrollHeight, clone.scrollHeight, clone.offsetHeight)
+            });
+          }finally{
+            host.remove();
+          }
+        }
+
+        function canvasToPdfImage(canvas, preset){
+          const imageType = String(preset?.imageType || 'JPEG').toUpperCase() === 'PNG' ? 'PNG' : 'JPEG';
+          if(imageType === 'PNG'){
+            return { imageType, dataUrl: canvas.toDataURL('image/png') };
+          }
+          return {
+            imageType,
+            dataUrl: canvas.toDataURL('image/jpeg', Math.max(0.4, Math.min(0.95, Number(preset?.imageQuality) || 0.82)))
+          };
+        }
+
+        function downloadBlob(blob, filename){
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function collectMlSummaryPdfSections(summaryCard){
+          if(!summaryCard) return [];
+          const sections = [];
+          const pushSection = (node, classNames = []) => {
+            if(!node) return;
+            sections.push({ node, classNames });
+          };
+
+          const overviewPage = summaryCard.querySelector('[data-ml-page="overview"]');
+          if(overviewPage){
+            pushSection(overviewPage.querySelector('.ml-summary-top'), ['pdf-sheet']);
+            pushSection(overviewPage.querySelector('.ml-brief-grid'), ['pdf-sheet']);
+          }
+
+          const regressStack = summaryCard.querySelector('[data-ml-page="regress"] .ml-summary-page-stack');
+          Array.from(regressStack?.children || []).forEach(node => pushSection(node, []));
+
+          const releaseStack = summaryCard.querySelector('[data-ml-page="release"] .ml-summary-page-stack');
+          Array.from(releaseStack?.children || []).forEach(node => pushSection(node, []));
+
+          const secondaryGrid = summaryCard.querySelector('[data-ml-page="secondary"] .ml-secondary-grid');
+          Array.from(secondaryGrid?.children || []).forEach(node => pushSection(node, []));
+
+          if(!sections.length){
+            pushSection(summaryCard, ['pdf-sheet', 'pdf-sheet--ml']);
+          }
+          return sections;
         }
 
         async function exportAllChartsToPDF(){
@@ -960,13 +1197,6 @@
             }
 
             const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', 'a4');
-
-            const pageW = pdf.internal.pageSize.getWidth();
-            const pageH = pdf.internal.pageSize.getHeight();
-            const margin = 10;
-            const contentH = pageH - margin * 2;
-            let y = margin;
 
             // фиксируем ML-выгрузку и обновляем summary
             try{
@@ -979,76 +1209,121 @@
 
             const restoreTooltips = disableChartTooltips();
             const restoreCollapsed = expandCollapsedForPdf();
+            let finalBlob = null;
+            let usedPreset = PDF_EXPORT_PRESETS[PDF_EXPORT_PRESETS.length - 1];
             document.body.classList.add('pdf-export');
             try{
               await waitForLayoutFrames(2);
               resizeChartsForPdf();
               await waitForLayoutFrames(2);
-              const addCanvasToPdf = (canvas) => {
-                if(!canvas) return;
-                const imgW = pageW - margin * 2;
-                const imgH = imgW * (canvas.height / canvas.width);
+              const summaryCard = document.getElementById('mlSummaryCard');
+              const cards = Array.from(document.querySelectorAll('section.card'))
+                .filter(card => (card.querySelector('canvas') || card.hasAttribute('data-export-card')) && window.getComputedStyle(card).display !== 'none');
 
-                if (imgH <= contentH) {
-                  if (y + imgH > pageH - margin && y !== margin) {
-                    pdf.addPage();
-                    y = margin;
-                  }
-                  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, imgW, imgH);
-                  y += imgH + 10;
-                } else {
-                  if (y !== margin) {
-                    pdf.addPage();
-                    y = margin;
-                  }
-                  const pxPerMm = canvas.width / imgW;
-                  const pagePx = Math.floor(contentH * pxPerMm);
-                  let sy = 0;
-                  while (sy < canvas.height) {
-                    const sliceH = Math.min(pagePx, canvas.height - sy);
-                    const slice = document.createElement('canvas');
-                    slice.width = canvas.width;
-                    slice.height = sliceH;
-                    const sctx = slice.getContext('2d');
-                    sctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+              const buildPdfBlobForPreset = async (preset) => {
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pageW = pdf.internal.pageSize.getWidth();
+                const pageH = pdf.internal.pageSize.getHeight();
+                const margin = 10;
+                const contentH = pageH - margin * 2;
+                let y = margin;
+                let hasBlocks = false;
 
-                    const sliceH_mm = sliceH / pxPerMm;
-                    pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceH_mm);
-                    sy += sliceH;
-                    if (sy < canvas.height) {
+                const addCanvasToPdf = (canvas) => {
+                  if(!canvas) return;
+                  const imgW = pageW - margin * 2;
+                  const imgH = imgW * (canvas.height / canvas.width);
+                  const image = canvasToPdfImage(canvas, preset);
+                  const compression = preset.imageCompression || 'MEDIUM';
+
+                  if (imgH <= contentH) {
+                    if (y + imgH > pageH - margin && y !== margin) {
                       pdf.addPage();
+                      y = margin;
                     }
+                    pdf.addImage(image.dataUrl, image.imageType, margin, y, imgW, imgH, undefined, compression);
+                    y += imgH + 10;
+                  } else {
+                    if (y !== margin) {
+                      pdf.addPage();
+                      y = margin;
+                    }
+                    const pxPerMm = canvas.width / imgW;
+                    const pagePx = Math.floor(contentH * pxPerMm);
+                    let sy = 0;
+                    while (sy < canvas.height) {
+                      const sliceH = Math.min(pagePx, canvas.height - sy);
+                      const slice = document.createElement('canvas');
+                      slice.width = canvas.width;
+                      slice.height = sliceH;
+                      const sctx = slice.getContext('2d', { alpha: false });
+                      if(sctx){
+                        sctx.fillStyle = '#ffffff';
+                        sctx.fillRect(0, 0, slice.width, slice.height);
+                        sctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+                      }
+                      const sliceImage = canvasToPdfImage(slice, preset);
+                      const sliceH_mm = sliceH / pxPerMm;
+                      pdf.addImage(sliceImage.dataUrl, sliceImage.imageType, margin, margin, imgW, sliceH_mm, undefined, compression);
+                      sy += sliceH;
+                      if (sy < canvas.height) {
+                        pdf.addPage();
+                      }
+                    }
+                    y = margin;
                   }
-                  y = margin;
+                };
+
+                if(summaryCard){
+                  try{
+                    const summarySections = collectMlSummaryPdfSections(summaryCard);
+                    for(let i = 0; i < summarySections.length; i += 1){
+                      const section = summarySections[i];
+                      if(hasBlocks){
+                        pdf.addPage();
+                        y = margin;
+                      }
+                      const summaryCanvas = await renderNodeInPdfSandbox(section.node, preset.summaryScale, {
+                        width: preset.summaryWidth,
+                        prepareClone(clone){
+                          clone.classList.add(...(section.classNames || []));
+                          clone.querySelector('.ml-summary-toolbar')?.remove();
+                        }
+                      });
+                      addCanvasToPdf(summaryCanvas);
+                      hasBlocks = true;
+                    }
+                  }catch(e){
+                    console.error('ML summary capture error', e);
+                  }
                 }
+
+                for (const card of cards) {
+                  if(hasBlocks){
+                    pdf.addPage();
+                    y = margin;
+                  }
+                  const canvas = await renderNodeInPdfSandbox(card, preset.cardScale, {
+                    width: getPdfCaptureWidth(card, preset.cardWidth),
+                    prepareClone(clone){
+                      clone.querySelectorAll('.ml-summary-toolbar, .ml-tooltip').forEach(el => el.remove());
+                    }
+                  });
+                  addCanvasToPdf(canvas);
+                  hasBlocks = true;
+                }
+
+                return pdf.output('blob');
               };
 
-              const summaryCard = document.getElementById('mlSummaryCard');
-              if(summaryCard){
-                try{
-                  summaryCard.classList.add('pdf-sheet--ml');
-                  const summaryCanvas = await renderCardCanvas(summaryCard, 2);
-                  addCanvasToPdf(summaryCanvas);
-                  const chartCards = Array.from(document.querySelectorAll('section.card'))
-                    .filter(card => card.querySelector('canvas'));
-                  if(chartCards.length){
-                    pdf.addPage();
-                    y = margin;
-                  }
-                }catch(e){
-                  console.error('ML summary capture error', e);
-                }finally{
-                  summaryCard.classList.remove('pdf-sheet--ml');
+              for(let i = 0; i < PDF_EXPORT_PRESETS.length; i += 1){
+                const preset = PDF_EXPORT_PRESETS[i];
+                const blob = await buildPdfBlobForPreset(preset);
+                usedPreset = preset;
+                finalBlob = blob;
+                if(blob.size <= PDF_MAX_BYTES){
+                  break;
                 }
-              }
-
-              // Берём именно карточки графиков целиком
-              const cards = Array.from(document.querySelectorAll('section.card'))
-                .filter(card => card.querySelector('canvas'));
-
-              for (const card of cards) {
-                const canvas = await renderCardCanvas(card, 2);
-                addCanvasToPdf(canvas);
               }
             }finally{
               restoreCollapsed();
@@ -1057,7 +1332,15 @@
               document.body.classList.remove('pdf-export');
             }
 
-            pdf.save('WB_All_Charts.pdf');
+            if(!finalBlob){
+              showToast('Не удалось собрать PDF', false);
+              return;
+            }
+            if(finalBlob.size > PDF_MAX_BYTES){
+              console.warn('PDF size exceeds target after fallback', finalBlob.size, usedPreset);
+              showToast(`PDF собран, но вес ${Math.round(finalBlob.size / (1024 * 1024))} МБ. Применен максимальный режим сжатия.`, false);
+            }
+            downloadBlob(finalBlob, 'WB_All_Charts.pdf');
           }catch(e){
             console.error('PDF export failed', e);
             showToast(`PDF ошибка: ${e?.message || e}`, false);
@@ -1070,14 +1353,56 @@
         const ML_MAX_RECORDS = 200;
         const ML_DRIVE_URL = 'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec';
         const ML_DRIVE_FILE = 'wb_graphs_v0_2_9_ml_dataset.json';
+        const ML_DRIVE_BUNDLE_FILE = 'wb_graphs_v0_2_9_catboost_bundle.json';
+        const ML_DRIVE_META_FILE = 'wb_graphs_v0_2_9_catboost_meta.json';
+        const ML_DRIVE_MANIFEST_FILE = 'wb_graphs_v0_2_9_catboost_manifest.json';
+        const ML_CATBOOST_RUNTIME_VERSION = '1.22.0';
         let mlLastAnomalies = null;
         let mlDatasetCache = null;
         let mlDatasetLoadPromise = null;
         let mlDatasetWritePromise = Promise.resolve();
+        let mlRemoteModelLoadPromise = null;
+        let mlCatboostSessionPromise = null;
+        let mlCatboostState = {
+          ready: false,
+          loading: false,
+          error: '',
+          session: null,
+          metadata: null,
+          source: 'local'
+        };
+        let mlCatboostPredictionState = {
+          key: '',
+          loading: false,
+          prob: null,
+          error: ''
+        };
+        let mlRetrainState = {
+          busy: false,
+          error: ''
+        };
+        let mlHelperState = {
+          loading: false,
+          online: false,
+          busy: false,
+          error: '',
+          checkedAt: 0,
+          commandHints: {
+            helper: './tools/run_ml_retrain_helper.sh',
+            retrain: './tools/retrain_catboost.sh'
+          }
+        };
         let mlDatasetSyncState = {
           loading: false,
           remote: false,
           ready: false,
+          error: ''
+        };
+        let mlRemoteModelState = {
+          loading: false,
+          remote: false,
+          applied: false,
+          version: '',
           error: ''
         };
         const FEATURE_KEYS = [
@@ -1089,6 +1414,429 @@
           'chp_total_delta_pct','chp_ios_delta_pct','chp_android_delta_pct',
           'release_anoms','type_anoms','platform_anoms','anom_score'
         ];
+        function getCatboostBundle(){
+          return window.WB_CATBOOST_ONNX_MODEL && typeof window.WB_CATBOOST_ONNX_MODEL === 'object'
+            ? window.WB_CATBOOST_ONNX_MODEL
+            : null;
+        }
+        function safeJsonParse(raw, fallback = null){
+          try{
+            return JSON.parse(raw);
+          }catch(e){
+            return fallback;
+          }
+        }
+        function parseMlModelVersion(value){
+          if(!value) return 0;
+          const ms = Date.parse(String(value));
+          return Number.isFinite(ms) ? ms : 0;
+        }
+        function getMlBundleVersion(bundle = getCatboostBundle()){
+          return String(bundle?.metadata?.trainedAt || bundle?.metadata?.version || '');
+        }
+        function decodeBase64ToUint8Array(base64){
+          if(typeof base64 !== 'string' || !base64) return null;
+          const binary = atob(base64);
+          const out = new Uint8Array(binary.length);
+          for(let i = 0; i < binary.length; i += 1){
+            out[i] = binary.charCodeAt(i);
+          }
+          return out;
+        }
+        function ensureMlCatboostSession(){
+          if(mlCatboostState.ready && mlCatboostState.session) return Promise.resolve(mlCatboostState.session);
+          if(mlCatboostSessionPromise) return mlCatboostSessionPromise;
+          if(!window.ort){
+            mlCatboostState.error = 'onnxruntime-web не загрузился';
+            return Promise.resolve(null);
+          }
+          const bundle = getCatboostBundle();
+          if(!bundle?.base64){
+            mlCatboostState.error = 'CatBoost bundle не найден';
+            return Promise.resolve(null);
+          }
+          mlCatboostState.loading = true;
+          mlCatboostState.error = '';
+          mlCatboostState.metadata = bundle.metadata || null;
+          mlCatboostSessionPromise = (async () => {
+            try{
+              if(window.ort?.env?.wasm){
+                window.ort.env.wasm.numThreads = 1;
+                window.ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ML_CATBOOST_RUNTIME_VERSION}/dist/`;
+              }
+              const bytes = decodeBase64ToUint8Array(bundle.base64);
+              if(!bytes?.length) throw new Error('Пустой bundle модели');
+              const session = await window.ort.InferenceSession.create(bytes, {
+                executionProviders: ['wasm'],
+                graphOptimizationLevel: 'all'
+              });
+              mlCatboostState.ready = true;
+              mlCatboostState.session = session;
+              mlCatboostState.metadata = bundle.metadata || null;
+              mlCatboostState.source = mlRemoteModelState.applied ? 'drive' : (mlCatboostState.source || 'local');
+              mlCatboostState.error = '';
+              return session;
+            }catch(e){
+              mlCatboostState.ready = false;
+              mlCatboostState.session = null;
+              mlCatboostState.error = e?.message || String(e);
+              return null;
+            }finally{
+              mlCatboostState.loading = false;
+            }
+          })();
+          return mlCatboostSessionPromise;
+        }
+        function featureVectorKey(features){
+          return FEATURE_KEYS.map(key => {
+            const value = Number(features?.[key] ?? 0);
+            return Number.isFinite(value) ? value.toFixed(6) : '0.000000';
+          }).join('|');
+        }
+        function extractFailProbabilityFromOrtValue(value){
+          const bigintOne = typeof BigInt === 'function' ? BigInt(1) : null;
+          if(value == null) return null;
+          if(typeof value === 'number' && Number.isFinite(value)) return value;
+          if(Array.isArray(value)){
+            if(!value.length) return null;
+            const first = value[0];
+            const nested = extractFailProbabilityFromOrtValue(first);
+            if(nested != null) return nested;
+          }
+          if(typeof value.get === 'function'){
+            const direct = value.get(1) ?? value.get('1') ?? (bigintOne == null ? undefined : value.get(bigintOne));
+            const parsed = Number(direct);
+            if(Number.isFinite(parsed)) return parsed;
+          }
+          if(value instanceof Map){
+            const direct = value.get(1) ?? value.get('1') ?? (bigintOne == null ? undefined : value.get(bigintOne));
+            const parsed = Number(direct);
+            if(Number.isFinite(parsed)) return parsed;
+          }
+          if(typeof value === 'object'){
+            if(ArrayBuffer.isView(value.data) || Array.isArray(value.data)){
+              const data = Array.from(value.data || []);
+              if(data.length >= 2){
+                const parsed = Number(data[1]);
+                if(Number.isFinite(parsed)) return parsed;
+              }
+            }
+            if('1' in value){
+              const parsed = Number(value['1']);
+              if(Number.isFinite(parsed)) return parsed;
+            }
+            if(1 in value){
+              const parsed = Number(value[1]);
+              if(Number.isFinite(parsed)) return parsed;
+            }
+          }
+          return null;
+        }
+        async function runCatboostPrediction(features){
+          const session = await ensureMlCatboostSession();
+          if(!session || !window.ort) return null;
+          const inputName = session.inputNames?.[0] || mlCatboostState.metadata?.onnx?.inputs?.[0]?.name || 'features';
+          const outputName = session.outputNames?.find(name => /prob/i.test(String(name))) || session.outputNames?.[1] || 'probabilities';
+          const tensor = new window.ort.Tensor('float32', Float32Array.from(featureVector(features)), [1, FEATURE_KEYS.length]);
+          const outputs = await session.run({ [inputName]: tensor });
+          const prob = extractFailProbabilityFromOrtValue(outputs?.[outputName]);
+          return Number.isFinite(prob) ? Math.max(0, Math.min(1, prob)) : null;
+        }
+        function ensureMlCatboostPrediction(features){
+          const key = featureVectorKey(features);
+          if(mlCatboostPredictionState.loading && mlCatboostPredictionState.key === key) return;
+          if(mlCatboostPredictionState.key === key && !mlCatboostPredictionState.loading && (mlCatboostPredictionState.prob != null || mlCatboostPredictionState.error)) return;
+          mlCatboostPredictionState = { key, loading: true, prob: null, error: '' };
+          runCatboostPrediction(features)
+            .then(prob => {
+              mlCatboostPredictionState = {
+                key,
+                loading: false,
+                prob,
+                error: prob == null ? (mlCatboostState.error || 'Не удалось прочитать выход CatBoost') : ''
+              };
+            })
+            .catch(e => {
+              mlCatboostPredictionState = {
+                key,
+                loading: false,
+                prob: null,
+                error: e?.message || String(e)
+              };
+            })
+            .finally(() => {
+              renderMlSummary();
+            });
+        }
+        function buildMlHelperUrl(path){
+          const normalized = String(path || '').startsWith('/') ? path : `/${String(path || '')}`;
+          return `${ML_HELPER_BASE}${normalized}`;
+        }
+        function setMlHelperIndicatorState(){
+          if(!mlHelperStatusBtn) return;
+          const helperHint = mlHelperState.commandHints?.helper || './tools/run_ml_retrain_helper.sh';
+          mlHelperStatusBtn.classList.remove('ml-helper-status--online', 'ml-helper-status--offline', 'ml-helper-status--busy', 'ml-helper-status--unknown');
+          let text = 'Helper: offline';
+          let tone = 'offline';
+          if(mlHelperState.loading){
+            text = 'Helper: проверка...';
+            tone = 'unknown';
+          }else if(mlHelperState.busy){
+            text = 'Helper: retrain...';
+            tone = 'busy';
+          }else if(mlHelperState.online){
+            text = 'Helper: online';
+            tone = 'online';
+          }else if(!mlHelperState.checkedAt){
+            text = 'Helper: —';
+            tone = 'unknown';
+          }
+          mlHelperStatusBtn.classList.add(`ml-helper-status--${tone}`);
+          mlHelperStatusBtn.textContent = text;
+          const tipText = mlHelperState.loading
+            ? 'Проверяем локальный helper для переобучения CatBoost.'
+            : (mlHelperState.online
+                ? `Локальный helper доступен по ${ML_HELPER_BASE}. Можно запускать переобучение из UI.`
+                : `Локальный helper недоступен. Запусти ${helperHint}`);
+          mlHelperStatusBtn.setAttribute('data-tip', tipText);
+        }
+        function getMlDriveModelIndicatorState(){
+          const localVersion = String(getMlBundleVersion() || '');
+          const remoteVersion = String(mlRemoteModelState.version || '');
+          const localMs = parseMlModelVersion(localVersion);
+          const remoteMs = parseMlModelVersion(remoteVersion);
+          const effectiveSource = String(mlCatboostState.source || 'local');
+          if(mlRemoteModelState.loading){
+            return {
+              tone: 'checking',
+              text: 'Drive model: checking',
+              tip: 'Проверяем опубликованную CatBoost-модель в Apps Script / Drive.'
+            };
+          }
+          if(mlRemoteModelState.error){
+            return {
+              tone: 'error',
+              text: 'Drive model: error',
+              tip: `Не удалось синхронизировать модель из Drive. ${mlRemoteModelState.error}`
+            };
+          }
+          if(!mlRemoteModelState.remote || !remoteVersion){
+            return {
+              tone: 'outdated',
+              text: 'Drive model: outdated',
+              tip: localVersion
+                ? `В Apps Script пока нет опубликованной версии CatBoost. Локально доступна модель ${localVersion}.`
+                : 'В Apps Script пока нет опубликованной версии CatBoost.'
+            };
+          }
+          const sameVersion = !!localVersion && remoteVersion === localVersion;
+          const driveApplied = mlRemoteModelState.applied || effectiveSource === 'drive';
+          if(driveApplied || sameVersion){
+            const baseTip = driveApplied
+              ? `Страница использует модель из Drive ${remoteVersion}.`
+              : `Drive-модель ${remoteVersion} синхронизирована с локальным bundle ${localVersion || remoteVersion}.`;
+            const fallbackTip = localVersion && localVersion !== remoteVersion
+              ? ` Локальный fallback: ${localVersion}.`
+              : '';
+            return {
+              tone: 'synced',
+              text: 'Drive model: synced',
+              tip: `${baseTip}${fallbackTip}`
+            };
+          }
+          const localAhead = localMs && remoteMs ? localMs > remoteMs : (!!localVersion && localVersion !== remoteVersion);
+          if(localAhead){
+            return {
+              tone: 'outdated',
+              text: 'Drive model: outdated',
+              tip: `Локальный bundle ${localVersion} новее версии в Drive ${remoteVersion}. Нужно опубликовать новую модель.`
+            };
+          }
+          return {
+            tone: 'outdated',
+            text: 'Drive model: outdated',
+            tip: `В Drive есть более свежая модель ${remoteVersion}, но страница еще не синхронизировала ее поверх локального bundle ${localVersion || '—'}.`
+          };
+        }
+        function setMlDriveModelIndicatorState(){
+          if(!mlDriveModelStatusBtn) return;
+          const state = getMlDriveModelIndicatorState();
+          mlDriveModelStatusBtn.classList.remove(
+            'ml-drive-model-status--synced',
+            'ml-drive-model-status--outdated',
+            'ml-drive-model-status--error',
+            'ml-drive-model-status--checking'
+          );
+          mlDriveModelStatusBtn.classList.add(`ml-drive-model-status--${state.tone}`);
+          mlDriveModelStatusBtn.textContent = state.text;
+          mlDriveModelStatusBtn.setAttribute('data-tip', state.tip);
+        }
+        async function checkMlHelperHealth({ silent = true } = {}){
+          if(mlHelperState.loading) return mlHelperState;
+          mlHelperState.loading = true;
+          setMlHelperIndicatorState();
+          try{
+            const response = await fetch(buildMlHelperUrl('/api/ml/health'), { cache: 'no-store' });
+            const payload = await response.json().catch(() => ({}));
+            if(!response.ok || !payload?.ok){
+              throw new Error(payload?.error || `Helper HTTP ${response.status}`);
+            }
+            mlHelperState = {
+              ...mlHelperState,
+              loading: false,
+              online: true,
+              busy: !!payload?.busy,
+              error: '',
+              checkedAt: Date.now(),
+              commandHints: payload?.commandHints || mlHelperState.commandHints
+            };
+            if(!silent){
+              showToast(payload?.busy ? 'ML helper online, идет retrain' : 'ML helper online', true);
+            }
+            return mlHelperState;
+          }catch(e){
+            mlHelperState = {
+              ...mlHelperState,
+              loading: false,
+              online: false,
+              busy: false,
+              error: e?.message || String(e),
+              checkedAt: Date.now()
+            };
+            if(!silent){
+              const helperHint = mlHelperState.commandHints?.helper || './tools/run_ml_retrain_helper.sh';
+              showToast(`ML helper offline. Запусти ${helperHint}`, false);
+            }
+            return mlHelperState;
+          }finally{
+            setMlHelperIndicatorState();
+          }
+        }
+        function setMlRetrainButtonState(){
+          if(!mlRetrainBtn) return;
+          mlRetrainBtn.disabled = !!mlRetrainState.busy;
+          mlRetrainBtn.textContent = mlRetrainState.busy ? 'Переобучаем...' : 'Переобучить CatBoost';
+        }
+        function resetMlCatboostRuntime(source = (mlRemoteModelState.applied ? 'drive' : 'local')){
+          mlCatboostSessionPromise = null;
+          mlCatboostState = {
+            ready: false,
+            loading: false,
+            error: '',
+            session: null,
+            metadata: null,
+            source
+          };
+          mlCatboostPredictionState = {
+            key: '',
+            loading: false,
+            prob: null,
+            error: ''
+          };
+          setMlDriveModelIndicatorState();
+        }
+        function applyMlBundlePayload(bundle, source = 'local'){
+          if(!bundle || typeof bundle !== 'object' || !bundle.base64){
+            throw new Error('Helper не вернул новый bundle CatBoost');
+          }
+          window.WB_CATBOOST_ONNX_MODEL = bundle;
+          resetMlCatboostRuntime(source);
+        }
+        async function retrainMlCatboostViaHelper({ showToastOnSuccess = true, showToastOnError = true } = {}){
+          if(mlRetrainState.busy) return { ok: false, error: 'Retrain уже выполняется', helperHint: mlHelperState.commandHints?.helper || './tools/run_ml_retrain_helper.sh' };
+          mlRetrainState.busy = true;
+          mlRetrainState.error = '';
+          mlHelperState.busy = true;
+          setMlRetrainButtonState();
+          setMlHelperIndicatorState();
+          let helperHint = './tools/run_ml_retrain_helper.sh';
+          let helperResponded = false;
+          try{
+            const response = await fetch(buildMlHelperUrl('/api/ml/retrain'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'retrain' })
+            });
+            const payload = await response.json().catch(() => ({}));
+            helperResponded = true;
+            helperHint = payload?.commandHints?.helper || helperHint;
+            if(!response.ok || !payload?.ok){
+              mlHelperState = {
+                ...mlHelperState,
+                online: true,
+                busy: response.status === 409,
+                error: payload?.error || `Helper HTTP ${response.status}`,
+                checkedAt: Date.now(),
+                commandHints: payload?.commandHints || mlHelperState.commandHints
+              };
+              throw new Error(payload?.error || `Helper HTTP ${response.status}`);
+            }
+            const publishedToDrive = payload?.publishedToDrive !== false;
+            const bundleSource = publishedToDrive ? 'drive' : 'local';
+            applyMlBundlePayload(payload.bundle, bundleSource);
+            if(payload.meta && typeof payload.meta === 'object'){
+              mlCatboostState.metadata = payload.meta;
+            }
+            mlRemoteModelState = {
+              loading: false,
+              remote: publishedToDrive,
+              applied: publishedToDrive,
+              version: String(payload?.meta?.trainedAt || payload?.bundle?.metadata?.trainedAt || ''),
+              error: publishedToDrive ? '' : String(payload?.publishError || '')
+            };
+            mlHelperState = {
+              ...mlHelperState,
+              online: true,
+              busy: false,
+              error: '',
+              checkedAt: Date.now(),
+              commandHints: payload?.commandHints || mlHelperState.commandHints
+            };
+            await ensureMlCatboostSession();
+            setMlDriveModelIndicatorState();
+            renderMlSummary();
+            const durationSec = Math.max(1, Math.round(Number(payload?.durationMs || 0) / 1000));
+            if(showToastOnSuccess){
+              if(publishedToDrive){
+                showToast(`CatBoost переобучен за ${durationSec} c`, true);
+              }else{
+                const warn = payload?.publishError ? `, но не выгружен в Drive: ${payload.publishError}` : ', но не выгружен в Drive';
+                showToast(`CatBoost переобучен локально за ${durationSec} c${warn}`, false);
+              }
+            }
+            return {
+              ok: true,
+              durationMs: Number(payload?.durationMs || 0),
+              helperHint,
+              payload
+            };
+          }catch(e){
+            mlRetrainState.error = e?.message || String(e);
+            if(!helperResponded){
+              mlHelperState = {
+                ...mlHelperState,
+                online: false,
+                busy: false,
+                error: e?.message || String(e),
+                checkedAt: Date.now()
+              };
+            }
+            console.error('CatBoost retrain failed', e);
+            if(showToastOnError){
+              showToast(`Не удалось переобучить CatBoost. Запусти ${helperHint}`, false);
+            }
+            return {
+              ok: false,
+              error: e?.message || String(e),
+              helperHint
+            };
+          }finally{
+            mlRetrainState.busy = false;
+            setMlRetrainButtonState();
+            setMlHelperIndicatorState();
+            renderMlSummary();
+          }
+        }
 
         function hashMlText(value){
           const text = String(value || '');
@@ -1191,21 +1939,90 @@
           }, { maxTries: 3, baseDelay: 220 });
         }
         async function mlDriveGetDataset(){
-          const raw = await mlDriveFetch(`${ML_DRIVE_URL}?op=get&name=${encodeURIComponent(ML_DRIVE_FILE)}`, { method: 'GET' });
-          try{
-            return normalizeMlDataset(JSON.parse(raw || '[]'));
-          }catch(e){
-            return [];
-          }
+          const payload = await mlDriveGetJsonFile(ML_DRIVE_FILE, []);
+          return normalizeMlDataset(Array.isArray(payload) ? payload : []);
+        }
+        async function mlDriveGetJsonFile(name, fallback = null){
+          const raw = await mlDriveFetch(`${ML_DRIVE_URL}?op=get&name=${encodeURIComponent(name)}`, { method: 'GET' });
+          const parsed = safeJsonParse(raw || '', fallback);
+          return parsed == null ? fallback : parsed;
+        }
+        async function mlDriveSaveJsonFile(name, payload){
+          const body = JSON.stringify(payload);
+          await mlDriveFetch(`${ML_DRIVE_URL}?name=${encodeURIComponent(name)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body
+          });
+          return true;
         }
         async function mlDriveSaveDataset(dataset){
-          const payload = JSON.stringify(normalizeMlDataset(dataset));
           await mlDriveFetch(`${ML_DRIVE_URL}?name=${encodeURIComponent(ML_DRIVE_FILE)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: payload
+            body: JSON.stringify(normalizeMlDataset(dataset))
           });
           return true;
+        }
+        async function ensureRemoteCatboostBundle(force = false){
+          if(mlRemoteModelLoadPromise && !force) return mlRemoteModelLoadPromise;
+          mlRemoteModelState.loading = true;
+          setMlDriveModelIndicatorState();
+          mlRemoteModelLoadPromise = (async () => {
+            try{
+              const manifest = await mlDriveGetJsonFile(ML_DRIVE_MANIFEST_FILE, null);
+              const remoteVersion = String(manifest?.version || manifest?.trainedAt || '');
+              const localVersion = getMlBundleVersion();
+              mlRemoteModelState.remote = !!manifest;
+              mlRemoteModelState.version = remoteVersion;
+              if(!manifest || !remoteVersion){
+                mlRemoteModelState.applied = false;
+                mlRemoteModelState.error = '';
+                setMlDriveModelIndicatorState();
+                return null;
+              }
+              const remoteMs = parseMlModelVersion(remoteVersion);
+              const localMs = parseMlModelVersion(localVersion);
+              if(localMs && remoteMs && remoteMs <= localMs){
+                mlRemoteModelState.applied = false;
+                mlRemoteModelState.error = '';
+                setMlDriveModelIndicatorState();
+                return null;
+              }
+              const bundleName = String(manifest?.bundleName || ML_DRIVE_BUNDLE_FILE);
+              const metaName = String(manifest?.metaName || ML_DRIVE_META_FILE);
+              const [bundlePayload, metaPayload] = await Promise.all([
+                mlDriveGetJsonFile(bundleName, null),
+                mlDriveGetJsonFile(metaName, null).catch(() => null)
+              ]);
+              if(!bundlePayload?.base64){
+                throw new Error('В Drive нет корректного bundle CatBoost');
+              }
+              const mergedBundle = {
+                ...bundlePayload,
+                metadata: metaPayload && typeof metaPayload === 'object'
+                  ? metaPayload
+                  : (bundlePayload.metadata || {})
+              };
+              applyMlBundlePayload(mergedBundle, 'drive');
+              mlRemoteModelState.applied = true;
+              mlRemoteModelState.error = '';
+              setMlDriveModelIndicatorState();
+              await ensureMlCatboostSession();
+              renderMlSummary();
+              return mergedBundle;
+            }catch(e){
+              mlRemoteModelState.applied = false;
+              mlRemoteModelState.remote = false;
+              mlRemoteModelState.error = e?.message || String(e);
+              setMlDriveModelIndicatorState();
+              return null;
+            }finally{
+              mlRemoteModelState.loading = false;
+              setMlDriveModelIndicatorState();
+            }
+          })();
+          return mlRemoteModelLoadPromise;
         }
         async function ensureMlDatasetLoaded(force = false){
           if(mlDatasetLoadPromise && !force) return mlDatasetLoadPromise;
@@ -1480,6 +2297,122 @@
           if(deltaPct == null) return '';
           return `(${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(2)}%)`;
         }
+        function metricDeltaUnitLabel(label, fallbackUnit = ''){
+          if(fallbackUnit) return fallbackUnit;
+          const raw = String(label || '').trim();
+          const l = raw.toLowerCase();
+          if(!l) return '';
+          if(l.includes('уву') || l.includes('uwu')) return 'ед. УВУ';
+          if(l.includes('ат')) return 'автотестов';
+          if(l.includes('чп') || l.includes('cherepiki')) return 'ЧП';
+          if(l.includes('время') || l.includes('задержка') || l.includes('lag') || l.includes('store') || l.includes('cutoff')) return 'мин';
+          if(l.includes('тренд')) return 'п.п.';
+          if(l.includes('разброс')) return 'тест-кейсов';
+          if(l.includes('релиз')) return 'релизов';
+          return 'тест-кейсов';
+        }
+        function getMetricBetterDirection(label){
+          const l = String(label || '').trim().toLowerCase();
+          if(!l) return null;
+          if(l.startsWith('android:') || l.startsWith('ios:')) return 'up';
+          if(
+            l.includes('критичные проверки swat + stream') ||
+            l.includes('критичные проверки swat') ||
+            l.includes('критичные проверки stream') ||
+            l.includes('high/blocker swat+stream') ||
+            l.includes('high/blocker swat') ||
+            l.includes('high/blocker stream') ||
+            l.includes('ат в регрессе') ||
+            l.includes('тренд объема регресса')
+          ) return 'up';
+          if(
+            l.includes('объем регресса') ||
+            l.includes('селектив') ||
+            l.includes('среднее время') ||
+            l.includes('чп') ||
+            l.includes('cherepiki') ||
+            l.includes('cutoff') ||
+            l.includes('store') ||
+            l.includes('задержка') ||
+            l.includes('lag') ||
+            l.includes('разброс') ||
+            l.includes(': bug') ||
+            l.includes(': баг')
+          ) return 'down';
+          return null;
+        }
+        function classifyDirectionTone(direction){
+          if(direction === 'good') return 'good';
+          if(direction === 'bad') return 'bad';
+          return 'neutral';
+        }
+        function classifyDeltaTone(delta, better){
+          const n = Number(delta);
+          if(!Number.isFinite(n) || !better || n === 0) return 'neutral';
+          if(better === 'up') return n > 0 ? 'good' : 'bad';
+          if(better === 'down') return n < 0 ? 'good' : 'bad';
+          return 'neutral';
+        }
+        function anomalyToneForItem(item){
+          return classifyDeltaTone(item?.delta, getMetricBetterDirection(item?.label || ''));
+        }
+        function formatMagnitudeWithUnit(value, digits = 0, unit = ''){
+          const n = Math.abs(Number(value) || 0);
+          const text = digits ? n.toFixed(digits) : Math.round(n).toLocaleString('ru-RU');
+          return unit ? `${text} ${unit}` : text;
+        }
+        function formatDeltaWithUnit(label, delta, digits = 0, fallbackUnit = '', deltaPct = null){
+          if(delta == null || !Number.isFinite(delta)) return 'Нет базы для сравнения';
+          const unit = metricDeltaUnitLabel(label, fallbackUnit);
+          const pct = Number.isFinite(deltaPct) ? ` ${fmtDeltaPct(deltaPct)}` : '';
+          const sign = delta >= 0 ? '+' : '−';
+          return `${sign}${formatMagnitudeWithUnit(delta, digits, unit)}${pct}`.trim();
+        }
+        function formatReleaseListCompact(list, limit = 6){
+          const arr = (Array.isArray(list) ? list : []).filter(Boolean).map(formatReleaseShort);
+          if(!arr.length) return '—';
+          if(arr.length <= limit) return arr.join(', ');
+          const head = arr.slice(0, Math.ceil(limit / 2));
+          const tail = arr.slice(-(Math.floor(limit / 2)));
+          return `${head.join(', ')}, ..., ${tail.join(', ')}`;
+        }
+        function quarterLabelFromMsLocal(msLocal){
+          const ms = Number(msLocal);
+          if(!Number.isFinite(ms)) return 'Без квартала';
+          const d = new Date(ms);
+          const quarter = Math.floor(d.getUTCMonth() / 3) + 1;
+          return `Q${quarter} ${d.getUTCFullYear()}`;
+        }
+        function quarterSortValue(label){
+          const m = String(label || '').match(/^Q(\d)\s+(\d{4})$/i);
+          if(!m) return Number.POSITIVE_INFINITY;
+          return Number(m[2]) * 10 + Number(m[1]);
+        }
+        function extractIssueSubstreamLabel(issue){
+          const candidates = [
+            issue?.sub_stream,
+            issue?.subStream,
+            issue?.substream,
+            issue?.sub_stream_name,
+            issue?.subStreamName,
+            issue?.stream_sub,
+            issue?.stream_sub_name,
+            issue?.subteam,
+            issue?.subTeam,
+            issue?.sub_team,
+            issue?.streamInfo?.sub_stream,
+            issue?.streamInfo?.subStream,
+            issue?.streamInfo?.substream
+          ];
+          for(const value of candidates){
+            if(typeof value === 'string' && value.trim()) return value.trim();
+            if(value && typeof value === 'object'){
+              const nested = value.name || value.title || value.label || value.value;
+              if(typeof nested === 'string' && nested.trim()) return nested.trim();
+            }
+          }
+          return 'Без сабстрима';
+        }
         function computeMlFeatures(){
           if(!tcChart || !Array.isArray(tcChart.data?.labels) || tcChart.data.labels.length === 0){
             return null;
@@ -1566,36 +2499,69 @@
           return 1 / (1 + Math.exp(-z));
         }
         function recordMlExport(){
+          const result = ensureCurrentMlExportEntry();
+          return result?.ok ? result.entry : null;
+        }
+        function ensureCurrentMlExportEntry(){
           const features = computeMlFeatures();
-          if (!features) return null;
+          if(!features) return { ok:false, reason:'Нет данных для сохранения' };
+          const data = getMlDataset();
+          const currentKey = featureVectorKey(features);
+          const lastId = getLastMlExportId();
+          const lastIndex = lastId
+            ? data.findIndex(item => item && item.id === lastId)
+            : (data.length - 1);
+          const lastEntry = lastIndex >= 0 ? data[lastIndex] : null;
+          if(lastEntry && featureVectorKey(lastEntry.features) === currentKey){
+            rememberLastMlExportId(lastEntry.id);
+            return { ok:true, created:false, entry:lastEntry };
+          }
           const entry = {
             id: `ml_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             time: new Date().toISOString(),
             features,
             label: null
           };
-          const data = getMlDataset();
           data.push(entry);
           setMlDataset(data);
           rememberLastMlExportId(entry.id);
-          return entry;
+          return { ok:true, created:true, entry };
         }
-        async function labelLastExport(label){
+        async function labelMlExport(label, entryId = ''){
           const data = getMlDataset();
           if (!data.length) return { ok:false, reason:'Нет сохраненной ML-выгрузки' };
-          const lastId = getLastMlExportId();
-          const index = lastId
-            ? data.findIndex(item => item && item.id === lastId)
+          const targetId = entryId || getLastMlExportId();
+          const index = targetId
+            ? data.findIndex(item => item && item.id === targetId)
             : (data.length - 1);
           const targetIndex = index >= 0 ? index : (data.length - 1);
-          if(targetIndex < 0 || !data[targetIndex]) return { ok:false, reason:'Не удалось найти последнюю выгрузку для разметки' };
+          if(targetIndex < 0 || !data[targetIndex]) return { ok:false, reason:'Не удалось найти выгрузку для разметки' };
           data[targetIndex].label = label;
           data[targetIndex].labeledAt = new Date().toISOString();
           rememberLastMlExportId(data[targetIndex].id);
           setMlDataset(data);
           const synced = await syncMlDatasetToDrive(false);
           renderMlSummary();
-          return { ok:true, synced };
+          return { ok:true, synced, entry:data[targetIndex] };
+        }
+        async function labelLastExport(label){
+          return labelMlExport(label);
+        }
+        async function saveLabelAndRetrain(label){
+          const ensured = ensureCurrentMlExportEntry();
+          if(!ensured?.ok) return { ok:false, reason:ensured?.reason || 'Нет данных для сохранения' };
+          const labeled = await labelMlExport(label, ensured.entry?.id || '');
+          if(!labeled?.ok) return labeled;
+          const retrain = await retrainMlCatboostViaHelper({ showToastOnSuccess: false, showToastOnError: false });
+          return {
+            ok: true,
+            created: !!ensured.created,
+            synced: !!labeled.synced,
+            retrained: !!retrain?.ok,
+            retrainError: retrain?.ok ? '' : (retrain?.error || ''),
+            helperHint: retrain?.helperHint || mlHelperState.commandHints?.helper || './tools/run_ml_retrain_helper.sh',
+            durationMs: Number(retrain?.durationMs || 0)
+          };
         }
         function renderMlSummary(){
           if (!mlSummaryBody) return;
@@ -1606,24 +2572,53 @@
           }
 
           const data = getMlDataset();
-          const model = trainMlModel(data);
-          const prob = predictMl(features, model);
+          const linearModel = trainMlModel(data);
+          const linearProb = predictMl(features, linearModel);
+          ensureMlCatboostPrediction(features);
+          const catboostReady = mlCatboostState.ready && mlCatboostPredictionState.key === featureVectorKey(features) && mlCatboostPredictionState.prob != null;
+          const catboostProb = catboostReady ? mlCatboostPredictionState.prob : null;
+          const activeProb = catboostProb != null ? catboostProb : linearProb;
+          const catboostSourceLabel = mlCatboostState.source === 'drive' ? 'Drive' : 'Local';
+          const activeEngine = catboostProb != null
+            ? `CatBoost ${catboostSourceLabel}`
+            : (linearProb != null ? 'Линейный fallback' : 'Нет модели');
+          const engineTip = catboostProb != null
+            ? (mlCatboostState.source === 'drive'
+                ? 'Основная модель: CatBoost, выгруженный в Apps Script / Drive и автоматически подтянутый поверх локального fallback.'
+                : 'Основная модель: CatBoost, экспортированный в ONNX и загруженный локально в браузер.')
+            : (mlCatboostState.loading
+                ? 'CatBoost-модель загружается, пока используем временный fallback.'
+                : (mlCatboostState.error
+                    ? `CatBoost недоступен: ${mlCatboostState.error}. Работаем на встроенном fallback.`
+                    : 'CatBoost еще не готов, пока используем fallback.'));
+          const cloudSourceTip = mlDatasetSyncState.remote
+            ? 'ML-история синхронизируется через Google Apps Script / Drive.'
+            : (mlDatasetSyncState.loading ? 'Идет загрузка истории ML из облака.' : `Облачная синхронизация недоступна. ${mlDatasetSyncState.error || 'Работаем только локально.'}`);
+          const trainingTip = catboostProb != null
+            ? (mlCatboostState.source === 'drive'
+                ? 'CatBoost-модель уже обучена, опубликована в Apps Script / Drive и автоматически подхвачена страницей.'
+                : 'CatBoost-модель уже обучена и сохранена рядом со страницей. Разметка в Drive нужна для следующего переобучения модели.')
+            : (linearModel.trained
+                ? 'Встроенная линейная fallback-модель обучена на локальной размеченной истории.'
+                : `Fallback-модель пока не обучена. ${linearModel.reason || ''}`);
+          const catboostWarnings = Array.isArray(mlCatboostState.metadata?.warnings) ? mlCatboostState.metadata.warnings : [];
           let statusText = 'Нет обучения';
           let statusClass = 'ml-warn';
-          if (mlDatasetSyncState.loading && !model.trained){
+          if (mlDatasetSyncState.loading && !linearModel.trained){
             statusText = 'Загрузка истории ML';
-          } else if (!model.trained && model.count > 0) {
-            statusText = `Разметка ${model.count}/${model.minCount || 5}`;
-          } else if (!model.trained && !model.count) {
+          } else if (!linearModel.trained && linearModel.count > 0) {
+            statusText = `Разметка ${linearModel.count}/${linearModel.minCount || 5}`;
+          } else if (!linearModel.trained && !linearModel.count) {
             statusText = 'Нет размеченной истории';
           }
-          if (prob != null){
-            if (prob >= 0.7){ statusText = `Регресс (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-bad'; }
-            else if (prob >= 0.4){ statusText = `Внимание (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-warn'; }
-            else { statusText = `OK (p=${(prob * 100).toFixed(1)}%)`; statusClass = 'ml-ok'; }
+          if (activeProb != null){
+            if (activeProb >= 0.7){ statusText = `Регресс (p=${(activeProb * 100).toFixed(1)}%)`; statusClass = 'ml-bad'; }
+            else if (activeProb >= 0.4){ statusText = `Внимание (p=${(activeProb * 100).toFixed(1)}%)`; statusClass = 'ml-warn'; }
+            else { statusText = `OK (p=${(activeProb * 100).toFixed(1)}%)`; statusClass = 'ml-ok'; }
           }
 
           const tcSeries = findDataset(tcChart, 'всего')?.data || [];
+          const autoSeries = findDataset(tcChart, 'авто')?.data || [];
           const covSwatSeries = findDataset(covChart, 'swat')?.data || [];
           const covStreamSeries = findDataset(covChart, 'stream')?.data || [];
           const covSeries = sumSeries(covSwatSeries, covStreamSeries);
@@ -1655,6 +2650,7 @@
           };
 
           const tcBase = baselineStats(tcSeries, compareMode);
+          const autoBase = baselineStats(autoSeries, compareMode);
           const covBase = baselineStats(covSeries, compareMode);
           const covSwatBase = baselineStats(covSwatSeries, compareMode);
           const covStreamBase = baselineStats(covStreamSeries, compareMode);
@@ -1672,6 +2668,7 @@
           const lagAndBase = baselineStats(lagAndSeries, compareMode);
 
           const tcPrev = previousValueFromSeries(tcSeries);
+          const autoPrev = previousValueFromSeries(autoSeries);
           const covPrev = previousValueFromSeries(covSeries);
           const covSwatPrev = previousValueFromSeries(covSwatSeries);
           const covStreamPrev = previousValueFromSeries(covStreamSeries);
@@ -1694,7 +2691,28 @@
                 : `Сравнение со средней историей по ${tcBase.n} прошлым релизам`)
             : 'Истории релизов недостаточно для сравнения';
 
+          const releaseRange = Array.isArray(window.__releaseRangeAll) && window.__releaseRangeAll.length
+            ? window.__releaseRangeAll.slice()
+            : (Array.isArray(tcChart?.data?.labels) ? tcChart.data.labels.slice() : []);
+          const currentRelease = releaseRange.length ? releaseRange[releaseRange.length - 1] : '';
+          const previousRelease = releaseRange.length > 1 ? releaseRange[releaseRange.length - 2] : '';
+          const baseReleases = compareMode === 'prev'
+            ? (previousRelease ? [previousRelease] : [])
+            : releaseRange.slice(0, -1);
+          const releaseRangeText = releaseRange.length
+            ? `${formatReleaseShort(releaseRange[0])} → ${formatReleaseShort(releaseRange[releaseRange.length - 1])}`
+            : '—';
+          const compareReleaseText = compareMode === 'prev'
+            ? (previousRelease
+                ? `${formatReleaseShort(currentRelease)} ↔ ${formatReleaseShort(previousRelease)}`
+                : 'Недостаточно релизов для сравнения')
+            : (baseReleases.length
+                ? `${formatReleaseShort(currentRelease)} ↔ среднее по ${formatReleaseListCompact(baseReleases, 8)}`
+                : 'Недостаточно релизов для сравнения');
+          const compareGroupNote = `${compareLabel} · ${compareReleaseText}`;
+
           const tcDiff = diffToBase(tcBase);
+          const autoDiff = diffToBase(autoBase);
           const covDiff = diffToBase(covBase);
           const covSwatDiff = diffToBase(covSwatBase);
           const covStreamDiff = diffToBase(covStreamBase);
@@ -1725,6 +2743,7 @@
 
           const descs = {
             tc: 'Объем регресса. Считается как сумма всех Smoke и Selective тест-кейсов в релизе.',
+            tcAuto: 'Количество автотестов в объеме регресса. Показывает, сколько АТ вошло в текущий регресс и как изменился этот объем.',
             hbSwat: 'Критичные проверки SWAT. Количество High/Blocker тест-кейсов, которые выполнила команда SWAT.',
             hbStream: 'Критичные проверки Stream. Количество High/Blocker тест-кейсов, которые выполнили стримы.',
             hbTotal: 'Общее число критичных проверок. Сумма High/Blocker кейсов SWAT и Stream.',
@@ -1734,14 +2753,14 @@
             chpTotal: 'Общее количество ЧП в релизе. Считается по задачам из Deploy-lab, которые попали после cutoff.',
             chpIos: 'Количество ЧП, относящихся к iOS-релизу.',
             chpAnd: 'Количество ЧП, относящихся к Android-релизу.',
-            cutIos: 'Время начала iOS cutoff. Считается в минутах от 00:00 локального дня релиза; валидное окно — 14:00 плюс-минус 10 минут.',
-            cutAnd: 'Время начала Android cutoff. Считается в минутах от 00:00 локального дня релиза; валидное окно — 14:00 плюс-минус 10 минут.',
+            cutIos: 'Время начала iOS cutoff. Считается в минутах от 00:00 локального дня релиза; целевой диапазон старта — 14:00 плюс-минус 10 минут.',
+            cutAnd: 'Время начала Android cutoff. Считается в минутах от 00:00 локального дня релиза; целевой диапазон старта — 14:00 плюс-минус 10 минут.',
             storeIos: 'Время отправки iOS в Store. Считается в минутах от 00:00 локального дня релиза; целевой дедлайн для команды — до 18:00.',
             storeAnd: 'Время отправки Android в Store. Считается в минутах от 00:00 локального дня релиза; целевой дедлайн для команды — до 18:00.',
             lagIos: 'Задержка после cutoff для iOS. Формула: время отправки в Store минус время начала cutoff. Рабочий коридор — до 4 часов.',
             lagAnd: 'Задержка после cutoff для Android. Формула: время отправки в Store минус время начала cutoff. Рабочий коридор — до 4 часов.',
-            vol: 'Разброс объема регресса. Это стандартное отклонение total test cases по истории релизов.',
-            slope: 'Тренд объема регресса. Показывает, как изменился объем проверок от первого релиза диапазона к последнему.',
+            vol: 'Показывает, насколько объем регресса скачет между релизами в выбранном диапазоне. Чем выше число, тем менее предсказуема нагрузка на команду.',
+            slope: 'Показывает общее изменение объема регресса от первого релиза диапазона к последнему. Плюс означает рост нагрузки, минус — снижение.',
             anoms: 'Количество резких отклонений по релизам, типам задач и платформам.'
           };
           const anomRuleGeneric = 'Аномалия: резкое изменение последнего релиза. Срабатывает, если |z| >= 2 и |Δ| >= minAbs, либо |Δ%| >= порога и |Δ| >= minAbs.';
@@ -1752,12 +2771,14 @@
               'analytics': 'аналитика',
               'release': 'релизы',
               'epic': 'эпики',
+              'defect': 'дефекты',
               'user story': 'user story',
               'testing': 'тестирование',
               'documentation': 'документация',
               'test automation': 'автотесты',
               'feature': 'фичи',
               'tech dept': 'техдолг',
+              'unknown': 'прочее',
               'product': 'аналитика',
               'vlet': 'влет',
               'crash': 'краши'
@@ -1765,11 +2786,27 @@
             const key = String(value || '').trim().toLowerCase();
             return map[key] || value || 'прочее';
           };
-          const describeTypeAnomaly = (platform, typeName) => `Изменение количества задач типа «${translateTypeName(typeName)}» на платформе ${platform}. Сравнивается последний релиз с выбранной базой.`;
+          const PLATFORM_TYPE_EXCLUDED_KEYS = new Set([
+            'release',
+            'epic',
+            'defect',
+            'documentation',
+            'test automation',
+            'autotest',
+            'autotests',
+            'feature',
+            'tech dept',
+            'tech debt',
+            'techdept'
+          ]);
+          const normalizePlatformTypeKey = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+          const includePlatformTypeInSummary = (value) => !PLATFORM_TYPE_EXCLUDED_KEYS.has(normalizePlatformTypeKey(value));
+          const describeTypeAnomaly = (platform, typeName) => `Изменение количества задач типа «${translateTypeName(typeName)}» на платформе ${platform}. Для этого блока рост считаем позитивным сигналом, снижение — риском.`;
           const presentMetricInfo = (label) => {
             const raw = String(label || '').trim();
             const l = raw.toLowerCase();
             if(l.includes('tc total')) return { label:'Объем регресса', desc: descs.tc };
+            if(l.includes('ат в регрессе') || l.includes('auto regression') || l.includes('autotests regression')) return { label:'АТ в регрессе', desc: descs.tcAuto };
             if(l.includes('high/blocker swat+stream')) return { label:'Критичные проверки SWAT + Stream', desc: descs.hbTotal };
             if(l.includes('high/blocker swat')) return { label:'Критичные проверки SWAT', desc: descs.hbSwat };
             if(l.includes('high/blocker stream')) return { label:'Критичные проверки Stream', desc: descs.hbStream };
@@ -1785,8 +2822,8 @@
             if(l.includes('android cutoff') || l.includes('cutoff android')) return { label:'Время начала cutoff Android', desc: descs.cutAnd };
             if(l.includes('store ios')) return { label:'Время отправки в Store iOS', desc: descs.storeIos };
             if(l.includes('store android')) return { label:'Время отправки в Store Android', desc: descs.storeAnd };
-            if(l.includes('разброс')) return { label:'Разброс объема регресса', desc: descs.vol };
-            if(l.includes('тренд')) return { label:'Тренд объема регресса', desc: descs.slope };
+            if(l.includes('разброс')) return { label:'Разброс объема регресса между релизами', desc: descs.vol };
+            if(l.includes('тренд')) return { label:'Тренд объема регресса по диапазону', desc: descs.slope };
             if(l.startsWith('android:') || l.startsWith('ios:')){
               const [platform, typeName] = raw.split(':').map(part => String(part || '').trim());
               return { label: `${platform}: ${translateTypeName(typeName)}`, desc: describeTypeAnomaly(platform, typeName) };
@@ -1829,9 +2866,9 @@
             if(!Number.isFinite(minutes)) return 'Нет данных по cutoff';
             const from = formatClockMinutes(targetMinutes - CUT_TARGET_WINDOW_MIN);
             const to = formatClockMinutes(targetMinutes + CUT_TARGET_WINDOW_MIN);
-            if(minutes < targetMinutes - CUT_TARGET_WINDOW_MIN) return `раньше окна ${from}–${to} на ${Math.round((targetMinutes - CUT_TARGET_WINDOW_MIN) - minutes)} мин`;
-            if(minutes <= targetMinutes + CUT_TARGET_WINDOW_MIN) return `в целевом окне ${from}–${to}`;
-            return `позже окна ${from}–${to} на ${Math.round(minutes - (targetMinutes + CUT_TARGET_WINDOW_MIN))} мин`;
+            if(minutes < targetMinutes - CUT_TARGET_WINDOW_MIN) return `раньше целевого диапазона ${from}–${to} на ${Math.round((targetMinutes - CUT_TARGET_WINDOW_MIN) - minutes)} мин`;
+            if(minutes <= targetMinutes + CUT_TARGET_WINDOW_MIN) return `вовремя: ${from}–${to}`;
+            return `позже целевого диапазона ${from}–${to} на ${Math.round(minutes - (targetMinutes + CUT_TARGET_WINDOW_MIN))} мин`;
           };
           const formatStoreHint = (minutes) => {
             if(!Number.isFinite(minutes)) return 'Нет данных по store';
@@ -1844,6 +2881,22 @@
             if(minutes <= LAG_TARGET_MAX_MINUTES) return 'рабочий лаг до 4 часов';
             return `длинный лаг ${Math.round(minutes)} мин`;
           };
+          const formatCaseTrend = (current, previous, baseline) => {
+            const currentText = formatCurrentValue('count', current);
+            if(compareMode === 'prev'){
+              return Number.isFinite(previous)
+                ? `было ${formatCurrentValue('count', previous)} → стало ${currentText}`
+                : `текущий релиз ${currentText}`;
+            }
+            const parts = [`текущий ${currentText}`];
+            if(Number.isFinite(previous)) parts.push(`предыдущий ${formatCurrentValue('count', previous)}`);
+            if(Number.isFinite(baseline)) parts.push(`средняя история ${formatCurrentValue('count', baseline)}`);
+            return parts.join(', ');
+          };
+          const formatSplitTrend = (parts) => (Array.isArray(parts) ? parts : [])
+            .filter(part => Number.isFinite(part?.current))
+            .map(part => `${part.label}: ${formatCaseTrend(part.current, part.previous, part.baseline)}`)
+            .join('\n');
           const buildMetricTooltip = (item) => {
             const bits = [item.desc];
             bits.push(`Текущее значение: ${item.valueText}.`);
@@ -1853,7 +2906,7 @@
               });
             }
             bits.push(compareNote);
-            if(item.businessKind === 'cutoff') bits.push('Для cutoff важно попасть в окно 14:00 плюс-минус 10 минут.');
+            if(item.businessKind === 'cutoff') bits.push('Для cutoff важно стартовать около 14:00; допустимое отклонение — плюс-минус 10 минут.');
             else if(item.businessKind === 'store') bits.push('Для Store важно уложиться в дедлайн до 18:00.');
             else if(item.businessKind === 'lag') bits.push('Для задержки после cutoff рабочий коридор составляет до 4 часов.');
             else if(item.better === 'down') bits.push('Для этой метрики меньшие значения лучше.');
@@ -1871,10 +2924,7 @@
             return 'neutral';
           };
           const formatDeltaLine = (item) => {
-            if(item.delta == null || !Number.isFinite(item.delta)) return 'Нет базы для сравнения';
-            const suffix = item.deltaUnit ? ` ${item.deltaUnit}` : '';
-            const pct = Number.isFinite(item.pct) ? ` ${fmtDeltaPct(item.pct)}` : '';
-            return `${fmtDelta(item.delta, item.deltaDigits || 0)}${suffix}${pct}`.trim();
+            return formatDeltaWithUnit(item.label, item.delta, item.deltaDigits || 0, item.deltaUnit || '', item.pct);
           };
           const renderMetricCompareFacts = (item, tooltipText) => {
             if(!Array.isArray(item.compareFacts) || !item.compareFacts.length) return '';
@@ -1889,17 +2939,45 @@
               </div>
             `;
           };
+          const renderSignalEntry = (item, forcedTone = null) => {
+            const derivedTone = item?.direction
+              ? classifyDirectionTone(item.direction)
+              : classifyDeltaTone(item?.delta, getMetricBetterDirection(item?.label || ''));
+            const tone = forcedTone || derivedTone || 'neutral';
+            const info = presentMetricInfo(item?.label || '');
+            const title = info.label || item?.label || 'Сигнал';
+            const primaryText = (item?.delta != null && Number.isFinite(item.delta))
+              ? formatDeltaWithUnit(title, item.delta, item.digits || 0, item.unit || '', Number.isFinite(item.pct) ? item.pct : item.deltaPct)
+              : (item?.text || item?.summaryText || 'Без деталей');
+            const detailText = item?.text || '';
+            return `
+              <li class="ml-signal-row ml-tip-target" ${tip(item?.desc || '')}>
+                <div class="ml-signal-row-head">
+                  ${renderToneIcon(tone, tone === 'good' ? 'Позитивный сигнал' : (tone === 'bad' ? 'Негативный сигнал' : 'Нейтральный сигнал'))}
+                  <span class="ml-signal-row-title">${escHtml(title)}</span>
+                </div>
+                <div class="ml-signal-row-value">${escHtml(primaryText)}</div>
+                ${detailText ? `<div class="ml-signal-row-desc">${escHtml(detailText)}</div>` : ''}
+              </li>
+            `;
+          };
           const renderMetricCard = (item) => {
             const tone = classifyMetricTone(item);
             const tooltipText = buildMetricTooltip(item);
             return `
               <div class="ml-metric-card ml-metric-card--${tone}">
-                <div class="ml-metric-label ml-tip-target" ${tip(tooltipText)}>${item.label}</div>
+                <div class="ml-metric-label-row">
+                  ${renderToneIcon(tone, tone === 'good' ? 'Позитивная метрика' : (tone === 'bad' ? 'Негативная метрика' : 'Нейтральная метрика'))}
+                  <div class="ml-metric-label ml-tip-target" ${tip(tooltipText)}>${item.label}</div>
+                </div>
                 <div class="ml-metric-value ml-tip-target" ${tip(tooltipText)}>${item.valueText}</div>
                 ${renderMetricCompareFacts(item, tooltipText)}
                 <div class="ml-metric-delta-wrap ml-tip-target" ${tip(tooltipText)}>
                   <div class="ml-metric-delta-caption">${item.deltaLabel || compareDeltaLabel}</div>
-                  <div class="ml-metric-delta">${formatDeltaLine(item)}</div>
+                  <div class="ml-metric-delta-row">
+                    ${renderToneIcon(tone, tone === 'good' ? 'Позитивная метрика' : (tone === 'bad' ? 'Негативная метрика' : 'Нейтральная метрика'))}
+                    <div class="ml-metric-delta">${formatDeltaLine(item)}</div>
+                  </div>
                 </div>
                 <div class="ml-metric-note ml-tip-target" ${tip(tooltipText)}>${item.note || compareLabel}</div>
               </div>
@@ -1921,7 +2999,7 @@
               <div class="ml-outcome-title">${title}</div>
               ${
                 items.length
-                  ? `<ul class="ml-outcome-list">${items.map(item => `<li class="ml-tip-target" ${tip(item.desc || '')}>${escHtml(item.text || '')}</li>`).join('')}</ul>`
+                  ? `<ul class="ml-outcome-list">${items.map(item => renderSignalEntry(item, tone)).join('')}</ul>`
                   : '<div class="ml-outcome-empty">нет заметных</div>'
               }
             </div>
@@ -1957,11 +3035,331 @@
             }
             return list.map(a => `
               <div class="ml-anoms-item">
-                <span class="ml-anoms-name ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${escHtml(presentMetricInfo(a.label || '').label || '')}</span>
-                <span class="ml-anoms-delta ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${fmtDelta(a.delta || 0)} ${Number.isFinite(a.deltaPct) ? `(${fmtPct(a.deltaPct)})` : ''}</span>
+                <div class="ml-anoms-name-row">
+                  ${renderToneIcon(anomalyToneForItem(a), 'Оценка отклонения')}
+                  <span class="ml-anoms-name ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${escHtml(presentMetricInfo(a.label || '').label || '')}</span>
+                </div>
+                <span class="ml-anoms-delta ml-anoms-delta--${anomalyToneForItem(a)} ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${formatDeltaWithUnit(a.label || '', a.delta || 0, 0, '', Number.isFinite(a.deltaPct) ? a.deltaPct : null)}</span>
                 ${Number.isFinite(a.z) ? `<span class="ml-anoms-z">z=${a.z.toFixed(2)}</span>` : ''}
               </div>
             `).join('');
+          };
+          const formatTypeCountValue = (value) => {
+            if(!Number.isFinite(value)) return '—';
+            return intFmt.format(Math.round(value));
+          };
+          const buildPositiveDelta = (current, base) => {
+            if(!Number.isFinite(base)) return { delta: null, pct: null, tone: 'neutral' };
+            const delta = current - base;
+            const pct = base !== 0 ? (delta / base * 100) : (current ? 100 : 0);
+            const tone = delta === 0 ? 'neutral' : (delta > 0 ? 'good' : 'bad');
+            return { delta, pct, tone };
+          };
+          const buildPlatformTypeDynamics = (rows, platformLabel) => {
+            const list = Array.isArray(rows) ? rows : [];
+            if(!list.length){
+              return {
+                platform: platformLabel,
+                compareText: 'Нет данных по платформе',
+                baselineLabel: compareMode === 'prev' ? 'Предыдущий релиз' : 'Средняя история',
+                items: [],
+                positiveCount: 0,
+                negativeCount: 0,
+                managerTone: 'neutral',
+                managerTitle: 'Нет данных для вывода',
+                managerLines: ['По этой платформе пока нет истории, чтобы оценить динамику типов задач.'],
+                totals: []
+              };
+            }
+            const currentRow = list[list.length - 1] || {};
+            const prevRow = list.length >= 2 ? (list[list.length - 2] || null) : null;
+            const baselineRows = compareMode === 'prev'
+              ? (list.length >= 2 ? [list[list.length - 2]] : [])
+              : list.slice(0, -1);
+            const allTypeSet = new Set();
+            [currentRow, prevRow, ...baselineRows].filter(Boolean).forEach(row => {
+              Object.keys(row?.counts || {}).forEach(type => {
+                if(includePlatformTypeInSummary(type)) allTypeSet.add(type);
+              });
+            });
+            const orderedTypes = sortTypesByCanon(allTypeSet);
+            if(!orderedTypes.length){
+              return {
+                platform: platformLabel,
+                compareText: 'Нет учитываемых типов задач',
+                baselineLabel: compareMode === 'prev' ? 'Предыдущий релиз' : 'Средняя история',
+                items: [],
+                positiveCount: 0,
+                negativeCount: 0,
+                managerTone: 'neutral',
+                managerTitle: 'Нет учитываемых типов',
+                managerLines: ['После исключения служебных типов по этой платформе не осталось задач для расчета.'],
+                totals: []
+              };
+            }
+            const baselineLabel = compareMode === 'prev' ? 'Предыдущий релиз' : 'Средняя история';
+            const currentReleaseLabel = currentRow?.release ? `Текущий релиз ${formatReleaseShort(currentRow.release)}` : 'Текущий релиз';
+            const previousReleaseLabel = prevRow?.release ? `Предыдущий релиз ${formatReleaseShort(prevRow.release)}` : 'Предыдущий релиз';
+            const compareText = compareMode === 'prev'
+              ? (baselineRows[0]?.release
+                  ? `${formatReleaseShort(currentRow.release)} ↔ ${formatReleaseShort(baselineRows[0].release)}`
+                  : 'Недостаточно релизов для сравнения')
+              : (baselineRows.length
+                  ? `${formatReleaseShort(currentRow.release)} ↔ среднее по ${formatReleaseListCompact(baselineRows.map(row => row.release), 6)}`
+                  : 'Недостаточно релизов для сравнения');
+            const sumRowCounts = (row) => orderedTypes.reduce((sum, type) => sum + Number(row?.counts?.[type] || 0), 0);
+            const items = orderedTypes.map(type => {
+              const current = Number(currentRow?.counts?.[type] || 0);
+              const previous = prevRow ? Number(prevRow?.counts?.[type] || 0) : null;
+              const history = baselineRows.length
+                ? (compareMode === 'prev'
+                    ? Number(baselineRows[0]?.counts?.[type] || 0)
+                    : baselineRows.reduce((sum, row) => sum + Number(row?.counts?.[type] || 0), 0) / baselineRows.length)
+                : null;
+              const prevDiff = buildPositiveDelta(current, previous);
+              const historyDiff = buildPositiveDelta(current, history);
+              const primaryDiff = compareMode === 'prev' ? prevDiff : historyDiff;
+              const title = translateTypeName(type);
+              const currentText = formatTypeCountValue(current);
+              const previousText = Number.isFinite(previous) ? formatTypeCountValue(previous) : '—';
+              const historyText = Number.isFinite(history) ? formatTypeCountValue(history) : '—';
+              const tone = primaryDiff.tone;
+              const statusText = tone === 'good'
+                ? 'Позитив'
+                : (tone === 'bad' ? 'Риск' : 'Нейтрально');
+              const deltaRows = [];
+              if(Number.isFinite(previous)){
+                deltaRows.push({
+                  key: 'prev',
+                  label: compareMode === 'prev' ? 'Разница к предыдущему релизу' : 'К предыдущему релизу',
+                  baseText: previousText,
+                  delta: prevDiff.delta,
+                  pct: prevDiff.pct,
+                  tone: prevDiff.tone
+                });
+              }
+              if(compareMode !== 'prev' && Number.isFinite(history)){
+                deltaRows.push({
+                  key: 'history',
+                  label: 'К средней истории',
+                  baseText: historyText,
+                  delta: historyDiff.delta,
+                  pct: historyDiff.pct,
+                  tone: historyDiff.tone
+                });
+              }
+              const tooltipText = [
+                `Платформа: ${platformLabel}.`,
+                `Тип задач: ${title}.`,
+                `${currentReleaseLabel}: ${currentText}.`,
+                `${previousReleaseLabel}: ${previousText}.`,
+                `${baselineLabel}: ${historyText}.`,
+                'Для этого блока рост количества задач считаем позитивной динамикой, снижение — риском.',
+                compareNote
+              ].join(' ');
+              return {
+                platform: platformLabel,
+                rawType: type,
+                title,
+                current,
+                previous,
+                baseline: history,
+                currentText,
+                currentLabel: currentReleaseLabel,
+                previousText,
+                previousLabel: previousReleaseLabel,
+                baselineText: historyText,
+                baselineLabel,
+                delta: primaryDiff.delta,
+                deltaPct: primaryDiff.pct,
+                tone,
+                statusText,
+                tooltipText,
+                deltaRows
+              };
+            });
+            const currentTotal = sumRowCounts(currentRow);
+            const previousTotal = prevRow ? sumRowCounts(prevRow) : null;
+            const baselineTotal = baselineRows.length
+              ? (compareMode === 'prev'
+                  ? previousTotal
+                  : baselineRows.reduce((sum, row) => sum + sumRowCounts(row), 0) / baselineRows.length)
+              : null;
+            const prevTotalDiff = buildPositiveDelta(currentTotal, previousTotal);
+            const historyTotalDiff = buildPositiveDelta(currentTotal, baselineTotal);
+            const primaryTotalDiff = compareMode === 'prev' ? prevTotalDiff : historyTotalDiff;
+            const currentTotalText = formatTypeCountValue(currentTotal);
+            const previousTotalText = Number.isFinite(previousTotal) ? formatTypeCountValue(previousTotal) : '—';
+            const baselineTotalText = Number.isFinite(baselineTotal) ? formatTypeCountValue(baselineTotal) : '—';
+            const sortedPositives = items
+              .filter(item => item.tone === 'good')
+              .slice()
+              .sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0));
+            const sortedRisks = items
+              .filter(item => item.tone === 'bad')
+              .slice()
+              .sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0));
+            const topPositive = sortedPositives[0] || null;
+            const topRisk = sortedRisks[0] || null;
+            const managerTone = primaryTotalDiff.tone;
+            const managerTitle = managerTone === 'good'
+              ? 'В релиз вошло больше задач'
+              : (managerTone === 'bad' ? 'В релиз вошло меньше задач' : 'Поток задач в релизе близок к базе');
+            const managerLines = [`${currentReleaseLabel}: ${currentTotalText}`];
+            if(Number.isFinite(prevTotalDiff.delta)){
+              managerLines.push(`К предыдущему релизу: ${formatDeltaWithUnit(`${platformLabel}: Total`, prevTotalDiff.delta, 0, 'задач', prevTotalDiff.pct)} · база ${previousTotalText}`);
+            }
+            if(compareMode !== 'prev' && Number.isFinite(historyTotalDiff.delta)){
+              managerLines.push(`К средней истории: ${formatDeltaWithUnit(`${platformLabel}: Total`, historyTotalDiff.delta, 0, 'задач', historyTotalDiff.pct)} · среднее ${baselineTotalText}`);
+            }
+            if(topPositive){
+              managerLines.push(`Главный драйвер роста: ${topPositive.title} (${formatDeltaWithUnit(`${topPositive.platform}: ${topPositive.rawType}`, topPositive.delta, 0, 'задач', topPositive.deltaPct)})`);
+            }
+            if(topRisk){
+              managerLines.push(`Сильнее всего просел: ${topRisk.title} (${formatDeltaWithUnit(`${topRisk.platform}: ${topRisk.rawType}`, topRisk.delta, 0, 'задач', topRisk.deltaPct)})`);
+            }
+            const totals = [
+              { label: currentReleaseLabel, value: currentTotalText, emphasis: 'current' }
+            ];
+            if(Number.isFinite(previousTotal)){
+              totals.push({ label: previousReleaseLabel, value: previousTotalText, emphasis: 'base' });
+            }
+            if(compareMode !== 'prev' && Number.isFinite(baselineTotal)){
+              totals.push({ label: baselineLabel, value: baselineTotalText, emphasis: 'base' });
+            }
+            return {
+              platform: platformLabel,
+              compareText,
+              baselineLabel,
+              items,
+              positiveCount: items.filter(item => item.tone === 'good').length,
+              negativeCount: items.filter(item => item.tone === 'bad').length,
+              managerTone,
+              managerTitle,
+              managerLines,
+              totals
+            };
+          };
+          const renderPlatformTypeDynamicsSection = (summaries) => {
+            const list = (Array.isArray(summaries) ? summaries : []).filter(Boolean);
+            if(!list.some(summary => Array.isArray(summary.items) && summary.items.length)) return '';
+            const renderDeltaRow = (item, row) => {
+              const rowText = row.delta == null || !Number.isFinite(row.delta)
+                ? 'Нет базы для сравнения'
+                : `${formatDeltaWithUnit(`${item.platform}: ${item.rawType}`, row.delta, 0, 'задач', row.pct)} · база ${row.baseText}`;
+              return `
+                <div class="ml-type-dynamics-diff-row ml-type-dynamics-diff-row--${row.tone}">
+                  <span class="ml-type-dynamics-diff-label">${escHtml(row.label)}</span>
+                  <span class="ml-type-dynamics-diff-value">${escHtml(rowText)}</span>
+                </div>
+              `;
+            };
+            const renderTypeItem = (item) => `
+              <li class="ml-type-dynamics-item ml-type-dynamics-item--${item.tone}">
+                <div class="ml-type-dynamics-item-head">
+                  <div class="ml-type-dynamics-item-title-row">
+                    ${renderToneIcon(item.tone, item.statusText)}
+                    <div class="ml-type-dynamics-item-main">
+                      <div class="ml-type-dynamics-item-title ml-tip-target" ${tip(item.tooltipText)}>${escHtml(item.title)}</div>
+                    </div>
+                  </div>
+                  <span class="ml-type-dynamics-item-badge ml-type-dynamics-item-badge--${item.tone}">${item.statusText}</span>
+                </div>
+                <div class="ml-type-dynamics-item-current ml-tip-target" ${tip(item.tooltipText)}>
+                  <span class="ml-type-dynamics-item-current-label">${escHtml(item.currentLabel)}</span>
+                  <span class="ml-type-dynamics-item-current-value">${escHtml(item.currentText)}</span>
+                </div>
+                <div class="ml-type-dynamics-diff-list">
+                  ${(item.deltaRows || []).map(row => renderDeltaRow(item, row)).join('')}
+                </div>
+              </li>
+            `;
+            const renderPlatformCard = (summary) => `
+              <article class="ml-type-dynamics-card">
+                <div class="ml-type-dynamics-card-head">
+                  <div>
+                    <div class="ml-type-dynamics-card-title">${escHtml(summary.platform)}</div>
+                    <div class="ml-type-dynamics-card-subtitle">${escHtml(summary.compareText)}</div>
+                  </div>
+                  <div class="ml-type-dynamics-card-stats">
+                    <span class="ml-type-dynamics-stat ml-type-dynamics-stat--bad">Риски: ${summary.negativeCount}</span>
+                    <span class="ml-type-dynamics-stat ml-type-dynamics-stat--good">Позитив: ${summary.positiveCount}</span>
+                  </div>
+                </div>
+                <div class="ml-type-dynamics-summary ml-type-dynamics-summary--${summary.managerTone}">
+                  <div class="ml-type-dynamics-summary-head">
+                    ${renderToneIcon(summary.managerTone, escHtml(summary.managerTitle))}
+                    <div class="ml-type-dynamics-summary-main">
+                      <div class="ml-type-dynamics-summary-title">${escHtml(summary.managerTitle)}</div>
+                    </div>
+                  </div>
+                  <div class="ml-type-dynamics-summary-lines">
+                    ${(summary.managerLines || []).map(line => `<div class="ml-type-dynamics-summary-line">${escHtml(line)}</div>`).join('')}
+                  </div>
+                  <div class="ml-type-dynamics-summary-stats">
+                    ${(summary.totals || []).map(item => `
+                      <div class="ml-type-dynamics-summary-stat ml-type-dynamics-summary-stat--${item.emphasis || 'base'}">
+                        <span class="ml-type-dynamics-summary-stat-label">${escHtml(item.label)}</span>
+                        <span class="ml-type-dynamics-summary-stat-value">${escHtml(item.value)}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+                ${
+                  summary.items.length
+                    ? `<ul class="ml-type-dynamics-list">${summary.items.map(renderTypeItem).join('')}</ul>`
+                    : '<div class="stream-insight-empty">Нет данных по типам задач</div>'
+                }
+              </article>
+            `;
+            return `
+              <section class="ml-type-dynamics-shell">
+                <div class="stream-insights-head">
+                  <div>
+                    <div class="stream-insights-title">Типы задач по платформам</div>
+                    <div class="stream-insights-subtitle">Учитываем только рабочие типы задач. Релизы, эпики, дефекты, документацию, автотесты, фичи и техдолг исключаем из расчета. Для этого блока рост считаем позитивной динамикой, снижение — риском.</div>
+                  </div>
+                </div>
+                <div class="ml-type-dynamics-grid">
+                  ${list.map(renderPlatformCard).join('')}
+                </div>
+              </section>
+            `;
+          };
+          const buildPlatformTypeSignals = (summaries) => {
+            const list = (Array.isArray(summaries) ? summaries : []).filter(Boolean);
+            return list.flatMap(summary => (Array.isArray(summary.items) ? summary.items : []).map(item => {
+              if(item.delta == null || !Number.isFinite(item.delta) || item.delta === 0) return null;
+              const abs = Math.abs(item.delta);
+              const pctAbs = Number.isFinite(item.deltaPct) ? Math.abs(item.deltaPct) : 0;
+              const volume = Math.max(Number(item.current) || 0, Number(item.previous) || 0, Number(item.baseline) || 0);
+              const isMeaningful = abs >= 2 || (pctAbs >= 25 && volume >= 5);
+              if(!isMeaningful) return null;
+              const pctScore = Math.min(pctAbs, 120) * 0.15;
+              const score = abs * 5 + pctScore;
+              const direction = item.delta > 0 ? 'good' : 'bad';
+              const detailParts = [`${item.currentLabel}: ${item.currentText}`];
+              (item.deltaRows || []).forEach(row => {
+                if(row.delta == null || !Number.isFinite(row.delta)) return;
+                detailParts.push(`${row.label}: ${formatDeltaWithUnit(`${item.platform}: ${item.rawType}`, row.delta, 0, 'задач', row.pct)} · база ${row.baseText}`);
+              });
+              return signalWithDomain({
+                label: `${item.platform}: ${item.rawType}`,
+                group: 'release',
+                delta: item.delta,
+                pct: item.deltaPct,
+                digits: 0,
+                unit: 'задач',
+                direction,
+                score,
+                text: `${item.platform}: ${direction === 'good' ? 'в релиз вошло больше задач этого типа' : 'в релиз вошло меньше задач этого типа'}\n${detailParts.join('\n')}`,
+                desc: [
+                  `Изменение количества задач типа «${item.title}» на платформе ${item.platform}.`,
+                  'Для этого блока рост считаем позитивной динамикой, снижение — риском.',
+                  compareNote
+                ].join(' ')
+              });
+            }).filter(Boolean));
           };
 
           const tcStatsAll = seriesStats(tcSeries);
@@ -2022,20 +3420,22 @@
               : (m.delta < 0 ? 'good' : (m.delta > 0 ? 'bad' : null));
             if(!direction) return null;
             const abs = Math.abs(m.delta);
-            const val = m.digits ? abs.toFixed(m.digits) : Math.round(abs);
-            const unit = m.unit ? ` ${m.unit}` : '';
-            const pct = Number.isFinite(m.pct) ? ` ${fmtDeltaPct(m.pct)}` : '';
             const info = presentMetricInfo(m.label);
             const scoreBase = (m.absTh ?? 1) ? (abs / (m.absTh ?? 1)) * 8 : abs;
             const pctBase = Number.isFinite(m.pct) ? Math.abs(m.pct) * 0.6 : 0;
+            const deltaText = formatDeltaWithUnit(info.label || m.label, m.delta, m.digits || 0, m.unit || '', m.pct);
+            const moveVerb = m.delta < 0 ? 'снизился' : 'вырос';
+            const detailText = m.signalText || `${info.label || m.label}: ${moveVerb} на ${deltaText.replace(/^[+\-−]\s*/, '')}`;
             return signalWithDomain({
               label: info.label || m.label,
               group: m.group,
               delta: m.delta,
               pct: m.pct,
+              digits: m.digits || 0,
+              unit: m.unit || '',
               direction,
               score: scoreBase + pctBase,
-              text: `${info.label || m.label}: ${m.delta >= 0 ? '+' : '−'}${val}${unit}${pct}`,
+              text: detailText,
               desc: [m.desc || '', compareNote].filter(Boolean).join(' ')
             });
           };
@@ -2047,7 +3447,7 @@
             const windowText = cutoffWindowLabel(m.targetMinutes);
             const currentClock = formatClockMinutes(m.current);
             const baseClock = Number.isFinite(m.baseline) ? formatClockMinutes(m.baseline) : '—';
-            const desc = [m.desc || '', `Целевое окно: ${windowText}.`, compareNote].join(' ');
+            const desc = [m.desc || '', `Целевой диапазон старта: ${windowText}.`, compareNote].join(' ');
             if(baseOutside == null){
               if(currentOutside === 0) return null;
               return signalWithDomain({
@@ -2055,7 +3455,7 @@
                 group: m.group,
                 direction: 'bad',
                 score: 18 + Math.min(currentOutside, 120) * 0.6,
-                text: `${label}: вне окна ${windowText} на ${Math.round(currentOutside)} мин (${currentClock})`,
+                text: `${label}: отклонение от целевого диапазона ${windowText} на ${Math.round(currentOutside)} мин (${currentClock})`,
                 desc
               });
             }
@@ -2066,7 +3466,7 @@
                 group: m.group,
                 direction: 'good',
                 score: 24 + Math.min(baseOutside, 120) * 0.6,
-                text: `${label}: вошел в окно ${windowText} (${currentClock}, было ${baseClock})`,
+                text: `${label}: вовремя относительно диапазона ${windowText} (${currentClock}, было ${baseClock})`,
                 desc
               });
             }
@@ -2076,7 +3476,7 @@
                 group: m.group,
                 direction: 'bad',
                 score: 28 + Math.min(currentOutside, 120) * 0.6,
-                text: `${label}: вышел из окна ${windowText} на ${Math.round(currentOutside)} мин (${currentClock})`,
+                text: `${label}: ушел с целевого диапазона ${windowText} на ${Math.round(currentOutside)} мин (${currentClock})`,
                 desc
               });
             }
@@ -2088,8 +3488,8 @@
               direction: deltaOutside > 0 ? 'good' : 'bad',
               score: 12 + Math.min(Math.abs(deltaOutside), 120) * 0.5 + Math.min(currentOutside, 60) * 0.2,
               text: deltaOutside > 0
-                ? `${label}: ближе к окну ${windowText}, осталось ${Math.round(currentOutside)} мин (${currentClock})`
-                : `${label}: дальше от окна ${windowText}, отклонение ${Math.round(currentOutside)} мин (${currentClock})`,
+                ? `${label}: ближе к целевому диапазону ${windowText}, осталось ${Math.round(currentOutside)} мин (${currentClock})`
+                : `${label}: дальше от целевого диапазона ${windowText}, отклонение ${Math.round(currentOutside)} мин (${currentClock})`,
               desc
             });
           };
@@ -2118,7 +3518,7 @@
                 group: m.group,
                 direction: 'good',
                 score: 22 + Math.min(baseDelay, 180) * 0.35,
-                text: `${label}: вернулось до дедлайна 18:00 (${currentClock})`,
+                text: `${label}: вовремя, до дедлайна 18:00 (${currentClock})`,
                 desc
               });
             }
@@ -2170,7 +3570,7 @@
                 group: m.group,
                 direction: 'good',
                 score: 22 + Math.min(baseOverflow, 240) * 0.25,
-                text: `${label}: вернулась в рабочий коридор до 4 часов (${currentText})`,
+                text: `${label}: снова в рабочем коридоре до 4 часов (${currentText})`,
                 desc
               });
             }
@@ -2197,12 +3597,19 @@
               desc
             });
           };
+          const platformTypeSummaries = [
+            buildPlatformTypeDynamics(window.__iosTypesRowsAll || [], 'iOS'),
+            buildPlatformTypeDynamics(window.__andTypesRowsAll || [], 'Android')
+          ];
+          const platformTypeSignals = buildPlatformTypeSignals(platformTypeSummaries);
+
           const metrics = [
-            { label:'Объем регресса', desc: descs.tc, group:'regress', delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'down', absTh: 100, pctTh: 2, digits: 0 },
-            { label:'Критичные проверки SWAT', desc: descs.hbSwat, group:'regress', delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', absTh: 20, pctTh: 2, digits: 0 },
-            { label:'Критичные проверки Stream', desc: descs.hbStream, group:'regress', delta: covStreamDiff.delta, pct: covStreamDiff.deltaPct, better:'up', absTh: 20, pctTh: 2, digits: 0 },
-            { label:'Критичные проверки SWAT + Stream', desc: descs.hbTotal, group:'regress', delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', absTh: 30, pctTh: 2, digits: 0 },
-            { label:'Селективные проверки', desc: descs.selTotal, group:'regress', delta: selDiff.delta, pct: selDiff.deltaPct, better:'down', absTh: 20, pctTh: 3, digits: 0 },
+            { label:'Объем регресса', desc: descs.tc, group:'regress', delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'down', absTh: 100, pctTh: 2, digits: 0, signalText: `В регресс вошло кейсов: ${formatCaseTrend(tcBase.last, tcPrev, tcBase.base)}\nИз них критичные SWAT + Stream: ${formatCaseTrend(covBase.last, covPrev, covBase.base)}\nСелективные: ${formatCaseTrend(selBase.last, selPrev, selBase.base)}` },
+            { label:'АТ в регрессе', desc: descs.tcAuto, group:'regress', delta: autoDiff.delta, pct: autoDiff.deltaPct, better:'up', absTh: 40, pctTh: 2, digits: 0, signalText: `Автотестов в регрессе: ${formatCaseTrend(autoBase.last, autoPrev, autoBase.base)}` },
+            { label:'Критичные проверки SWAT', desc: descs.hbSwat, group:'regress', delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', absTh: 20, pctTh: 2, digits: 0, signalText: `SWAT закрыл критичных кейсов: ${formatCaseTrend(covSwatBase.last, covSwatPrev, covSwatBase.base)}` },
+            { label:'Критичные проверки Stream', desc: descs.hbStream, group:'regress', delta: covStreamDiff.delta, pct: covStreamDiff.deltaPct, better:'up', absTh: 20, pctTh: 2, digits: 0, signalText: `Stream закрыл критичных кейсов: ${formatCaseTrend(covStreamBase.last, covStreamPrev, covStreamBase.base)}` },
+            { label:'Критичные проверки SWAT + Stream', desc: descs.hbTotal, group:'regress', delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', absTh: 30, pctTh: 2, digits: 0, signalText: `Всего критичных кейсов закрыто: ${formatCaseTrend(covBase.last, covPrev, covBase.base)}\n${formatSplitTrend([{ label:'SWAT закрыл', current: covSwatBase.last, previous: covSwatPrev, baseline: covSwatBase.base }, { label:'Stream закрыл', current: covStreamBase.last, previous: covStreamPrev, baseline: covStreamBase.base }])}` },
+            { label:'Селективные проверки', desc: descs.selTotal, group:'regress', delta: selDiff.delta, pct: selDiff.deltaPct, better:'down', absTh: 20, pctTh: 3, digits: 0, signalText: `В селективный контур вошло кейсов: ${formatCaseTrend(selBase.last, selPrev, selBase.base)}` },
             { label:'Среднее время прохождения', desc: descs.avgTotal, group:'regress', delta: avgDiff.delta, pct: avgDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2, digits: 2, unit: 'мин' },
             { label:'Среднее время на один кейс', desc: descs.avgCaseWeighted, group:'regress', delta: avgWeightedDiff.delta, pct: avgWeightedDiff.deltaPct, better:'down', absTh: 0.2, pctTh: 2, digits: 2, unit: 'мин' },
             { label:'ЧП всего', desc: descs.chpTotal, group:'release', delta: chpDiff.delta, pct: chpDiff.deltaPct, better:'down', absTh: 2, pctTh: 5, digits: 0 },
@@ -2214,8 +3621,8 @@
             { label:'Время отправки в Store Android', desc: descs.storeAnd, group:'release', businessKind:'store', current: storeAndBase.last, baseline: storeAndBase.base, delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
             { label:'Задержка после cutoff iOS', desc: descs.lagIos, group:'release', businessKind:'lag', current: lagIosBase.last, baseline: lagIosBase.base, delta: lagIosDiff.delta, pct: lagIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
             { label:'Задержка после cutoff Android', desc: descs.lagAnd, group:'release', businessKind:'lag', current: lagAndBase.last, baseline: lagAndBase.base, delta: lagAndDiff.delta, pct: lagAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
-            { label:'Разброс объема регресса', desc: descs.vol, group:'stability', delta: tcVolDiff, pct: tcVolDiffPct, better:'down', absTh: 10, pctTh: 5, digits: 1, unit: 'п.' },
-            { label:'Тренд объема регресса', desc: descs.slope, group:'stability', delta: tcSlopeDiff, pct: null, better:'up', absTh: 2, pctTh: null, digits: 2, unit: 'п.п.' }
+            { label:'Разброс объема регресса между релизами', desc: descs.vol, group:'stability', delta: tcVolDiff, pct: tcVolDiffPct, better:'down', absTh: 10, pctTh: 5, digits: 0, unit: 'тест-кейсов' },
+            { label:'Тренд объема регресса по диапазону', desc: descs.slope, group:'stability', delta: tcSlopeDiff, pct: null, better:'up', absTh: 2, pctTh: null, digits: 2, unit: 'п.п.' }
           ];
           const buildMetricSignal = (m) => {
             if(m.businessKind === 'cutoff') return buildCutoffSignal(m);
@@ -2230,6 +3637,11 @@
             if(!signal) return;
             if(signal.direction === 'good') improvements[m.group].push(signal);
             if(signal.direction === 'bad') declines[m.group].push(signal);
+          });
+          platformTypeSignals.forEach(signal => {
+            if(!signal) return;
+            if(signal.direction === 'good') improvements.release.push(signal);
+            if(signal.direction === 'bad') declines.release.push(signal);
           });
           Object.keys(improvements).forEach(group => {
             improvements[group].sort((a,b) => (b.score || 0) - (a.score || 0));
@@ -2253,21 +3665,19 @@
           const formatAnomalyBrief = (item) => {
             if(!item) return 'Явных аномалий не найдено.';
             const label = presentMetricInfo(item.label || '').label || item.label || 'Аномалия';
-            const pct = Number.isFinite(item.deltaPct) ? ` ${fmtPct(item.deltaPct)}` : '';
-            return `${label}: ${fmtDelta(item.delta || 0)}${pct}`;
+            return `${label}: ${formatDeltaWithUnit(label, item.delta || 0, 0, '', Number.isFinite(item.deltaPct) ? item.deltaPct : null)}`;
           };
-          const summarizeSignals = (items, limit = 2) => items.slice(0, limit).map(item => item.summaryText || item.text).join('; ');
           const buildExecutiveBrief = () => {
             const topRisk = topDeclines[0] || null;
             const topWin = topImprovements[0] || null;
-            const riskText = summarizeSignals(topDeclines, 2);
-            const winText = summarizeSignals(topImprovements, 2);
             if(topRisk && topWin){
               if((topRisk.score || 0) >= (topWin.score || 0) + 8){
                 return {
                   tone: 'bad',
                   title: 'Есть выраженные риски',
-                  body: `Основные зоны риска сейчас: ${riskText}. Сильные улучшения при этом тоже есть: ${winText}.`,
+                  intro: 'Ниже собраны самые заметные негативные и позитивные сигналы по текущему сравнению.',
+                  risks: topDeclines.slice(0, 3),
+                  wins: topImprovements.slice(0, 3),
                   focus: topAnomaly ? `Самая заметная аномалия: ${formatAnomalyBrief(topAnomaly)}.` : 'Сильных аномалий поверх этого не обнаружено.'
                 };
               }
@@ -2275,14 +3685,18 @@
                 return {
                   tone: 'good',
                   title: 'Картина скорее позитивная',
-                  body: `Сильнее всего сейчас помогают: ${winText}. Точки риска, которые еще нужно контролировать: ${riskText}.`,
+                  intro: 'Позитивных сигналов больше, но рядом остаются точки контроля.',
+                  risks: topDeclines.slice(0, 3),
+                  wins: topImprovements.slice(0, 3),
                   focus: topAnomaly ? `Из аномалий сильнее всего выбивается: ${formatAnomalyBrief(topAnomaly)}.` : 'Крупных аномалий по релизу не найдено.'
                 };
               }
               return {
                 tone: 'warn',
                 title: 'Картина смешанная',
-                body: `Есть и сильные улучшения, и заметные риски. Улучшения: ${winText}. Зоны риска: ${riskText}.`,
+                intro: 'Есть и заметные улучшения, и выраженные риски. Ниже они разложены по пунктам.',
+                risks: topDeclines.slice(0, 3),
+                wins: topImprovements.slice(0, 3),
                 focus: topAnomaly ? `Отдельно стоит проверить аномалию: ${formatAnomalyBrief(topAnomaly)}.` : 'Аномальный фон при этом умеренный.'
               };
             }
@@ -2290,7 +3704,9 @@
               return {
                 tone: 'bad',
                 title: 'Нужна дополнительная проверка',
-                body: `Главные просадки сейчас: ${riskText}.`,
+                intro: 'Сейчас сильнее всего выделяются риски. Их список ниже.',
+                risks: topDeclines.slice(0, 3),
+                wins: [],
                 focus: topAnomaly ? `Самая заметная аномалия: ${formatAnomalyBrief(topAnomaly)}.` : 'Дополнительных крупных аномалий не видно.'
               };
             }
@@ -2298,26 +3714,60 @@
               return {
                 tone: 'good',
                 title: 'Есть заметные улучшения',
-                body: `Сильные позитивные сигналы сейчас такие: ${winText}.`,
+                intro: 'Позитивные сигналы сейчас сильнее рисков. Их список ниже.',
+                risks: [],
+                wins: topImprovements.slice(0, 3),
                 focus: topAnomaly ? `При этом стоит посмотреть на аномалию: ${formatAnomalyBrief(topAnomaly)}.` : 'Крупных аномалий не обнаружено.'
               };
             }
             return {
               tone: 'neutral',
               title: 'Сильных сдвигов не найдено',
-              body: 'ML не видит выраженных улучшений или зон риска относительно выбранной базы сравнения.',
+              intro: 'ML не видит выраженных улучшений или зон риска относительно выбранной базы сравнения.',
+              risks: [],
+              wins: [],
               focus: topAnomaly ? `Единственный заметный фокус внимания: ${formatAnomalyBrief(topAnomaly)}.` : 'Аномалии не выбиваются из общего фона.'
             };
           };
           const executiveBrief = buildExecutiveBrief();
+          const streamLeadersHtml = renderStreamLeaders(window.__streamInsightData || null);
+          const chpQuarterHtml = renderChpQuarterSummary(window.__chpQuarterStats || null);
+          const platformTypeDynamicsHtml = renderPlatformTypeDynamicsSection(platformTypeSummaries);
           const renderBriefList = (title, tone, items, emptyText) => `
             <section class="ml-brief-card ml-brief-card--${tone}">
               <div class="ml-brief-eyebrow">${title}</div>
               ${
                 items.length
-                  ? `<ul class="ml-brief-list">${items.map(item => `<li class="ml-tip-target" ${tip(item.desc || '')}>${escHtml(item.summaryText || item.text || '')}</li>`).join('')}</ul>`
+                  ? `<ul class="ml-brief-list">${items.map(item => renderSignalEntry(item, tone)).join('')}</ul>`
                   : `<div class="ml-brief-empty">${emptyText}</div>`
               }
+            </section>
+          `;
+          const renderExecutiveSignalStack = (title, items, emptyText = '') => {
+            if(!items?.length && !emptyText) return '';
+            return `
+              <div class="ml-brief-stack-block">
+                <div class="ml-brief-stack-title">${title}</div>
+                ${
+                  items?.length
+                    ? `<div class="ml-brief-stack-lines">${items.map(item => `
+                        <div class="ml-brief-stack-line">${escHtml(`${presentMetricInfo(item.label || '').label || item.label}: ${formatDeltaWithUnit(item.label || '', item.delta || 0, item.digits || 0, item.unit || '', Number.isFinite(item.pct) ? item.pct : item.deltaPct)}`)}</div>
+                      `).join('')}</div>`
+                    : `<div class="ml-brief-empty">${escHtml(emptyText)}</div>`
+                }
+              </div>
+            `;
+          };
+          const renderExecutiveBriefCard = (brief) => `
+            <section class="ml-brief-card ml-brief-card--${brief.tone}">
+              <div class="ml-brief-eyebrow">Краткий вывод ML</div>
+              <div class="ml-brief-title">${escHtml(brief.title)}</div>
+              <div class="ml-brief-body">${escHtml(brief.intro || '')}</div>
+              <div class="ml-brief-stack">
+                ${renderExecutiveSignalStack('Выраженные риски', brief.risks, 'Выраженных рисков нет.')}
+                ${renderExecutiveSignalStack('Поддерживающие сигналы', brief.wins, 'Сильных позитивных сигналов нет.')}
+              </div>
+              <div class="ml-brief-focus">${escHtml(brief.focus)}</div>
             </section>
           `;
 
@@ -2326,146 +3776,164 @@
           const stabilityBadge = summarizeDomain(improvements.stability, declines.stability);
 
           const regressGroups = [
-            renderMetricGroup('Объем регресса', compareLabel, [
+            renderMetricGroup('Объем регресса', compareGroupNote, [
               { label:'Объем регресса', valueText: formatCurrentValue('count', tcBase.last), delta: tcDiff.delta, pct: tcDiff.deltaPct, better:'down', desc: descs.tc, note:'текущий объем регресса', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', tcPrev), formatCurrentValue('count', tcBase.base)) },
+              { label:'АТ в регрессе', valueText: formatCurrentValue('count', autoBase.last), delta: autoDiff.delta, pct: autoDiff.deltaPct, better:'up', desc: descs.tcAuto, note:'сколько автотестов входит в регресс', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', autoPrev), formatCurrentValue('count', autoBase.base)) },
               { label:'Критичные проверки SWAT + Stream', valueText: formatCurrentValue('count', covBase.last), delta: covDiff.delta, pct: covDiff.deltaPct, better:'up', desc: descs.hbTotal, note:'общее покрытие критичных сценариев', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covPrev), formatCurrentValue('count', covBase.base)) },
               { label:'Селективные проверки', valueText: formatCurrentValue('count', selBase.last), delta: selDiff.delta, pct: selDiff.deltaPct, better:'down', desc: descs.selTotal, note:'проверки по селективному контуру', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', selPrev), formatCurrentValue('count', selBase.base)) }
             ]),
-            renderMetricGroup('Кто тянет регресс', compareLabel, [
+            renderMetricGroup('Кто проходит регресс (SWAT + Stream)', compareGroupNote, [
               { label:'Критичные проверки SWAT', valueText: formatCurrentValue('count', covSwatBase.last), delta: covSwatDiff.delta, pct: covSwatDiff.deltaPct, better:'up', desc: descs.hbSwat, note:'вклад команды SWAT', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covSwatPrev), formatCurrentValue('count', covSwatBase.base)) },
               { label:'Критичные проверки Stream', valueText: formatCurrentValue('count', covStreamBase.last), delta: covStreamDiff.delta, pct: covStreamDiff.deltaPct, better:'up', desc: descs.hbStream, note:'вклад стримов', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', covStreamPrev), formatCurrentValue('count', covStreamBase.base)) }
             ]),
-            renderMetricGroup('Скорость прохождения', compareLabel, [
+            renderMetricGroup('Скорость прохождения', compareGroupNote, [
               { label:'Среднее время прохождения', valueText: formatCurrentValue('minutes', avgBase.last, 2), delta: avgDiff.delta, pct: avgDiff.deltaPct, better:'down', desc: descs.avgTotal, note:'чем ниже, тем быстрее идет регресс', deltaDigits: 2, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', avgPrev, 2), formatCurrentValue('minutes', avgBase.base, 2)) },
               { label:'Среднее время на один кейс', valueText: formatCurrentValue('minutes', avgWeightedBase.last, 2), delta: avgWeightedDiff.delta, pct: avgWeightedDiff.deltaPct, better:'down', desc: descs.avgCaseWeighted, note:'скорость на один тест-кейс', deltaDigits: 2, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', avgWeightedPrev, 2), formatCurrentValue('minutes', avgWeightedBase.base, 2)) }
             ])
           ];
 
           const releaseGroups = [
-            renderMetricGroup('ЧП', compareLabel, [
+            renderMetricGroup('ЧП', compareGroupNote, [
               { label:'ЧП всего', valueText: formatCurrentValue('count', chpBase.last), delta: chpDiff.delta, pct: chpDiff.deltaPct, better:'down', desc: descs.chpTotal, note:'меньше — лучше', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', chpPrev), formatCurrentValue('count', chpBase.base)) },
               { label:'ЧП iOS', valueText: formatCurrentValue('count', chpIosBase.last), delta: chpIosDiff.delta, pct: chpIosDiff.deltaPct, better:'down', desc: descs.chpIos, note:'качество iOS-релиза', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', chpIosPrev), formatCurrentValue('count', chpIosBase.base)) },
               { label:'ЧП Android', valueText: formatCurrentValue('count', chpAndBase.last), delta: chpAndDiff.delta, pct: chpAndDiff.deltaPct, better:'down', desc: descs.chpAnd, note:'качество Android-релиза', compareFacts: buildMetricCompareFacts(formatCurrentValue('count', chpAndPrev), formatCurrentValue('count', chpAndBase.base)) }
             ]),
-            renderMetricGroup('Cutoff и публикация в Store', compareLabel, [
+            renderMetricGroup('Cutoff и публикация в Store', compareGroupNote, [
               { label:'Время начала cutoff iOS', valueText: formatCurrentValue('clock', cutIosBase.last), delta: cutIosDiff.delta, pct: cutIosDiff.deltaPct, better:'down', businessKind:'cutoff', tone: cutoffTone(cutIosBase.last, CUT_TARGET_MINUTES.ios), desc: descs.cutIos, note: formatCutoffHint(cutIosBase.last, CUT_TARGET_MINUTES.ios), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', cutIosPrev), formatCurrentValue('clock', cutIosBase.base)) },
               { label:'Время начала cutoff Android', valueText: formatCurrentValue('clock', cutAndBase.last), delta: cutAndDiff.delta, pct: cutAndDiff.deltaPct, better:'down', businessKind:'cutoff', tone: cutoffTone(cutAndBase.last, CUT_TARGET_MINUTES.android), desc: descs.cutAnd, note: formatCutoffHint(cutAndBase.last, CUT_TARGET_MINUTES.android), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', cutAndPrev), formatCurrentValue('clock', cutAndBase.base)) },
               { label:'Время отправки в Store iOS', valueText: formatCurrentValue('clock', storeIosBase.last), delta: storeIosDiff.delta, pct: storeIosDiff.deltaPct, better:'down', businessKind:'store', tone: storeTone(storeIosBase.last), desc: descs.storeIos, note: formatStoreHint(storeIosBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', storeIosPrev), formatCurrentValue('clock', storeIosBase.base)) },
               { label:'Время отправки в Store Android', valueText: formatCurrentValue('clock', storeAndBase.last), delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', businessKind:'store', tone: storeTone(storeAndBase.last), desc: descs.storeAnd, note: formatStoreHint(storeAndBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', storeAndPrev), formatCurrentValue('clock', storeAndBase.base)) }
             ], 'ml-metric-group--release-timeline'),
-            renderMetricGroup('Задержка после cutoff', compareLabel, [
+            renderMetricGroup('Задержка после cutoff', compareGroupNote, [
               { label:'Задержка после cutoff iOS', valueText: formatCurrentValue('minutes', lagIosBase.last, 1), delta: lagIosDiff.delta, pct: lagIosDiff.deltaPct, better:'down', businessKind:'lag', tone: lagTone(lagIosBase.last), desc: descs.lagIos, note: formatLagHint(lagIosBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', lagIosPrev, 1), formatCurrentValue('minutes', lagIosBase.base, 1)) },
               { label:'Задержка после cutoff Android', valueText: formatCurrentValue('minutes', lagAndBase.last, 1), delta: lagAndDiff.delta, pct: lagAndDiff.deltaPct, better:'down', businessKind:'lag', tone: lagTone(lagAndBase.last), desc: descs.lagAnd, note: formatLagHint(lagAndBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('minutes', lagAndPrev, 1), formatCurrentValue('minutes', lagAndBase.base, 1)) }
             ])
           ];
 
           const stabilityGroups = [
-            renderMetricGroup('Стабильность объема', compareLabel, [
-              { label:'Разброс объема регресса', valueText: formatCurrentValue('minutes', features.tc_volatility, 1).replace(' мин', ''), delta: tcVolDiff, pct: tcVolDiffPct, better:'down', desc: descs.vol, note:'чем ниже, тем ровнее идут релизы', deltaDigits: 1, deltaUnit: 'п.', compareFacts: [{ label: 'История до текущего релиза', value: Number.isFinite(tcVolBase) ? Number(tcVolBase).toFixed(1) : '—' }] },
-              { label:'Тренд объема регресса', valueText: formatCurrentValue('percent', features.tc_slope_pct, 2), delta: tcSlopeDiff, pct: null, better:'up', desc: descs.slope, note:'динамика от первого релиза диапазона к последнему', deltaDigits: 2, deltaUnit: 'п.п.', compareFacts: [{ label: 'История до текущего релиза', value: Number.isFinite(tcSlopeBase) ? `${Number(tcSlopeBase).toFixed(2)}%` : '—' }] }
+            renderMetricGroup('Предсказуемость объема регресса', compareGroupNote, [
+              { label:'Разброс объема регресса между релизами', valueText: formatCurrentValue('count', features.tc_volatility), delta: tcVolDiff, pct: tcVolDiffPct, better:'down', desc: descs.vol, note:'чем меньше значение, тем ровнее и предсказуемее нагрузка между релизами', deltaDigits: 0, deltaUnit: 'тест-кейсов', compareFacts: [{ label: 'Средний разброс раньше', value: formatCurrentValue('count', tcVolBase) }] },
+              { label:'Тренд объема регресса по диапазону', valueText: formatCurrentValue('percent', features.tc_slope_pct, 2), delta: tcSlopeDiff, pct: null, better:'up', desc: descs.slope, note:'плюс означает рост общего объема к последнему релизу диапазона, минус — снижение', deltaDigits: 2, deltaUnit: 'п.п.', compareFacts: [{ label: 'Средний тренд раньше', value: Number.isFinite(tcSlopeBase) ? `${Number(tcSlopeBase).toFixed(2)}%` : '—' }] }
             ])
           ];
 
           mlSummaryBody.innerHTML = `
             <div class="ml-summary-shell">
-              <div class="ml-summary-top">
-                <div class="ml-status-row">
-                  <div class="ml-status ml-tip-target ${statusClass}" ${tip('Общая оценка риска по ML-модели. Она строится по истории ваших предыдущих выгрузок и текущему набору метрик.')}>Статус ML: ${statusText}</div>
-                  <div class="ml-meta-strip">
-                    <span class="ml-meta-pill ml-tip-target" ${tip('Сколько раз вы сохраняли ML-выгрузку для этой страницы.')}>Выгрузок: ${data.length}</span>
-                    <span class="ml-meta-pill ml-tip-target" ${tip('Сколько выгрузок уже размечено как OK или Регресс и участвует в обучении.')}>Метки: ${model.count || 0}</span>
-                    <span class="ml-meta-pill ml-tip-target" ${tip(model.trained ? 'Модель обучена и использует размеченную историю для оценки риска.' : `Модель пока не обучена. ${model.reason || ''}`)}>Обучение: ${model.trained ? 'готово' : (model.count ? `${model.count}/${model.minCount || 5} меток` : (model.reason || '—'))}</span>
-                    <span class="ml-meta-pill ml-tip-target" ${tip('Сколько прошлых релизов попало в базу сравнения для текущей оценки.')}>История: ${histCount || 0}</span>
-                    <span class="ml-meta-pill ml-tip-target" ${tip(mlDatasetSyncState.remote ? 'ML-история синхронизируется через Google Apps Script / Drive.' : (mlDatasetSyncState.loading ? 'Идет загрузка истории ML из облака.' : `Облачная синхронизация недоступна. ${mlDatasetSyncState.error || 'Работаем только локально.'}`))}>Источник: ${mlDatasetSyncState.loading ? 'синхр...' : (mlDatasetSyncState.remote ? 'Drive' : 'локально')}</span>
+              <section class="ml-summary-page ml-summary-page--overview" data-ml-page="overview">
+                <div class="ml-summary-top">
+                  <div class="ml-status-row">
+                    <div class="ml-status ml-tip-target ${statusClass}" ${tip('Общая оценка риска по ML-модели. Она строится по истории ваших предыдущих выгрузок и текущему набору метрик.')}>Статус ML: ${statusText}</div>
+                    <div class="ml-meta-strip">
+                      <span class="ml-meta-pill ml-tip-target" ${tip('Сколько раз вы сохраняли ML-выгрузку для этой страницы.')}>Выгрузок: ${data.length}</span>
+                      <span class="ml-meta-pill ml-tip-target" ${tip('Сколько выгрузок уже размечено как OK или Регресс и участвует в fallback-обучении / следующем переобучении CatBoost.')}>Метки: ${linearModel.count || 0}</span>
+                      <span class="ml-meta-pill ml-tip-target" ${tip(trainingTip)}>Обучение: ${catboostProb != null ? 'CatBoost готов' : (linearModel.trained ? 'fallback готов' : (linearModel.count ? `${linearModel.count}/${linearModel.minCount || 5} меток` : (linearModel.reason || '—')))}</span>
+                      <span class="ml-meta-pill ml-tip-target" ${tip(engineTip)}>Движок: ${mlCatboostState.loading ? 'CatBoost загр...' : activeEngine}</span>
+                      <span class="ml-meta-pill ml-tip-target" ${tip('Сколько прошлых релизов попало в базу сравнения для текущей оценки.')}>История: ${histCount || 0}</span>
+                      <span class="ml-meta-pill ml-tip-target" ${tip(cloudSourceTip)}>Источник: ${mlDatasetSyncState.loading ? 'синхр...' : (mlDatasetSyncState.remote ? 'Drive' : 'локально')}</span>
+                    </div>
                   </div>
+                  <div class="ml-release-strip">
+                    <span class="ml-release-pill ml-tip-target" ${tip('Полный диапазон релизов, который попал в текущий расчет.')}>Диапазон: ${releaseRangeText}</span>
+                    <span class="ml-release-pill ml-tip-target" ${tip('Последний релиз из выбранного диапазона, который считается текущим.')}>Текущий релиз: ${currentRelease ? formatReleaseShort(currentRelease) : '—'}</span>
+                    <span class="ml-release-pill ml-tip-target" ${tip('Какие именно релизы участвуют в текущем сравнении.')}>Сравниваем: ${compareReleaseText}</span>
+                    <span class="ml-release-pill ml-tip-target" ${tip('Все релизы, которые вошли в текущий расчет ML summary.')}>Релизы в расчете: ${formatReleaseListCompact(releaseRange, 10)}</span>
+                  </div>
+                  <div class="ml-summary-note ml-tip-target" ${tip(compareNote)}>${compareNote}. Диапазон релизов: ${releaseRangeText}. Сравниваем: ${compareReleaseText}.</div>
+                  ${catboostWarnings.length
+                    ? `<div class="ml-summary-note ml-summary-note--warn">${catboostWarnings.map(escHtml).join(' ')}</div>`
+                    : ''}
                 </div>
-                <div class="ml-summary-note ml-tip-target" ${tip(compareNote)}>${compareNote}</div>
-              </div>
 
-              <div class="ml-brief-grid">
-                <section class="ml-brief-card ml-brief-card--${executiveBrief.tone}">
-                  <div class="ml-brief-eyebrow">Краткий вывод ML</div>
-                  <div class="ml-brief-title">${escHtml(executiveBrief.title)}</div>
-                  <div class="ml-brief-body">${escHtml(executiveBrief.body)}</div>
-                  <div class="ml-brief-focus">${escHtml(executiveBrief.focus)}</div>
-                </section>
-                ${renderBriefList('Сильные улучшения', 'good', topImprovements, 'Сильных улучшений пока нет.')}
-                ${renderBriefList('Главные риски', 'bad', topDeclines, 'Сильных рисков пока не найдено.')}
-              </div>
+                <div class="ml-brief-grid">
+                  ${renderExecutiveBriefCard(executiveBrief)}
+                  ${renderBriefList('Сильные улучшения', 'good', topImprovements, 'Сильных улучшений пока нет.')}
+                  ${renderBriefList('Главные риски', 'bad', topDeclines, 'Сильных рисков пока не найдено.')}
+                </div>
+              </section>
 
-              <div class="ml-domain-grid">
-                ${renderDomainCard({
-                  modifier: 'regress',
-                  eyebrow: 'Контур 1',
-                  title: 'Регресс',
-                  subtitle: 'Сколько проверок входит в регресс, кто закрывает критичные сценарии и как меняется скорость прохождения.',
-                  badge: regressBadge,
-                  groups: regressGroups,
-                  improvements: improvements.regress,
-                  declines: declines.regress
-                })}
-                ${renderDomainCard({
-                  modifier: 'release',
-                  eyebrow: 'Контур 2',
-                  title: 'Релиз',
-                  subtitle: 'Релизное качество: число ЧП, время начала cutoff, публикация в Store и задержка после cutoff.',
-                  badge: releaseBadge,
-                  groups: releaseGroups,
-                  improvements: improvements.release,
-                  declines: declines.release
-                })}
-              </div>
-
-              <div class="ml-secondary-grid">
-                ${renderDomainCard({
-                  modifier: 'stability',
-                  eyebrow: 'Поддерживающий слой',
-                  title: 'Стабильность',
-                  subtitle: 'Насколько ровно ведет себя объем регресса на истории релизов и не скачет ли нагрузка.',
-                  badge: stabilityBadge,
-                  groups: stabilityGroups,
-                  improvements: improvements.stability,
-                  declines: declines.stability
-                })}
-                <section class="ml-domain-card ml-domain-card--anoms">
-                  <div class="ml-domain-head">
-                    <div>
-                      <div class="ml-domain-eyebrow">Контроль отклонений</div>
-                      <div class="ml-domain-title">Аномалии</div>
-                      <div class="ml-domain-subtitle">Показываем только самые заметные выбросы по релизам, типам задач и платформам.</div>
+              <section class="ml-summary-page ml-summary-page--regress" data-ml-page="regress">
+                <div class="ml-summary-page-stack">
+                  ${renderDomainCard({
+                    modifier: 'regress',
+                    eyebrow: 'Контур 1',
+                    title: 'Регресс',
+                    subtitle: 'Сколько проверок входит в регресс, кто закрывает критичные сценарии и как меняется скорость прохождения.',
+                    badge: regressBadge,
+                    groups: regressGroups,
+                    improvements: improvements.regress,
+                    declines: declines.regress
+                  })}
+                  ${streamLeadersHtml}
+                </div>
+              </section>
+              <section class="ml-summary-page ml-summary-page--release" data-ml-page="release">
+                <div class="ml-summary-page-stack">
+                  ${renderDomainCard({
+                    modifier: 'release',
+                    eyebrow: 'Контур 2',
+                    title: 'Релиз',
+                    subtitle: 'Релизное качество: число ЧП, время начала cutoff, публикация в Store и задержка после cutoff.',
+                    badge: releaseBadge,
+                    groups: releaseGroups,
+                    improvements: improvements.release,
+                    declines: declines.release
+                  })}
+                  ${chpQuarterHtml}
+                  ${platformTypeDynamicsHtml}
+                </div>
+              </section>
+              <section class="ml-summary-page ml-summary-page--secondary" data-ml-page="secondary">
+                <div class="ml-secondary-grid">
+                  ${renderDomainCard({
+                    modifier: 'stability',
+                    eyebrow: 'Поддерживающий слой',
+                    title: 'Стабильность',
+                    subtitle: 'Насколько ровно ведет себя объем регресса на истории релизов и не скачет ли нагрузка.',
+                    badge: stabilityBadge,
+                    groups: stabilityGroups,
+                    improvements: improvements.stability,
+                    declines: declines.stability
+                  })}
+                  <section class="ml-domain-card ml-domain-card--anoms">
+                    <div class="ml-domain-head">
+                      <div>
+                        <div class="ml-domain-eyebrow">Контроль отклонений</div>
+                        <div class="ml-domain-title">Аномалии</div>
+                        <div class="ml-domain-subtitle">Показываем только самые заметные выбросы по релизам, типам задач и платформам.</div>
+                      </div>
+                      <div class="ml-domain-badge ml-domain-badge--neutral ml-tip-target" ${tip(descs.anoms)}>Индекс риска: ${features.anom_score}</div>
                     </div>
-                    <div class="ml-domain-badge ml-domain-badge--neutral ml-tip-target" ${tip(descs.anoms)}>Индекс риска: ${features.anom_score}</div>
-                  </div>
-                  <div class="ml-anoms-summary">
-                    <div class="ml-anoms-stat">
-                      <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий, найденных на уровне релизных метрик: объем регресса, ЧП, cutoff, Store и задержка после cutoff.')}>Релизы</span>
-                      <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий, найденных на уровне релизных метрик: объем регресса, ЧП, cutoff, Store и задержка после cutoff.')}>${anomalies.release.count}</span>
+                    <div class="ml-anoms-summary">
+                      <div class="ml-anoms-stat">
+                        <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий, найденных на уровне релизных метрик: объем регресса, ЧП, cutoff, Store и задержка после cutoff.')}>Релизы</span>
+                        <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий, найденных на уровне релизных метрик: объем регресса, ЧП, cutoff, Store и задержка после cutoff.')}>${anomalies.release.count}</span>
+                      </div>
+                      <div class="ml-anoms-stat">
+                        <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий по типам задач и типам ЧП: где структура релиза резко изменилась относительно базы сравнения.')}>Типы</span>
+                        <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий по типам задач и типам ЧП: где структура релиза резко изменилась относительно базы сравнения.')}>${anomalies.type.count}</span>
+                      </div>
+                      <div class="ml-anoms-stat">
+                        <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий на уровне платформ: iOS или Android получили резкое отклонение по метрикам относительно базы сравнения.')}>Платформы</span>
+                        <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий на уровне платформ: iOS или Android получили резкое отклонение по метрикам относительно базы сравнения.')}>${anomalies.platform.count}</span>
+                      </div>
                     </div>
-                    <div class="ml-anoms-stat">
-                      <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий по типам задач и типам ЧП: где структура релиза резко изменилась относительно базы сравнения.')}>Типы</span>
-                      <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий по типам задач и типам ЧП: где структура релиза резко изменилась относительно базы сравнения.')}>${anomalies.type.count}</span>
+                    <div class="ml-anoms-columns">
+                      <div class="ml-anoms-section">
+                        <div class="ml-anoms-sub">Релизы</div>
+                        <div class="ml-anoms-list">${renderAnomList(anomalies.release.list)}</div>
+                      </div>
+                      <div class="ml-anoms-section">
+                        <div class="ml-anoms-sub">Типы</div>
+                        <div class="ml-anoms-list">${renderAnomList(anomalies.type.list)}</div>
+                      </div>
+                      <div class="ml-anoms-section">
+                        <div class="ml-anoms-sub">Платформы</div>
+                        <div class="ml-anoms-list">${renderAnomList(anomalies.platform.list)}</div>
+                      </div>
                     </div>
-                    <div class="ml-anoms-stat">
-                      <span class="ml-anoms-stat-label ml-tip-target" ${tip('Количество аномалий на уровне платформ: iOS или Android получили резкое отклонение по метрикам относительно базы сравнения.')}>Платформы</span>
-                      <span class="ml-anoms-stat-value ml-tip-target" ${tip('Количество аномалий на уровне платформ: iOS или Android получили резкое отклонение по метрикам относительно базы сравнения.')}>${anomalies.platform.count}</span>
-                    </div>
-                  </div>
-                  <div class="ml-anoms-columns">
-                    <div class="ml-anoms-section">
-                      <div class="ml-anoms-sub">Релизы</div>
-                      <div class="ml-anoms-list">${renderAnomList(anomalies.release.list)}</div>
-                    </div>
-                    <div class="ml-anoms-section">
-                      <div class="ml-anoms-sub">Типы</div>
-                      <div class="ml-anoms-list">${renderAnomList(anomalies.type.list)}</div>
-                    </div>
-                    <div class="ml-anoms-section">
-                      <div class="ml-anoms-sub">Платформы</div>
-                      <div class="ml-anoms-list">${renderAnomList(anomalies.platform.list)}</div>
-                    </div>
-                  </div>
-                </section>
-              </div>
+                  </section>
+                </div>
+              </section>
             </div>
           `;
         }
@@ -2475,6 +3943,8 @@
           const contentWrap = document.getElementById('tcContent');
           const tbody = document.getElementById('tcTbody');
           const tcStreamDeltaTbody = document.getElementById('tcStreamDeltaTbody');
+          const streamCatalogCard = document.getElementById('streamCatalogCard');
+          const streamCatalogWrap = document.getElementById('streamCatalogWrap');
           const tcTableReleaseFilter = document.getElementById('tcTableReleaseFilter');
 
           // Coverage (HB)
@@ -3388,6 +4858,238 @@
             }
             return { internal, external };
           }
+          function buildLatestStreamDeltaSummary(series, unitLabel){
+            const rows = Array.isArray(series) ? series : [];
+            if(rows.length < 2) return null;
+            const prev = rows[rows.length - 2];
+            const curr = rows[rows.length - 1];
+            const streams = new Set([
+              ...Array.from(prev?.counts?.keys?.() || []),
+              ...Array.from(curr?.counts?.keys?.() || [])
+            ]);
+            const deltas = [];
+            for(const rawStream of streams){
+              const stream = normalizeStreamLabel(rawStream);
+              const before = Number(prev?.counts?.get(rawStream) || 0);
+              const after = Number(curr?.counts?.get(rawStream) || 0);
+              const delta = after - before;
+              if(!delta) continue;
+              deltas.push({
+                stream,
+                delta,
+                before,
+                after,
+                tone: delta > 0 ? 'bad' : 'good',
+                external: isExternalStreamLabel(stream)
+              });
+            }
+            deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.delta - a.delta || a.stream.localeCompare(b.stream));
+            return {
+              from: prev.release,
+              to: curr.release,
+              unitLabel: unitLabel || 'тест-кейсов',
+              added: deltas.filter(item => item.delta > 0).slice(0, 3),
+              removed: deltas.filter(item => item.delta < 0).slice(0, 3)
+            };
+          }
+          function renderToneIcon(tone, title = ''){
+            const safeTitle = String(title || '').replace(/"/g, '&quot;');
+            return `<span class="ml-signal-icon ml-signal-icon--${tone}"${safeTitle ? ` title="${safeTitle}"` : ''} aria-hidden="true">${tone === 'good' ? '✓' : (tone === 'bad' ? '✕' : '•')}</span>`;
+          }
+          function renderStreamDeltaList(items, emptyText, unitLabel){
+            const list = Array.isArray(items) ? items : [];
+            if(!list.length){
+              return `<div class="stream-insight-empty">${emptyText}</div>`;
+            }
+            return `
+              <ul class="stream-insight-list">
+                ${list.map(item => `
+                  <li class="stream-insight-item">
+                    ${renderToneIcon(item.tone, item.tone === 'good' ? 'Позитивный сигнал' : 'Негативный сигнал')}
+                    <div class="stream-insight-main">
+                      <div class="stream-insight-title">${item.stream}</div>
+                      <div class="stream-insight-meta">${item.delta > 0 ? '+' : '−'}${formatMagnitudeWithUnit(item.delta, 0, unitLabel)} · было ${Math.round(item.before).toLocaleString('ru-RU')} → стало ${Math.round(item.after).toLocaleString('ru-RU')}</div>
+                    </div>
+                    <span class="stream-insight-kind ${item.external ? 'stream-insight-kind--external' : 'stream-insight-kind--internal'}">${item.external ? 'Внешний' : 'Внутренний'}</span>
+                  </li>
+                `).join('')}
+              </ul>
+            `;
+          }
+          function renderStreamNameList(names, emptyText){
+            const list = (Array.isArray(names) ? names : []).filter(Boolean);
+            if(!list.length) return `<div class="stream-insight-empty">${emptyText}</div>`;
+            return `
+              <div class="stream-chip-list">
+                ${list.map(name => `<span class="stream-chip">${name}</span>`).join('')}
+              </div>
+            `;
+          }
+          function renderStreamLeaders(summary){
+            if(!summary || (!summary.hb && !summary.selective && !summary.uwu)) return '';
+            const comparedText = summary.from && summary.to
+              ? `${formatReleaseShort(summary.from)} → ${formatReleaseShort(summary.to)}`
+              : 'Недостаточно релизов для сравнения';
+            const hb = summary.hb || null;
+            const selective = summary.selective || null;
+            const uwu = summary.uwu || null;
+            return `
+              <section class="stream-insights-shell">
+                <div class="stream-insights-head">
+                  <div>
+                    <div class="stream-insights-title">Лидеры изменений по стримам</div>
+                    <div class="stream-insights-subtitle">Смотрим последний шаг между релизами: ${comparedText}.</div>
+                  </div>
+                </div>
+                <div class="stream-insights-grid">
+                  ${[
+                    { title: 'HB', data: hb, unit: 'тест-кейсов' },
+                    { title: 'Selective', data: selective, unit: 'тест-кейсов' },
+                    { title: 'УВУ', data: uwu, unit: 'ед. УВУ' }
+                  ].map(section => `
+                    <article class="stream-insight-card">
+                      <div class="stream-insight-card-title">${section.title}</div>
+                      <div class="stream-insight-card-subtitle">${section.data ? `Сравнение ${formatReleaseShort(section.data.from)} → ${formatReleaseShort(section.data.to)}` : 'Недостаточно данных'}</div>
+                      <div class="stream-insight-split">
+                        <div>
+                          <div class="stream-insight-label stream-insight-label--bad">Рост нагрузки</div>
+                          ${renderStreamDeltaList(section.data?.added || [], 'Нет заметного роста нагрузки', section.data?.unitLabel || section.unit)}
+                        </div>
+                        <div>
+                          <div class="stream-insight-label stream-insight-label--good">Снижение нагрузки</div>
+                          ${renderStreamDeltaList(section.data?.removed || [], 'Нет заметного снижения нагрузки', section.data?.unitLabel || section.unit)}
+                        </div>
+                      </div>
+                    </article>
+                  `).join('')}
+                </div>
+              </section>
+            `;
+          }
+          function renderStreamCatalog(summary){
+            if(!summary) return '';
+            const internal = Array.isArray(summary.internalStreams) ? summary.internalStreams : [];
+            const external = Array.isArray(summary.externalStreams) ? summary.externalStreams : [];
+            if(!internal.length && !external.length) return '';
+            return `
+              <div class="stream-insights-grid stream-insights-grid--lists">
+                <article class="stream-insight-card">
+                  <div class="stream-insight-card-title">Внутренние стримы</div>
+                  <div class="stream-insight-card-subtitle">Список стримов из текущего релиза.</div>
+                  ${renderStreamNameList(internal, 'Внутренние стримы не найдены')}
+                </article>
+                <article class="stream-insight-card">
+                  <div class="stream-insight-card-title">Внешние стримы</div>
+                  <div class="stream-insight-card-subtitle">Список стримов из текущего релиза.</div>
+                  ${renderStreamNameList(external, 'Внешние стримы не найдены')}
+                </article>
+              </div>
+            `;
+          }
+          function addChpIssueToQuarterAgg(aggMap, quarterLabel, issue){
+            if(!(aggMap instanceof Map) || !issue) return;
+            const quarter = quarterLabel || 'Без квартала';
+            if(!aggMap.has(quarter)){
+              aggMap.set(quarter, { total: 0, streams: new Map() });
+            }
+            const bucket = aggMap.get(quarter);
+            bucket.total += 1;
+
+            const stream = normalizeStreamLabel(issue.stream);
+            const substream = extractIssueSubstreamLabel(issue);
+            if(!bucket.streams.has(stream)){
+              bucket.streams.set(stream, {
+                name: stream,
+                count: 0,
+                external: isExternalStreamLabel(stream),
+                substreams: new Map()
+              });
+            }
+            const streamBucket = bucket.streams.get(stream);
+            streamBucket.count += 1;
+            streamBucket.substreams.set(substream, (streamBucket.substreams.get(substream) || 0) + 1);
+          }
+          function buildChpQuarterStats(chpRows, aggMap){
+            const rows = Array.isArray(chpRows) ? chpRows : [];
+            const avg = rows.length
+              ? rows.reduce((sum, row) => sum + (Number(row?.total || 0) || 0), 0) / rows.length
+              : 0;
+            const quarters = Array.from((aggMap instanceof Map ? aggMap.entries() : []))
+              .sort((a, b) => quarterSortValue(a[0]) - quarterSortValue(b[0]))
+              .map(([quarter, data]) => {
+                const streams = Array.from(data.streams.values())
+                  .map(streamRow => {
+                    const topSubstream = Array.from(streamRow.substreams.entries())
+                      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
+                    return {
+                      name: streamRow.name,
+                      count: streamRow.count,
+                      external: streamRow.external,
+                      topSubstream: topSubstream ? { name: topSubstream[0], count: topSubstream[1] } : null
+                    };
+                  })
+                  .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+                return {
+                  quarter,
+                  total: Number(data.total || 0),
+                  streams
+                };
+              });
+            return {
+              average: avg,
+              releases: rows.length,
+              quarters
+            };
+          }
+          function renderChpQuarterSummary(stats){
+            if(!stats || (!stats.releases && !stats.quarters?.length)) return '';
+            return `
+              <section class="chp-quarter-shell">
+                <div class="chp-quarter-head">
+                  <div>
+                    <div class="chp-quarter-title">ЧП по диапазону и кварталам</div>
+                    <div class="chp-quarter-subtitle">Среднее ЧП считаем по всем выбранным релизам, а топ стримов показываем по кварталам с их главным сабстримом.</div>
+                  </div>
+                  <div class="chp-quarter-stat">
+                    <span class="chp-quarter-stat-label">Среднее ЧП за диапазон</span>
+                    <span class="chp-quarter-stat-value">${Number(stats.average || 0).toFixed(1)}</span>
+                  </div>
+                </div>
+                <div class="chp-quarter-grid">
+                  ${(stats.quarters || []).length
+                    ? stats.quarters.map(q => `
+                      <article class="chp-quarter-card">
+                        <div class="chp-quarter-card-head">
+                          <div class="chp-quarter-card-title">${q.quarter}</div>
+                          <div class="chp-quarter-card-total">${q.total} ЧП</div>
+                        </div>
+                        ${(q.streams || []).length
+                          ? `
+                            <ol class="chp-quarter-list">
+                              ${q.streams.slice(0, 5).map(stream => `
+                                <li class="chp-quarter-item">
+                                  <div class="chp-quarter-stream-row">
+                                    <span class="chp-quarter-stream-name">${stream.name}</span>
+                                    <span class="chp-quarter-stream-count">${stream.count} ЧП</span>
+                                  </div>
+                                  <div class="chp-quarter-stream-meta">
+                                    <span class="chp-quarter-kind ${stream.external ? 'chp-quarter-kind--external' : 'chp-quarter-kind--internal'}">${stream.external ? 'Внешний стрим' : 'Внутренний стрим'}</span>
+                                    <span>${stream.topSubstream ? `Топ сабстрим: ${stream.topSubstream.name} (${stream.topSubstream.count})` : 'Сабстрим не найден'}</span>
+                                  </div>
+                                </li>
+                              `).join('')}
+                            </ol>
+                          `
+                          : `<div class="stream-insight-empty">Нет ЧП по стримам за квартал</div>`
+                        }
+                      </article>
+                    `).join('')
+                    : '<div class="stream-insight-empty">Недостаточно данных по кварталам</div>'
+                  }
+                </div>
+              </section>
+            `;
+          }
 
           let __streamPopover = null;
           function ensureStreamPopover(){
@@ -3787,6 +5489,10 @@
             setEmpty(text);
             contentWrap.style.display = 'none';
           }
+          function setStreamCatalog(html){
+            if(streamCatalogWrap) streamCatalogWrap.innerHTML = html || '';
+            if(streamCatalogCard) streamCatalogCard.style.display = html ? '' : 'none';
+          }
 
           function setCovEmpty(text){
             if(!covEmpty) return;
@@ -3847,7 +5553,6 @@
             if(chpContent) chpContent.style.display = 'none';
             if(chpTableWrap) chpTableWrap.style.display = 'none';
           }
-
           function setChpTypesEmpty(text){
             if(!chpTypesEmpty) return;
             chpTypesEmpty.textContent = text;
@@ -3979,6 +5684,9 @@
           function clear(){
             tbody.innerHTML = '';
             if(tcStreamDeltaTbody) tcStreamDeltaTbody.innerHTML = '';
+            setStreamCatalog('');
+            window.__streamInsightData = null;
+            window.__chpQuarterStats = null;
             if(tcChart){
               tcChart.data.labels = [];
               tcChart.data.datasets.forEach(d => d.data = []);
@@ -4048,6 +5756,8 @@
               });
               cutChart.update();
             }
+            window.__releaseRangeAll = [];
+            window.__releaseTimelineByRelease = {};
           }
 
           async function fetchSwatLogins(release, signal){
@@ -4502,121 +6212,128 @@
             return (id == null) ? null : String(id);
           }
 
-          async function collectStreamCountsByLaunch(launchId, allMap, autoMap, allUwuMap, autoUwuMap, signal){
+          async function collectStreamCountsByLaunch(launchId, allMap, autoMap, allUwuMap, autoUwuMap, signal, opts = {}){
             loadTcStreamCache();
             loadTcUwuCache();
+            const includeAll = opts.includeAll !== false;
+            const includeAuto = opts.includeAuto !== false;
+            const includeUwu = opts.includeUwu !== false;
             let page = 0;
-            while(true){
-              const data = await httpGet('/api/testresulttree/leaf', {
-                launchId,
-                sort: 'duration,asc',
-                size: LEAF_PAGE_SIZE,
-                page
-              }, signal);
-              const content = (data && data.content) ? data.content : [];
-              if(!content.length) break;
+            if(includeAll){
+              while(true){
+                const data = await httpGet('/api/testresulttree/leaf', {
+                  launchId,
+                  sort: 'duration,asc',
+                  size: LEAF_PAGE_SIZE,
+                  page
+                }, signal);
+                const content = (data && data.content) ? data.content : [];
+                if(!content.length) break;
 
-              for(const leaf of content){
-                const resultId = getLeafResultId(leaf);
-                let stream = 'Без стрима';
-                let uwu = 0;
-                let testCaseId = getLeafTestCaseId(leaf);
-                try{
-                  if(testCaseId == null && resultId){
-                    const core = await fetchTestResultCore(resultId, signal);
-                    testCaseId = core?.testCaseId ?? null;
-                  }
-                }catch(e){}
+                for(const leaf of content){
+                  const resultId = getLeafResultId(leaf);
+                  let stream = 'Без стрима';
+                  let uwu = 0;
+                  let testCaseId = getLeafTestCaseId(leaf);
+                  try{
+                    if(testCaseId == null && resultId){
+                      const core = await fetchTestResultCore(resultId, signal);
+                      testCaseId = core?.testCaseId ?? null;
+                    }
+                  }catch(e){}
 
-                if(testCaseId != null){
-                  const key = String(testCaseId);
-                  const hasStream = __tcStreamCache.has(key);
-                  const hasUwu = __tcUwuCache.has(key);
+                  if(testCaseId != null){
+                    const key = String(testCaseId);
+                    const hasStream = __tcStreamCache.has(key);
+                    const hasUwu = __tcUwuCache.has(key);
 
-                  if(hasStream) stream = __tcStreamCache.get(key);
-                  if(hasUwu) uwu = Number(__tcUwuCache.get(key) || 0);
+                    if(hasStream) stream = __tcStreamCache.get(key);
+                    if(hasUwu) uwu = Number(__tcUwuCache.get(key) || 0);
 
-                  if(!hasStream || !hasUwu){
-                    try{
-                      const overview = await fetchTestCaseOverview(key, signal);
-                      if(!hasStream){
-                        stream = extractStreamFromOverview(overview);
-                        __tcStreamCache.set(key, stream);
+                    if(!hasStream || (includeUwu && !hasUwu)){
+                      try{
+                        const overview = await fetchTestCaseOverview(key, signal);
+                        if(!hasStream){
+                          stream = extractStreamFromOverview(overview);
+                          __tcStreamCache.set(key, stream);
+                        }
+                        if(includeUwu && !hasUwu){
+                          uwu = extractUwuFromOverview(overview);
+                          __tcUwuCache.set(key, uwu);
+                        }
+                      }catch(e){
+                        if(!hasStream) stream = 'Без стрима';
+                        if(includeUwu && !hasUwu) uwu = 0;
                       }
-                      if(!hasUwu){
-                        uwu = extractUwuFromOverview(overview);
-                        __tcUwuCache.set(key, uwu);
-                      }
-                    }catch(e){
-                      if(!hasStream) stream = 'Без стрима';
-                      if(!hasUwu) uwu = 0;
                     }
                   }
+                  allMap.set(stream, (allMap.get(stream) || 0) + 1);
+                  if(includeUwu) allUwuMap.set(stream, (allUwuMap.get(stream) || 0) + Number(uwu || 0));
                 }
-                allMap.set(stream, (allMap.get(stream) || 0) + 1);
-                allUwuMap.set(stream, (allUwuMap.get(stream) || 0) + Number(uwu || 0));
-              }
 
-              if(content.length < LEAF_PAGE_SIZE) break;
-              page += 1;
+                if(content.length < LEAF_PAGE_SIZE) break;
+                page += 1;
+              }
             }
 
-            const search = b64Query([{ id:'automated', type:'boolean', value: true }]);
-            page = 0;
-            while(true){
-              const data = await httpGet('/api/testresulttree/leaf', {
-                launchId,
-                sort: 'duration,asc',
-                size: LEAF_PAGE_SIZE,
-                page,
-                search
-              }, signal);
-              const content = (data && data.content) ? data.content : [];
-              if(!content.length) break;
+            if(includeAuto){
+              const search = b64Query([{ id:'automated', type:'boolean', value: true }]);
+              page = 0;
+              while(true){
+                const data = await httpGet('/api/testresulttree/leaf', {
+                  launchId,
+                  sort: 'duration,asc',
+                  size: LEAF_PAGE_SIZE,
+                  page,
+                  search
+                }, signal);
+                const content = (data && data.content) ? data.content : [];
+                if(!content.length) break;
 
-              for(const leaf of content){
-                const resultId = getLeafResultId(leaf);
-                let stream = 'Без стрима';
-                let uwu = 0;
-                let testCaseId = getLeafTestCaseId(leaf);
-                try{
-                  if(testCaseId == null && resultId){
-                    const core = await fetchTestResultCore(resultId, signal);
-                    testCaseId = core?.testCaseId ?? null;
-                  }
-                }catch(e){}
+                for(const leaf of content){
+                  const resultId = getLeafResultId(leaf);
+                  let stream = 'Без стрима';
+                  let uwu = 0;
+                  let testCaseId = getLeafTestCaseId(leaf);
+                  try{
+                    if(testCaseId == null && resultId){
+                      const core = await fetchTestResultCore(resultId, signal);
+                      testCaseId = core?.testCaseId ?? null;
+                    }
+                  }catch(e){}
 
-                if(testCaseId != null){
-                  const key = String(testCaseId);
-                  const hasStream = __tcStreamCache.has(key);
-                  const hasUwu = __tcUwuCache.has(key);
+                  if(testCaseId != null){
+                    const key = String(testCaseId);
+                    const hasStream = __tcStreamCache.has(key);
+                    const hasUwu = __tcUwuCache.has(key);
 
-                  if(hasStream) stream = __tcStreamCache.get(key);
-                  if(hasUwu) uwu = Number(__tcUwuCache.get(key) || 0);
+                    if(hasStream) stream = __tcStreamCache.get(key);
+                    if(hasUwu) uwu = Number(__tcUwuCache.get(key) || 0);
 
-                  if(!hasStream || !hasUwu){
-                    try{
-                      const overview = await fetchTestCaseOverview(key, signal);
-                      if(!hasStream){
-                        stream = extractStreamFromOverview(overview);
-                        __tcStreamCache.set(key, stream);
+                    if(!hasStream || (includeUwu && !hasUwu)){
+                      try{
+                        const overview = await fetchTestCaseOverview(key, signal);
+                        if(!hasStream){
+                          stream = extractStreamFromOverview(overview);
+                          __tcStreamCache.set(key, stream);
+                        }
+                        if(includeUwu && !hasUwu){
+                          uwu = extractUwuFromOverview(overview);
+                          __tcUwuCache.set(key, uwu);
+                        }
+                      }catch(e){
+                        if(!hasStream) stream = 'Без стрима';
+                        if(includeUwu && !hasUwu) uwu = 0;
                       }
-                      if(!hasUwu){
-                        uwu = extractUwuFromOverview(overview);
-                        __tcUwuCache.set(key, uwu);
-                      }
-                    }catch(e){
-                      if(!hasStream) stream = 'Без стрима';
-                      if(!hasUwu) uwu = 0;
                     }
                   }
+                  autoMap.set(stream, (autoMap.get(stream) || 0) + 1);
+                  if(includeUwu) autoUwuMap.set(stream, (autoUwuMap.get(stream) || 0) + Number(uwu || 0));
                 }
-                autoMap.set(stream, (autoMap.get(stream) || 0) + 1);
-                autoUwuMap.set(stream, (autoUwuMap.get(stream) || 0) + Number(uwu || 0));
-              }
 
-              if(content.length < LEAF_PAGE_SIZE) break;
-              page += 1;
+                if(content.length < LEAF_PAGE_SIZE) break;
+                page += 1;
+              }
             }
             persistTcStreamCache();
             persistTcUwuCache();
@@ -5919,10 +7636,10 @@
               const end = targetMinutes + CUT_TARGET_WINDOW_MIN;
               if(minutes >= start && minutes <= end){
                 status = 'cut-on';
-                note = ' (старт в окне)';
+                note = ' (старт вовремя)';
               }else{
                 status = 'cut-late';
-                note = minutes < start ? ' (старт раньше окна)' : ' (старт позже окна)';
+                note = minutes < start ? ' (старт раньше целевого диапазона)' : ' (старт позже целевого диапазона)';
               }
             }
             const timeHtml = status ? `<span class="cut-time ${status}">${timeText}</span>` : `<span class="cut-time">${timeText}</span>`;
@@ -6130,7 +7847,11 @@
             const avgRowsData = [];
             const chpRowsData = [];
             const tcStreamByRelease = [];
+            const hbStreamByRelease = [];
+            const selStreamByRelease = [];
+            const uwuStreamByRelease = [];
             let tcStreamDeltaRowsAll = [];
+            const releaseTimelineByRelease = Object.create(null);
 
             let firstRow = true;
             window.__iosTypesRowsAll = [];
@@ -6138,6 +7859,7 @@
             window.__chpTypesRowsAll = [];
             window.__chpTypesRowsIosAll = [];
             window.__chpTypesRowsAndAll = [];
+            window.__releaseRangeAll = releases.slice();
 
             for(const rel of releases){
               if(signal?.aborted) break;
@@ -6291,6 +8013,22 @@
                 }
               }
               const swatPeopleHB = swatPeopleDeclared;
+              const hbStreamCounts = new Map();
+              if(idsHB.length){
+                const perHbStream = await asyncPool(idsHB, STREAM_CONCURRENCY, async (id) => {
+                  const mAll = new Map();
+                  await collectStreamCountsByLaunch(id, mAll, new Map(), new Map(), new Map(), signal, {
+                    includeAuto: false,
+                    includeUwu: false
+                  });
+                  return mAll;
+                }, signal);
+                for(const map of perHbStream){
+                  if(!(map instanceof Map)) continue;
+                  mergeMapOfCounts(hbStreamCounts, map);
+                }
+              }
+              hbStreamByRelease.push({ release: rel, counts: hbStreamCounts });
 
               // 3) SWAT/STREAM Selective (только Selective)
               const selLaunches = await fetchLaunches(rel, 'Selective', signal);
@@ -6318,6 +8056,22 @@
                 }
               }
               const swatPeopleSel = swatPeopleDeclared;
+              const selStreamCounts = new Map();
+              if(selIds.length){
+                const perSelStream = await asyncPool(selIds, STREAM_CONCURRENCY, async (id) => {
+                  const mAll = new Map();
+                  await collectStreamCountsByLaunch(id, mAll, new Map(), new Map(), new Map(), signal, {
+                    includeAuto: false,
+                    includeUwu: false
+                  });
+                  return mAll;
+                }, signal);
+                for(const map of perSelStream){
+                  if(!(map instanceof Map)) continue;
+                  mergeMapOfCounts(selStreamCounts, map);
+                }
+              }
+              selStreamByRelease.push({ release: rel, counts: selStreamCounts });
 
               // 1) TOTAL/AUTO
               const perLaunchAll = await asyncPool(idsAll, LAUNCH_CONCURRENCY, async (id) => {
@@ -6357,8 +8111,10 @@
                   mergeMapOfCounts(autoUwuMap, r.uwuAuto || new Map());
                 }
                 tcStreamByRelease.push({ release: rel, counts: buildCountsByStream(allMap, autoMap, allUwuMap, autoUwuMap) });
+                uwuStreamByRelease.push({ release: rel, counts: new Map(allUwuMap) });
               }else{
                 tcStreamByRelease.push({ release: rel, counts: new Map() });
+                uwuStreamByRelease.push({ release: rel, counts: new Map() });
               }
 
               // Черепики (deploy-lab issues) — через прокси
@@ -6414,11 +8170,13 @@
                 andCutLbl = andCut?.label || null;
                 iosStoreLbl = iosStore?.label || null;
                 andStoreLbl = andStore?.label || null;
+                releaseTimelineByRelease[rel] = Number(iosCut?.msLocal || andCut?.msLocal || iosStore?.msLocal || andStore?.msLocal || 0) || null;
               }catch(e){
                 addCutPoint(rel, 0, null);
                 addCutPoint(rel, 1, null);
                 addCutPoint(rel, 2, null);
                 addCutPoint(rel, 3, null);
+                releaseTimelineByRelease[rel] = null;
               }
 
               if(cutTbody){
@@ -6478,12 +8236,29 @@
               tcStreamDeltaRowsAll = deltaRows.slice();
             }
 
+            const latestStreamCounts = tcStreamByRelease.length ? tcStreamByRelease[tcStreamByRelease.length - 1].counts : new Map();
+            const latestStreamNames = Array.from(latestStreamCounts.keys()).map(normalizeStreamLabel).filter(Boolean).sort((a,b) => a.localeCompare(b));
+            const internalStreams = latestStreamNames.filter(name => !isExternalStreamLabel(name));
+            const externalStreams = latestStreamNames.filter(name => isExternalStreamLabel(name));
+            const streamInsightData = {
+              from: tcStreamByRelease.length > 1 ? tcStreamByRelease[tcStreamByRelease.length - 2].release : '',
+              to: tcStreamByRelease.length ? tcStreamByRelease[tcStreamByRelease.length - 1].release : '',
+              hb: buildLatestStreamDeltaSummary(hbStreamByRelease, 'тест-кейсов'),
+              selective: buildLatestStreamDeltaSummary(selStreamByRelease, 'тест-кейсов'),
+              uwu: buildLatestStreamDeltaSummary(uwuStreamByRelease, 'ед. УВУ'),
+              internalStreams,
+              externalStreams
+            };
+            window.__streamInsightData = streamInsightData;
+            setStreamCatalog(renderStreamCatalog(streamInsightData));
+
             window.__tcRowsAll = tcRowsData.slice();
             window.__tcDeltaRowsAll = tcStreamDeltaRowsAll.slice();
             window.__covRowsAll = covRowsData.slice();
             window.__selRowsAll = selRowsData.slice();
             window.__avgRowsAll = avgRowsData.slice();
             window.__chpRowsAll = chpRowsData.slice();
+            window.__releaseTimelineByRelease = { ...releaseTimelineByRelease };
             populateAllReleaseFilters(releases);
             applyAllReleaseFilters();
 
@@ -6499,6 +8274,7 @@
               const andRows = [];
               const iosSet = new Set();
               const andSet = new Set();
+              const chpQuarterAgg = new Map();
               const chpTypesRows = [];
               const chpTypesRowsIos = [];
               const chpTypesRowsAnd = [];
@@ -6529,9 +8305,17 @@
                 iosRows.push({ release: rel, counts: a1.counts, details: a1.details });
                 andRows.push({ release: rel, counts: a2.counts, details: a2.details });
 
+                const iosChpIssuesBase = (iosIssues || []).filter(it => it && it.merged_after_cutoff === true);
+                const andChpIssuesBase = (andIssues || []).filter(it => it && it.merged_after_cutoff === true);
+                const releaseQuarter = quarterLabelFromMsLocal(releaseTimelineByRelease[rel]);
+                const quarterIssues = uniqueIssuesByKey([...(iosChpIssuesBase || []), ...(andChpIssuesBase || [])]);
+                for(const issue of quarterIssues){
+                  addChpIssueToQuarterAgg(chpQuarterAgg, releaseQuarter, issue);
+                }
+
                 if(canChpTypes){
-                  const iosChpIssues = (iosIssues || []).filter(it => it && it.merged_after_cutoff === true);
-                  const andChpIssues = (andIssues || []).filter(it => it && it.merged_after_cutoff === true);
+                  const iosChpIssues = iosChpIssuesBase;
+                  const andChpIssues = andChpIssuesBase;
                   const iosAllIssues = uniqueIssuesByKey(iosIssues || []);
                   const andAllIssues = uniqueIssuesByKey(andIssues || []);
                   const allIssues = uniqueIssuesByKey([...(iosIssues || []), ...(andIssues || [])]);
@@ -6644,6 +8428,9 @@
                   updateChpTypesPlatformCharts(releases, chpTypesRowsIos, chpTypesRowsAnd);
                 }
               }
+
+              const chpQuarterStats = buildChpQuarterStats(chpRowsData, chpQuarterAgg);
+              window.__chpQuarterStats = chpQuarterStats;
             }
 
 
@@ -6760,14 +8547,37 @@
           });
 
           mlSaveBtn?.addEventListener('click', async () => {
-            const entry = recordMlExport();
-            if(entry){
+            const saved = ensureCurrentMlExportEntry();
+            if(saved?.ok){
               renderMlSummary();
               const synced = await syncMlDatasetToDrive(false);
-              showToast(synced ? 'Выгрузка сохранена в ML-историю' : 'Выгрузка сохранена локально', synced);
+              if(saved.created){
+                showToast(synced ? 'Выгрузка сохранена в ML-историю' : 'Выгрузка сохранена локально', synced);
+              }else{
+                showToast(synced ? 'Текущая выгрузка уже сохранена в ML-истории' : 'Текущая выгрузка уже сохранена локально', synced);
+              }
             }else{
-              showToast('Нет данных для сохранения', false);
+              showToast(saved?.reason || 'Нет данных для сохранения', false);
             }
+          });
+          mlHelperStatusBtn?.addEventListener('click', async () => {
+            await checkMlHelperHealth({ silent: false });
+          });
+          mlDriveModelStatusBtn?.addEventListener('click', async () => {
+            const bundle = await ensureRemoteCatboostBundle(true);
+            if(bundle){
+              showToast('Свежая модель из Drive подхвачена', true);
+              return;
+            }
+            const state = getMlDriveModelIndicatorState();
+            if(state.tone === 'synced'){
+              showToast('Drive-модель уже синхронизирована', true);
+            }else{
+              showToast(state.tip, false);
+            }
+          });
+          mlRetrainBtn?.addEventListener('click', async () => {
+            await retrainMlCatboostViaHelper();
           });
 
           // custom tooltip for data-tip
@@ -6820,22 +8630,49 @@
           }
 
           mlLabelOkBtn?.addEventListener('click', async () => {
-            const result = await labelLastExport('ok');
+            const result = await saveLabelAndRetrain('ok');
             if(!result?.ok){
               showToast(result?.reason || 'Нет сохраненной ML-выгрузки', false);
               return;
             }
-            showToast(result.synced ? 'Выгрузка размечена как OK' : 'Метка OK сохранена локально', result.synced);
+            const syncPrefix = result.synced ? 'Сохранено' : 'Сохранено локально';
+            if(result.retrained){
+              const durationSec = Math.max(1, Math.round(Number(result.durationMs || 0) / 1000));
+              showToast(`${syncPrefix} как OK и CatBoost переобучен за ${durationSec} c`, true);
+            }else{
+              showToast(`${syncPrefix} как OK, но CatBoost не переобучен. Запусти ${result.helperHint}`, false);
+            }
           });
           mlLabelFailBtn?.addEventListener('click', async () => {
-            const result = await labelLastExport('fail');
+            const result = await saveLabelAndRetrain('fail');
             if(!result?.ok){
               showToast(result?.reason || 'Нет сохраненной ML-выгрузки', false);
               return;
             }
-            showToast(result.synced ? 'Выгрузка размечена как Регресс' : 'Метка Регресс сохранена локально', result.synced);
+            const syncPrefix = result.synced ? 'Сохранено' : 'Сохранено локально';
+            if(result.retrained){
+              const durationSec = Math.max(1, Math.round(Number(result.durationMs || 0) / 1000));
+              showToast(`${syncPrefix} как Регресс и CatBoost переобучен за ${durationSec} c`, true);
+            }else{
+              showToast(`${syncPrefix} как Регресс, но CatBoost не переобучен. Запусти ${result.helperHint}`, false);
+            }
           });
           comparePrevOnly?.addEventListener('change', renderMlSummary);
+          setMlRetrainButtonState();
+          setMlHelperIndicatorState();
+          setMlDriveModelIndicatorState();
+          checkMlHelperHealth({ silent: true }).catch(() => null);
+          window.setInterval(() => {
+            checkMlHelperHealth({ silent: true }).catch(() => null);
+          }, 30000);
+          ensureMlCatboostSession().then(() => {
+            renderMlSummary();
+          }).catch((e) => {
+            console.error('CatBoost ONNX init failed', e);
+          });
+          ensureRemoteCatboostBundle(false).catch((e) => {
+            console.error('Remote CatBoost load failed', e);
+          });
           ensureMlDatasetLoaded().catch((e) => {
             console.error('ML dataset load failed', e);
           });
