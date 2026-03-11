@@ -3009,6 +3009,101 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   gap:6px;
   width:100%;
 }
+.release-launch .release-launch-split-action{
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) 20px;
+  gap:0;
+  width:100%;
+}
+.release-launch .release-launch-split-action > .btn{
+  width:100%;
+  border-top-right-radius:0;
+  border-bottom-right-radius:0;
+}
+.release-launch .release-launch-split-toggle{
+  position:relative;
+  min-height:34px;
+  height:34px;
+  border-radius:0 10px 10px 0;
+  border:1px solid #e9e2ff;
+  border-left:0;
+  background:#f7f5ff;
+  color:#4c1d95;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  cursor:pointer;
+  transition:background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.release-launch .release-launch-split-toggle::before{
+  content:"";
+  position:absolute;
+  top:7px;
+  bottom:7px;
+  left:0;
+  width:1px;
+  background:#d1d5db;
+}
+.release-launch .release-launch-split-toggle:hover{
+  background:#f3efff;
+  border-color:#e9e2ff;
+  color:#4c1d95;
+}
+.release-launch .release-launch-split-toggle[aria-expanded="true"]{
+  background:#f3efff;
+  border-color:#e9e2ff;
+  color:#4c1d95;
+}
+.release-launch .release-launch-split-toggle-chevron{
+  font-size:20px;
+  font-weight:400;
+  line-height:1;
+  transform:translateY(-2px);
+}
+.release-launch .release-launch-split-toggle:disabled{
+  background:#f1f5f9;
+  color:#94a3b8;
+  border-color:#e2e8f0;
+  cursor:not-allowed;
+}
+.release-launch .release-launch-split-toggle:disabled::before{
+  background:#e2e8f0;
+}
+.release-launch .release-launch-schedule-menu{
+  position:absolute;
+  top:calc(100% + 6px);
+  right:0;
+  width:220px;
+  padding:6px;
+  border-radius:12px;
+  border:1px solid #e2e8f0;
+  background:#fff;
+  box-shadow:0 16px 36px rgba(15, 23, 42, .16);
+  display:grid;
+  gap:4px;
+  z-index:30;
+}
+.release-launch .release-launch-schedule-menu[hidden]{
+  display:none !important;
+}
+.release-launch .release-launch-schedule-item{
+  width:100%;
+  min-height:34px;
+  border:0;
+  border-radius:9px;
+  background:#fff;
+  color:#334155;
+  text-align:left;
+  padding:8px 10px;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.release-launch .release-launch-schedule-item:hover{
+  background:#f8fafc;
+}
 .release-launch .release-launch-publish-side-meta{
   position:absolute;
   left:calc(100% + 10px);
@@ -3039,7 +3134,6 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   border-color:#e2e8f0 !important;
   box-shadow:none !important;
   cursor:not-allowed;
-  pointer-events:none;
   transform:none !important;
   filter:none !important;
 }
@@ -3047,6 +3141,108 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   background:#f1f5f9 !important;
   color:#94a3b8 !important;
   border-color:#e2e8f0 !important;
+}
+.release-launch-modal-open{
+  overflow:hidden;
+}
+.release-launch .release-launch-modal{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:rgba(15, 23, 42, .36);
+  backdrop-filter:blur(3px);
+  z-index:5000;
+}
+.release-launch .release-launch-modal[hidden]{
+  display:none !important;
+}
+.release-launch .release-launch-modal-dialog{
+  width:min(500px, calc(100vw - 32px));
+  border-radius:20px;
+  background:#fff;
+  box-shadow:0 24px 64px rgba(15, 23, 42, .28);
+  border:1px solid rgba(226, 232, 240, .95);
+  overflow:hidden;
+}
+.release-launch .release-launch-modal-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  padding:24px 24px 8px;
+}
+.release-launch .release-launch-modal-title{
+  font-size:24px;
+  line-height:1.12;
+  font-weight:800;
+  color:#3f3f53;
+}
+.release-launch .release-launch-modal-note{
+  margin-top:18px;
+  font-size:15px;
+  line-height:1.4;
+  color:#7c8190;
+}
+.release-launch .release-launch-modal-close{
+  border:0;
+  background:transparent;
+  color:#8b90a0;
+  font-size:34px;
+  line-height:1;
+  padding:0;
+  width:40px;
+  height:40px;
+  cursor:pointer;
+}
+.release-launch .release-launch-modal-body{
+  padding:10px 24px 24px;
+}
+.release-launch .release-launch-modal-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px;
+  margin-top:4px;
+}
+.release-launch .release-launch-modal-field{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.release-launch .release-launch-modal-label{
+  font-size:14px;
+  font-weight:700;
+  color:#6b7280;
+}
+.release-launch .release-launch-modal-field .input{
+  height:48px;
+  border-radius:12px;
+  font-size:15px;
+  padding:0 14px;
+}
+.release-launch .release-launch-modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:16px;
+}
+.release-launch .release-launch-modal-actions .btn{
+  min-width:180px;
+  min-height:48px;
+  border-radius:12px;
+  font-size:15px;
+}
+.release-launch .release-launch-modal-actions .btn,
+.release-launch .release-launch-modal-actions .btn:hover,
+.release-launch .release-launch-modal-actions .btn:focus,
+.release-launch .release-launch-modal-actions .btn:focus-visible{
+  color:#fff;
+  background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+}
+.release-launch .release-launch-modal-actions .btn:hover{
+  filter:none;
+  transform:none;
 }
 @media (max-width: 980px){
   .release-launch .release-launch-params-split{
@@ -3083,6 +3279,25 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   }
   .release-launch .release-launch-publish-side-meta{
     left:calc(100% + 10px);
+  }
+  .release-launch .release-launch-modal-dialog{
+    width:min(100%, calc(100vw - 24px));
+  }
+  .release-launch .release-launch-modal-head{
+    padding:20px 18px 8px;
+  }
+  .release-launch .release-launch-modal-title{
+    font-size:20px;
+  }
+  .release-launch .release-launch-modal-body{
+    padding:10px 18px 20px;
+  }
+  .release-launch .release-launch-modal-grid{
+    grid-template-columns:1fr;
+  }
+  .release-launch .release-launch-modal-actions .btn{
+    width:100%;
+    min-width:0;
   }
 }
 .release-launch .release-launch-mode-tab:focus,

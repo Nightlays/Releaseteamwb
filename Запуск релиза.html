@@ -113,7 +113,16 @@
               <div id="runPublishControls" class="release-launch-publish-side" style="display:none;">
                 <div class="release-launch-publish-side-row">
                   <div class="release-launch-publish-side-buttons">
-                    <button id="runPushSwatBtn" type="button" class="btn btn-soft release-launch-run-btn-soft release-launch-run-btn-compact">SWAT Team Only</button>
+                    <div id="runPushSwatSplit" class="release-launch-split-action">
+                      <button id="runPushSwatBtn" type="button" class="btn btn-soft release-launch-run-btn-soft release-launch-run-btn-compact">SWAT Team Only</button>
+                      <button id="runPushSwatScheduleBtn" type="button" class="release-launch-split-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="runPushSwatScheduleMenu" title="Запланировать SWAT Team Only">
+                        <span class="release-launch-split-toggle-chevron" aria-hidden="true">▾</span>
+                      </button>
+                      <div id="runPushSwatScheduleMenu" class="release-launch-schedule-menu" role="menu" hidden>
+                        <button id="runPushSwatScheduleDefaultBtn" type="button" class="release-launch-schedule-item" role="menuitem">Отправить в 10:00</button>
+                        <button id="runPushSwatScheduleCustomBtn" type="button" class="release-launch-schedule-item" role="menuitem">В другое время</button>
+                      </div>
+                    </div>
                     <button id="runPushReleaseFeedBtn" type="button" class="btn btn-soft release-launch-run-btn-soft release-launch-run-btn-compact">Лента релизов</button>
                   </div>
                   <div class="release-launch-publish-side-meta">
@@ -222,6 +231,33 @@
     <div id="toastInner" class="px-4 py-2 rounded-2xl text-sm font-semibold bg-white/90 ring-1 ring-[#ecebff] text-slate-700 shadow"></div>
   </div>
 
+  <div id="swatScheduleModal" class="release-launch-modal" role="dialog" aria-modal="true" aria-labelledby="swatScheduleModalTitle" aria-hidden="true" hidden>
+    <div class="release-launch-modal-dialog">
+      <div class="release-launch-modal-head">
+        <div>
+          <div id="swatScheduleModalTitle" class="release-launch-modal-title">Запланировать сообщение</div>
+        </div>
+        <button id="swatScheduleModalClose" type="button" class="release-launch-modal-close" aria-label="Закрыть окно планирования">×</button>
+      </div>
+      <div class="release-launch-modal-body">
+        <div class="release-launch-modal-grid">
+          <label class="release-launch-modal-field">
+            <span class="release-launch-modal-label">Дата</span>
+            <input id="swatScheduleDateInput" class="input" type="date" />
+          </label>
+          <label class="release-launch-modal-field">
+            <span class="release-launch-modal-label">Время</span>
+            <input id="swatScheduleTimeInput" class="input" type="time" step="60" />
+          </label>
+        </div>
+        <div id="swatScheduleModalError" class="release-launch-run-error" style="display:none;"></div>
+        <div class="release-launch-modal-actions">
+          <button id="swatScheduleSubmitBtn" type="button" class="btn btn-grad">Запланировать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function(){
       const $ = (id) => document.getElementById(id);
@@ -259,6 +295,7 @@
       const RUN_TP_NAPI_ANDROID = 1871;
       const RUN_TP_SMOKE_RUSTORE = 999;
       const RUN_TP_SMOKE_APPGALLERY = 1000;
+      const RUN_CREATOR_PROJECT_ID = 7;
 
       const STREAM_ALIASES = {
         'Core': ['Core Android', 'Core iOS'],
@@ -329,10 +366,21 @@
       const runBuildInput = $('runBuildInput');
       const swatLeadViktor = $('swatLeadViktor');
       const swatLeadRoman = $('swatLeadRoman');
+      const runPushSwatSplit = $('runPushSwatSplit');
       const runPushSwatBtn = $('runPushSwatBtn');
+      const runPushSwatScheduleBtn = $('runPushSwatScheduleBtn');
+      const runPushSwatScheduleMenu = $('runPushSwatScheduleMenu');
+      const runPushSwatScheduleDefaultBtn = $('runPushSwatScheduleDefaultBtn');
+      const runPushSwatScheduleCustomBtn = $('runPushSwatScheduleCustomBtn');
       const runPushReleaseFeedBtn = $('runPushReleaseFeedBtn');
       const runCreateError = $('runCreateError');
       const runCreateResultLog = $('runCreateResultLog');
+      const swatScheduleModal = $('swatScheduleModal');
+      const swatScheduleModalClose = $('swatScheduleModalClose');
+      const swatScheduleDateInput = $('swatScheduleDateInput');
+      const swatScheduleTimeInput = $('swatScheduleTimeInput');
+      const swatScheduleSubmitBtn = $('swatScheduleSubmitBtn');
+      const swatScheduleModalError = $('swatScheduleModalError');
       const ytTokenInput = $('ytTokenInput');
 
       const resultsEmpty = $('resultsEmpty');
@@ -682,6 +730,63 @@
         }
       }
 
+      async function runCreatorGetJson(path, signal){
+        const base = RUN_CREATOR_BASE_URL.replace(/\/+$/, '');
+        const url = `${base}/api${path.startsWith('/') ? path : `/${path}`}`;
+        let resp;
+        try{
+          resp = await fetch(url, {
+            method: 'GET',
+            mode: 'cors',
+            credentials: 'omit',
+            headers: runCreatorHeaders(),
+            signal
+          });
+        }catch(error){
+          const msg = (error && error.message) ? error.message : String(error);
+          throw new Error(`HTTP ошибка при GET ${url}: ${msg}`);
+        }
+
+        const text = await resp.text();
+        if(Math.floor(resp.status / 100) !== 2){
+          throw new Error(`Запрос ${url} вернул ${resp.status}:\n${text}`);
+        }
+        if(!text.trim()) return null;
+        try{
+          return JSON.parse(text);
+        }catch(_){
+          return text;
+        }
+      }
+
+      function runCreatorBase64Utf8(value){
+        const bytes = new TextEncoder().encode(String(value || ''));
+        let binary = '';
+        const chunk = 0x8000;
+        for(let i = 0; i < bytes.length; i += chunk){
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        }
+        return btoa(binary);
+      }
+
+      async function runCreatorFindExistingLaunchByName(launchName, signal){
+        const filter = runCreatorBase64Utf8(JSON.stringify([
+          { id: 'name', value: String(launchName || ''), type: 'string' }
+        ]));
+        const query = new URLSearchParams({
+          page: '0',
+          size: '25',
+          search: filter,
+          projectId: String(RUN_CREATOR_PROJECT_ID),
+          preview: 'true',
+          sort: 'createdDate,desc'
+        });
+        const data = await runCreatorGetJson(`/launch?${query.toString()}`, signal);
+        const content = Array.isArray(data && data.content) ? data.content : [];
+        const exactName = String(launchName || '').trim();
+        return content.find((item) => String((item && item.name) || '').trim() === exactName) || null;
+      }
+
       async function runCreatorCreateTag(name, signal){
         const data = await runCreatorPostJson('/launch/tag', { name }, signal);
         if(!data || typeof data !== 'object' || !('id' in data)){
@@ -691,12 +796,17 @@
       }
 
       async function runCreatorRunTestplan(tpId, launchName, tagIds, signal){
+        const existingLaunch = await runCreatorFindExistingLaunchByName(launchName, signal);
+        if(existingLaunch && existingLaunch.id){
+          runCreatorInfo(`Найден существующий ран, переиспользую: id=${existingLaunch.id}`, { kind: 'ok' });
+          return Object.assign({}, existingLaunch, { reused: true });
+        }
         const payload = { launchName, tags: tagIds.map((id) => ({ id })) };
         const data = await runCreatorPostJson(`/testplan/${tpId}/run`, payload, signal);
         if(!data || typeof data !== 'object' || !('id' in data)){
           throw new Error(`Тест-план ${tpId} запустился не как ожидалось. Ответ: ${JSON.stringify(data)}`);
         }
-        return data;
+        return Object.assign({}, data, { reused: false });
       }
 
       async function runCreatorSyncTestplan(tpId, signal){
@@ -907,6 +1017,108 @@
         const month = two(mskDate.getUTCMonth() + 1);
         const year = mskDate.getUTCFullYear();
         return `${day}.${month}.${year}`;
+      }
+
+      function getMskParts(ms){
+        const mskDate = new Date(Number(ms) + MSK_OFFSET_MS);
+        return {
+          year: mskDate.getUTCFullYear(),
+          month: mskDate.getUTCMonth() + 1,
+          day: mskDate.getUTCDate(),
+          hours: mskDate.getUTCHours(),
+          minutes: mskDate.getUTCMinutes()
+        };
+      }
+
+      function formatMskDateInputValue(ms){
+        const parts = getMskParts(ms);
+        return `${parts.year}-${two(parts.month)}-${two(parts.day)}`;
+      }
+
+      function formatMskTimeInputValue(ms){
+        const parts = getMskParts(ms);
+        return `${two(parts.hours)}:${two(parts.minutes)}`;
+      }
+
+      function formatMskDateTimeHuman(ms){
+        const parts = getMskParts(ms);
+        return `${two(parts.day)}.${two(parts.month)}.${parts.year} ${two(parts.hours)}:${two(parts.minutes)} (МСК)`;
+      }
+
+      function formatMskDateTimeShort(ms){
+        const parts = getMskParts(ms);
+        return `${two(parts.day)}.${two(parts.month)}.${parts.year} ${two(parts.hours)}:${two(parts.minutes)}`;
+      }
+
+      function buildDefaultSwatScheduleMs(nowMs){
+        const parts = getMskParts(Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now());
+        const passedToday = (parts.hours * 60 + parts.minutes) > 10 * 60;
+        return Date.UTC(parts.year, parts.month - 1, parts.day + (passedToday ? 1 : 0), 10, 0, 0, 0) - MSK_OFFSET_MS;
+      }
+
+      function parseMskDateTimeToMs(dateValue, timeValue){
+        const dateTxt = String(dateValue || '').trim();
+        const timeTxt = String(timeValue || '').trim();
+        const dateMatch = dateTxt.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        const timeMatch = timeTxt.match(/^(\d{2}):(\d{2})$/);
+        if(!dateMatch || !timeMatch){
+          return NaN;
+        }
+        const year = Number(dateMatch[1]);
+        const month = Number(dateMatch[2]);
+        const day = Number(dateMatch[3]);
+        const hours = Number(timeMatch[1]);
+        const minutes = Number(timeMatch[2]);
+        return Date.UTC(year, month - 1, day, hours, minutes, 0, 0) - MSK_OFFSET_MS;
+      }
+
+      function syncSwatScheduleDefaultLabel(){
+        if(!runPushSwatScheduleDefaultBtn) return;
+        const targetMs = buildDefaultSwatScheduleMs(Date.now());
+        runPushSwatScheduleDefaultBtn.textContent = `Отправить ${formatMskDateTimeShort(targetMs)}`;
+      }
+
+      function closeSwatScheduleMenu(){
+        if(runPushSwatScheduleMenu) runPushSwatScheduleMenu.hidden = true;
+        if(runPushSwatScheduleBtn) runPushSwatScheduleBtn.setAttribute('aria-expanded', 'false');
+      }
+
+      function openSwatScheduleMenu(){
+        syncSwatScheduleDefaultLabel();
+        if(runPushSwatScheduleMenu) runPushSwatScheduleMenu.hidden = false;
+        if(runPushSwatScheduleBtn) runPushSwatScheduleBtn.setAttribute('aria-expanded', 'true');
+      }
+
+      function toggleSwatScheduleMenu(){
+        if(!runPushSwatScheduleMenu || !runPushSwatScheduleBtn || runPushSwatScheduleBtn.disabled) return;
+        if(runPushSwatScheduleMenu.hidden) openSwatScheduleMenu();
+        else closeSwatScheduleMenu();
+      }
+
+      function showSwatScheduleModalError(message){
+        if(!swatScheduleModalError) return;
+        const text = String(message || '').trim();
+        swatScheduleModalError.textContent = text;
+        swatScheduleModalError.style.display = text ? '' : 'none';
+      }
+
+      function closeSwatScheduleModal(){
+        if(!swatScheduleModal) return;
+        swatScheduleModal.hidden = true;
+        swatScheduleModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('release-launch-modal-open');
+        showSwatScheduleModalError('');
+      }
+
+      function openSwatScheduleModal(prefillMs){
+        const targetMs = Number.isFinite(Number(prefillMs)) ? Number(prefillMs) : buildDefaultSwatScheduleMs(Date.now());
+        if(swatScheduleDateInput) swatScheduleDateInput.value = formatMskDateInputValue(targetMs);
+        if(swatScheduleTimeInput) swatScheduleTimeInput.value = formatMskTimeInputValue(targetMs);
+        showSwatScheduleModalError('');
+        if(!swatScheduleModal) return;
+        swatScheduleModal.hidden = false;
+        swatScheduleModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('release-launch-modal-open');
       }
 
       function asBearer(rawToken){
@@ -2067,6 +2279,40 @@
         return proxyRequestJson('POST', 'https://band.wb.ru/api/v4/posts', headers, payload, signal);
       }
 
+      async function bandSchedulePost(message, cfg, scheduledAtMs, signal, options){
+        const opts = options || {};
+        const channelId = String(opts.channelId || cfg.bandChannelId || '').trim();
+        const rootId = String(opts.rootId || '').trim();
+        const userId = BAND_POST_USER_ID;
+        if(!channelId) throw new Error('Заполни Канал SWAT QA');
+        if(!userId) throw new Error('Не задан BAND_POST_USER_ID');
+        const scheduledAt = Number(scheduledAtMs);
+        if(!Number.isFinite(scheduledAt)) throw new Error('Некорректная дата планирования.');
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesRead);
+        const payload = {
+          id: '',
+          scheduled_at: scheduledAt,
+          create_at: 0,
+          user_id: userId,
+          channel_id: channelId,
+          root_id: rootId,
+          message,
+          props: {},
+          metadata: {},
+          file_ids: []
+        };
+        const headers = {
+          'Accept': '*/*',
+          'Accept-Language': 'ru',
+          'Content-Type': 'application/json',
+          'Origin': 'https://band.wb.ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+        return proxyRequestJson('POST', 'https://band.wb.ru/api/v4/posts/schedule', headers, payload, signal);
+      }
+
       async function bandSearchUserIds(handles, cfg, signal){
         const out = {};
         if(!handles.size) return out;
@@ -2285,6 +2531,8 @@
         const isNonMajor = hasMode && !isMajor;
         const isReleaseFeedBlockedMode = appState.currentMode === '3' || appState.currentMode === '4';
         const isBuildMode = isRunBuildMode(appState.currentMode);
+        const hasPublishData = isNonMajor && hasRunCreatorPublishData();
+        const collectHint = 'Сначала запустите сбор данных';
         if(runModeSelect) runModeSelect.disabled = locked;
         for(const btn of runModeButtons){
           btn.disabled = locked;
@@ -2295,8 +2543,26 @@
         if(runBuildInput) runBuildInput.disabled = locked || !isBuildMode || !hasMode;
         if(swatLeadViktor) swatLeadViktor.disabled = locked || !isNonMajor;
         if(swatLeadRoman) swatLeadRoman.disabled = locked || !isNonMajor;
-        if(runPushSwatBtn) runPushSwatBtn.disabled = locked || !isNonMajor;
-        if(runPushReleaseFeedBtn) runPushReleaseFeedBtn.disabled = locked || !isNonMajor || isReleaseFeedBlockedMode;
+        if(runPushSwatBtn){
+          runPushSwatBtn.disabled = locked || !isNonMajor || !hasPublishData;
+          runPushSwatBtn.title = (!locked && isNonMajor && !hasPublishData) ? collectHint : '';
+        }
+        if(runPushSwatScheduleBtn){
+          runPushSwatScheduleBtn.disabled = locked || !isNonMajor || !hasPublishData;
+          runPushSwatScheduleBtn.title = (!locked && isNonMajor && !hasPublishData) ? collectHint : '';
+        }
+        if(runPushSwatSplit){
+          runPushSwatSplit.title = (!locked && isNonMajor && !hasPublishData) ? collectHint : '';
+        }
+        if(runPushReleaseFeedBtn){
+          runPushReleaseFeedBtn.disabled = locked || !isNonMajor || isReleaseFeedBlockedMode || !hasPublishData;
+          runPushReleaseFeedBtn.title = (!locked && isNonMajor && !hasPublishData)
+            ? collectHint
+            : ((!locked && isNonMajor && isReleaseFeedBlockedMode) ? 'Недоступно для выбранного типа запуска' : '');
+        }
+        if((locked || !isNonMajor) && !appState.runCreateRunning){
+          closeSwatScheduleMenu();
+        }
       }
 
       function setRunCreateRunning(running){
@@ -2399,13 +2665,13 @@
       }
 
       async function withButtonBusy(button, busyText, task){
-        const old = button.textContent;
+        const old = button ? button.innerHTML : '';
         button.disabled = true;
         if(busyText) button.textContent = busyText;
         try{
           return await task();
         }finally{
-          button.textContent = old;
+          button.innerHTML = old;
           button.disabled = false;
           refreshButtons();
         }
@@ -2687,6 +2953,10 @@
         return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
       }
 
+      function hasRunCreatorPublishData(){
+        return collectRunCreatorLinks().length > 0 || !!collectRunCreatorCopyMessage();
+      }
+
       function buildReleaseFeedThreadMessage(release, runRef, boardUrl, releaseTaskRef, buildValue){
         const today = formatMskDateDot(new Date());
         const buildText = String(buildValue || '').trim();
@@ -2793,16 +3063,20 @@
         showToast(posts.length > 1 ? `Опубликовано тредов: ${posts.length}` : 'Опубликовано в ленту релизов');
       }
 
-      async function publishSwatTeamOnlyPost(){
-        const cfg = collectSettings();
-        ensureReleaseFeedFields(cfg);
-
+      function buildSwatTeamOnlyPostText(){
         const baseText = collectRunCreatorCopyMessage();
         const leadTag = getSwatShiftLeadTag();
         const text = `${baseText}\n\nSWAT${leadTag ? `\n${leadTag}` : ''}`.trim();
         if(!text){
           throw new Error('Не найден текст для копирования после создания рана.');
         }
+        return text;
+      }
+
+      async function publishSwatTeamOnlyPost(){
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+        const text = buildSwatTeamOnlyPostText();
 
         await bandCreatePost(text, cfg, null, {
           channelId: SWAT_TEAM_ONLY_CHANNEL_ID
@@ -2810,6 +3084,21 @@
 
         runCreatorInfo('SWAT Team Only: сообщение опубликовано', { kind: 'ok' });
         showToast('Опубликовано в SWAT Team Only');
+      }
+
+      async function scheduleSwatTeamOnlyPost(scheduledAtMs){
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+        const text = buildSwatTeamOnlyPostText();
+        const targetMs = Number(scheduledAtMs);
+        if(!Number.isFinite(targetMs)) throw new Error('Некорректная дата планирования.');
+        if(targetMs <= Date.now()) throw new Error('Время планирования должно быть позже текущего момента.');
+        await bandSchedulePost(text, cfg, targetMs, null, {
+          channelId: SWAT_TEAM_ONLY_CHANNEL_ID
+        });
+        const human = formatMskDateTimeHuman(targetMs);
+        runCreatorInfo(`SWAT Team Only: сообщение запланировано на <b>${escHtml(human)}</b>`, { html: true, kind: 'ok' });
+        showToast(`Запланировано на ${human}`);
       }
 
       async function publishPing(){
@@ -3074,10 +3363,43 @@
           runCreatorInfo(`SWAT Team Only: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
           showToast(err.message || 'Ошибка публикации', false);
         }));
+        runPushSwatScheduleBtn?.addEventListener('click', () => {
+          toggleSwatScheduleMenu();
+        });
+        runPushSwatScheduleDefaultBtn?.addEventListener('click', () => {
+          closeSwatScheduleMenu();
+          withButtonBusy(runPushSwatScheduleBtn, '...', () => scheduleSwatTeamOnlyPost(buildDefaultSwatScheduleMs(Date.now()))).catch((err) => {
+            runCreatorInfo(`SWAT Team Only: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
+            showToast(err.message || 'Ошибка планирования', false);
+          });
+        });
+        runPushSwatScheduleCustomBtn?.addEventListener('click', () => {
+          closeSwatScheduleMenu();
+          openSwatScheduleModal(buildDefaultSwatScheduleMs(Date.now()));
+        });
         runPushReleaseFeedBtn?.addEventListener('click', () => withButtonBusy(runPushReleaseFeedBtn, 'Публикую...', publishReleaseFeedPosts).catch((err) => {
           runCreatorInfo(`Лента релизов: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
           showToast(err.message || 'Ошибка публикации', false);
         }));
+        swatScheduleModalClose?.addEventListener('click', closeSwatScheduleModal);
+        swatScheduleModal?.addEventListener('click', (event) => {
+          if(event.target === swatScheduleModal){
+            closeSwatScheduleModal();
+          }
+        });
+        swatScheduleSubmitBtn?.addEventListener('click', () => {
+          const targetMs = parseMskDateTimeToMs(
+            swatScheduleDateInput ? swatScheduleDateInput.value : '',
+            swatScheduleTimeInput ? swatScheduleTimeInput.value : ''
+          );
+          withButtonBusy(swatScheduleSubmitBtn, 'Планирую...', async () => {
+            showSwatScheduleModalError('');
+            await scheduleSwatTeamOnlyPost(targetMs);
+            closeSwatScheduleModal();
+          }).catch((err) => {
+            showSwatScheduleModalError(err.message || 'Ошибка планирования');
+          });
+        });
         stopBtn?.addEventListener('click', () => {
           if(appState.abortController){
             appState.abortController.abort();
@@ -3108,6 +3430,19 @@
           try{
             localStorage.setItem(LS_RUN_BUILD_KEY, String(runBuildInput.value || '').trim());
           }catch(_){ }
+        });
+        document.addEventListener('click', (event) => {
+          const target = event.target;
+          if(!runPushSwatSplit || !target || runPushSwatScheduleMenu?.hidden) return;
+          if(!runPushSwatSplit.contains(target)){
+            closeSwatScheduleMenu();
+          }
+        });
+        document.addEventListener('keydown', (event) => {
+          if(event.key === 'Escape'){
+            closeSwatScheduleMenu();
+            closeSwatScheduleModal();
+          }
         });
         swatLeadViktor?.addEventListener('change', () => {
           handleSwatShiftLeadChange('viktor');
