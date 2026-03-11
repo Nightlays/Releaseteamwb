@@ -605,6 +605,13 @@
         return s.replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
       }
 
+      function calcUwUPerHour(uwuSum, workedHours){
+        const uwu = toNum(uwuSum);
+        const hours = toNum(workedHours);
+        if(!Number.isFinite(hours) || hours <= 0) return null;
+        return uwu / hours;
+      }
+
       function fmtShiftHours(h){
         const n = toNum(h);
         if(!Number.isFinite(n) || n <= 0) return '';
@@ -736,6 +743,7 @@
             case 'name': return normalizeStr(r.full_name || r.login);
             case 'target': return normalizeStr(r.targetStream || '');
             case 'uwu': return toNum(r.uwuSum || 0);
+            case 'uwuph': return (r.uwuPerHour == null ? null : toNum(r.uwuPerHour));
             case 'iosh': return toInt(r.iosMinutes ?? 0);
             case 'andh': return toInt(r.androidMinutes ?? 0);
             case 'iosc': return toInt(r.iosCases);
@@ -749,7 +757,14 @@
           const av = getVal(a);
           const bv = getVal(b);
 
-          if(typeof av === 'number' && typeof bv === 'number'){
+          if((typeof av === 'number' || av == null) && (typeof bv === 'number' || bv == null)){
+            const aMissing = !(typeof av === 'number' && Number.isFinite(av));
+            const bMissing = !(typeof bv === 'number' && Number.isFinite(bv));
+            if(aMissing && bMissing){
+              return (normalizeStr(a.full_name||a.login)).localeCompare(normalizeStr(b.full_name||b.login),'ru');
+            }
+            if(aMissing) return 1;
+            if(bMissing) return -1;
             if(bv === av) return (normalizeStr(a.full_name||a.login)).localeCompare(normalizeStr(b.full_name||b.login),'ru');
             return (av < bv ? -1 : 1) * dir;
           }
@@ -934,7 +949,8 @@
           { key:'iosc',   w: 120, min:90,  title:'Кейсы iOS', sortableKey:'iosc', align:'right' },
           { key:'andc',   w: 140, min:100, title:'Кейсы Android', sortableKey:'andc', align:'right' },
           { key:'avg',    w: 160, min:120, title:'Среднее кейс', sortableKey:'avg', align:'right' },
-          { key:'uwu',    w: 120, min:90,  title:'uWu', sortableKey:'uwu', align:'right' }
+          { key:'uwu',    w: 120, min:90,  title:'uWu', sortableKey:'uwu', align:'right' },
+          { key:'uwuph',  w: 120, min:100, title:'uWu/Ч', sortableKey:'uwuph', align:'right' }
         ];
         const dayW = 110;
 
@@ -1025,6 +1041,9 @@
           const pathHtml = `<span class="cell-ellipsis">${escapeHtml(pathText)}</span>`;
 
           const avgPerCase = r.avgMsPerCase > 0 ? fmtMMSSFromMs(r.avgMsPerCase) : '—';
+          const uwuPerHourTitle = r.uwuPerHour == null
+            ? 'Нет часов из worked_days'
+            : `${r.uwuPerHourText} (uWu ${r.uwuText || '0'} / ${fmtShiftHours(r.workedHoursTotal || 0)}ч)`;
 
           const dayCells = r.days.map(dc => {
             const ring = dc.worked ? 'ring-emerald-200' : 'ring-rose-200';
@@ -1052,6 +1071,7 @@
             <td class="text-right whitespace-nowrap mono" title="${escapeHtml(String(r.androidCases || 0))}"><span class="cell-ellipsis">${escapeHtml(String(r.androidCases || 0))}</span></td>
             <td class="text-right whitespace-nowrap mono" title="${escapeHtml(avgPerCase)}"><span class="cell-ellipsis">${escapeHtml(avgPerCase)}</span></td>
             <td class="text-right whitespace-nowrap mono" title="${escapeHtml(String(r.uwuText || '0'))}"><span class="cell-ellipsis">${escapeHtml(String(r.uwuText || '0'))}</span></td>
+            <td class="text-right whitespace-nowrap mono" title="${escapeHtml(uwuPerHourTitle)}"><span class="cell-ellipsis">${escapeHtml(String(r.uwuPerHourText || '—'))}</span></td>
             ${dayCells}
           `;
 
@@ -1543,6 +1563,7 @@
         const headers = [
           'SWAT',
           'uWu',
+          'uWu/Ч',
           'Целевой стрим',
           'Проходил',
           'iOS (ч/м)',
@@ -1570,6 +1591,7 @@
           aoa.push([
             String(name),
             String(r.uwuText || '0'),
+            String(r.uwuPerHourText || '—'),
             String(target),
             String(path),
             String(r.iosHoursDec ?? ''),
@@ -1690,6 +1712,7 @@
         const days = Object.keys(workedDays).sort();
         const presenceByDay = {};
         const shiftHoursByDay = {};
+        const totalWorkedHoursByLogin = {};
         const swatCountByDay = {};
 
         for(const d of days){
@@ -1700,7 +1723,9 @@
             const l = String(login||'').trim().toLowerCase();
             if(!l) continue;
             set.add(l);
-            sh[l] = toNum(val);
+            const hours = toNum(val);
+            sh[l] = hours;
+            totalWorkedHoursByLogin[l] = toNum(totalWorkedHoursByLogin[l]) + hours;
           }
           presenceByDay[d] = set;
           shiftHoursByDay[d] = sh;
@@ -2015,6 +2040,8 @@
           const totalCases = toInt(u.iosCases) + toInt(u.androidCases);
           const totalDurMs = toInt(u.iosDurMs) + toInt(u.androidDurMs);
           const avgMsPerCase = totalCases > 0 ? (totalDurMs / totalCases) : 0;
+          const workedHoursTotal = toNum(totalWorkedHoursByLogin[login] || 0);
+          const uwuPerHour = calcUwUPerHour(u.uwuSum || 0, workedHoursTotal);
 
           const dayCells = days.map(d => {
             const workedFromShift = !!presenceByDay?.[d]?.has(login);
@@ -2054,6 +2081,9 @@
             allStreamsHover,
             uwuSum: toNum(u.uwuSum || 0),
             uwuText: fmtUwU(u.uwuSum || 0),
+            workedHoursTotal,
+            uwuPerHour,
+            uwuPerHourText: uwuPerHour == null ? '—' : fmtUwU(uwuPerHour),
             iosMinutes,
             androidMinutes,
             iosHoursDec,
