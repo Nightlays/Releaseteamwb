@@ -1,0 +1,107 @@
+{
+  "modelType": "catboost-onnx",
+  "trainedAt": "2026-03-11T19:22:50Z",
+  "featureKeys": [
+    "tc_total",
+    "tc_total_delta",
+    "tc_total_delta_pct",
+    "tc_volatility",
+    "tc_slope_pct",
+    "cov_swat_delta_pct",
+    "cov_stream_delta_pct",
+    "sel_swat_delta_pct",
+    "sel_stream_delta_pct",
+    "avg_total_delta",
+    "chp_total_delta_pct",
+    "chp_ios_delta_pct",
+    "chp_android_delta_pct",
+    "release_anoms",
+    "type_anoms",
+    "platform_anoms",
+    "anom_score"
+  ],
+  "dataset": {
+    "totalRecords": 16,
+    "labeledOk": 14,
+    "labeledFail": 2,
+    "source": "https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec?op=get&name=wb_graphs_v0_2_9_ml_dataset.json"
+  },
+  "threshold": 0.5,
+  "trainMetrics": {
+    "accuracy": 1.0,
+    "balanced_accuracy": 1.0,
+    "precision_fail": 1.0,
+    "recall_fail": 1.0,
+    "confusion": {
+      "tp": 2,
+      "tn": 14,
+      "fp": 0,
+      "fn": 0
+    }
+  },
+  "topFeatures": [
+    {
+      "key": "anom_score",
+      "importance": 27.3842
+    },
+    {
+      "key": "type_anoms",
+      "importance": 26.8103
+    },
+    {
+      "key": "release_anoms",
+      "importance": 10.8018
+    },
+    {
+      "key": "tc_volatility",
+      "importance": 9.7517
+    },
+    {
+      "key": "tc_slope_pct",
+      "importance": 8.3528
+    },
+    {
+      "key": "chp_android_delta_pct",
+      "importance": 6.4981
+    },
+    {
+      "key": "chp_total_delta_pct",
+      "importance": 6.0822
+    },
+    {
+      "key": "tc_total_delta",
+      "importance": 0.845
+    }
+  ],
+  "onnx": {
+    "inputs": [
+      {
+        "name": "features",
+        "dims": [
+          0,
+          17
+        ],
+        "elemType": 1
+      }
+    ],
+    "outputs": [
+      {
+        "name": "label",
+        "dims": [
+          0
+        ]
+      },
+      {
+        "name": "probability_tensor",
+        "dims": [
+          0,
+          2
+        ]
+      }
+    ]
+  },
+  "warnings": [
+    "В истории мало негативных примеров. Используйте оценку CatBoost как ранний сигнал, а не как окончательный вердикт.",
+    "Обучающая история короткая. Качество модели может заметно измениться после накопления новых размеченных релизов."
+  ]
+}
