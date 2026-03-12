@@ -86,6 +86,14 @@
                 <label class="block text-xs font-semibold text-[#111827] mb-1">Куки GitLab</label>
                 <input class="input" id="gitlabCookie" type="password" autocomplete="off" placeholder="known_sign_in=...; _gitlab_session=..." />
               </div>
+              <div class="md:col-span-6">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Wiki Bearer token</label>
+                <input class="input" id="wikiToken" type="password" autocomplete="off" placeholder="Вставьте Bearer token wiki" />
+              </div>
+              <div class="md:col-span-6">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Band Cookies (чтение)</label>
+                <input class="input" id="bandCookiesRead" type="password" autocomplete="off" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
+              </div>
             </div>
 
           </div>
@@ -621,6 +629,136 @@
         </div>
       </section>
 
+      <!-- 6.1) Время простоя DEV iOS -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Время простоя DEV iOS</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="devDowntime" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="devDowntime" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="devDowntimeEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="devDowntimeContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="devDowntimeViewport">
+                <canvas id="devDowntimeChart" aria-label="Dev downtime chart" role="img"></canvas>
+              </div>
+
+              <div id="devDowntimeTableWrap" class="table-block" style="display:none;">
+                <div class="table-scroll-x">
+                  <table id="devDowntimeTable" class="dev-downtime-table dev-downtime-table--ios">
+                    <colgroup>
+                      <col class="dev-downtime-col dev-downtime-col--date">
+                      <col class="dev-downtime-col dev-downtime-col--weekday">
+                      <col class="dev-downtime-col dev-downtime-col--release">
+                      <col class="dev-downtime-col dev-downtime-col--total">
+                      <col class="dev-downtime-col dev-downtime-col--intervals">
+                      <col class="dev-downtime-col dev-downtime-col--domain">
+                      <col class="dev-downtime-col dev-downtime-col--owners">
+                      <col class="dev-downtime-col dev-downtime-col--comment">
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th class="text-left">Дата</th>
+                        <th>День</th>
+                        <th>Релиз</th>
+                        <th>Итого простой</th>
+                        <th class="text-left">Интервалы</th>
+                        <th class="text-left">Домен сбоя</th>
+                        <th class="text-left">Кто сломал</th>
+                        <th class="text-left">Комментарий</th>
+                      </tr>
+                    </thead>
+                    <tbody id="devDowntimeTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-start gap-3">
+            <div class="legend">
+              <span class="lg-item"><span class="dot dot-dev-downtime"></span><span class="lg-text">Суммарный простой DEV iOS за дату</span></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6.2) Время простоя DEV Android -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Время простоя DEV Android</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="androidDevDowntime" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="androidDevDowntime" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="androidDevDowntimeEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="androidDevDowntimeContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="androidDevDowntimeViewport">
+                <canvas id="androidDevDowntimeChart" aria-label="Android dev downtime chart" role="img"></canvas>
+              </div>
+
+              <div id="androidDevDowntimeTableWrap" class="table-block" style="display:none;">
+                <div class="table-scroll-x">
+                  <table id="androidDevDowntimeTable" class="dev-downtime-table dev-downtime-table--android">
+                    <colgroup>
+                      <col class="dev-downtime-col dev-downtime-col--date">
+                      <col class="dev-downtime-col dev-downtime-col--weekday">
+                      <col class="dev-downtime-col dev-downtime-col--release">
+                      <col class="dev-downtime-col dev-downtime-col--total">
+                      <col class="dev-downtime-col dev-downtime-col--intervals">
+                      <col class="dev-downtime-col dev-downtime-col--broken">
+                      <col class="dev-downtime-col dev-downtime-col--fixed">
+                      <col class="dev-downtime-col dev-downtime-col--comment">
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th class="text-left">Дата</th>
+                        <th>День</th>
+                        <th>Релиз</th>
+                        <th>Итого простой</th>
+                        <th class="text-left">Интервалы</th>
+                        <th class="text-left">Кто сломал</th>
+                        <th class="text-left">Кто починил</th>
+                        <th class="text-left">Комментарий</th>
+                      </tr>
+                    </thead>
+                    <tbody id="androidDevDowntimeTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-start gap-3">
+            <div class="legend">
+              <span class="lg-item"><span class="dot dot-dev-downtime-android"></span><span class="lg-text">Суммарный простой DEV Android за дату</span></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- 7) Время старта регресса -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -843,6 +981,11 @@
           const PROXY_BASE = readRuntimeProxyBase().replace(/\/+$/, '');
           const ML_HELPER_BASE = readMlHelperBase().replace(/\/+$/, '');
           const LS_COLLAPSE_KEY = 'wb_all_table_collapsed';
+          const WIKI_DEV_OUTAGES_URL = 'https://wiki.wb.ru/api/v1/space/308/article/6157';
+          const BAND_ANDROID_DEV_FAILURES_CHANNEL_ID = 'csbuypwc93yozfazeqkkncboch';
+          const BAND_DEFAULT_LOOKBACK_DAYS = 365;
+          const BAND_LOOKBACK_BUFFER_DAYS = 7;
+          const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
 
           const DEPLOY_BASE_URL_TMPL   = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
           const DEPLOY_DEPLOY_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/deploy';
@@ -873,6 +1016,8 @@
           const LS_YT_TOKEN_KEY = 'wb_all_table_yt_token';
           const LS_YT_ENABLED_KEY = 'wb_all_table_yt_enabled';
           const LS_GITLAB_COOKIE_KEY = 'wb_all_table_gitlab_cookie';
+          const LS_WIKI_TOKEN_KEY = 'wb_all_table_wiki_token';
+          const LS_BAND_READ_COOKIES_KEY = 'wb_all_table_band_read_cookies';
           const YT_BASE_URL = 'https://youtrack.wildberries.ru';
 
           const startBtn = document.getElementById('startBtn');
@@ -895,6 +1040,8 @@
           const inpYtToken = document.getElementById('ytToken');
           const inpYtRequestsEnabled = document.getElementById('ytRequestsEnabled');
           const inpGitlabCookie = document.getElementById('gitlabCookie');
+          const inpWikiToken = document.getElementById('wikiToken');
+          const inpBandCookiesRead = document.getElementById('bandCookiesRead');
           const mlSummaryBody = document.getElementById('mlSummaryBody');
           const mlSaveBtn = document.getElementById('mlSaveBtn');
           const mlLabelOkBtn = document.getElementById('mlLabelOk');
@@ -923,7 +1070,7 @@
         function disableChartTooltips(){
           const list = [
             tcChart, covChart, selChart, avgChart, chpChart, chpTypesChart, chpTypesIosChart, chpTypesAndChart,
-            cutChart, regressionChart, iosTypesChart, andTypesChart
+            cutChart, devDowntimeChart, androidDevDowntimeChart, regressionChart, iosTypesChart, andTypesChart
           ].filter(Boolean);
           const stash = [];
           for(const ch of list){
@@ -947,7 +1094,7 @@
         function resizeChartsForPdf(){
           const list = [
             tcChart, covChart, selChart, avgChart, chpChart, chpTypesChart, chpTypesIosChart, chpTypesAndChart,
-            cutChart, regressionChart, iosTypesChart, andTypesChart
+            cutChart, devDowntimeChart, androidDevDowntimeChart, regressionChart, iosTypesChart, andTypesChart
           ].filter(Boolean);
           for(const ch of list){
             try{
@@ -1019,15 +1166,27 @@
           });
         }
 
+        async function waitForPdfFonts(doc = document, timeoutMs = 4000){
+          const fontSet = doc?.fonts;
+          if(!fontSet?.ready) return;
+          try{
+            await Promise.race([
+              fontSet.ready,
+              new Promise(resolve => setTimeout(resolve, Math.max(250, Number(timeoutMs) || 4000)))
+            ]);
+          }catch(e){}
+        }
+
         const PDF_MAX_BYTES = 300 * 1024 * 1024;
+        const PDF_PAGE_CONTENT_RATIO = (297 - 20) / (210 - 20);
         const PDF_EXPORT_PRESETS = [
-          { summaryScale: 2.35, cardScale: 2.0, tableScale: 2.1, summaryImageType: 'PNG', cardImageType: 'JPEG', tableImageType: 'PNG', cardImageQuality: 0.94, imageCompression: 'MEDIUM', summaryWidth: 1360, cardWidth: 1480, tableWidth: 1480 },
+          { summaryScale: 2.5, cardScale: 2.2, tableScale: 2.3, summaryImageType: 'PNG', cardImageType: 'PNG', tableImageType: 'PNG', imageCompression: 'MEDIUM', summaryWidth: 1520, cardWidth: 1640, tableWidth: 1720 },
           { summaryScale: 2.0, cardScale: 1.72, tableScale: 1.82, summaryImageType: 'PNG', cardImageType: 'JPEG', tableImageType: 'PNG', cardImageQuality: 0.86, imageCompression: 'MEDIUM', summaryWidth: 1260, cardWidth: 1380, tableWidth: 1380 },
           { summaryScale: 1.55, cardScale: 1.35, tableScale: 1.45, summaryImageType: 'JPEG', cardImageType: 'JPEG', tableImageType: 'JPEG', summaryImageQuality: 0.86, cardImageQuality: 0.76, tableImageQuality: 0.84, imageCompression: 'FAST', summaryWidth: 1100, cardWidth: 1240, tableWidth: 1240 },
           { summaryScale: 1.3, cardScale: 1.15, tableScale: 1.2, summaryImageType: 'JPEG', cardImageType: 'JPEG', tableImageType: 'JPEG', summaryImageQuality: 0.74, cardImageQuality: 0.64, tableImageQuality: 0.72, imageCompression: 'FAST', summaryWidth: 1000, cardWidth: 1120, tableWidth: 1120 }
         ];
 
-        function getPdfCaptureWidth(node, fallback = 1200, min = 920, max = 1400){
+        function getPdfCaptureWidth(node, fallback = 1200, min = 960, max = 1800){
           const rect = node?.getBoundingClientRect?.() || {};
           const measured = Math.max(
             Number(node?.scrollWidth) || 0,
@@ -1036,6 +1195,19 @@
             fallback
           );
           return Math.min(max, Math.max(min, measured));
+        }
+
+        function copyComputedCustomProperties(source, target){
+          if(!source || !target || !window.getComputedStyle) return;
+          const styles = window.getComputedStyle(source);
+          for(let i = 0; i < styles.length; i += 1){
+            const name = styles[i];
+            if(!String(name || '').startsWith('--')) continue;
+            const value = styles.getPropertyValue(name);
+            if(value){
+              target.style.setProperty(name, value);
+            }
+          }
         }
 
         function syncCanvasBitmaps(sourceRoot, cloneRoot){
@@ -1192,6 +1364,7 @@
         async function renderNodeInPdfSandbox(source, scale, options = {}){
           if(!source || !window.html2canvas) return null;
           const syncSource = options.syncSource || source;
+          const captureWidth = Math.max(320, Number(options.width) || source.scrollWidth || source.offsetWidth || 1200);
           const host = document.createElement('div');
           host.setAttribute('aria-hidden', 'true');
           host.style.position = 'fixed';
@@ -1201,16 +1374,31 @@
           host.style.background = '#ffffff';
           host.style.margin = '0';
           host.style.padding = '0';
+          host.style.overflow = 'visible';
 
           const scope = document.createElement('div');
-          scope.className = ['wb-graphs', 'pdf-export', options.scopeClassName || ''].filter(Boolean).join(' ');
+          scope.className = Array.from(new Set([
+            'wb-graphs',
+            ...Array.from(document.body?.classList || []),
+            'pdf-export',
+            options.scopeClassName || ''
+          ].filter(Boolean))).join(' ');
           scope.style.background = '#ffffff';
           scope.style.margin = '0';
           scope.style.padding = '0';
           scope.style.boxSizing = 'border-box';
-          scope.style.width = `${Math.max(320, Number(options.width) || source.scrollWidth || source.offsetWidth || 1200)}px`;
+          scope.style.width = `${captureWidth}px`;
+          scope.style.minWidth = `${captureWidth}px`;
+          scope.style.maxWidth = `${captureWidth}px`;
+          scope.style.overflow = 'visible';
+          copyComputedCustomProperties(document.documentElement, scope);
+          copyComputedCustomProperties(document.body, scope);
 
           const clone = source.cloneNode(true);
+          clone.style.boxSizing = 'border-box';
+          clone.style.width = '100%';
+          clone.style.maxWidth = 'none';
+          clone.style.overflow = 'visible';
           if(typeof options.prepareClone === 'function'){
             options.prepareClone(clone, scope);
           }
@@ -1220,6 +1408,7 @@
           document.body.appendChild(host);
 
           syncCanvasBitmaps(syncSource, clone);
+          await waitForPdfFonts(document);
           await waitForLayoutFrames(2);
           try{
             return await renderCardCanvas(clone, scale, {
@@ -1304,11 +1493,7 @@
           };
         }
 
-        function buildPdfGridSection(sourceNodes = [], options = {}){
-          const section = document.createElement('section');
-          section.className = ['pdf-grid-section', ...(Array.isArray(options.sectionClassNames) ? options.sectionClassNames : [])]
-            .filter(Boolean)
-            .join(' ');
+        function buildPdfGridLayout(sourceNodes = [], options = {}){
           const grid = document.createElement('div');
           const columns = Math.max(1, Number(options.columns) || 1);
           grid.className = [
@@ -1321,6 +1506,15 @@
             clone.classList.add('pdf-grid-item');
             grid.appendChild(clone);
           });
+          return grid;
+        }
+
+        function buildPdfGridSection(sourceNodes = [], options = {}){
+          const section = document.createElement('section');
+          section.className = ['pdf-grid-section', ...(Array.isArray(options.sectionClassNames) ? options.sectionClassNames : [])]
+            .filter(Boolean)
+            .join(' ');
+          const grid = buildPdfGridLayout(sourceNodes, options);
           section.appendChild(grid);
           return section;
         }
@@ -1328,7 +1522,10 @@
         function buildPdfGridRowSections(sourceNodes = [], options = {}){
           const rows = chunkArray(sourceNodes, Math.max(1, Number(options.columns) || 1));
           return rows.map(nodes => ({
-            node: buildPdfGridSection(nodes, options),
+            node: buildPdfGridSection(nodes, {
+              ...options,
+              columns: Math.min(Math.max(1, Number(options.columns) || 1), Math.max(1, nodes.length))
+            }),
             kind: options.kind || 'summary'
           }));
         }
@@ -1338,7 +1535,7 @@
           const releaseStrip = overviewPage.querySelector('.ml-release-strip');
           if(!releaseStrip) return null;
           const section = document.createElement('section');
-          section.className = 'pdf-compare-sheet';
+          section.className = 'pdf-sheet pdf-compare-sheet';
           const title = document.createElement('div');
           title.className = 'pdf-title';
           title.textContent = 'Сравниваемые версии';
@@ -1348,6 +1545,17 @@
           section.appendChild(title);
           section.appendChild(meta);
           section.appendChild(releaseStrip.cloneNode(true));
+          return section;
+        }
+
+        function buildPdfShellSection(classNames = [], headNode = null, rowNodes = [], options = {}){
+          const section = buildPdfWrapper('section', classNames, headNode ? [headNode] : []);
+          if(Array.isArray(rowNodes) && rowNodes.length){
+            section.appendChild(buildPdfGridLayout(rowNodes, {
+              columns: Math.min(Math.max(1, Number(options.columns) || 1), rowNodes.length),
+              gridClassNames: Array.isArray(options.gridClassNames) ? options.gridClassNames : []
+            }));
+          }
           return section;
         }
 
@@ -1409,7 +1617,28 @@
           const classes = Array.from(shell.classList);
           const head = shell.querySelector(headSelector);
           if(head){
+            const grid = shell.querySelector(gridSelector);
+            const items = Array.from(grid?.children || []);
+            const itemRows = chunkArray(items, Math.max(1, Number(columns) || 1));
+            if(itemRows.length){
+              sections.push({
+                node: buildPdfShellSection(classes, head, itemRows[0], {
+                  columns,
+                  gridClassNames: Array.from(grid?.classList || [])
+                }),
+                kind: 'summary'
+              });
+              itemRows.slice(1).forEach(nodes => sections.push({
+                node: buildPdfGridSection(nodes, {
+                  columns: Math.min(Math.max(1, Number(columns) || 1), Math.max(1, nodes.length)),
+                  gridClassNames: Array.from(grid?.classList || [])
+                }),
+                kind: 'summary'
+              }));
+              return sections;
+            }
             sections.push({ node: buildPdfWrapper('section', classes, [head]), kind: 'summary' });
+            return sections;
           }
           const grid = shell.querySelector(gridSelector);
           const items = Array.from(grid?.children || []);
@@ -1449,9 +1678,6 @@
           if(!shell) return [];
           const sections = [];
           const head = shell.querySelector('.stream-insights-head');
-          if(head){
-            sections.push({ node: buildPdfWrapper('section', Array.from(shell.classList), [head]), kind: 'summary' });
-          }
           const cardSections = Array.from(shell.querySelectorAll('.ml-type-dynamics-grid > .ml-type-dynamics-card'))
             .map(card => collectPlatformDynamicsCardPdfSections(card));
           const maxRows = cardSections.reduce((max, parts) => Math.max(max, parts.length), 0);
@@ -1460,6 +1686,16 @@
               .map(parts => parts[rowIndex]?.node)
               .filter(Boolean);
             if(!rowNodes.length) continue;
+            if(rowIndex === 0 && head){
+              sections.push({
+                node: buildPdfShellSection(Array.from(shell.classList), head, rowNodes, {
+                  columns: Math.min(2, rowNodes.length),
+                  gridClassNames: ['ml-type-dynamics-grid']
+                }),
+                kind: 'summary'
+              });
+              continue;
+            }
             sections.push({
               node: buildPdfGridSection(rowNodes, {
                 columns: Math.min(2, rowNodes.length),
@@ -1467,6 +1703,9 @@
               }),
               kind: 'summary'
             });
+          }
+          if(head && !maxRows){
+            sections.push({ node: buildPdfWrapper('section', Array.from(shell.classList), [head]), kind: 'summary' });
           }
           if(!sections.length){
             sections.push({ node: shell, kind: 'summary' });
@@ -1479,14 +1718,17 @@
           const sections = [];
           const pushSection = (node, classNames = [], extra = {}) => {
             if(!node) return;
+            (Array.isArray(classNames) ? classNames : []).filter(Boolean).forEach(className => {
+              node.classList.add(className);
+            });
             sections.push({ node, classNames, ...extra });
           };
 
           const overviewPage = summaryCard.querySelector('[data-ml-page="overview"]');
           if(overviewPage){
             pushSection(buildMlPdfCompareSection(overviewPage), ['pdf-sheet'], { kind: 'summary' });
-            pushSection(overviewPage.querySelector('.ml-overview-domain-grid'), ['pdf-sheet'], { kind: 'summary' });
-            pushSection(overviewPage.querySelector('.ml-brief-grid'), ['pdf-sheet'], { kind: 'summary' });
+            pushSection(buildPdfWrapper('section', ['pdf-grid-section'], [overviewPage.querySelector('.ml-overview-domain-grid')]), ['pdf-sheet'], { kind: 'summary' });
+            pushSection(buildPdfWrapper('section', ['pdf-grid-section'], [overviewPage.querySelector('.ml-brief-grid')]), ['pdf-sheet'], { kind: 'summary' });
           }
 
           const regressStack = summaryCard.querySelector('[data-ml-page="regress"] .ml-summary-page-stack');
@@ -1507,6 +1749,11 @@
           Array.from(releaseStack?.children || []).forEach(node => {
             if(node.classList.contains('ml-domain-card')){
               collectDomainCardPdfSections(node).forEach(section => pushSection(section.node, ['pdf-sheet'], section));
+              return;
+            }
+            if(node.classList.contains('stream-insights-shell')){
+              const columns = node.querySelector('.stream-insights-grid--lists') ? 2 : 3;
+              collectShellPdfSections(node, '.stream-insights-head', '.stream-insights-grid', columns).forEach(section => pushSection(section.node, ['pdf-sheet'], section));
               return;
             }
             if(node.classList.contains('chp-quarter-shell')){
@@ -1552,6 +1799,12 @@
           return rows > 12 || block.scrollHeight > 420;
         }
 
+        function getLargePdfTableIndexes(card){
+          return Array.from(card?.querySelectorAll?.('.table-block') || [])
+            .map((block, index) => (isVisiblePdfTableBlock(block) && isLargePdfTableBlock(block) ? index : -1))
+            .filter(index => index >= 0);
+        }
+
         function buildCardPdfFragment(card, mutateClone){
           const clone = card.cloneNode(true);
           clone.querySelectorAll('.ml-summary-toolbar, .ml-tooltip').forEach(el => el.remove());
@@ -1573,12 +1826,154 @@
           return clone;
         }
 
-        function collectExportCardSections(card){
+        function cleanupTableBlockForPdf(block){
+          if(!block) return;
+          block.querySelectorAll('.table-filter-row, .release-filter-dropdown, .release-filter-label, select.release-select-hidden').forEach(el => el.remove());
+          const scrollWrap = block.querySelector('.table-scroll-x');
+          if(scrollWrap){
+            scrollWrap.style.overflow = 'visible';
+            scrollWrap.style.overflowX = 'visible';
+            scrollWrap.style.overflowY = 'visible';
+          }
+        }
+
+        function buildTableChunkCardFragment(card, tableIndex, rowIndexes = null, continuation = null){
+          const allowedRows = Array.isArray(rowIndexes) ? new Set(rowIndexes.map(index => Number(index))) : null;
+          return buildCardPdfFragment(card, clone => {
+            Array.from(clone.querySelectorAll('.table-block')).forEach((block, blockIndex) => {
+              if(blockIndex !== tableIndex){
+                block.remove();
+                return;
+              }
+              cleanupTableBlockForPdf(block);
+              const tbody = block.querySelector('tbody');
+              if(tbody && allowedRows){
+                Array.from(tbody.querySelectorAll('tr')).forEach((row, rowIndex) => {
+                  if(!allowedRows.has(rowIndex)) row.remove();
+                });
+              }
+            });
+            clone.querySelectorAll('.chart-viewport, canvas, .legend, .chart-notes').forEach(el => el.remove());
+            if(continuation?.total > 1){
+              const title = clone.querySelector('h2');
+              if(title){
+                const baseTitle = String(title.textContent || '').replace(/\s+—\s+таблица\s+\d+\/\d+$/u, '').trim();
+                title.textContent = `${baseTitle} — таблица ${continuation.index + 1}/${continuation.total}`;
+              }
+            }
+          });
+        }
+
+        async function buildLargeTablePdfSections(card, tableIndex, options = {}){
+          const captureWidth = getPdfCaptureWidth(card, options.targetWidth || 1480);
+          const maxCanvasHeight = Math.floor(captureWidth * PDF_PAGE_CONTENT_RATIO) - 24;
+          const firstChunkMaxCanvasHeight = Math.max(
+            0,
+            Math.min(
+              maxCanvasHeight,
+              Math.floor(Number(options.firstChunkMaxCanvasHeight) || maxCanvasHeight)
+            )
+          ) || maxCanvasHeight;
+          const measurementSource = buildTableChunkCardFragment(card, tableIndex);
+          const host = document.createElement('div');
+          host.setAttribute('aria-hidden', 'true');
+          host.style.position = 'fixed';
+          host.style.left = '-20000px';
+          host.style.top = '0';
+          host.style.pointerEvents = 'none';
+          host.style.background = '#ffffff';
+          host.style.margin = '0';
+          host.style.padding = '0';
+          host.style.overflow = 'visible';
+
+          const scope = document.createElement('div');
+          scope.className = Array.from(new Set([
+            'wb-graphs',
+            ...Array.from(document.body?.classList || []),
+            'pdf-export'
+          ])).join(' ');
+          scope.style.background = '#ffffff';
+          scope.style.margin = '0';
+          scope.style.padding = '0';
+          scope.style.boxSizing = 'border-box';
+          scope.style.width = `${captureWidth}px`;
+          scope.style.minWidth = `${captureWidth}px`;
+          scope.style.maxWidth = `${captureWidth}px`;
+          scope.style.overflow = 'visible';
+          copyComputedCustomProperties(document.documentElement, scope);
+          copyComputedCustomProperties(document.body, scope);
+
+          measurementSource.style.boxSizing = 'border-box';
+          measurementSource.style.width = '100%';
+          measurementSource.style.maxWidth = 'none';
+          measurementSource.style.overflow = 'visible';
+
+          scope.appendChild(measurementSource);
+          host.appendChild(scope);
+          document.body.appendChild(host);
+
+          try{
+            await waitForPdfFonts(document);
+            await waitForLayoutFrames(2);
+            const tableBlock = measurementSource.querySelector('.table-block');
+            const table = tableBlock?.querySelector('table');
+            const tbody = table?.querySelector('tbody');
+            const allRows = Array.from(tbody?.querySelectorAll('tr') || []);
+            const visibleRows = allRows
+              .map((row, index) => ({ row, index }))
+              .filter(({ row }) => window.getComputedStyle(row).display !== 'none');
+            if(!table || !tbody || !visibleRows.length){
+              return [{ node: buildTableChunkCardFragment(card, tableIndex), syncSource: card, kind: 'table' }];
+            }
+
+            const cloneRect = measurementSource.getBoundingClientRect();
+            const blockRect = tableBlock.getBoundingClientRect();
+            const tableRect = table.getBoundingClientRect();
+            const theadHeight = Math.ceil(table.querySelector('thead')?.getBoundingClientRect().height || 0);
+            const blockExtraHeight = Math.max(0, Math.ceil(blockRect.height - tableRect.height));
+            const cardExtraHeight = Math.max(0, Math.ceil(cloneRect.height - blockRect.height));
+            const fullAvailableRowsHeight = Math.max(120, maxCanvasHeight - cardExtraHeight - blockExtraHeight - theadHeight - 20);
+            const firstAvailableRowsHeight = Math.max(
+              120,
+              Math.min(
+                fullAvailableRowsHeight,
+                firstChunkMaxCanvasHeight - cardExtraHeight - blockExtraHeight - theadHeight - 20
+              )
+            );
+
+            const chunks = [];
+            let currentRows = [];
+            let currentHeight = 0;
+            for(const entry of visibleRows){
+              const rowHeight = Math.max(24, Math.ceil(entry.row.getBoundingClientRect().height || entry.row.scrollHeight || 0));
+              const currentChunkLimit = chunks.length === 0 ? firstAvailableRowsHeight : fullAvailableRowsHeight;
+              if(currentRows.length && (currentHeight + rowHeight) > currentChunkLimit){
+                chunks.push(currentRows);
+                currentRows = [entry.index];
+                currentHeight = rowHeight;
+                continue;
+              }
+              currentRows.push(entry.index);
+              currentHeight += rowHeight;
+            }
+            if(currentRows.length) chunks.push(currentRows);
+            if(!chunks.length){
+              chunks.push(visibleRows.map(entry => entry.index));
+            }
+
+            return chunks.map((rowChunk, index) => ({
+              node: buildTableChunkCardFragment(card, tableIndex, rowChunk, { index, total: chunks.length }),
+              syncSource: card,
+              kind: 'table'
+            }));
+          }finally{
+            host.remove();
+          }
+        }
+
+        async function collectExportCardSections(card, options = {}){
           if(!card) return [];
-          const visibleTables = Array.from(card.querySelectorAll('.table-block')).filter(isVisiblePdfTableBlock);
-          const largeTableIndexes = visibleTables
-            .map((block, index) => (isLargePdfTableBlock(block) ? index : -1))
-            .filter(index => index >= 0);
+          const largeTableIndexes = getLargePdfTableIndexes(card);
           if(!largeTableIndexes.length){
             return [{ node: card, syncSource: card, kind: 'card' }];
           }
@@ -1588,15 +1983,10 @@
             largeTableIndexes.forEach(index => cloneTables[index]?.remove());
           });
           sections.push({ node: chartFragment, syncSource: card, kind: 'card' });
-          largeTableIndexes.forEach(index => {
-            const tableFragment = buildCardPdfFragment(card, clone => {
-              Array.from(clone.querySelectorAll('.table-block')).forEach((block, blockIndex) => {
-                if(blockIndex !== index) block.remove();
-              });
-              clone.querySelectorAll('.chart-viewport, canvas, .legend, .chart-notes').forEach(el => el.remove());
-            });
-            sections.push({ node: tableFragment, syncSource: card, kind: 'table' });
-          });
+          for(const index of largeTableIndexes){
+            const tableSections = await buildLargeTablePdfSections(card, index, options);
+            sections.push(...tableSections);
+          }
           return sections;
         }
 
@@ -1615,9 +2005,13 @@
             let usedPreset = PDF_EXPORT_PRESETS[PDF_EXPORT_PRESETS.length - 1];
             document.body.classList.add('pdf-export');
             try{
+              await waitForPdfFonts(document);
               await waitForLayoutFrames(2);
               resizeChartsForPdf();
+              await waitForPdfFonts(document);
               await waitForLayoutFrames(2);
+              const summaryCard = document.getElementById('mlSummaryCard');
+              const summarySections = collectMlSummaryPdfSections(summaryCard);
               const cards = Array.from(document.querySelectorAll('section.card'))
                 .filter(card => card.id !== 'mlSummaryCard')
                 .filter(card => (card.querySelector('canvas') || card.hasAttribute('data-export-card')) && window.getComputedStyle(card).display !== 'none');
@@ -1627,6 +2021,7 @@
                 const pageW = pdf.internal.pageSize.getWidth();
                 const pageH = pdf.internal.pageSize.getHeight();
                 const margin = 10;
+                const contentW = pageW - margin * 2;
                 const contentH = pageH - margin * 2;
                 let y = margin;
                 let hasBlocks = false;
@@ -1635,6 +2030,7 @@
                   if(!canvas) return;
                   const imgW = pageW - margin * 2;
                   const imgH = imgW * (canvas.height / canvas.width);
+                  const blockGap = block.kind === 'summary' ? 6 : (block.kind === 'table' ? 5 : 8);
                   const imageType = block.kind === 'summary'
                     ? (preset.summaryImageType || preset.imageType || 'JPEG')
                     : (block.kind === 'table'
@@ -1654,7 +2050,7 @@
                       y = margin;
                     }
                     pdf.addImage(image.dataUrl, image.imageType, margin, y, imgW, imgH, undefined, compression);
-                    y += imgH + 10;
+                    y += imgH + blockGap;
                   } else {
                     if (y !== margin) {
                       pdf.addPage();
@@ -1686,28 +2082,72 @@
                   }
                 };
 
-                if(hasBlocks && cards.length){
-                  pdf.addPage();
-                  y = margin;
-                }
-
-                const cardSections = cards.flatMap(card => collectExportCardSections(card));
-                for (const block of cardSections) {
-                  const targetWidth = block.kind === 'table'
+                const renderExportBlockCanvas = async (block, kind = block.kind || 'card') => {
+                  const targetWidth = kind === 'table'
                     ? (preset.tableWidth || preset.cardWidth)
                     : preset.cardWidth;
-                  const targetScale = block.kind === 'table'
+                  const targetScale = kind === 'table'
                     ? (preset.tableScale || preset.cardScale)
                     : preset.cardScale;
-                  const canvas = await renderNodeInPdfSandbox(block.node, targetScale, {
+                  return renderNodeInPdfSandbox(block.node, targetScale, {
                     width: getPdfCaptureWidth(block.node, targetWidth),
                     syncSource: block.syncSource || block.node,
                     prepareClone(clone){
                       clone.querySelectorAll('.ml-summary-toolbar, .ml-tooltip').forEach(el => el.remove());
                     }
                   });
-                  addCanvasToPdf(canvas, { kind: block.kind || 'card' });
+                };
+
+                for (const block of summarySections) {
+                  const canvas = await renderNodeInPdfSandbox(block.node, preset.summaryScale || preset.cardScale, {
+                    width: getPdfCaptureWidth(block.node, preset.summaryWidth || preset.cardWidth || 1200),
+                    syncSource: block.syncSource || block.node,
+                    prepareClone(clone){
+                      clone.querySelectorAll('.ml-summary-toolbar, .ml-tooltip').forEach(el => el.remove());
+                    }
+                  });
+                  addCanvasToPdf(canvas, { kind: 'summary' });
                   hasBlocks = true;
+                }
+
+                if(hasBlocks && cards.length){
+                  pdf.addPage();
+                  y = margin;
+                }
+
+                for (const card of cards) {
+                  const largeTableIndexes = getLargePdfTableIndexes(card);
+                  if(!largeTableIndexes.length){
+                    const canvas = await renderExportBlockCanvas({ node: card, syncSource: card, kind: 'card' }, 'card');
+                    addCanvasToPdf(canvas, { kind: 'card' });
+                    hasBlocks = true;
+                    continue;
+                  }
+
+                  const chartFragment = buildCardPdfFragment(card, clone => {
+                    const cloneTables = Array.from(clone.querySelectorAll('.table-block'));
+                    largeTableIndexes.forEach(index => cloneTables[index]?.remove());
+                  });
+                  const chartCanvas = await renderExportBlockCanvas({ node: chartFragment, syncSource: card, kind: 'card' }, 'card');
+                  addCanvasToPdf(chartCanvas, { kind: 'card' });
+                  hasBlocks = true;
+
+                  for (const tableIndex of largeTableIndexes){
+                    const remainingContentMm = Math.max(0, pageH - margin - y);
+                    const captureWidth = getPdfCaptureWidth(card, preset.tableWidth || preset.cardWidth);
+                    const firstChunkMaxCanvasHeight = remainingContentMm >= 48
+                      ? Math.max(0, Math.floor((remainingContentMm - 2) * (captureWidth / contentW)))
+                      : null;
+                    const tableSections = await buildLargeTablePdfSections(card, tableIndex, {
+                      targetWidth: preset.tableWidth || preset.cardWidth,
+                      firstChunkMaxCanvasHeight
+                    });
+                    for (const block of tableSections) {
+                      const canvas = await renderExportBlockCanvas(block, 'table');
+                      addCanvasToPdf(canvas, { kind: 'table' });
+                      hasBlocks = true;
+                    }
+                  }
                 }
 
                 return pdf.output('blob');
@@ -2513,6 +2953,12 @@
           const ds = cutChart.data.datasets.find(d => String(d.label || '').toLowerCase().includes(key));
           return Array.isArray(ds?.data) ? ds.data.slice() : [];
         }
+        function getRegressionSeriesByLabel(part){
+          if(!regressionChart?.data?.datasets) return [];
+          const key = String(part || '').toLowerCase();
+          const ds = regressionChart.data.datasets.find(d => String(d.label || '').toLowerCase().includes(key));
+          return Array.isArray(ds?.data) ? ds.data.slice() : [];
+        }
         function buildLagSeries(storeSeries, cutSeries){
           const len = Math.max(storeSeries.length, cutSeries.length);
           const out = [];
@@ -2543,6 +2989,8 @@
           const storeAndSeries = getCutSeriesByLabel('android store');
           const cutIosSeries = getCutSeriesByLabel('ios cutoff');
           const cutAndSeries = getCutSeriesByLabel('android cutoff');
+          const regressionIosSeries = getRegressionSeriesByLabel('ios');
+          const regressionAndSeries = getRegressionSeriesByLabel('android');
           const lagIosSeries = buildLagSeries(storeIosSeries, cutIosSeries);
           const lagAndSeries = buildLagSeries(storeAndSeries, cutAndSeries);
 
@@ -2560,6 +3008,8 @@
           pushIf('Cherepiki Total', chpSeries, { pct: 40, z: 2, minAbs: 3 });
           pushIf('iOS Cutoff', cutIosSeries, { pct: 3, z: 2, minAbs: 15 });
           pushIf('Android Cutoff', cutAndSeries, { pct: 3, z: 2, minAbs: 15 });
+          pushIf('Regression Start iOS', regressionIosSeries, { pct: 3, z: 2, minAbs: 15 });
+          pushIf('Regression Start Android', regressionAndSeries, { pct: 3, z: 2, minAbs: 15 });
           pushIf('Store iOS', storeIosSeries, { pct: 3, z: 2, minAbs: 20 });
           pushIf('Store Android', storeAndSeries, { pct: 3, z: 2, minAbs: 20 });
           pushIf('Lag Store iOS', lagIosSeries, { pct: 20, z: 2, minAbs: 15 });
@@ -2699,10 +3149,28 @@
           const raw = String(label || '').trim();
           const l = raw.toLowerCase();
           if(!l) return '';
+          const isPlatformTypeLabel = l.startsWith('android:') || l.startsWith('ios:');
+          if(isPlatformTypeLabel){
+            if(l.includes('влет')) return 'влетов';
+            if(l.includes('краш') || l.includes('чп')) return 'ЧП';
+            return 'задач';
+          }
           if(l.includes('уву') || l.includes('uwu')) return 'ед. УВУ';
           if(l.includes('ат')) return 'автотестов';
           if(l.includes('чп') || l.includes('cherepiki')) return 'ЧП';
-          if(l.includes('время') || l.includes('задержка') || l.includes('lag') || l.includes('store') || l.includes('cutoff')) return 'мин';
+          if(
+            l.includes('задач') ||
+            l.includes('аналитик') ||
+            l.includes('баг') ||
+            l.includes('user story') ||
+            l.includes('дефект') ||
+            l.includes('фич') ||
+            l.includes('документ') ||
+            l.includes('тестирован') ||
+            l.includes('product')
+          ) return 'задач';
+          if(l.includes('влет')) return 'влетов';
+          if(l.includes('время') || l.includes('задержка') || l.includes('lag') || l.includes('store') || l.includes('cutoff') || l.includes('regression start')) return 'мин';
           if(l.includes('тренд')) return 'п.п.';
           if(l.includes('разброс')) return 'тест-кейсов';
           if(l.includes('релиз')) return 'релизов';
@@ -2726,8 +3194,10 @@
             l.includes('объем регресса') ||
             l.includes('селектив') ||
             l.includes('среднее время') ||
+            l.includes('старта регресса') ||
             l.includes('чп') ||
             l.includes('cherepiki') ||
+            l.includes('regression start') ||
             l.includes('cutoff') ||
             l.includes('store') ||
             l.includes('задержка') ||
@@ -3032,6 +3502,8 @@
           const storeAndSeries = getCutSeriesByLabel('android store');
           const cutIosSeries = getCutSeriesByLabel('ios cutoff');
           const cutAndSeries = getCutSeriesByLabel('android cutoff');
+          const regressionStartIosSeries = getRegressionSeriesByLabel('ios');
+          const regressionStartAndSeries = getRegressionSeriesByLabel('android');
           const lagIosSeries = buildLagSeries(storeIosSeries, cutIosSeries);
           const lagAndSeries = buildLagSeries(storeAndSeries, cutAndSeries);
 
@@ -3059,6 +3531,8 @@
           const chpAndBase = baselineStats(chpAndSeries, compareMode);
           const cutIosBase = baselineStats(cutIosSeries, compareMode);
           const cutAndBase = baselineStats(cutAndSeries, compareMode);
+          const regressionStartIosBase = baselineStats(regressionStartIosSeries, compareMode);
+          const regressionStartAndBase = baselineStats(regressionStartAndSeries, compareMode);
           const storeIosBase = baselineStats(storeIosSeries, compareMode);
           const storeAndBase = baselineStats(storeAndSeries, compareMode);
           const lagIosBase = baselineStats(lagIosSeries, compareMode);
@@ -3077,6 +3551,8 @@
           const chpAndPrev = previousValueFromSeries(chpAndSeries);
           const cutIosPrev = previousValueFromSeries(cutIosSeries);
           const cutAndPrev = previousValueFromSeries(cutAndSeries);
+          const regressionStartIosPrev = previousValueFromSeries(regressionStartIosSeries);
+          const regressionStartAndPrev = previousValueFromSeries(regressionStartAndSeries);
           const storeIosPrev = previousValueFromSeries(storeIosSeries);
           const storeAndPrev = previousValueFromSeries(storeAndSeries);
           const lagIosPrev = previousValueFromSeries(lagIosSeries);
@@ -3121,6 +3597,8 @@
           const chpAndDiff = diffToBase(chpAndBase);
           const cutIosDiff = diffToBase(cutIosBase);
           const cutAndDiff = diffToBase(cutAndBase);
+          const regressionStartIosDiff = diffToBase(regressionStartIosBase);
+          const regressionStartAndDiff = diffToBase(regressionStartAndBase);
           const storeIosDiff = diffToBase(storeIosBase);
           const storeAndDiff = diffToBase(storeAndBase);
           const lagIosDiff = diffToBase(lagIosBase);
@@ -3152,6 +3630,8 @@
             chpAnd: 'Количество ЧП, относящихся к Android-релизу.',
             cutIos: 'Время начала iOS cutoff. Считается в минутах от 00:00 локального дня релиза; целевой диапазон старта — 14:00 плюс-минус 10 минут.',
             cutAnd: 'Время начала Android cutoff. Считается в минутах от 00:00 локального дня релиза; целевой диапазон старта — 14:00 плюс-минус 10 минут.',
+            regressionStartIos: 'Время фактического старта регресса iOS. Считается по первой найденной regression pipeline-точке для релиза в минутах от 00:00 локального дня.',
+            regressionStartAnd: 'Время фактического старта регресса Android. Считается по первой найденной regression pipeline-точке для релиза в минутах от 00:00 локального дня.',
             storeIos: 'Время отправки iOS в Store. Считается в минутах от 00:00 локального дня релиза; целевой дедлайн для команды — до 18:00.',
             storeAnd: 'Время отправки Android в Store. Считается в минутах от 00:00 локального дня релиза; целевой дедлайн для команды — до 18:00.',
             lagIos: 'Задержка после cutoff для iOS. Формула: время отправки в Store минус время начала cutoff. Рабочий коридор — до 4 часов.',
@@ -3250,6 +3730,8 @@
             if(l.includes('lag store android') || l.includes('лаг android') || l.includes('задержка после cutoff android')) return { label:'Задержка после cutoff Android', desc: descs.lagAnd };
             if(l.includes('ios cutoff') || l.includes('cutoff ios')) return { label:'Время начала cutoff iOS', desc: descs.cutIos };
             if(l.includes('android cutoff') || l.includes('cutoff android')) return { label:'Время начала cutoff Android', desc: descs.cutAnd };
+            if(l.includes('regression start ios') || l.includes('старта регресса ios')) return { label:'Время старта регресса iOS', desc: descs.regressionStartIos };
+            if(l.includes('regression start android') || l.includes('старта регресса android')) return { label:'Время старта регресса Android', desc: descs.regressionStartAnd };
             if(l.includes('store ios')) return { label:'Время отправки в Store iOS', desc: descs.storeIos };
             if(l.includes('store android')) return { label:'Время отправки в Store Android', desc: descs.storeAnd };
             if(l.includes('разброс')) return { label:'Разброс объема регресса между релизами', desc: descs.vol };
@@ -3310,6 +3792,10 @@
             if(minutes <= 120) return 'быстрый лаг до 2 часов';
             if(minutes <= LAG_TARGET_MAX_MINUTES) return 'рабочий лаг до 4 часов';
             return `длинный лаг ${Math.round(minutes)} мин`;
+          };
+          const formatRegressionStartHint = (minutes) => {
+            if(!Number.isFinite(minutes)) return 'Нет данных по старту регресса';
+            return `фактический старт регресса: ${formatClockMinutes(minutes)}; чем раньше старт, тем больше запас по времени`;
           };
           const formatCaseTrend = (current, previous, baseline) => {
             const currentText = formatCurrentValue('count', current);
@@ -3469,7 +3955,7 @@
                   ${renderToneIcon(anomalyToneForItem(a), 'Оценка отклонения')}
                   <span class="ml-anoms-name ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${escHtml(presentMetricInfo(a.label || '').label || '')}</span>
                 </div>
-                <span class="ml-anoms-delta ml-anoms-delta--${anomalyToneForItem(a)} ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${formatDeltaWithUnit(a.label || '', a.delta || 0, 0, '', Number.isFinite(a.deltaPct) ? a.deltaPct : null)}</span>
+                <span class="ml-anoms-delta ml-anoms-delta--${anomalyToneForItem(a)} ml-tip-target" ${tip(getAnomDesc(a.label || ''))}>${formatDeltaWithUnit(a.label || '', a.delta || 0, 0, a.unit || '', Number.isFinite(a.deltaPct) ? a.deltaPct : null)}</span>
                 ${Number.isFinite(a.z) ? `<span class="ml-anoms-z">z=${a.z.toFixed(2)}</span>` : ''}
               </div>
             `).join('');
@@ -4171,6 +4657,23 @@
               desc
             });
           };
+          const buildRegressionStartSignal = (m) => {
+            if(m.delta == null || !Number.isFinite(m.delta) || !Number.isFinite(m.current) || !isSignificant(m)) return null;
+            const label = presentMetricInfo(m.label).label || m.label;
+            const currentClock = formatClockMinutes(m.current);
+            const baseClock = Number.isFinite(m.baseline) ? formatClockMinutes(m.baseline) : '—';
+            const deltaMinutes = Math.abs(m.delta);
+            return signalWithDomain({
+              label,
+              group: m.group,
+              direction: m.delta < 0 ? 'good' : 'bad',
+              score: 10 + Math.min(deltaMinutes, 180) * 0.3 + (Number.isFinite(m.pct) ? Math.abs(m.pct) * 0.2 : 0),
+              text: m.delta < 0
+                ? `${label}: старт раньше базы на ${Math.round(deltaMinutes)} мин (${currentClock}, база ${baseClock})`
+                : `${label}: старт позже базы на ${Math.round(deltaMinutes)} мин (${currentClock}, база ${baseClock})`,
+              desc: [m.desc || '', compareNote].filter(Boolean).join(' ')
+            });
+          };
           const platformTypeSummaries = [
             buildPlatformTypeDynamics(window.__iosTypesRowsAll || [], 'iOS', { vletRows: window.__chpTypesRowsIosAll || [] }),
             buildPlatformTypeDynamics(window.__andTypesRowsAll || [], 'Android', { vletRows: window.__chpTypesRowsAndAll || [] })
@@ -4191,6 +4694,8 @@
             { label:'ЧП Android', desc: descs.chpAnd, group:'release', delta: chpAndDiff.delta, pct: chpAndDiff.deltaPct, better:'down', absTh: 2, pctTh: 5, digits: 0 },
             { label:'Время начала cutoff iOS', desc: descs.cutIos, group:'release', businessKind:'cutoff', current: cutIosBase.last, baseline: cutIosBase.base, targetMinutes: CUT_TARGET_MINUTES.ios, delta: cutIosDiff.delta, pct: cutIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
             { label:'Время начала cutoff Android', desc: descs.cutAnd, group:'release', businessKind:'cutoff', current: cutAndBase.last, baseline: cutAndBase.base, targetMinutes: CUT_TARGET_MINUTES.android, delta: cutAndDiff.delta, pct: cutAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Время старта регресса iOS', desc: descs.regressionStartIos, group:'release', businessKind:'regressionStart', current: regressionStartIosBase.last, baseline: regressionStartIosBase.base, delta: regressionStartIosDiff.delta, pct: regressionStartIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
+            { label:'Время старта регресса Android', desc: descs.regressionStartAnd, group:'release', businessKind:'regressionStart', current: regressionStartAndBase.last, baseline: regressionStartAndBase.base, delta: regressionStartAndDiff.delta, pct: regressionStartAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
             { label:'Время отправки в Store iOS', desc: descs.storeIos, group:'release', businessKind:'store', current: storeIosBase.last, baseline: storeIosBase.base, delta: storeIosDiff.delta, pct: storeIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
             { label:'Время отправки в Store Android', desc: descs.storeAnd, group:'release', businessKind:'store', current: storeAndBase.last, baseline: storeAndBase.base, delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
             { label:'Задержка после cutoff iOS', desc: descs.lagIos, group:'release', businessKind:'lag', current: lagIosBase.last, baseline: lagIosBase.base, delta: lagIosDiff.delta, pct: lagIosDiff.deltaPct, better:'down', absTh: 5, pctTh: 1, digits: 1, unit: 'мин' },
@@ -4200,6 +4705,7 @@
           ];
           const buildMetricSignal = (m) => {
             if(m.businessKind === 'cutoff') return buildCutoffSignal(m);
+            if(m.businessKind === 'regressionStart') return buildRegressionStartSignal(m);
             if(m.businessKind === 'store') return buildStoreSignal(m);
             if(m.businessKind === 'lag') return buildLagSignal(m);
             return buildGenericSignal(m);
@@ -4239,7 +4745,7 @@
           const formatAnomalyBrief = (item) => {
             if(!item) return 'Явных аномалий не найдено.';
             const label = presentMetricInfo(item.label || '').label || item.label || 'Аномалия';
-            return `${label}: ${formatDeltaWithUnit(label, item.delta || 0, 0, '', Number.isFinite(item.deltaPct) ? item.deltaPct : null)}`;
+            return `${label}: ${formatDeltaWithUnit(label, item.delta || 0, 0, item.unit || '', Number.isFinite(item.deltaPct) ? item.deltaPct : null)}`;
           };
           const buildExecutiveBrief = () => {
             const topRisk = topDeclines[0] || null;
@@ -4371,9 +4877,28 @@
           const executiveBrief = buildExecutiveBrief();
           const regressOverviewBrief = buildDomainOverviewBrief('regress');
           const releaseOverviewBrief = buildDomainOverviewBrief('release');
+          const devDowntimeSummaryOptions = {
+            releaseRange,
+            currentRelease,
+            compareMode,
+            previousRelease,
+            baseReleases
+          };
+          const iosDevDowntimeSummary = buildDevDowntimePlatformSummary(window.__devDowntimeRowsAll || [], 'iOS', devDowntimeSummaryOptions);
+          const androidDevDowntimeSummary = buildDevDowntimePlatformSummary(window.__androidDevDowntimeRowsAll || [], 'Android', devDowntimeSummaryOptions);
+          const devDowntimeComparisonSummary = buildDevDowntimeComparisonSummary(iosDevDowntimeSummary, androidDevDowntimeSummary, {
+            currentRelease,
+            compareMode
+          });
           const streamLeadersHtml = renderStreamLeaders(window.__streamInsightData || null);
           const chpQuarterHtml = renderChpQuarterSummary(window.__chpQuarterStats || null);
           const platformTypeDynamicsHtml = renderPlatformTypeDynamicsSection(platformTypeSummaries);
+          const devDowntimeAnalyticsHtml = renderDevDowntimeAnalyticsSection(
+            iosDevDowntimeSummary,
+            androidDevDowntimeSummary,
+            devDowntimeComparisonSummary,
+            { releaseRange, compareNote, escHtml }
+          );
           const renderBriefList = (title, tone, items, emptyText) => `
             <section class="ml-brief-card ml-brief-card--${tone}">
               <div class="ml-brief-eyebrow">${title}</div>
@@ -4455,6 +4980,8 @@
             renderMetricGroup('Cutoff и публикация в Store', compareGroupNote, [
               { label:'Время начала cutoff iOS', valueText: formatCurrentValue('clock', cutIosBase.last), delta: cutIosDiff.delta, pct: cutIosDiff.deltaPct, better:'down', businessKind:'cutoff', tone: cutoffTone(cutIosBase.last, CUT_TARGET_MINUTES.ios), desc: descs.cutIos, note: formatCutoffHint(cutIosBase.last, CUT_TARGET_MINUTES.ios), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', cutIosPrev), formatCurrentValue('clock', cutIosBase.base)) },
               { label:'Время начала cutoff Android', valueText: formatCurrentValue('clock', cutAndBase.last), delta: cutAndDiff.delta, pct: cutAndDiff.deltaPct, better:'down', businessKind:'cutoff', tone: cutoffTone(cutAndBase.last, CUT_TARGET_MINUTES.android), desc: descs.cutAnd, note: formatCutoffHint(cutAndBase.last, CUT_TARGET_MINUTES.android), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', cutAndPrev), formatCurrentValue('clock', cutAndBase.base)) },
+              { label:'Время старта регресса iOS', valueText: formatCurrentValue('clock', regressionStartIosBase.last), delta: regressionStartIosDiff.delta, pct: regressionStartIosDiff.deltaPct, better:'down', businessKind:'regressionStart', desc: descs.regressionStartIos, note: formatRegressionStartHint(regressionStartIosBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', regressionStartIosPrev), formatCurrentValue('clock', regressionStartIosBase.base)) },
+              { label:'Время старта регресса Android', valueText: formatCurrentValue('clock', regressionStartAndBase.last), delta: regressionStartAndDiff.delta, pct: regressionStartAndDiff.deltaPct, better:'down', businessKind:'regressionStart', desc: descs.regressionStartAnd, note: formatRegressionStartHint(regressionStartAndBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', regressionStartAndPrev), formatCurrentValue('clock', regressionStartAndBase.base)) },
               { label:'Время отправки в Store iOS', valueText: formatCurrentValue('clock', storeIosBase.last), delta: storeIosDiff.delta, pct: storeIosDiff.deltaPct, better:'down', businessKind:'store', tone: storeTone(storeIosBase.last), desc: descs.storeIos, note: formatStoreHint(storeIosBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', storeIosPrev), formatCurrentValue('clock', storeIosBase.base)) },
               { label:'Время отправки в Store Android', valueText: formatCurrentValue('clock', storeAndBase.last), delta: storeAndDiff.delta, pct: storeAndDiff.deltaPct, better:'down', businessKind:'store', tone: storeTone(storeAndBase.last), desc: descs.storeAnd, note: formatStoreHint(storeAndBase.last), deltaDigits: 1, deltaUnit: 'мин', compareFacts: buildMetricCompareFacts(formatCurrentValue('clock', storeAndPrev), formatCurrentValue('clock', storeAndBase.base)) }
             ], 'ml-metric-group--release-timeline'),
@@ -4538,6 +5065,7 @@
                   })}
                   ${chpQuarterHtml}
                   ${platformTypeDynamicsHtml}
+                  ${devDowntimeAnalyticsHtml}
                 </div>
               </section>
               <section class="ml-summary-page ml-summary-page--secondary" data-ml-page="secondary">
@@ -4658,6 +5186,16 @@
           const regressionTbody = document.getElementById('regressionTbody');
           const regressionTableWrap = document.getElementById('regressionTableWrap');
           const regressionReleaseFilter = document.getElementById('regressionReleaseFilter');
+          const devDowntimeEmpty = document.getElementById('devDowntimeEmpty');
+          const devDowntimeContent = document.getElementById('devDowntimeContent');
+          const devDowntimeTbody = document.getElementById('devDowntimeTbody');
+          const devDowntimeTableWrap = document.getElementById('devDowntimeTableWrap');
+          const devDowntimeCanvas = document.getElementById('devDowntimeChart');
+          const androidDevDowntimeEmpty = document.getElementById('androidDevDowntimeEmpty');
+          const androidDevDowntimeContent = document.getElementById('androidDevDowntimeContent');
+          const androidDevDowntimeTbody = document.getElementById('androidDevDowntimeTbody');
+          const androidDevDowntimeTableWrap = document.getElementById('androidDevDowntimeTableWrap');
+          const androidDevDowntimeCanvas = document.getElementById('androidDevDowntimeChart');
 
           // Types (Deploy-lab issues) — iOS/Android
           const iosTypesEmpty = document.getElementById('iosTypesEmpty');
@@ -4689,6 +5227,8 @@
           let chpTypesIosChart = null;
           let chpTypesAndChart = null;
           let cutChart = null;
+          let devDowntimeChart = null;
+          let androidDevDowntimeChart = null;
           let regressionChart = null;
           let iosTypesChart = null;
           let andTypesChart = null;
@@ -5197,6 +5737,34 @@
             };
           }
 
+          function normalizeBearerToken(value){
+            return String(value || '').trim().replace(/^Bearer\s+/i, '').trim();
+          }
+
+          function wikiHeaders(){
+            const tok = normalizeBearerToken(inpWikiToken?.value || '');
+            if(!tok) return null;
+            return {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${tok}`
+            };
+          }
+
+          function getBandReadCookies(){
+            return String(inpBandCookiesRead?.value || '').trim();
+          }
+
+          function bandHeaders(){
+            const cookies = getBandReadCookies();
+            if(!cookies) return null;
+            return {
+              'Accept': '*/*',
+              'accept-language': 'ru,en;q=0.9',
+              'x-requested-with': 'XMLHttpRequest',
+              [PROXY_COOKIE_HEADER]: cookies
+            };
+          }
+
           function getGitlabCookie(){
             return String(inpGitlabCookie?.value || '').trim();
           }
@@ -5286,6 +5854,22 @@
                 throw new Error(`Не удалось распарсить JSON от прокси: ${preview || 'пустой ответ'}`);
               }
             });
+          }
+
+          async function fetchJsonWithFallback(targetUrl, headers, signal){
+            try{
+              return await proxyGetJson(targetUrl, headers, signal);
+            }catch(proxyError){
+              return fetchWithRetry(async () => {
+                const r = await fetch(targetUrl, {
+                  headers,
+                  signal,
+                  cache: 'no-store'
+                });
+                if(!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+              });
+            }
           }
 
           function parseIsoToMs(iso){
@@ -5428,9 +6012,16 @@
               if (maxMsLocal === null) return null;
               return labelFromMsLocal(maxMsLocal);
             } catch (e) {
+              if(isAbortLikeError(e, signal)) return null;
               console.error('Error fetching last cherepik:', e);
               return null;
             }
+          }
+
+          function isAbortLikeError(error, signal = null){
+            if(signal?.aborted) return true;
+            if(error?.name === 'AbortError') return true;
+            return /aborted/i.test(String(error?.message || ''));
           }
 
           async function fetchDeployIssueCount(prefix, release, signal){
@@ -5801,6 +6392,459 @@
             return Number(m[1]) * 60 + Number(m[2]);
           }
 
+          const DEV_DOWNTIME_MONTHS = {
+            'января': 0,
+            'янв': 0,
+            'февраля': 1,
+            'фев': 1,
+            'марта': 2,
+            'мар': 2,
+            'апреля': 3,
+            'апр': 3,
+            'мая': 4,
+            'май': 4,
+            'июня': 5,
+            'июн': 5,
+            'июля': 6,
+            'июл': 6,
+            'августа': 7,
+            'авг': 7,
+            'сентября': 8,
+            'сен': 8,
+            'октября': 9,
+            'окт': 9,
+            'ноября': 10,
+            'ноя': 10,
+            'декабря': 11,
+            'дек': 11
+          };
+
+          const DEV_DOWNTIME_MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+          const DEV_DOWNTIME_MONTHS_FULL = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+          const DEV_DOWNTIME_WEEKDAYS_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+
+          function normalizeWikiMultilineText(value){
+            return String(value || '')
+              .replace(/\u00a0/g, ' ')
+              .replace(/\r/g, '')
+              .replace(/[ \t]+\n/g, '\n')
+              .replace(/\n[ \t]+/g, '\n')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim();
+          }
+
+          function normalizeWikiInlineText(value){
+            return normalizeWikiMultilineText(value).replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+          }
+
+          function extractWikiCellText(cell){
+            if(!cell) return '';
+            const chunks = [];
+            const BLOCK_TAGS = new Set(['p', 'div', 'li', 'ul', 'ol', 'tr']);
+            const walk = (node) => {
+              if(!node) return;
+              if(node.nodeType === Node.TEXT_NODE){
+                chunks.push(node.textContent || '');
+                return;
+              }
+              if(node.nodeType !== Node.ELEMENT_NODE) return;
+              const tag = String(node.tagName || '').toLowerCase();
+              if(tag === 'br'){
+                chunks.push('\n');
+                return;
+              }
+              for(const child of Array.from(node.childNodes || [])) walk(child);
+              if(BLOCK_TAGS.has(tag)){
+                const last = chunks[chunks.length - 1] || '';
+                if(!String(last).endsWith('\n')) chunks.push('\n');
+              }
+            };
+            for(const child of Array.from(cell.childNodes || [])) walk(child);
+            return normalizeWikiMultilineText(chunks.join(''));
+          }
+
+          function buildNaiveDate(year, monthIndex, day, hour = 0, minute = 0){
+            return new Date(year, monthIndex, day, hour, minute, 0, 0);
+          }
+
+          function parseDevDowntimeTime(token){
+            const m = String(token || '').trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
+            if(!m) return null;
+            return {
+              hour: Number(m[1] || 0),
+              minute: Number(m[2] || 0)
+            };
+          }
+
+          function parseDevDowntimeDateFragment(fragment, fallbackDate){
+            const raw = normalizeWikiInlineText(fragment).toLowerCase().replace(/[.,]+$/g, '');
+            if(!raw){
+              return {
+                year: fallbackDate.getFullYear(),
+                monthIndex: fallbackDate.getMonth(),
+                day: fallbackDate.getDate()
+              };
+            }
+
+            let m = raw.match(/(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?/);
+            if(m){
+              let year = fallbackDate.getFullYear();
+              if(m[3]){
+                const parsedYear = Number(m[3]);
+                year = parsedYear < 100 ? (2000 + parsedYear) : parsedYear;
+              }
+              return {
+                year,
+                monthIndex: Number(m[2]) - 1,
+                day: Number(m[1])
+              };
+            }
+
+            m = raw.match(/(\d{1,2})(?:\s*-\s*\d{1,2})?\s+([а-яё]+)/i);
+            if(m){
+              const monthKey = String(m[2] || '').toLowerCase();
+              const monthIndex = DEV_DOWNTIME_MONTHS[monthKey];
+              if(Number.isInteger(monthIndex)){
+                return {
+                  year: fallbackDate.getFullYear(),
+                  monthIndex,
+                  day: Number(m[1])
+                };
+              }
+            }
+
+            m = raw.match(/^(\d{1,2})$/);
+            if(m){
+              return {
+                year: fallbackDate.getFullYear(),
+                monthIndex: fallbackDate.getMonth(),
+                day: Number(m[1])
+              };
+            }
+
+            return {
+              year: fallbackDate.getFullYear(),
+              monthIndex: fallbackDate.getMonth(),
+              day: fallbackDate.getDate()
+            };
+          }
+
+          function parseDevDowntimeRowDate(rawDate, baseYear){
+            const text = normalizeWikiInlineText(rawDate).toLowerCase();
+            let m = text.match(/(\d{1,2})\s*-\s*(\d{1,2})\s+([а-яё]+)/i);
+            if(m){
+              const monthIndex = DEV_DOWNTIME_MONTHS[String(m[3] || '').toLowerCase()];
+              if(Number.isInteger(monthIndex)){
+                return buildNaiveDate(baseYear, monthIndex, Number(m[2]));
+              }
+            }
+
+            m = text.match(/(\d{1,2})\s+([а-яё]+)/i);
+            if(m){
+              const monthIndex = DEV_DOWNTIME_MONTHS[String(m[2] || '').toLowerCase()];
+              if(Number.isInteger(monthIndex)){
+                return buildNaiveDate(baseYear, monthIndex, Number(m[1]));
+              }
+            }
+
+            m = text.match(/(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?/);
+            if(m){
+              let year = baseYear;
+              if(m[3]){
+                const parsedYear = Number(m[3]);
+                year = parsedYear < 100 ? (2000 + parsedYear) : parsedYear;
+              }
+              return buildNaiveDate(year, Number(m[2]) - 1, Number(m[1]));
+            }
+
+            return buildNaiveDate(baseYear, 0, 1);
+          }
+
+          function shortenDevDowntimeDateLabel(rawDate){
+            const text = normalizeWikiInlineText(rawDate);
+            return text.replace(/([А-Яа-яё]+)/g, (monthText) => {
+              const monthIndex = DEV_DOWNTIME_MONTHS[String(monthText || '').toLowerCase()];
+              return Number.isInteger(monthIndex) ? DEV_DOWNTIME_MONTHS_SHORT[monthIndex] : monthText;
+            });
+          }
+
+          function formatDevDowntimeDayLabel(date){
+            if(!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+            return `${date.getDate()} ${DEV_DOWNTIME_MONTHS_FULL[date.getMonth()] || ''}`.trim();
+          }
+
+          function formatDevDowntimeShortDayLabel(date){
+            if(!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+            return `${date.getDate()} ${DEV_DOWNTIME_MONTHS_SHORT[date.getMonth()] || ''}`.trim();
+          }
+
+          function formatDevDowntimeWeekdayLabel(row){
+            const anchorDate = row?.sortDate instanceof Date && !Number.isNaN(row.sortDate.getTime())
+              ? row.sortDate
+              : new Date(Number(row?.sortKey || NaN));
+            if(!(anchorDate instanceof Date) || Number.isNaN(anchorDate.getTime())) return '';
+            return DEV_DOWNTIME_WEEKDAYS_SHORT[anchorDate.getDay()] || '';
+          }
+
+          function formatDevDowntimeMinutes(minutes){
+            const total = Math.max(0, Math.round(Number(minutes) || 0));
+            const hours = Math.floor(total / 60);
+            const mins = total % 60;
+            if(hours && mins) return `${hours}ч ${mins}м`;
+            if(hours) return `${hours}ч`;
+            return `${mins}м`;
+          }
+
+          function formatDevDowntimeAxisLabel(minutes){
+            const total = Math.max(0, Math.round(Number(minutes) || 0));
+            const hours = Math.floor(total / 60);
+            const mins = total % 60;
+            return `${hours}:${String(mins).padStart(2, '0')}`;
+          }
+
+          function formatDevDowntimeDateTime(date){
+            if(!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${day}.${month} ${hours}:${minutes}`;
+          }
+
+          function parseReleaseDateMsCandidate(value){
+            if(value === null || value === undefined || value === '') return null;
+            if(value instanceof Date){
+              return Number.isNaN(value.getTime()) ? null : value.getTime();
+            }
+            if(typeof value === 'number'){
+              if(!Number.isFinite(value) || value <= 0) return null;
+              if(value < 1e11) return value * 1000;
+              if(value > 1e14) return Math.round(value / 1000);
+              return value;
+            }
+            const raw = String(value || '').trim();
+            if(!raw) return null;
+            if(/^\d+$/.test(raw)) return parseReleaseDateMsCandidate(Number(raw));
+            const parsed = Date.parse(raw);
+            if(Number.isFinite(parsed)) return parsed;
+            return null;
+          }
+
+          function extractLaunchDateMs(launch){
+            if(!launch || typeof launch !== 'object') return null;
+            const candidates = [
+              launch.createdDate,
+              launch.created_date,
+              launch.createdAt,
+              launch.created_at,
+              launch.startTime,
+              launch.start_time,
+              launch.startDate,
+              launch.start_date,
+              launch.launchTime,
+              launch.launch_time,
+              launch.time,
+              launch.date
+            ];
+
+            let best = null;
+            for(const candidate of candidates){
+              const ms = parseReleaseDateMsCandidate(candidate);
+              if(!Number.isFinite(ms)) continue;
+              if(best === null || ms < best) best = ms;
+            }
+            return best;
+          }
+
+          function getDevDowntimeRowRange(row){
+            if(row?.intervals?.length){
+              const starts = row.intervals.map(interval => interval.start.getTime()).filter(ms => Number.isFinite(ms));
+              const ends = row.intervals.map(interval => interval.end.getTime()).filter(ms => Number.isFinite(ms));
+              if(starts.length && ends.length){
+                return {
+                  startMs: Math.min(...starts),
+                  endMs: Math.max(...ends)
+                };
+              }
+            }
+            const anchorMs = Number(row?.sortKey) || null;
+            return {
+              startMs: anchorMs,
+              endMs: anchorMs
+            };
+          }
+
+          function normalizeReleaseWindowStart(ms){
+            const d = new Date(ms);
+            d.setHours(0, 0, 0, 0);
+            return d.getTime();
+          }
+
+          function normalizeReleaseWindowEnd(ms){
+            const d = new Date(ms);
+            d.setHours(23, 59, 59, 999);
+            return d.getTime();
+          }
+
+          function collectReleaseMarker(releaseMarkersMap, release, ms, source){
+            if(!releaseMarkersMap || !release || !Number.isFinite(ms)) return;
+            const prev = releaseMarkersMap.get(release);
+            if(!prev){
+              releaseMarkersMap.set(release, {
+                release,
+                fromMs: ms,
+                toMs: ms,
+                sources: new Set(source ? [source] : [])
+              });
+              return;
+            }
+            if(ms < prev.fromMs) prev.fromMs = ms;
+            if(ms > prev.toMs) prev.toMs = ms;
+            if(source) prev.sources.add(source);
+          }
+
+          function buildReleaseMarkersList(releaseMarkersMap){
+            return Array.from(releaseMarkersMap.values())
+              .filter(item => item && Number.isFinite(item.fromMs) && Number.isFinite(item.toMs) && item.release)
+              .map(item => ({
+                release: item.release,
+                fromMs: normalizeReleaseWindowStart(item.fromMs),
+                toMs: normalizeReleaseWindowEnd(item.toMs),
+                source: Array.from(item.sources || []).join(', ')
+              }))
+              .sort((a, b) => (a.fromMs - b.fromMs) || compareReleaseAsc(a.release, b.release));
+          }
+
+          function applyReleaseMarkersToDevDowntimeRows(rows, releaseMarkers){
+            const markers = Array.isArray(releaseMarkers) ? releaseMarkers.slice() : [];
+            if(!markers.length){
+              return (rows || []).map(row => ({
+                ...row,
+                release: '',
+                releaseShort: '',
+                releaseSource: ''
+              }));
+            }
+
+            return (rows || []).map(row => {
+              const { startMs, endMs } = getDevDowntimeRowRange(row);
+              const matchedMarkers = markers.filter(candidate => Number.isFinite(startMs) && Number.isFinite(endMs) && startMs <= candidate.toMs && endMs >= candidate.fromMs);
+              let marker = null;
+              if(matchedMarkers.length === 1){
+                marker = matchedMarkers[0];
+              }
+              return {
+                ...row,
+                release: marker?.release || '',
+                releaseShort: marker?.release ? formatReleaseShort(marker.release) : '',
+                releaseSource: marker?.source || ''
+              };
+            });
+          }
+
+          function filterDevDowntimeRowsByAssignedRelease(rows, releaseMarkers){
+            const preparedRows = Array.isArray(rows) ? rows.slice() : [];
+            if(!Array.isArray(releaseMarkers) || !releaseMarkers.length) return preparedRows;
+            return preparedRows.filter(row => String(row?.release || '').trim());
+          }
+
+          function parseDevDowntimeLine(line, rowDate){
+            const originalText = normalizeWikiInlineText(line);
+            if(!originalText) return { interval: null, warning: '' };
+
+            let prepared = originalText.replace(/^[0-9]+\)\s*/, '').trim();
+            const splitMatch = prepared.match(/^(.*?)\s+(?:и\s+)?до\s+(.+)$/i);
+            if(!splitMatch){
+              return { interval: null, warning: prepared };
+            }
+            let left = normalizeWikiInlineText(splitMatch[1]).replace(/^[СCсc]\s*/u, '').trim();
+            const right = normalizeWikiInlineText(splitMatch[2]);
+            const startMatch = left.match(/^(\d{1,2}(?::\d{2})?)(?:\s+(.*))?$/);
+            const endMatch = right.match(/^(\d{1,2}(?::\d{2})?)(?:\s+(.*))?$/);
+
+            if(!startMatch || !endMatch){
+              return { interval: null, warning: prepared };
+            }
+
+            const startTime = parseDevDowntimeTime(startMatch[1]);
+            const endTime = parseDevDowntimeTime(endMatch[1]);
+            if(!startTime || !endTime){
+              return { interval: null, warning: prepared };
+            }
+
+            const startDateParts = parseDevDowntimeDateFragment(startMatch[2], rowDate);
+            const endDateParts = parseDevDowntimeDateFragment(endMatch[2], rowDate);
+            const start = buildNaiveDate(startDateParts.year, startDateParts.monthIndex, startDateParts.day, startTime.hour, startTime.minute);
+            let end = buildNaiveDate(endDateParts.year, endDateParts.monthIndex, endDateParts.day, endTime.hour, endTime.minute);
+
+            if(end.getTime() < start.getTime()){
+              if(!normalizeWikiInlineText(endMatch[2])){
+                end = buildNaiveDate(start.getFullYear(), start.getMonth(), start.getDate() + 1, endTime.hour, endTime.minute);
+              }else{
+                while(end.getTime() < start.getTime()){
+                  end = buildNaiveDate(end.getFullYear(), end.getMonth(), end.getDate() + 1, end.getHours(), end.getMinutes());
+                }
+              }
+            }
+
+            const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+            if(durationMinutes < 0){
+              return { interval: null, warning: prepared };
+            }
+
+            return {
+              interval: {
+                originalText,
+                start,
+                end,
+                durationMinutes
+              },
+              warning: ''
+            };
+          }
+
+          function parseDevDowntimeIntervals(rawText, rowDate){
+            const sourceLines = normalizeWikiMultilineText(rawText)
+              .split(/\n+/)
+              .map(line => normalizeWikiInlineText(line))
+              .filter(Boolean);
+
+            const lines = [];
+            for(const sourceLine of sourceLines){
+              const numberedParts = sourceLine.match(/\d+\)\s*.*?(?=(?:\s+\d+\)\s*)|$)/g);
+              if(numberedParts && (numberedParts.length > 1 || /^\d+\)/.test(sourceLine))){
+                numberedParts
+                  .map(part => normalizeWikiInlineText(part))
+                  .filter(Boolean)
+                  .forEach(part => lines.push(part));
+                continue;
+              }
+
+              const repeatedStarts = sourceLine
+                .split(/(?=\s+[СCсc]\s*\d{1,2}(?::\d{2})?)/u)
+                .map(part => normalizeWikiInlineText(part))
+                .filter(Boolean);
+              if(repeatedStarts.length > 1){
+                repeatedStarts.forEach(part => lines.push(part));
+                continue;
+              }
+
+              lines.push(sourceLine);
+            }
+
+            const intervals = [];
+            const warnings = [];
+
+            for(const line of lines){
+              if(!/\sдо\s/i.test(` ${line} `)) continue;
+              const { interval, warning } = parseDevDowntimeLine(line, rowDate);
+              if(interval) intervals.push(interval);
+              else if(warning) warnings.push(warning);
+            }
+
+            return { intervals, warnings };
+          }
+
           function isExternalStreamLabel(label){
             const s = String(label || '').trim().toLowerCase();
             if(!s) return false;
@@ -5916,6 +6960,234 @@
               </div>
             `;
           }
+          const formatDevDowntimeDelta = (delta, pct = null) => {
+            if(delta == null || !Number.isFinite(delta)) return 'Нет базы для сравнения';
+            const sign = delta >= 0 ? '+' : '−';
+            const pctText = Number.isFinite(pct) ? ` ${fmtDeltaPct(pct)}` : '';
+            return `${sign}${formatDevDowntimeMinutes(Math.abs(delta))}${pctText}`;
+          };
+          const createDowntimeAggregate = (release = '') => ({
+            release,
+            totalMinutes: 0,
+            days: 0,
+            intervalCount: 0,
+            longestDayMinutes: 0,
+            longestDayLabel: ''
+          });
+          const buildDevDowntimeReleaseSeries = (rows, releaseRange = []) => {
+            const fallbackOrder = Array.from(new Set(
+              (Array.isArray(rows) ? rows : [])
+                .map(row => String(row?.release || '').trim())
+                .filter(Boolean)
+            )).sort(compareReleaseAsc);
+            const releaseOrder = (Array.isArray(releaseRange) && releaseRange.length ? releaseRange.slice() : fallbackOrder)
+              .map(release => String(release || '').trim())
+              .filter(Boolean);
+            const byRelease = new Map(releaseOrder.map(release => [release, createDowntimeAggregate(release)]));
+
+            (Array.isArray(rows) ? rows : []).forEach(row => {
+              const release = String(row?.release || '').trim();
+              if(!release) return;
+              if(!byRelease.has(release)){
+                byRelease.set(release, createDowntimeAggregate(release));
+                releaseOrder.push(release);
+              }
+              const target = byRelease.get(release);
+              const totalMinutes = Math.max(0, Math.round(Number(row?.totalMinutes || 0)));
+              target.totalMinutes += totalMinutes;
+              target.days += 1;
+              target.intervalCount += Array.isArray(row?.intervals) ? row.intervals.length : 0;
+              if(totalMinutes >= target.longestDayMinutes){
+                target.longestDayMinutes = totalMinutes;
+                target.longestDayLabel = row?.shortDate || row?.rawDate || '';
+              }
+            });
+
+            return releaseOrder.map(release => {
+              const item = byRelease.get(release) || createDowntimeAggregate(release);
+              return {
+                ...item,
+                avgMinutesPerDay: item.days ? (item.totalMinutes / item.days) : 0
+              };
+            });
+          };
+          const buildDevDowntimePlatformSummary = (rows, platformLabel, options = {}) => {
+            const {
+              releaseRange = [],
+              currentRelease = '',
+              compareMode = 'mean',
+              previousRelease = '',
+              baseReleases = []
+            } = options;
+            const series = buildDevDowntimeReleaseSeries(rows, releaseRange);
+            const current = series.length
+              ? series[series.length - 1]
+              : createDowntimeAggregate(currentRelease || '');
+            const totalBase = baselineStats(series.map(item => item.totalMinutes), compareMode);
+            const daysBase = baselineStats(series.map(item => item.days), compareMode);
+            const intervalBase = baselineStats(series.map(item => item.intervalCount), compareMode);
+            const avgDayBase = baselineStats(series.map(item => item.avgMinutesPerDay), compareMode);
+            const totalDiff = diffToBase(totalBase);
+            const daysDiff = diffToBase(daysBase);
+            const intervalDiff = diffToBase(intervalBase);
+            const avgDayDiff = diffToBase(avgDayBase);
+            const tone = !Number.isFinite(totalDiff.delta) || totalDiff.delta === 0
+              ? (current.totalMinutes > 0 ? 'warn' : 'neutral')
+              : (totalDiff.delta < 0 ? 'good' : 'bad');
+            const platformRelease = current.release || currentRelease || '';
+            const platformReleaseShort = platformRelease ? formatReleaseShort(platformRelease) : '—';
+            const compareText = compareMode === 'prev'
+              ? (previousRelease
+                  ? `${platformReleaseShort} ↔ ${formatReleaseShort(previousRelease)}`
+                  : 'Недостаточно релизов для сравнения')
+              : (baseReleases.length
+                  ? `${platformReleaseShort} ↔ среднее по ${formatReleaseListCompact(baseReleases, 8)}`
+                  : 'Недостаточно релизов для сравнения');
+            const lines = [];
+            if(current.totalMinutes > 0){
+              lines.push(`Текущий релиз ${platformReleaseShort}: ${formatDevDowntimeMinutes(current.totalMinutes)} простоя, ${current.days} дн. с простоем, ${current.intervalCount} интервалов.`);
+            }else{
+              lines.push(`Текущий релиз ${platformReleaseShort}: простоев DEV не было.`);
+            }
+            if(Number.isFinite(totalDiff.delta)){
+              lines.push(compareMode === 'prev'
+                ? `К предыдущему релизу: ${formatDevDowntimeDelta(totalDiff.delta, totalDiff.deltaPct)} · было ${formatDevDowntimeMinutes(totalBase.base)}.`
+                : `К средней истории: ${formatDevDowntimeDelta(totalDiff.delta, totalDiff.deltaPct)} · среднее ${formatDevDowntimeMinutes(totalBase.base)}.`);
+            }
+            if(Number.isFinite(daysDiff.delta)){
+              lines.push(compareMode === 'prev'
+                ? `По дням с простоем: ${daysDiff.delta >= 0 ? '+' : '−'}${Math.abs(Math.round(daysDiff.delta))} · было ${Math.round(daysBase.base || 0)}.`
+                : `По дням с простоем: ${daysDiff.delta >= 0 ? '+' : '−'}${Math.abs(Number(daysDiff.delta).toFixed(1))} · среднее ${Number(daysBase.base || 0).toFixed(1)}.`);
+            }
+            if(Number.isFinite(intervalDiff.delta)){
+              lines.push(compareMode === 'prev'
+                ? `По числу интервалов: ${intervalDiff.delta >= 0 ? '+' : '−'}${Math.abs(Math.round(intervalDiff.delta))} · было ${Math.round(intervalBase.base || 0)}.`
+                : `По числу интервалов: ${intervalDiff.delta >= 0 ? '+' : '−'}${Math.abs(Number(intervalDiff.delta).toFixed(1))} · среднее ${Number(intervalBase.base || 0).toFixed(1)}.`);
+            }
+            if(current.longestDayMinutes > 0){
+              lines.push(`Самый тяжелый день: ${current.longestDayLabel || '—'} · ${formatDevDowntimeMinutes(current.longestDayMinutes)}.`);
+            }
+
+            return {
+              platform: platformLabel,
+              title: `DEV ${platformLabel}`,
+              subtitle: `Простой в релизном окне · ${compareText}`,
+              tone,
+              current,
+              totalBase,
+              totalDiff,
+              stats: [
+                { label: 'Итого простой', value: formatDevDowntimeMinutes(current.totalMinutes) },
+                { label: 'Дней с простоем', value: String(current.days || 0) },
+                { label: 'Интервалов', value: String(current.intervalCount || 0) },
+                { label: 'Среднее на день', value: current.days ? formatDevDowntimeMinutes(current.avgMinutesPerDay) : '0м' }
+              ],
+              lines,
+              avgDayDiff
+            };
+          };
+          const buildDevDowntimeComparisonSummary = (iosSummary, androidSummary, options = {}) => {
+            const {
+              currentRelease = '',
+              compareMode = 'mean'
+            } = options;
+            const iosCurrent = iosSummary?.current || createDowntimeAggregate(currentRelease || '');
+            const androidCurrent = androidSummary?.current || createDowntimeAggregate(currentRelease || '');
+            const totalCurrentMinutes = (iosCurrent.totalMinutes || 0) + (androidCurrent.totalMinutes || 0);
+            const iosBaseMinutes = Number(iosSummary?.totalBase?.base);
+            const androidBaseMinutes = Number(androidSummary?.totalBase?.base);
+            const totalBaseMinutes = Number.isFinite(iosBaseMinutes) || Number.isFinite(androidBaseMinutes)
+              ? (Number.isFinite(iosBaseMinutes) ? iosBaseMinutes : 0) + (Number.isFinite(androidBaseMinutes) ? androidBaseMinutes : 0)
+              : null;
+            const totalBaseDiff = totalBaseMinutes == null ? null : (totalCurrentMinutes - totalBaseMinutes);
+            const totalBasePct = totalBaseMinutes ? ((totalBaseDiff / totalBaseMinutes) * 100) : (totalCurrentMinutes ? 100 : 0);
+            const releaseShort = currentRelease ? formatReleaseShort(currentRelease) : '—';
+            const iosShare = totalCurrentMinutes > 0 ? Math.round((iosCurrent.totalMinutes / totalCurrentMinutes) * 100) : 0;
+            const androidShare = totalCurrentMinutes > 0 ? (100 - iosShare) : 0;
+            const gapMinutes = iosCurrent.totalMinutes - androidCurrent.totalMinutes;
+            let leaderText = 'без простоя';
+            if(totalCurrentMinutes > 0){
+              if(Math.abs(gapMinutes) <= 15) leaderText = 'паритет';
+              else leaderText = gapMinutes > 0 ? 'iOS' : 'Android';
+            }
+            const tone = totalBaseDiff == null || totalBaseDiff === 0
+              ? (totalCurrentMinutes > 0 ? 'warn' : 'neutral')
+              : (totalBaseDiff < 0 ? 'good' : 'bad');
+            const lines = [];
+            if(totalCurrentMinutes > 0){
+              if(leaderText === 'паритет'){
+                lines.push(`Платформы дали почти одинаковый простой: iOS ${formatDevDowntimeMinutes(iosCurrent.totalMinutes)} и Android ${formatDevDowntimeMinutes(androidCurrent.totalMinutes)}.`);
+              }else{
+                lines.push(`Лидер по простою: ${leaderText} · iOS ${formatDevDowntimeMinutes(iosCurrent.totalMinutes)} против Android ${formatDevDowntimeMinutes(androidCurrent.totalMinutes)}.`);
+              }
+              lines.push(`Доля в суммарном простое: iOS ${iosShare}% · Android ${androidShare}%.`);
+              lines.push(`По дням с простоем: iOS ${iosCurrent.days || 0}, Android ${androidCurrent.days || 0}.`);
+            }else{
+              lines.push(`В текущем релизе ${releaseShort} обе платформы прошли без простоя DEV.`);
+            }
+            if(totalBaseDiff != null && Number.isFinite(totalBaseDiff)){
+              lines.push(compareMode === 'prev'
+                ? `Суммарно к предыдущему релизу: ${formatDevDowntimeDelta(totalBaseDiff, totalBasePct)} · было ${formatDevDowntimeMinutes(totalBaseMinutes)}.`
+                : `Суммарно к средней истории: ${formatDevDowntimeDelta(totalBaseDiff, totalBasePct)} · среднее ${formatDevDowntimeMinutes(totalBaseMinutes)}.`);
+            }
+            return {
+              title: 'Сравнение платформ',
+              subtitle: `Текущий релиз ${releaseShort}`,
+              tone,
+              stats: [
+                { label: 'Сумма двух платформ', value: formatDevDowntimeMinutes(totalCurrentMinutes) },
+                { label: 'Лидер по простою', value: leaderText },
+                { label: 'Доля iOS', value: `${iosShare}%` },
+                { label: 'Доля Android', value: `${androidShare}%` }
+              ],
+              lines
+            };
+          };
+          const renderDevDowntimeSummaryCard = (summary, escHtmlFn) => {
+            if(!summary) return '';
+            const esc = typeof escHtmlFn === 'function' ? escHtmlFn : (value) => String(value || '');
+            return `
+              <article class="stream-insight-card ml-downtime-card ml-downtime-card--${summary.tone || 'neutral'}">
+                <div class="stream-insight-card-title">${esc(summary.title || 'Простой DEV')}</div>
+                <div class="stream-insight-card-subtitle">${esc(summary.subtitle || '—')}</div>
+                <div class="ml-downtime-kpi-grid">
+                  ${(summary.stats || []).map(item => `
+                    <div class="ml-downtime-kpi">
+                      <div class="ml-downtime-kpi-label">${esc(item.label || '')}</div>
+                      <div class="ml-downtime-kpi-value">${esc(item.value || '—')}</div>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="ml-downtime-lines">
+                  ${(summary.lines || []).map(line => `<div class="ml-downtime-line">${esc(line)}</div>`).join('')}
+                </div>
+              </article>
+            `;
+          };
+          const renderDevDowntimeAnalyticsSection = (iosSummary, androidSummary, comparisonSummary, options = {}) => {
+            const {
+              releaseRange = [],
+              compareNote = '',
+              escHtml: escHtmlFn = null
+            } = options;
+            if(!(Array.isArray(releaseRange) && releaseRange.length)) return '';
+            const esc = typeof escHtmlFn === 'function' ? escHtmlFn : (value) => String(value || '');
+            return `
+              <section class="stream-insights-shell">
+                <div class="stream-insights-head">
+                  <div>
+                    <div class="stream-insights-title">Простой DEV по платформам</div>
+                    <div class="stream-insights-subtitle">Считаем только даты, которые однозначно попали в окно релиза. ${esc(compareNote)}.</div>
+                  </div>
+                </div>
+                <div class="stream-insights-grid">
+                  ${renderDevDowntimeSummaryCard(iosSummary, esc)}
+                  ${renderDevDowntimeSummaryCard(androidSummary, esc)}
+                  ${renderDevDowntimeSummaryCard(comparisonSummary, esc)}
+                </div>
+              </section>
+            `;
+          };
           function renderStreamLeaders(summary){
             if(!summary || (!summary.hb && !summary.selective && !summary.uwu)) return '';
             const comparedText = summary.from && summary.to
@@ -6466,6 +7738,606 @@
             return { cutoff: cutoffIso, storeMsLocal };
           }
 
+          async function fetchWikiDevDowntimeArticle(signal){
+            const headers = wikiHeaders();
+            if(!headers) return null;
+            return fetchJsonWithFallback(WIKI_DEV_OUTAGES_URL, headers, signal);
+          }
+
+          function parseWikiDevDowntimeRows(payload){
+            const article = payload?.article;
+            const html = String(article?.content || '').trim();
+            if(!html) return [];
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const table = doc.querySelector('table');
+            if(!table) return [];
+
+            const baseYearSource = article?.updated_at || article?.created_at || new Date().toISOString();
+            const baseYear = new Date(baseYearSource).getFullYear() || new Date().getFullYear();
+            const rows = [];
+            const bodyRows = Array.from(table.querySelectorAll('tr')).slice(1);
+
+            bodyRows.forEach((tr, index) => {
+              const cells = Array.from(tr.children || []);
+              if(cells.length < 5) return;
+
+              const rawDate = extractWikiCellText(cells[0]);
+              if(!rawDate) return;
+
+              const rowDate = parseDevDowntimeRowDate(rawDate, baseYear);
+              const domainText = extractWikiCellText(cells[1]);
+              const ownersText = extractWikiCellText(cells[2]);
+              const downtimeText = extractWikiCellText(cells[3]);
+              const commentText = extractWikiCellText(cells[4]);
+              const { intervals, warnings } = parseDevDowntimeIntervals(downtimeText, rowDate);
+              const totalMinutes = intervals.reduce((sum, interval) => sum + (Number(interval.durationMinutes) || 0), 0);
+
+              rows.push({
+                rawDate,
+                shortDate: shortenDevDowntimeDateLabel(rawDate),
+                sortDate: rowDate,
+                sortKey: rowDate.getTime(),
+                totalMinutes,
+                domainText,
+                ownersText,
+                downtimeText,
+                commentText,
+                intervals,
+                warnings,
+                sourceIndex: index
+              });
+            });
+
+            rows.sort((a, b) => (a.sortKey - b.sortKey) || (a.sourceIndex - b.sourceIndex));
+            return rows;
+          }
+
+          function renderDevDowntimeRow(row){
+            if(!devDowntimeTbody || !row) return;
+            const tr = document.createElement('tr');
+
+            const makeCell = (text, className = 'text-left dev-downtime-cell') => {
+              const td = document.createElement('td');
+              td.className = className;
+              td.textContent = text || '—';
+              return td;
+            };
+
+            const dateCell = makeCell(row.rawDate, 'mono text-left dev-downtime-cell dev-downtime-cell--compact');
+            const weekdayCell = makeCell(formatDevDowntimeWeekdayLabel(row) || '—', 'mono text-center dev-downtime-cell dev-downtime-cell--compact');
+            const releaseCell = makeCell(row.releaseShort || '—', 'mono text-center dev-downtime-cell dev-downtime-cell--compact');
+            const totalCell = makeCell(formatDevDowntimeMinutes(row.totalMinutes), 'mono text-center font-semibold dev-downtime-cell dev-downtime-cell--compact');
+            const intervalLines = row.intervals.length
+              ? row.intervals.map((interval, idx) => `${idx + 1}) ${formatDevDowntimeDateTime(interval.start)} -> ${formatDevDowntimeDateTime(interval.end)} (${formatDevDowntimeMinutes(interval.durationMinutes)})`).join('\n')
+              : normalizeWikiInlineText(row.downtimeText || '');
+            const commentLines = [];
+            if(row.commentText) commentLines.push(row.commentText);
+            if(row.warnings.length){
+              commentLines.push(`Не удалось полностью распарсить: ${row.warnings.join('; ')}`);
+            }
+
+            tr.appendChild(dateCell);
+            tr.appendChild(weekdayCell);
+            tr.appendChild(releaseCell);
+            tr.appendChild(totalCell);
+            tr.appendChild(makeCell(intervalLines));
+            tr.appendChild(makeCell(row.domainText));
+            tr.appendChild(makeCell(row.ownersText));
+            tr.appendChild(makeCell(commentLines.join('\n') || '—', row.warnings.length ? 'text-left dev-downtime-cell dev-downtime-warning' : 'text-left dev-downtime-cell'));
+            devDowntimeTbody.appendChild(tr);
+          }
+
+          function updateDevDowntimeChart(rows){
+            if(!devDowntimeChart) return;
+            devDowntimeChart.data.labels = rows.map(row => row.releaseShort ? [row.shortDate || row.rawDate, `релиз ${row.releaseShort}`] : (row.shortDate || row.rawDate));
+            devDowntimeChart.data.datasets[0].data = rows.map(row => Number(row.totalMinutes) || 0);
+            devDowntimeChart.$rows = rows.slice();
+            devDowntimeChart.update();
+          }
+
+          function renderDevDowntimeData(rows){
+            window.__devDowntimeRowsAll = Array.isArray(rows) ? rows.slice() : [];
+            if(!rows?.length){
+              showDevDowntimeEmpty('Не удалось получить строки из таблицы wiki');
+              return;
+            }
+            showDevDowntimeContent();
+            updateDevDowntimeChart(rows);
+            if(devDowntimeTbody) devDowntimeTbody.innerHTML = '';
+            rows.forEach(renderDevDowntimeRow);
+            if(devDowntimeTableWrap) devDowntimeTableWrap.style.display = rows.length ? '' : 'none';
+          }
+
+          async function loadDevDowntimeData(signal){
+            const headers = wikiHeaders();
+            if(!headers){
+              showDevDowntimeEmpty('Вставьте Bearer token wiki');
+              return [];
+            }
+
+            try{
+              const payload = await fetchWikiDevDowntimeArticle(signal);
+              const rows = parseWikiDevDowntimeRows(payload);
+              if(!rows.length){
+                showDevDowntimeEmpty('Не удалось получить строки из таблицы wiki');
+                return [];
+              }
+
+              renderDevDowntimeData(rows);
+              return rows;
+            }catch(e){
+              if(signal?.aborted) return [];
+              showDevDowntimeEmpty(`Ошибка wiki: ${e?.message || e}`);
+              return [];
+            }
+          }
+
+          function unwrapBandPostsPayload(raw){
+            let node = raw;
+            for(let i = 0; i < 4; i += 1){
+              if(node && typeof node === 'object' && node.posts && typeof node.posts === 'object'){
+                return node;
+              }
+
+              if(node && typeof node === 'object' && node.body !== undefined){
+                if(typeof node.body === 'string'){
+                  try{
+                    const parsed = JSON.parse(node.body);
+                    if(parsed && typeof parsed === 'object'){
+                      node = parsed;
+                      continue;
+                    }
+                  }catch(e){}
+                }else if(node.body && typeof node.body === 'object'){
+                  node = node.body;
+                  continue;
+                }
+              }
+
+              if(node && typeof node === 'object' && node.data && typeof node.data === 'object'){
+                node = node.data;
+                continue;
+              }
+
+              break;
+            }
+            return (raw && typeof raw === 'object') ? raw : {};
+          }
+
+          async function fetchBandChannelPostsSince(channelId, sinceMs, signal){
+            const headers = bandHeaders();
+            if(!headers) throw new Error('Вставьте Band Cookies (чтение)');
+
+            const postsById = new Map();
+            const perPage = 30;
+            let beforeId = '';
+
+            for(let page = 0; page < 400; page += 1){
+              if(signal?.aborted) break;
+
+              const url = new URL(`https://band.wb.ru/api/v4/channels/${encodeURIComponent(channelId)}/posts`);
+              url.searchParams.set('page', '0');
+              url.searchParams.set('per_page', String(perPage));
+              if(beforeId) url.searchParams.set('before', beforeId);
+              url.searchParams.set('skipFetchThreads', 'false');
+              url.searchParams.set('collapsedThreads', 'true');
+              url.searchParams.set('collapsedThreadsExtended', 'false');
+
+              const payload = unwrapBandPostsPayload(await proxyGetJson(url.toString(), headers, signal));
+              const postsMap = payload && payload.posts && typeof payload.posts === 'object' ? payload.posts : {};
+              const order = Array.isArray(payload && payload.order) ? payload.order : Object.keys(postsMap);
+              if(!order.length && !Object.keys(postsMap).length) break;
+
+              const batch = [];
+              for(const id of order){
+                const post = postsMap[id];
+                if(post && typeof post === 'object'){
+                  batch.push(post);
+                }
+                if(post && typeof post === 'object' && !postsById.has(id)){
+                  postsById.set(id, post);
+                }
+              }
+              for(const [id, post] of Object.entries(postsMap)){
+                if(post && typeof post === 'object' && !postsById.has(id)){
+                  postsById.set(id, post);
+                }
+              }
+
+              batch.sort((a, b) => (Number(b?.create_at) || 0) - (Number(a?.create_at) || 0));
+              const oldestPost = batch[batch.length - 1] || null;
+              const oldestId = String(oldestPost?.id || '').trim();
+              const oldestCreateAt = Number(oldestPost?.create_at || 0);
+
+              if(!oldestId || oldestId === beforeId) break;
+              beforeId = oldestId;
+
+              if(order.length < perPage) break;
+              if(Number.isFinite(sinceMs) && Number.isFinite(oldestCreateAt) && oldestCreateAt < sinceMs) break;
+            }
+
+            return Array.from(postsById.values())
+              .filter(post => {
+                const deletedAt = Number(post?.delete_at);
+                if(Number.isFinite(deletedAt) && deletedAt > 0) return false;
+                if(String(post?.root_id || '').trim()) return false;
+                const createdAt = Number(post?.create_at);
+                if(Number.isFinite(sinceMs) && Number.isFinite(createdAt) && createdAt < sinceMs) return false;
+                return Number.isFinite(createdAt) && createdAt > 0;
+              })
+              .sort((a, b) => (Number(a?.create_at) || 0) - (Number(b?.create_at) || 0));
+          }
+
+          function normalizeBandMessageText(value){
+            return normalizeWikiMultilineText(
+              String(value || '')
+                .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2')
+                .replace(/\\([\\`*_{}\[\]()#+\-.!])/g, '$1')
+                .replace(/\*\*([^*]+)\*\*/g, '$1')
+                .replace(/\*([^*\n]+)\*/g, '$1')
+                .replace(/`([^`]+)`/g, '$1')
+            );
+          }
+
+          function extractBandPostText(post){
+            const chunks = [];
+            const pushChunk = (value) => {
+              const text = normalizeBandMessageText(value);
+              if(text) chunks.push(text);
+            };
+
+            pushChunk(post?.message || '');
+
+            const attachments = Array.isArray(post?.props?.attachments) ? post.props.attachments : [];
+            for(const attachment of attachments){
+              pushChunk(attachment?.pretext);
+              pushChunk(attachment?.title);
+              pushChunk(attachment?.text);
+              pushChunk(attachment?.fallback);
+
+              const fields = Array.isArray(attachment?.fields) ? attachment.fields : [];
+              for(const field of fields){
+                const title = normalizeWikiInlineText(field?.title);
+                const value = normalizeBandMessageText(field?.value);
+                if(title && value) pushChunk(`${title}: ${value}`);
+                else{
+                  pushChunk(title);
+                  pushChunk(value);
+                }
+              }
+            }
+
+            return normalizeWikiMultilineText(chunks.join('\n'));
+          }
+
+          function parseBandPostDetails(text){
+            const normalized = normalizeBandMessageText(text);
+            const lines = normalized.split(/\n+/).map(line => line.trim()).filter(Boolean);
+            const details = {
+              text: normalized,
+              title: lines[0] || '',
+              branch: '',
+              jobType: '',
+              triggeredBy: '',
+              commitMessage: '',
+              mergeRequestUrl: '',
+              pipelineUrl: ''
+            };
+
+            const commitLines = [];
+            let captureCommit = false;
+
+            for(const rawLine of lines.slice(1)){
+              const line = rawLine.trim();
+              if(!line) continue;
+              const plain = line.replace(/^[\\\-\s*]+/, '').trim();
+              const mrMatch = line.match(/https?:\/\/gitlab\.wildberries\.ru\/\S*?\/merge_requests\/\d+\/?/i);
+              if(mrMatch && !details.mergeRequestUrl) details.mergeRequestUrl = mrMatch[0];
+
+              if(/^Pipeline:/i.test(plain)){
+                const pipelineMatch = line.match(/https?:\/\/\S+/i);
+                if(pipelineMatch && !details.pipelineUrl) details.pipelineUrl = pipelineMatch[0];
+                captureCommit = false;
+                continue;
+              }
+              if(/^Branch:/i.test(plain)){
+                details.branch = plain.replace(/^Branch:\s*/i, '').trim();
+                captureCommit = false;
+                continue;
+              }
+              if(/^Job Type:/i.test(plain)){
+                details.jobType = plain.replace(/^Job Type:\s*/i, '').trim();
+                captureCommit = false;
+                continue;
+              }
+              if(/^Triggered By:/i.test(plain)){
+                details.triggeredBy = plain.replace(/^Triggered By:\s*/i, '').trim();
+                captureCommit = false;
+                continue;
+              }
+              if(/^Commit Message:/i.test(plain)){
+                captureCommit = true;
+                const rest = plain.replace(/^Commit Message:\s*/i, '').trim();
+                if(rest) commitLines.push(rest);
+                continue;
+              }
+
+              if(captureCommit){
+                if(
+                  /^See merge request\b/i.test(plain) ||
+                  /^Please review the pipeline\b/i.test(plain) ||
+                  /^Details:\b/i.test(plain) ||
+                  /^Детали:\b/i.test(plain) ||
+                  /^Pipeline:\b/i.test(plain) ||
+                  /^Branch:\b/i.test(plain) ||
+                  /^Job Type:\b/i.test(plain) ||
+                  /^Triggered By:\b/i.test(plain)
+                ){
+                  captureCommit = false;
+                }else{
+                  commitLines.push(plain);
+                  continue;
+                }
+              }
+            }
+
+            details.commitMessage = normalizeWikiMultilineText(commitLines.join('\n'));
+            return details;
+          }
+
+          function classifyBandAndroidDevPost(details){
+            const text = String(details?.text || '');
+            const branch = String(details?.branch || '').trim().toLowerCase();
+            if(branch && branch !== 'dev') return '';
+            if(!branch && !/\bbranch:\s*`?dev`?\b/i.test(text)) return '';
+
+            const lower = text.toLowerCase();
+            if(/alert:\s*build debug failed/i.test(text) || lower.includes('дев поломан') || lower.includes('dev сломан')){
+              return 'fail';
+            }
+            if(lower.includes('dev починен') || lower.includes('dev снова зеленый') || lower.includes('dev снова зелёный') || lower.includes('дев снова работает')){
+              return 'recovery';
+            }
+            return '';
+          }
+
+          function parseBandAndroidDevEvent(post){
+            const createdAtMs = Number(post?.create_at);
+            if(!Number.isFinite(createdAtMs) || createdAtMs <= 0) return null;
+
+            const text = extractBandPostText(post);
+            if(!text) return null;
+
+            const details = parseBandPostDetails(text);
+            const kind = classifyBandAndroidDevPost(details);
+            if(!kind) return null;
+
+            return {
+              ...details,
+              id: String(post?.id || ''),
+              kind,
+              createdAtMs,
+              createdAt: new Date(createdAtMs)
+            };
+          }
+
+          function getBandDowntimeFetchWindow(releaseMarkers){
+            const msList = [];
+            for(const marker of (releaseMarkers || [])){
+              if(Number.isFinite(marker?.fromMs)) msList.push(marker.fromMs);
+              if(Number.isFinite(marker?.toMs)) msList.push(marker.toMs);
+            }
+            if(!msList.length){
+              return {
+                sinceMs: Date.now() - BAND_DEFAULT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+                untilMs: null
+              };
+            }
+            return {
+              sinceMs: Math.max(0, Math.min(...msList) - BAND_LOOKBACK_BUFFER_DAYS * 24 * 60 * 60 * 1000),
+              untilMs: Math.max(...msList) + BAND_LOOKBACK_BUFFER_DAYS * 24 * 60 * 60 * 1000
+            };
+          }
+
+          function filterDowntimeRowsByWindow(rows, sinceMs, untilMs){
+            return (rows || []).filter(row => {
+              const { startMs, endMs } = getDevDowntimeRowRange(row);
+              if(Number.isFinite(sinceMs) && Number.isFinite(endMs) && endMs < sinceMs) return false;
+              if(Number.isFinite(untilMs) && Number.isFinite(startMs) && startMs > untilMs) return false;
+              return true;
+            });
+          }
+
+          function buildAndroidDevDowntimeRows(posts){
+            const events = (posts || [])
+              .map(parseBandAndroidDevEvent)
+              .filter(Boolean)
+              .sort((a, b) => a.createdAtMs - b.createdAtMs);
+
+            const rowsByKey = new Map();
+            let sourceIndex = 0;
+            let activeFailure = null;
+
+            const ensureRow = (date) => {
+              const key = date.getTime();
+              if(rowsByKey.has(key)) return rowsByKey.get(key);
+              const row = {
+                rawDate: formatDevDowntimeDayLabel(date),
+                shortDate: formatDevDowntimeShortDayLabel(date),
+                sortDate: date,
+                sortKey: key,
+                totalMinutes: 0,
+                intervals: [],
+                warnings: [],
+                sourceIndex: sourceIndex++
+              };
+              rowsByKey.set(key, row);
+              return row;
+            };
+
+            for(const event of events){
+              if(event.kind === 'fail'){
+                if(!activeFailure){
+                  activeFailure = {
+                    ...event,
+                    repeatedFailures: []
+                  };
+                }else{
+                  activeFailure.repeatedFailures.push(event);
+                }
+                continue;
+              }
+
+              if(event.kind !== 'recovery' || !activeFailure) continue;
+              if(event.createdAtMs < activeFailure.createdAtMs) continue;
+
+              const start = new Date(activeFailure.createdAtMs);
+              const end = new Date(event.createdAtMs);
+              const durationMinutes = Math.round((event.createdAtMs - activeFailure.createdAtMs) / 60000);
+              if(durationMinutes < 0) continue;
+
+              const rowDate = buildNaiveDate(end.getFullYear(), end.getMonth(), end.getDate());
+              const row = ensureRow(rowDate);
+              const repeatedFailures = Array.isArray(activeFailure.repeatedFailures) ? activeFailure.repeatedFailures.length : 0;
+
+              row.intervals.push({
+                start,
+                end,
+                durationMinutes,
+                failTriggeredBy: activeFailure.triggeredBy,
+                recoveryTriggeredBy: event.triggeredBy,
+                failCommitMessage: activeFailure.commitMessage,
+                recoveryCommitMessage: event.commitMessage,
+                failMergeRequestUrl: activeFailure.mergeRequestUrl,
+                recoveryMergeRequestUrl: event.mergeRequestUrl,
+                failPipelineUrl: activeFailure.pipelineUrl,
+                recoveryPipelineUrl: event.pipelineUrl,
+                failTitle: activeFailure.title,
+                recoveryTitle: event.title,
+                failText: activeFailure.text,
+                recoveryText: event.text,
+                repeatedFailures
+              });
+              row.totalMinutes += durationMinutes;
+              if(repeatedFailures){
+                row.warnings.push(`До восстановления было ${repeatedFailures + 1} fail-сообщения подряд`);
+              }
+              activeFailure = null;
+            }
+
+            return Array.from(rowsByKey.values()).sort((a, b) => (a.sortKey - b.sortKey) || (a.sourceIndex - b.sourceIndex));
+          }
+
+          function renderAndroidDevDowntimeRow(row){
+            if(!androidDevDowntimeTbody || !row) return;
+            const tr = document.createElement('tr');
+
+            const makeCell = (text, className = 'text-left dev-downtime-cell') => {
+              const td = document.createElement('td');
+              td.className = className;
+              td.textContent = text || '—';
+              return td;
+            };
+
+            const intervalLines = row.intervals.length
+              ? row.intervals.map((interval, idx) => `${idx + 1}) ${formatDevDowntimeDateTime(interval.start)} -> ${formatDevDowntimeDateTime(interval.end)} (${formatDevDowntimeMinutes(interval.durationMinutes)})`).join('\n')
+              : '—';
+            const brokenLines = row.intervals.length
+              ? row.intervals.map((interval, idx) => `${idx + 1}) ${normalizeWikiInlineText(interval.failTriggeredBy || '') || '—'}`).join('\n')
+              : '—';
+            const fixedLines = row.intervals.length
+              ? row.intervals.map((interval, idx) => `${idx + 1}) ${normalizeWikiInlineText(interval.recoveryTriggeredBy || '') || '—'}`).join('\n')
+              : '—';
+
+            const commentLines = [];
+            for(let index = 0; index < row.intervals.length; index += 1){
+              const interval = row.intervals[index];
+              const parts = [];
+              if(interval.failCommitMessage) parts.push(`fail: ${normalizeWikiInlineText(interval.failCommitMessage)}`);
+              if(interval.recoveryCommitMessage) parts.push(`fix: ${normalizeWikiInlineText(interval.recoveryCommitMessage)}`);
+              if(interval.failMergeRequestUrl) parts.push(`MR fail: ${interval.failMergeRequestUrl}`);
+              if(interval.recoveryMergeRequestUrl && interval.recoveryMergeRequestUrl !== interval.failMergeRequestUrl){
+                parts.push(`MR fix: ${interval.recoveryMergeRequestUrl}`);
+              }
+              if(interval.repeatedFailures){
+                parts.push(`повторных fail до восстановления: ${interval.repeatedFailures}`);
+              }
+              if(parts.length) commentLines.push(`${index + 1}) ${parts.join(' | ')}`);
+            }
+            if(row.warnings.length){
+              commentLines.push(`Не удалось полностью распарсить: ${row.warnings.join('; ')}`);
+            }
+
+            tr.appendChild(makeCell(row.rawDate, 'mono text-left dev-downtime-cell dev-downtime-cell--compact'));
+            tr.appendChild(makeCell(formatDevDowntimeWeekdayLabel(row) || '—', 'mono text-center dev-downtime-cell dev-downtime-cell--compact'));
+            tr.appendChild(makeCell(row.releaseShort || '—', 'mono text-center dev-downtime-cell dev-downtime-cell--compact'));
+            tr.appendChild(makeCell(formatDevDowntimeMinutes(row.totalMinutes), 'mono text-center font-semibold dev-downtime-cell dev-downtime-cell--compact'));
+            tr.appendChild(makeCell(intervalLines));
+            tr.appendChild(makeCell(brokenLines));
+            tr.appendChild(makeCell(fixedLines));
+            tr.appendChild(makeCell(commentLines.join('\n') || '—', row.warnings.length ? 'text-left dev-downtime-cell dev-downtime-warning' : 'text-left dev-downtime-cell'));
+            androidDevDowntimeTbody.appendChild(tr);
+          }
+
+          function updateAndroidDevDowntimeChart(rows){
+            if(!androidDevDowntimeChart) return;
+            androidDevDowntimeChart.data.labels = rows.map(row => row.releaseShort ? [row.shortDate || row.rawDate, `релиз ${row.releaseShort}`] : (row.shortDate || row.rawDate));
+            androidDevDowntimeChart.data.datasets[0].data = rows.map(row => Number(row.totalMinutes) || 0);
+            androidDevDowntimeChart.$rows = rows.slice();
+            androidDevDowntimeChart.update();
+          }
+
+          function renderAndroidDevDowntimeData(rows){
+            window.__androidDevDowntimeRowsAll = Array.isArray(rows) ? rows.slice() : [];
+            if(!rows?.length){
+              showAndroidDevDowntimeEmpty('Не удалось получить интервалы из канала Band');
+              return;
+            }
+            showAndroidDevDowntimeContent();
+            updateAndroidDevDowntimeChart(rows);
+            if(androidDevDowntimeTbody) androidDevDowntimeTbody.innerHTML = '';
+            rows.forEach(renderAndroidDevDowntimeRow);
+            if(androidDevDowntimeTableWrap) androidDevDowntimeTableWrap.style.display = rows.length ? '' : 'none';
+          }
+
+          async function loadAndroidDevDowntimeData(signal, options = {}){
+            const headers = bandHeaders();
+            if(!headers){
+              showAndroidDevDowntimeEmpty('Вставьте Band Cookies (чтение)');
+              return [];
+            }
+
+            const releaseMarkers = Array.isArray(options.releaseMarkers) ? options.releaseMarkers : [];
+            const { sinceMs, untilMs } = getBandDowntimeFetchWindow(releaseMarkers);
+
+            try{
+              const posts = await fetchBandChannelPostsSince(BAND_ANDROID_DEV_FAILURES_CHANNEL_ID, sinceMs, signal);
+              let rows = buildAndroidDevDowntimeRows(posts);
+              rows = filterDowntimeRowsByWindow(rows, sinceMs, untilMs);
+              if(releaseMarkers.length){
+                rows = filterDevDowntimeRowsByAssignedRelease(
+                  applyReleaseMarkersToDevDowntimeRows(rows, releaseMarkers),
+                  releaseMarkers
+                );
+              }
+              if(!rows.length){
+                showAndroidDevDowntimeEmpty(releaseMarkers.length
+                  ? 'Нет простоев DEV Android в выбранном диапазоне релизов'
+                  : 'Не удалось получить интервалы из канала Band');
+                return [];
+              }
+
+              renderAndroidDevDowntimeData(rows);
+              return rows;
+            }catch(e){
+              if(signal?.aborted) return [];
+              showAndroidDevDowntimeEmpty(`Ошибка Band: ${e?.message || e}`);
+              return [];
+            }
+          }
+
           // ---- helpers: UI/empty ----
           function setEmpty(text){
             if(!emptyBox) return;
@@ -6587,6 +8459,36 @@
             if(cutTableWrap) cutTableWrap.style.display = 'none';
           }
 
+          function setDevDowntimeEmpty(text){
+            if(!devDowntimeEmpty) return;
+            devDowntimeEmpty.textContent = text;
+            devDowntimeEmpty.style.display = '';
+          }
+          function showDevDowntimeContent(){
+            if(devDowntimeEmpty) devDowntimeEmpty.style.display = 'none';
+            if(devDowntimeContent) devDowntimeContent.style.display = '';
+          }
+          function showDevDowntimeEmpty(text){
+            setDevDowntimeEmpty(text);
+            if(devDowntimeContent) devDowntimeContent.style.display = 'none';
+            if(devDowntimeTableWrap) devDowntimeTableWrap.style.display = 'none';
+          }
+
+          function setAndroidDevDowntimeEmpty(text){
+            if(!androidDevDowntimeEmpty) return;
+            androidDevDowntimeEmpty.textContent = text;
+            androidDevDowntimeEmpty.style.display = '';
+          }
+          function showAndroidDevDowntimeContent(){
+            if(androidDevDowntimeEmpty) androidDevDowntimeEmpty.style.display = 'none';
+            if(androidDevDowntimeContent) androidDevDowntimeContent.style.display = '';
+          }
+          function showAndroidDevDowntimeEmpty(text){
+            setAndroidDevDowntimeEmpty(text);
+            if(androidDevDowntimeContent) androidDevDowntimeContent.style.display = 'none';
+            if(androidDevDowntimeTableWrap) androidDevDowntimeTableWrap.style.display = 'none';
+          }
+
           function setRegressionEmpty(text){
             if(!regressionEmpty) return;
             regressionEmpty.textContent = text;
@@ -6644,9 +8546,12 @@
               showChpTypesEmpty('Данные появятся после получения из источника');
               setChpTypesPlatforms(false);
               showCutEmpty('Данные появятся после получения из источника');
+              showDevDowntimeEmpty('Данные появятся после получения из источника');
+              showAndroidDevDowntimeEmpty('Данные появятся после получения из источника');
               showRegressionEmpty('Данные появятся после получения из источника');
               showIosTypesEmpty('Данные появятся после получения из источника');
               showAndTypesEmpty('Данные появятся после получения из источника');
+              return window.__wbAbortController;
             }else{
               stopBtn.style.display = 'none';
               startBtn.style.display = '';
@@ -6655,6 +8560,7 @@
               }
               window.__wbAbortController = null;
             }
+            return null;
           }
 
           function saveInputs(){
@@ -6663,6 +8569,8 @@
             try{ localStorage.setItem(LS_YT_TOKEN_KEY, inpYtToken.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_YT_ENABLED_KEY, String(isYtRequestsEnabled())); }catch(e){}
             try{ localStorage.setItem(LS_GITLAB_COOKIE_KEY, inpGitlabCookie.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_WIKI_TOKEN_KEY, inpWikiToken.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_BAND_READ_COOKIES_KEY, inpBandCookiesRead.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' })); }catch(e){}
           }
 
@@ -6686,6 +8594,14 @@
             try{
               const gl = localStorage.getItem(LS_GITLAB_COOKIE_KEY) || '';
               if(inpGitlabCookie) inpGitlabCookie.value = gl;
+            }catch(e){}
+            try{
+              const wikiTok = localStorage.getItem(LS_WIKI_TOKEN_KEY) || '';
+              if(inpWikiToken) inpWikiToken.value = wikiTok;
+            }catch(e){}
+            try{
+              const bandCookies = localStorage.getItem(LS_BAND_READ_COOKIES_KEY) || '';
+              if(inpBandCookiesRead) inpBandCookiesRead.value = bandCookies;
             }catch(e){}
             try{
               const raw = localStorage.getItem(LS_RANGE_KEY);
@@ -6772,6 +8688,24 @@
               });
               cutChart.update();
             }
+            if(devDowntimeTbody) devDowntimeTbody.innerHTML = '';
+            if(devDowntimeTableWrap) devDowntimeTableWrap.style.display = 'none';
+            if(devDowntimeChart){
+              devDowntimeChart.data.labels = [];
+              devDowntimeChart.data.datasets.forEach(d => d.data = []);
+              devDowntimeChart.$rows = [];
+              devDowntimeChart.update();
+            }
+            window.__devDowntimeRowsAll = [];
+            if(androidDevDowntimeTbody) androidDevDowntimeTbody.innerHTML = '';
+            if(androidDevDowntimeTableWrap) androidDevDowntimeTableWrap.style.display = 'none';
+            if(androidDevDowntimeChart){
+              androidDevDowntimeChart.data.labels = [];
+              androidDevDowntimeChart.data.datasets.forEach(d => d.data = []);
+              androidDevDowntimeChart.$rows = [];
+              androidDevDowntimeChart.update();
+            }
+            window.__androidDevDowntimeRowsAll = [];
             if(regressionChart){
               regressionChart.data.labels = [];
               regressionChart.data.datasets.forEach(d => {
@@ -8447,6 +10381,197 @@
             });
           }
 
+          function ensureDevDowntimeChart(){
+            if(!devDowntimeCanvas || !window.Chart) return;
+            if(devDowntimeChart){
+              devDowntimeChart.data.labels = [];
+              devDowntimeChart.data.datasets.forEach(d => d.data = []);
+              devDowntimeChart.$rows = [];
+              devDowntimeChart.update();
+              return;
+            }
+
+            const color = cssVar('--dev-downtime', '#dc2626');
+
+            devDowntimeChart = new Chart(devDowntimeCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  {
+                    label: 'Простой дева',
+                    data: [],
+                    borderColor: color,
+                    backgroundColor: color,
+                    tension: 0.25,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    spanGaps: true
+                  }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  pointValueLabels: {
+                    datasets: [0],
+                    useDatasetColor: true,
+                    offsetY: 14,
+                    minGap: 12,
+                    minTop: 12,
+                    font: '600 10px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial',
+                    strokeWidth: 3,
+                    skipZero: false,
+                    formatter: (value) => formatDevDowntimeMinutes(value)
+                  },
+                  tooltip: {
+                    mode: 'nearest',
+                    intersect: false,
+                    callbacks: {
+                      title: (items) => {
+                        const row = devDowntimeChart?.$rows?.[items?.[0]?.dataIndex];
+                        if(!row) return items?.[0]?.label || '';
+                        return row.releaseShort ? `${row.rawDate} · релиз ${row.releaseShort}` : row.rawDate;
+                      },
+                      label: (ctx) => {
+                        const row = devDowntimeChart?.$rows?.[ctx.dataIndex];
+                        const value = row?.totalMinutes ?? ctx.raw;
+                        return `Итого простой: ${formatDevDowntimeMinutes(value)}`;
+                      },
+                      afterBody: (items) => {
+                        const row = devDowntimeChart?.$rows?.[items?.[0]?.dataIndex];
+                        if(!row) return [];
+                        const lines = [];
+                        if(row.intervals.length){
+                          row.intervals.forEach((interval, idx) => {
+                            lines.push(`${idx + 1}. ${formatDevDowntimeDateTime(interval.start)} -> ${formatDevDowntimeDateTime(interval.end)} (${formatDevDowntimeMinutes(interval.durationMinutes)})`);
+                          });
+                        }
+                        if(row.domainText) lines.push(`Домен: ${normalizeWikiInlineText(row.domainText)}`);
+                        if(row.ownersText) lines.push(`Кто сломал: ${normalizeWikiInlineText(row.ownersText)}`);
+                        if(row.commentText) lines.push(`Комментарий: ${normalizeWikiInlineText(row.commentText)}`);
+                        if(row.warnings.length) lines.push(`Не полностью распарсено: ${row.warnings.join('; ')}`);
+                        return lines;
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'nearest', intersect: false },
+                scales: {
+                  x: {
+                    ticks: { maxRotation: 0, autoSkip: false },
+                    grid: { color: 'rgba(148,163,184,.25)' }
+                  },
+                  y: {
+                    beginAtZero: true,
+                    grace: '16%',
+                    grid: { color: 'rgba(148,163,184,.25)' },
+                    ticks: {
+                      callback: (value) => formatDevDowntimeAxisLabel(value)
+                    }
+                  }
+                }
+              }
+            });
+          }
+
+          function ensureAndroidDevDowntimeChart(){
+            if(!androidDevDowntimeCanvas || !window.Chart) return;
+            if(androidDevDowntimeChart){
+              androidDevDowntimeChart.data.labels = [];
+              androidDevDowntimeChart.data.datasets.forEach(d => d.data = []);
+              androidDevDowntimeChart.$rows = [];
+              androidDevDowntimeChart.update();
+              return;
+            }
+
+            const color = cssVar('--dev-downtime-android', '#16a34a');
+
+            androidDevDowntimeChart = new Chart(androidDevDowntimeCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  {
+                    label: 'Простой дева Android',
+                    data: [],
+                    borderColor: color,
+                    backgroundColor: color,
+                    tension: 0.25,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    spanGaps: true
+                  }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  pointValueLabels: {
+                    datasets: [0],
+                    useDatasetColor: true,
+                    offsetY: 14,
+                    minGap: 12,
+                    minTop: 12,
+                    font: '600 10px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial',
+                    strokeWidth: 3,
+                    skipZero: false,
+                    formatter: (value) => formatDevDowntimeMinutes(value)
+                  },
+                  tooltip: {
+                    mode: 'nearest',
+                    intersect: false,
+                    callbacks: {
+                      title: (items) => {
+                        const row = androidDevDowntimeChart?.$rows?.[items?.[0]?.dataIndex];
+                        if(!row) return items?.[0]?.label || '';
+                        return row.releaseShort ? `${row.rawDate} · релиз ${row.releaseShort}` : row.rawDate;
+                      },
+                      label: (ctx) => {
+                        const row = androidDevDowntimeChart?.$rows?.[ctx.dataIndex];
+                        const value = row?.totalMinutes ?? ctx.raw;
+                        return `Итого простой: ${formatDevDowntimeMinutes(value)}`;
+                      },
+                      afterBody: (items) => {
+                        const row = androidDevDowntimeChart?.$rows?.[items?.[0]?.dataIndex];
+                        if(!row) return [];
+                        const lines = [];
+                        if(row.intervals.length){
+                          row.intervals.forEach((interval, idx) => {
+                            lines.push(`${idx + 1}. ${formatDevDowntimeDateTime(interval.start)} -> ${formatDevDowntimeDateTime(interval.end)} (${formatDevDowntimeMinutes(interval.durationMinutes)})`);
+                            if(interval.failTriggeredBy) lines.push(`fail by: ${normalizeWikiInlineText(interval.failTriggeredBy)}`);
+                            if(interval.recoveryTriggeredBy) lines.push(`fix by: ${normalizeWikiInlineText(interval.recoveryTriggeredBy)}`);
+                            if(interval.failCommitMessage) lines.push(`fail commit: ${normalizeWikiInlineText(interval.failCommitMessage)}`);
+                            if(interval.recoveryCommitMessage) lines.push(`fix commit: ${normalizeWikiInlineText(interval.recoveryCommitMessage)}`);
+                          });
+                        }
+                        if(row.warnings.length) lines.push(`Не полностью распарсено: ${row.warnings.join('; ')}`);
+                        return lines;
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'nearest', intersect: false },
+                scales: {
+                  x: {
+                    ticks: { maxRotation: 0, autoSkip: false },
+                    grid: { color: 'rgba(148,163,184,.25)' }
+                  },
+                  y: {
+                    beginAtZero: true,
+                    grace: '16%',
+                    grid: { color: 'rgba(148,163,184,.25)' },
+                    ticks: {
+                      callback: (value) => formatDevDowntimeAxisLabel(value)
+                    }
+                  }
+                }
+              }
+            });
+          }
+
           function ensureRegressionChart(){
             if(!regressionCanvas || !window.Chart) return;
             if(regressionChart){
@@ -8979,6 +11104,8 @@
                 if(key === 'chpTypes') chpTypesIosChart?.resize();
                 if(key === 'chpTypes') chpTypesAndChart?.resize();
                 if(key === 'cut') cutChart?.resize();
+                if(key === 'devDowntime') devDowntimeChart?.resize();
+                if(key === 'androidDevDowntime') androidDevDowntimeChart?.resize();
                 if(key === 'regression') regressionChart?.resize();
                 if(key === 'iosTypes') iosTypesChart?.resize();
                 if(key === 'andTypes') andTypesChart?.resize();
@@ -9032,15 +11159,26 @@
             saveInputs();
             clear();
 
+            const ensureStandaloneDowntimeCharts = async () => {
+              ensureDevDowntimeChart();
+              ensureAndroidDevDowntimeChart();
+              await Promise.all([
+                loadDevDowntimeData(window.__wbAbortController?.signal),
+                loadAndroidDevDowntimeData(window.__wbAbortController?.signal)
+              ]);
+            };
+
             const tok = (inpAllureToken?.value || '').trim();
             if(!tok){
               showEmpty('Вставьте API токен Allure');
+              await ensureStandaloneDowntimeCharts();
               return;
             }
 
             const releases = buildMajorRange();
             if(!releases.length){
               showEmpty('Укажите корректный диапазон (например 7.4.1000 → 7.4.4000 или 7.3.7 → 7.4.2)');
+              await ensureStandaloneDowntimeCharts();
               return;
             }
             populateAllReleaseFilters(releases);
@@ -9053,6 +11191,8 @@
             ensureChpTypesChart();
             ensureChpTypesPlatformCharts();
             ensureCutChart();
+            ensureDevDowntimeChart();
+            ensureAndroidDevDowntimeChart();
             ensureRegressionChart();
 
             showContent();
@@ -9061,6 +11201,8 @@
             showAvgContent();
             showChpContent();
             showCutContent();
+            showDevDowntimeContent();
+            showAndroidDevDowntimeContent();
             if(getGitlabCookie()){
               showRegressionContent();
             }else{
@@ -9070,6 +11212,7 @@
             showAndTypesContent();
 
             const signal = window.__wbAbortController?.signal;
+            const devDowntimePromise = loadDevDowntimeData(signal);
 
             tbody.innerHTML = '<tr><td class="mono text-left" colspan="5">Сбор данных…</td></tr>';
 
@@ -9087,6 +11230,7 @@
             const uwuStreamByRelease = [];
             let tcStreamDeltaRowsAll = [];
             const releaseTimelineByRelease = Object.create(null);
+            const releaseMarkersMap = new Map();
 
             let firstRow = true;
             window.__iosTypesRowsAll = [];
@@ -9094,6 +11238,8 @@
             window.__chpTypesRowsAll = [];
             window.__chpTypesRowsIosAll = [];
             window.__chpTypesRowsAndAll = [];
+            window.__devDowntimeRowsAll = [];
+            window.__androidDevDowntimeRowsAll = [];
             window.__releaseRangeAll = releases.slice();
 
             for(const rel of releases){
@@ -9119,8 +11265,13 @@
                 const launches = await fetchLaunches(rel, kind, signal);
                 for(const l of launches){
                   const id = Number(l?.id);
-                  if(Number.isFinite(id)) launchMapAll.set(id, id);
+                  if(Number.isFinite(id)) launchMapAll.set(id, l);
                 }
+              }
+              const allLaunches = Array.from(launchMapAll.values());
+              for(const launch of allLaunches){
+                const launchDateMs = extractLaunchDateMs(launch);
+                collectReleaseMarker(releaseMarkersMap, rel, launchDateMs, 'allure');
               }
               const idsAll = Array.from(launchMapAll.keys());
 
@@ -9389,12 +11540,16 @@
 
                 const iosCut = yValueFromIsoCut(ios.cutoff);
                 const andCut = yValueFromIsoCut(andr.cutoff);
+                collectReleaseMarker(releaseMarkersMap, rel, Number(iosCut?.msLocal), 'deploy');
+                collectReleaseMarker(releaseMarkersMap, rel, Number(andCut?.msLocal), 'deploy');
 
                 const iosStore = yValueFromMsLocalCut(ios.storeMsLocal);
                 if(iosStore) iosStore.lastChp = lastChpIos || '';
+                collectReleaseMarker(releaseMarkersMap, rel, Number(iosStore?.msLocal), 'deploy');
 
                 const andStore = yValueFromMsLocalCut(andr.storeMsLocal);
                 if(andStore) andStore.lastChp = lastChpAndr || '';
+                collectReleaseMarker(releaseMarkersMap, rel, Number(andStore?.msLocal), 'deploy');
 
                 addCutPoint(rel, 0, iosCut);
                 addCutPoint(rel, 1, andCut);
@@ -9737,6 +11892,16 @@
             if(regressionTableWrap && regressionTbody && regressionTbody.children.length){
               regressionTableWrap.style.display = '';
             }
+            const releaseMarkers = buildReleaseMarkersList(releaseMarkersMap);
+            const devDowntimeRows = await devDowntimePromise;
+            if(devDowntimeRows?.length){
+              const matchedDevDowntimeRows = filterDevDowntimeRowsByAssignedRelease(
+                applyReleaseMarkersToDevDowntimeRows(devDowntimeRows, releaseMarkers),
+                releaseMarkers
+              );
+              renderDevDowntimeData(matchedDevDowntimeRows);
+            }
+            await loadAndroidDevDowntimeData(signal, { releaseMarkers });
             applyAllReleaseFilters();
 
             if(!tcRowsData.length) showEmpty('Данные появятся после получения из источника');
@@ -9757,6 +11922,8 @@
           showChpEmpty('Данные появятся после получения из источника');
           showChpTypesEmpty('Данные появятся после получения из источника');
           showCutEmpty('Данные появятся после получения из источника');
+          showDevDowntimeEmpty('Данные появятся после получения из источника');
+          showAndroidDevDowntimeEmpty('Данные появятся после получения из источника');
           showRegressionEmpty('Данные появятся после получения из источника');
           showIosTypesEmpty('Данные появятся после получения из источника');
           showAndTypesEmpty('Данные появятся после получения из источника');
@@ -9798,16 +11965,16 @@
           });
 
           startBtn?.addEventListener('click', async () => {
+            const activeController = setRunning(true);
             try{
-              setRunning(true);
               await run();
             }catch(e){
-              if(!(window.__wbAbortController?.signal?.aborted)){
+              if(!isAbortLikeError(e, activeController?.signal)){
                 console.error(e);
                 showEmpty(`Ошибка получения данных: ${e?.message || e}`);
               }
             }finally{
-              if(!window.__wbAbortController?.signal?.aborted){
+              if(window.__wbAbortController === activeController && !activeController?.signal?.aborted){
                 setRunning(false);
               }
             }
