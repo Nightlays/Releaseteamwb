@@ -206,6 +206,8 @@ input:focus::placeholder{
 .dot-ios-store{background:var(--cut-ios-store,#7c3aed)}
 .dot-android-cutoff{background:var(--cut-android-cutoff,#22c55e)}
 .dot-android-store{background:var(--cut-android-store,#f59e0b)}
+.dot-regression-ios{background:var(--regression-ios,#38bdf8)}
+.dot-regression-android{background:var(--regression-android,#8b5cf6)}
 
 /* На всякий случай, если в style.css нет базового вида точек */
 .legend .dot{width:10px;height:10px;border-radius:9999px;display:inline-block;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
@@ -1000,6 +1002,8 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
       --cut-ios-store:#ef4444;
       --cut-android-cutoff:#14b8a6;
       --cut-android-store:#f59e0b;
+      --regression-ios:#38bdf8;
+      --regression-android:#8b5cf6;
     }
     .wb-graphs .overflow-auto{
       overflow:visible;
