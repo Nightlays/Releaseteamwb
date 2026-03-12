@@ -25,7 +25,7 @@
           <div class="flex items-center gap-2">
             <div class="font-extrabold leading-tight">WB All Table</div>
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v0.2.26</span>
+              <span aria-hidden="true">🏷️</span><span>v0.2.27</span>
             </span>
             <button id="exportPdfBtn"
               class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
@@ -73,8 +73,18 @@
                 <input class="input" id="deployToken" type="password" autocomplete="off" placeholder="Вставьте Deploy-lab token" />
               </div>
               <div class="md:col-span-6">
-                <label class="block text-xs font-semibold text-[#111827] mb-1">YouTrack token</label>
+                <div class="flex items-center justify-between gap-3 mb-1">
+                  <label class="block text-xs font-semibold text-[#111827]">YouTrack token</label>
+                  <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 whitespace-nowrap">
+                    <input type="checkbox" id="ytRequestsEnabled" checked />
+                    Запросы в YT
+                  </label>
+                </div>
                 <input class="input" id="ytToken" type="password" autocomplete="off" placeholder="Вставьте YouTrack token" />
+              </div>
+              <div class="md:col-span-6">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Куки GitLab</label>
+                <input class="input" id="gitlabCookie" type="password" autocomplete="off" placeholder="known_sign_in=...; _gitlab_session=..." />
               </div>
             </div>
 
@@ -130,6 +140,14 @@
             <div id="tcContent" class="tc-content" style="display:none;">
               <div class="chart-viewport" id="tcTrendViewport">
                 <canvas id="tcTrendChart" aria-label="Test cases chart" role="img"></canvas>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-start gap-3 px-4 pb-2">
+                <div class="legend">
+                  <span class="lg-item"><span class="dot dot-manual"></span><span class="lg-text">Ручные</span></span>
+                  <span class="lg-item"><span class="dot dot-auto"></span><span class="lg-text">Авто</span></span>
+                  <span class="lg-item"><span class="dot dot-total"></span><span class="lg-text">Всего</span></span>
+                </div>
               </div>
 
               <div id="tcStreamDeltaWrap" class="px-4 pb-4 pt-2 table-block">
@@ -201,14 +219,6 @@
               </div>
             </div>
           </div>
-
-          <div class="flex flex-wrap items-center justify-start gap-3">
-            <div class="legend">
-              <span class="lg-item"><span class="dot dot-manual"></span><span class="lg-text">Ручные</span></span>
-              <span class="lg-item"><span class="dot dot-auto"></span><span class="lg-text">Авто</span></span>
-              <span class="lg-item"><span class="dot dot-total"></span><span class="lg-text">Всего</span></span>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -237,6 +247,13 @@
                 <canvas id="covTrendChart" aria-label="SWAT/STREAM coverage chart" role="img"></canvas>
               </div>
 
+              <div class="flex flex-wrap items-center justify-start gap-3 px-4 pb-2">
+                <div class="legend">
+                  <span class="lg-item"><span class="dot dot-swat"></span><span class="lg-text">SWAT</span></span>
+                  <span class="lg-item"><span class="dot dot-stream"></span><span class="lg-text">STREAM</span></span>
+                </div>
+              </div>
+
               <div id="covTableWrap" class="table-block" style="display:none;">
                 <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
                   <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
@@ -262,13 +279,6 @@
                   </table>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-start gap-3">
-            <div class="legend">
-              <span class="lg-item"><span class="dot dot-swat"></span><span class="lg-text">SWAT</span></span>
-              <span class="lg-item"><span class="dot dot-stream"></span><span class="lg-text">STREAM</span></span>
             </div>
           </div>
         </div>
@@ -299,6 +309,13 @@
                 <canvas id="selTrendChart" aria-label="SWAT/STREAM Selective chart" role="img"></canvas>
               </div>
 
+              <div class="flex flex-wrap items-center justify-start gap-3 px-4 pb-2">
+                <div class="legend">
+                  <span class="lg-item"><span class="dot dot-swat"></span><span class="lg-text">SWAT</span></span>
+                  <span class="lg-item"><span class="dot dot-stream"></span><span class="lg-text">STREAM</span></span>
+                </div>
+              </div>
+
               <div id="selTableWrap" class="table-block" style="display:none;">
                 <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
                   <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
@@ -324,13 +341,6 @@
                   </table>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-start gap-3">
-            <div class="legend">
-              <span class="lg-item"><span class="dot dot-swat"></span><span class="lg-text">SWAT</span></span>
-              <span class="lg-item"><span class="dot dot-stream"></span><span class="lg-text">STREAM</span></span>
             </div>
           </div>
         </div>
@@ -361,6 +371,14 @@
                 <canvas id="avgTrendChart" aria-label="Average HB time chart" role="img"></canvas>
               </div>
 
+              <div class="flex flex-wrap items-center justify-start gap-3 px-4 pb-2">
+                <div class="legend">
+                  <span class="lg-item"><span class="dot dot-swat"></span><span class="lg-text">SWAT</span></span>
+                  <span class="lg-item"><span class="dot dot-stream"></span><span class="lg-text">STREAM</span></span>
+                  <span class="lg-item"><span class="dot dot-total"></span><span class="lg-text">Общее</span></span>
+                </div>
+              </div>
+
               <div id="avgTableWrap" class="table-block" style="display:none;">
                 <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
                   <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
@@ -384,14 +402,6 @@
                   </table>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-start gap-3">
-            <div class="legend">
-              <span class="lg-item"><span class="dot dot-swat"></span><span class="lg-text">SWAT</span></span>
-              <span class="lg-item"><span class="dot dot-stream"></span><span class="lg-text">STREAM</span></span>
-              <span class="lg-item"><span class="dot dot-total"></span><span class="lg-text">Общее</span></span>
             </div>
           </div>
         </div>
@@ -422,6 +432,14 @@
                 <canvas id="chpTrendChart" aria-label="Cherepiki chart" role="img"></canvas>
               </div>
 
+              <div class="flex flex-wrap items-center justify-start gap-3 px-4 pb-2">
+                <div class="legend">
+                  <span class="lg-item"><span class="dot dot-chp-ios"></span><span class="lg-text">iOS</span></span>
+                  <span class="lg-item"><span class="dot dot-chp-android"></span><span class="lg-text">Android</span></span>
+                  <span class="lg-item"><span class="dot dot-chp-total"></span><span class="lg-text">Всего</span></span>
+                </div>
+              </div>
+
               <div id="chpTableWrap" class="table-block" style="display:none;">
                 <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
                   <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
@@ -445,14 +463,6 @@
                   </table>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-start gap-3">
-            <div class="legend">
-              <span class="lg-item"><span class="dot dot-chp-ios"></span><span class="lg-text">iOS</span></span>
-              <span class="lg-item"><span class="dot dot-chp-android"></span><span class="lg-text">Android</span></span>
-              <span class="lg-item"><span class="dot dot-chp-total"></span><span class="lg-text">Всего</span></span>
             </div>
           </div>
         </div>
@@ -567,6 +577,15 @@
                 <canvas id="cutTrendChart" aria-label="Cutoff & Store chart" role="img"></canvas>
               </div>
 
+              <div class="flex flex-wrap items-center justify-start gap-3 px-4 pb-2">
+                <div class="legend">
+                  <span class="lg-item"><span class="dot dot-ios-cutoff"></span><span class="lg-text">iOS Cutoff</span></span>
+                  <span class="lg-item"><span class="dot dot-ios-store"></span><span class="lg-text">iOS Store</span></span>
+                  <span class="lg-item"><span class="dot dot-android-cutoff"></span><span class="lg-text">Android Cutoff</span></span>
+                  <span class="lg-item"><span class="dot dot-android-store"></span><span class="lg-text">Android Store</span></span>
+                </div>
+              </div>
+
               <div id="cutTableWrap" class="table-block" style="display:none;">
                 <div class="table-filter-row flex items-center gap-2 flex-wrap px-4 pt-2 justify-end">
                   <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
@@ -575,11 +594,6 @@
                     <div class="dropdown-list release-filter-list"></div>
                   </div>
                   <select id="cutReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
-                </div>
-                <div class="cutoff-legend px-4 pt-1 text-xs text-slate-600 flex items-center gap-3 flex-wrap">
-                  <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>13:50-14:10 — старт вовремя</span>
-                  <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>раньше 13:50 или позже 14:10 — отклонение от целевого времени</span>
-                  <span class="cutoff-item"><span class="cutoff-dot cutoff-store-late"></span>после 18:00 — отправка позже</span>
                 </div>
                 <div class="table-scroll-x">
                   <table id="cutTable">
@@ -595,22 +609,78 @@
                     <tbody id="cutTbody"></tbody>
                   </table>
                 </div>
+                <div class="cutoff-legend px-4 pt-2 pb-3 text-xs text-slate-600 flex items-center gap-3 flex-wrap">
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-on"></span>13:50-14:10 — старт вовремя</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-late"></span>раньше 13:50 или позже 14:10 — отклонение от целевого времени</span>
+                  <span class="cutoff-item"><span class="cutoff-dot cutoff-store-late"></span>после 18:00 — отправка позже</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7) Время старта регресса -->
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Время старта регресса</h2>
+          </div>
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white"
+            data-collapse-btn="regression" aria-expanded="true">
+            <span data-collapse-ico aria-hidden="true">▾</span>
+            <span data-collapse-text>Свернуть</span>
+          </button>
+        </div>
+
+        <div data-collapse-body="regression" class="space-y-4">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <div id="regressionEmpty" class="p-6 text-center text-sm text-slate-500 bg-white flex items-center justify-center empty-min-520" aria-live="polite">
+              Данные появятся после получения из источника
+            </div>
+
+            <div id="regressionContent" class="tc-content" style="display:none;">
+              <div class="chart-viewport" id="regressionTrendViewport">
+                <canvas id="regressionTrendChart" aria-label="Regression start chart" role="img"></canvas>
               </div>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-start gap-3">
             <div class="legend">
-              <span class="lg-item"><span class="dot dot-ios-cutoff"></span><span class="lg-text">iOS Cutoff</span></span>
-              <span class="lg-item"><span class="dot dot-ios-store"></span><span class="lg-text">iOS Store</span></span>
-              <span class="lg-item"><span class="dot dot-android-cutoff"></span><span class="lg-text">Android Cutoff</span></span>
-              <span class="lg-item"><span class="dot dot-android-store"></span><span class="lg-text">Android Store</span></span>
+              <span class="lg-item"><span class="dot dot-regression-ios"></span><span class="lg-text">iOS</span></span>
+              <span class="lg-item"><span class="dot dot-regression-android"></span><span class="lg-text">Android</span></span>
+            </div>
+          </div>
+
+          <div id="regressionTableWrap" class="table-block" style="display:none;">
+            <div class="table-filter-row flex items-center gap-2 flex-wrap pt-2 justify-end">
+              <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+              <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="regressionReleaseFilter">
+                <div class="dropdown-selected truncate">Все релизы</div>
+                <div class="dropdown-list release-filter-list"></div>
+              </div>
+              <select id="regressionReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
+            </div>
+            <div class="table-scroll-x">
+              <table id="regressionTable">
+                <thead>
+                  <tr>
+                    <th class="text-left">Релиз</th>
+                    <th>Время старта iOS</th>
+                    <th>Время старта Android</th>
+                  </tr>
+                </thead>
+                <tbody id="regressionTbody"></tbody>
+              </table>
             </div>
           </div>
         </div>
       </section>
 
-<!-- 7) Типы задач релиза iOS -->
+<!-- 8) Типы задач релиза iOS -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -777,11 +847,32 @@
           const DEPLOY_BASE_URL_TMPL   = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
           const DEPLOY_DEPLOY_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/deploy';
           const DEPLOY_ISSUES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/issues';
+          const GITLAB_BASE_URL = 'https://gitlab.wildberries.ru';
+          const GITLAB_GRAPHQL_URL = `${GITLAB_BASE_URL}/api/graphql`;
+          const GITLAB_PIPELINE_PAGE_SIZE = 100;
+          const GITLAB_PIPELINE_CONFIG = {
+            IOS: {
+              fullPath: 'mobile/ios/marketplace',
+              pipelinesUrl: `${GITLAB_BASE_URL}/mobile/ios/marketplace/-/pipelines.json`,
+              scope: 'finished',
+              jobName: 'build_for_testflight',
+              offsetMinutes: 15
+            },
+            ANDROID: {
+              fullPath: 'mobile/androidnative/androidnative',
+              pipelinesUrl: `${GITLAB_BASE_URL}/mobile/androidnative/androidnative/-/pipelines.json`,
+              scope: 'all',
+              jobName: 'build_qa',
+              offsetMinutes: 0
+            }
+          };
 
           const LS_TOKEN_KEY = 'swat_uwu_token';
           const LS_RANGE_KEY = 'swat_uwu_release_range';
           const LS_DEPLOY_KEY = 'wb_all_table_deploy_token';
           const LS_YT_TOKEN_KEY = 'wb_all_table_yt_token';
+          const LS_YT_ENABLED_KEY = 'wb_all_table_yt_enabled';
+          const LS_GITLAB_COOKIE_KEY = 'wb_all_table_gitlab_cookie';
           const YT_BASE_URL = 'https://youtrack.wildberries.ru';
 
           const startBtn = document.getElementById('startBtn');
@@ -802,6 +893,8 @@
           const inpAllureToken = document.getElementById('allureToken');
           const inpDeployToken = document.getElementById('deployToken');
           const inpYtToken = document.getElementById('ytToken');
+          const inpYtRequestsEnabled = document.getElementById('ytRequestsEnabled');
+          const inpGitlabCookie = document.getElementById('gitlabCookie');
           const mlSummaryBody = document.getElementById('mlSummaryBody');
           const mlSaveBtn = document.getElementById('mlSaveBtn');
           const mlLabelOkBtn = document.getElementById('mlLabelOk');
@@ -830,7 +923,7 @@
         function disableChartTooltips(){
           const list = [
             tcChart, covChart, selChart, avgChart, chpChart, chpTypesChart, chpTypesIosChart, chpTypesAndChart,
-            cutChart, iosTypesChart, andTypesChart
+            cutChart, regressionChart, iosTypesChart, andTypesChart
           ].filter(Boolean);
           const stash = [];
           for(const ch of list){
@@ -854,7 +947,7 @@
         function resizeChartsForPdf(){
           const list = [
             tcChart, covChart, selChart, avgChart, chpChart, chpTypesChart, chpTypesIosChart, chpTypesAndChart,
-            cutChart, iosTypesChart, andTypesChart
+            cutChart, regressionChart, iosTypesChart, andTypesChart
           ].filter(Boolean);
           for(const ch of list){
             try{
@@ -1181,6 +1274,36 @@
           return chunks;
         }
 
+        const DEFAULT_RELEASE_FILTER_COUNT = 3;
+        const RELEASE_FILTER_DEFAULT_COUNTS = {
+          tcReleaseFilter: 0,
+          tcTableReleaseFilter: 1
+        };
+
+        function getDefaultReleaseFilterCount(sel){
+          const id = String(sel?.id || '').trim();
+          const raw = Object.prototype.hasOwnProperty.call(RELEASE_FILTER_DEFAULT_COUNTS, id)
+            ? RELEASE_FILTER_DEFAULT_COUNTS[id]
+            : DEFAULT_RELEASE_FILTER_COUNT;
+          const count = Number(raw);
+          return Number.isFinite(count) && count >= 0 ? Math.floor(count) : DEFAULT_RELEASE_FILTER_COUNT;
+        }
+
+        function markReleaseFilterTouched(sel){
+          if(sel) sel.dataset.releaseFilterTouched = '1';
+        }
+
+        function readReleaseFilterState(sel){
+          const opts = getRealOptions(sel);
+          if(!opts.length) return null;
+          const selected = opts.filter(o => o.selected).map(o => String(o.value));
+          return {
+            selected: new Set(selected),
+            allSelected: opts.every(o => o.selected),
+            noneSelected: selected.length === 0
+          };
+        }
+
         function buildPdfGridSection(sourceNodes = [], options = {}){
           const section = document.createElement('section');
           section.className = ['pdf-grid-section', ...(Array.isArray(options.sectionClassNames) ? options.sectionClassNames : [])]
@@ -1438,6 +1561,7 @@
           Array.from(clone.querySelectorAll('*')).reverse().forEach(el => {
             if(el === clone) return;
             if(el.classList.contains('table-block')) return;
+            if(el.classList.contains('dot') || el.classList.contains('cutoff-dot')) return;
             const tag = el.tagName.toLowerCase();
             if(['table','thead','tbody','tr','td','th','canvas'].includes(tag)) return;
             const hasText = !!String(el.textContent || '').trim();
@@ -1485,15 +1609,6 @@
 
             const { jsPDF } = window.jspdf;
 
-            // фиксируем ML-выгрузку и обновляем summary
-            try{
-              const entry = recordMlExport();
-              if(entry) await syncMlDatasetToDrive(false);
-              renderMlSummary();
-            }catch(e){
-              console.error('ML export error', e);
-            }
-
             const restoreTooltips = disableChartTooltips();
             const restoreCollapsed = expandCollapsedForPdf();
             let finalBlob = null;
@@ -1503,8 +1618,8 @@
               await waitForLayoutFrames(2);
               resizeChartsForPdf();
               await waitForLayoutFrames(2);
-              const summaryCard = document.getElementById('mlSummaryCard');
               const cards = Array.from(document.querySelectorAll('section.card'))
+                .filter(card => card.id !== 'mlSummaryCard')
                 .filter(card => (card.querySelector('canvas') || card.hasAttribute('data-export-card')) && window.getComputedStyle(card).display !== 'none');
 
               const buildPdfBlobForPreset = async (preset) => {
@@ -1570,27 +1685,6 @@
                     y = margin;
                   }
                 };
-
-                if(summaryCard){
-                  try{
-                    const summarySections = collectMlSummaryPdfSections(summaryCard);
-                    for(let i = 0; i < summarySections.length; i += 1){
-                      const section = summarySections[i];
-                      const summaryCanvas = await renderNodeInPdfSandbox(section.node, preset.summaryScale, {
-                        width: preset.summaryWidth,
-                        syncSource: section.syncSource || section.node,
-                        prepareClone(clone){
-                          clone.classList.add(...(section.classNames || []));
-                          clone.querySelector('.ml-summary-toolbar')?.remove();
-                        }
-                      });
-                      addCanvasToPdf(summaryCanvas, { kind: section.kind || 'summary' });
-                      hasBlocks = true;
-                    }
-                  }catch(e){
-                    console.error('ML summary capture error', e);
-                  }
-                }
 
                 if(hasBlocks && cards.length){
                   pdf.addPage();
@@ -4558,6 +4652,12 @@
           const cutTableWrap = document.getElementById('cutTableWrap');
           const cutReleaseFilter = document.getElementById('cutReleaseFilter');
           const cutCanvas = document.getElementById('cutTrendChart');
+          const regressionEmpty = document.getElementById('regressionEmpty');
+          const regressionContent = document.getElementById('regressionContent');
+          const regressionCanvas = document.getElementById('regressionTrendChart');
+          const regressionTbody = document.getElementById('regressionTbody');
+          const regressionTableWrap = document.getElementById('regressionTableWrap');
+          const regressionReleaseFilter = document.getElementById('regressionReleaseFilter');
 
           // Types (Deploy-lab issues) — iOS/Android
           const iosTypesEmpty = document.getElementById('iosTypesEmpty');
@@ -4589,6 +4689,7 @@
           let chpTypesIosChart = null;
           let chpTypesAndChart = null;
           let cutChart = null;
+          let regressionChart = null;
           let iosTypesChart = null;
           let andTypesChart = null;
 
@@ -4777,6 +4878,173 @@
             }
           };
 
+          function drawTimeWindowLabels(chart, pluginOptions){
+            const opts = pluginOptions || {};
+            const fixedTextColor = String(opts.textColor || '').trim();
+            const startMin = Number(opts.startMinutes);
+            const endMin = Number(opts.endMinutes);
+            if(!fixedTextColor && (!Number.isFinite(startMin) || !Number.isFinite(endMin))) return;
+
+            const datasetSet = Array.isArray(opts.datasets)
+              ? new Set(opts.datasets.map(v => Number(v)).filter(v => Number.isFinite(v)))
+              : null;
+
+            const font = opts.font || '600 10px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+            const green = opts.onColor || '#22c55e';
+            const red = opts.offColor || '#f43f5e';
+            const bgColor = opts.backgroundColor || 'rgba(255,255,255,0.92)';
+            const borderColor = opts.borderColor || 'rgba(148,163,184,0.35)';
+            const leaderColor = opts.leaderColor || 'rgba(148,163,184,0.6)';
+            const useDatasetColor = opts.useDatasetColor !== false;
+            const padX = Number(opts.padX ?? 6);
+            const padY = Number(opts.padY ?? 3);
+            const offsetY = Number(opts.offsetY ?? 18);
+            const minGap = Number(opts.minGap ?? 10);
+            const shiftStep = Number(opts.shiftStep ?? 14);
+            const minTop = Number(opts.minTop ?? 10);
+            const textH = Number(opts.textHeight ?? 10);
+            const borderRadius = Number(opts.borderRadius ?? 6);
+            const collisionGapX = Number(opts.collisionGapX ?? 6);
+            const collisionGapY = Number(opts.collisionGapY ?? 4);
+            const maxShiftSteps = Number(opts.maxShiftSteps ?? 12);
+            const byX = new Map();
+            const datasets = chart.data?.datasets || [];
+            for(let di = 0; di < datasets.length; di++){
+              if(datasetSet && !datasetSet.has(di)) continue;
+              const ds = datasets[di];
+              const meta = chart.getDatasetMeta(di);
+              if(!ds || !meta || !Array.isArray(meta.data) || meta.hidden) continue;
+              const data = Array.isArray(ds.data) ? ds.data : [];
+              for(let i = 0; i < meta.data.length; i++){
+                const pt = meta.data[i];
+                if(!pt || pt.skip) continue;
+                const rawTimeLabel = ds?._timeLabel?.[i] || '';
+                const timeMatch = String(rawTimeLabel).match(/(\d{2}:\d{2})$/);
+                if(!timeMatch) continue;
+                let minutes = Number(data[i]);
+                if(!Number.isFinite(minutes)) minutes = parseTimeMinutesFromText(rawTimeLabel);
+                if(!Number.isFinite(minutes)) continue;
+                const xKey = Math.round(pt.x);
+                if(!byX.has(xKey)) byX.set(xKey, []);
+                byX.get(xKey).push({
+                  x: pt.x,
+                  anchorY: pt.y,
+                  minutes,
+                  text: timeMatch[1],
+                  datasetIndex: di,
+                  datasetColor: (typeof ds?.borderColor === 'string' && ds.borderColor)
+                    || (typeof ds?.backgroundColor === 'string' && ds.backgroundColor)
+                    || ''
+                });
+              }
+            }
+
+            if(!byX.size) return;
+
+            const rectsOverlap = (a, b) => !(
+              (a.right + collisionGapX) < b.left ||
+              (a.left - collisionGapX) > b.right ||
+              (a.bottom + collisionGapY) < b.top ||
+              (a.top - collisionGapY) > b.bottom
+            );
+
+            const roundRectPath = (ctx, x, y, w, h, r) => {
+              const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+              ctx.beginPath();
+              ctx.moveTo(x + rr, y);
+              ctx.lineTo(x + w - rr, y);
+              ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+              ctx.lineTo(x + w, y + h - rr);
+              ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+              ctx.lineTo(x + rr, y + h);
+              ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+              ctx.lineTo(x, y + rr);
+              ctx.quadraticCurveTo(x, y, x + rr, y);
+              ctx.closePath();
+            };
+
+            const ctx = chart.ctx;
+            const placed = [];
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, chart.width, chart.height);
+            ctx.clip();
+            ctx.font = font;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+
+            const groups = Array.from(byX.entries()).sort((a, b) => a[0] - b[0]).map(([, entries]) => entries);
+            for(const entries of groups){
+              entries.sort((a, b) => b.anchorY - a.anchorY || a.datasetIndex - b.datasetIndex);
+              let prevRectInGroup = null;
+              for(const entry of entries){
+                const textW = ctx.measureText(entry.text).width;
+                const boxW = textW + padX * 2;
+                const boxH = textH + padY * 2;
+                let bottomY = entry.anchorY - offsetY;
+                if(prevRectInGroup && bottomY > (prevRectInGroup.top - minGap)){
+                  bottomY = prevRectInGroup.top - minGap;
+                }
+                bottomY = Math.min(bottomY, entry.anchorY - 6);
+
+                let placedRect = null;
+                let finalBottomY = bottomY;
+                for(let attempt = 0; attempt <= maxShiftSteps; attempt++){
+                  const top = finalBottomY - boxH;
+                  const candidate = {
+                    left: entry.x - boxW / 2,
+                    right: entry.x + boxW / 2,
+                    top,
+                    bottom: finalBottomY
+                  };
+                  if(candidate.top < minTop) break;
+                  if(!placed.some(prev => rectsOverlap(candidate, prev))){
+                    placedRect = candidate;
+                    break;
+                  }
+                  finalBottomY -= shiftStep;
+                }
+                if(!placedRect && prevRectInGroup){
+                  const tightBottom = Math.min(entry.anchorY - 6, prevRectInGroup.top - 1);
+                  const tightTop = Math.max(minTop, tightBottom - boxH);
+                  placedRect = {
+                    left: entry.x - boxW / 2,
+                    right: entry.x + boxW / 2,
+                    top: tightTop,
+                    bottom: tightTop + boxH
+                  };
+                }
+                if(!placedRect) continue;
+
+                const textColor = fixedTextColor || (entry.minutes >= startMin && entry.minutes <= endMin ? green : red);
+                const badgeColor = useDatasetColor ? (entry.datasetColor || '') : '';
+                const badgeFill = badgeColor || bgColor;
+                const badgeStroke = badgeColor || borderColor;
+                const badgeLeader = badgeColor || leaderColor;
+                roundRectPath(ctx, placedRect.left, placedRect.top, boxW, boxH, borderRadius);
+                ctx.fillStyle = badgeFill;
+                ctx.strokeStyle = badgeStroke;
+                ctx.lineWidth = 1;
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.strokeStyle = badgeLeader;
+                ctx.lineWidth = 1;
+                ctx.moveTo(entry.x, entry.anchorY - 2);
+                ctx.lineTo(entry.x, placedRect.bottom - 1);
+                ctx.stroke();
+
+                ctx.fillStyle = textColor;
+                ctx.fillText(entry.text, entry.x, placedRect.bottom - padY);
+                placed.push(placedRect);
+                prevRectInGroup = placedRect;
+              }
+            }
+
+            ctx.restore();
+          }
+
           const cutTimeLabelsPlugin = {
             id: 'cutTimeLabels',
             afterDatasetsDraw(chart, args, pluginOptions){
@@ -4863,12 +5131,22 @@
             }
           };
 
+          const regressionTimeLabelsPlugin = {
+            id: 'regressionTimeLabels',
+            afterDatasetsDraw(chart, args, pluginOptions){
+              const opts = pluginOptions || chart?.options?.plugins?.regressionTimeLabels;
+              if(!opts) return;
+              drawTimeWindowLabels(chart, opts);
+            }
+          };
+
           try{
             if(window.Chart && typeof window.Chart.register === 'function'){
               window.Chart.register(deltaLabelsPlugin);
               window.Chart.register(valueLabelsPlugin);
               window.Chart.register(pointValueLabelsPlugin);
               window.Chart.register(cutTimeLabelsPlugin);
+              window.Chart.register(regressionTimeLabelsPlugin);
             }
           }catch(e){}
 
@@ -4916,6 +5194,24 @@
               'authorization-deploy-lab': bearer,
               'Authorization': bearer,
               'X-Authorization': bearer
+            };
+          }
+
+          function getGitlabCookie(){
+            return String(inpGitlabCookie?.value || '').trim();
+          }
+
+          function isYtRequestsEnabled(){
+            return inpYtRequestsEnabled ? !!inpYtRequestsEnabled.checked : true;
+          }
+
+          function gitlabHeaders(cookie = getGitlabCookie()){
+            const raw = String(cookie || '').trim();
+            if(!raw) return null;
+            return {
+              'accept': 'application/json, text/plain, */*',
+              'x-requested-with': 'XMLHttpRequest',
+              'X-Proxy-Cookie': raw
             };
           }
 
@@ -4973,10 +5269,135 @@
           async function proxyGetJson(targetUrl, headers, signal){
             const proxiedUrl = buildProxyRequestUrl(targetUrl);
             return fetchWithRetry(async () => {
-              const r = await fetch(proxiedUrl, { headers, signal });
+              const r = await fetch(proxiedUrl, {
+                headers,
+                signal,
+                cache: 'no-store'
+              });
               if(!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
-              return r.json();
+              const text = await r.text();
+              try{
+                return JSON.parse(text);
+              }catch(_){
+                const preview = String(text || '').trim().slice(0, 160);
+                if(/^<!DOCTYPE html>/i.test(preview) || /^<html/i.test(preview)){
+                  throw new Error('Вместо JSON пришёл HTML. Обычно это означает, что upstream не принял куки и отдал страницу логина.');
+                }
+                throw new Error(`Не удалось распарсить JSON от прокси: ${preview || 'пустой ответ'}`);
+              }
             });
+          }
+
+          function parseIsoToMs(iso){
+            const norm = normalizeIsoForJS(iso);
+            if(!norm) return null;
+            const ms = new Date(norm).getTime();
+            return Number.isFinite(ms) ? ms : null;
+          }
+
+          function buildGitlabPipelinesUrl(config, release, page = 1){
+            const url = new URL(config.pipelinesUrl);
+            url.searchParams.set('scope', config.scope);
+            url.searchParams.set('page', String(page));
+            url.searchParams.set('ref', `release/${release}`);
+            url.searchParams.set('per_page', String(GITLAB_PIPELINE_PAGE_SIZE));
+            return url.toString();
+          }
+
+          function buildGitlabPipelineJobsUrl(config, iid, after = null){
+            const query = [
+              'query getPipelineJobs($fullPath: ID!, $iid: ID!, $after: String) {',
+              '  project(fullPath: $fullPath) {',
+              '    pipeline(iid: $iid) {',
+              '      jobs(after: $after, first: 20) {',
+              '        pageInfo { hasNextPage endCursor }',
+              '        nodes { name finishedAt }',
+              '      }',
+              '    }',
+              '  }',
+              '}'
+            ].join(' ');
+            const url = new URL(GITLAB_GRAPHQL_URL);
+            url.searchParams.set('query', query);
+            url.searchParams.set('operationName', 'getPipelineJobs');
+            url.searchParams.set('variables', JSON.stringify({
+              fullPath: config.fullPath,
+              iid: String(iid),
+              after: after || null
+            }));
+            return url.toString();
+          }
+
+          async function fetchGitlabOldestPipeline(config, release, signal){
+            const headers = gitlabHeaders();
+            if(!headers) return null;
+
+            let oldest = null;
+            for(let page = 1; page <= 50; page += 1){
+              const url = buildGitlabPipelinesUrl(config, release, page);
+              const data = await proxyGetJson(url, headers, signal);
+              const pipelines = Array.isArray(data?.pipelines)
+                ? data.pipelines
+                : (Array.isArray(data) ? data : []);
+              if(!pipelines.length) break;
+
+              for(const pipe of pipelines){
+                const createdAt = pipe?.created_at || pipe?.createdAt || pipe?.created;
+                const createdMs = parseIsoToMs(createdAt);
+                const iid = pipe?.iid;
+                if(!Number.isFinite(createdMs) || iid === undefined || iid === null) continue;
+                if(!oldest || createdMs < oldest.createdMs){
+                  oldest = {
+                    iid: String(iid),
+                    createdAt,
+                    createdMs
+                  };
+                }
+              }
+
+              if(pipelines.length < GITLAB_PIPELINE_PAGE_SIZE) break;
+            }
+
+            return oldest;
+          }
+
+          async function fetchGitlabPipelineJobFinishedAt(config, iid, signal){
+            const headers = gitlabHeaders();
+            if(!headers || !iid) return null;
+
+            let after = null;
+            for(let page = 0; page < 30; page += 1){
+              const url = buildGitlabPipelineJobsUrl(config, iid, after);
+              const data = await proxyGetJson(url, headers, signal);
+              const jobs = data?.data?.project?.pipeline?.jobs;
+              const nodes = Array.isArray(jobs?.nodes) ? jobs.nodes : [];
+              const target = nodes.find(node => String(node?.name || '').trim() === config.jobName);
+              if(target){
+                return target?.finishedAt || null;
+              }
+              if(!jobs?.pageInfo?.hasNextPage || !jobs?.pageInfo?.endCursor) break;
+              after = jobs.pageInfo.endCursor;
+            }
+
+            return null;
+          }
+
+          async function fetchRegressionStartPoint(platformKey, release, signal){
+            const cookie = getGitlabCookie();
+            if(!cookie) return null;
+
+            const config = GITLAB_PIPELINE_CONFIG[platformKey];
+            if(!config) return null;
+
+            const oldest = await fetchGitlabOldestPipeline(config, release, signal);
+            if(!oldest?.iid) return null;
+
+            const finishedAt = await fetchGitlabPipelineJobFinishedAt(config, oldest.iid, signal);
+            const finishedParts = toMskLocalParts(finishedAt);
+            if(!Number.isFinite(finishedParts?.msLocal)) return null;
+
+            const shiftedMs = finishedParts.msLocal + (Number(config.offsetMinutes) || 0) * 60_000;
+            return yValueFromMsLocalCut(shiftedMs);
           }
 
           async function fetchLastCherepik(prefix, release, signal){
@@ -5043,6 +5464,7 @@
           }
 
           function youtrackHeaders(){
+            if(!isYtRequestsEnabled()) return null;
             const tok = (inpYtToken?.value || '').trim();
             if(!tok) return null;
             return {
@@ -6165,6 +6587,20 @@
             if(cutTableWrap) cutTableWrap.style.display = 'none';
           }
 
+          function setRegressionEmpty(text){
+            if(!regressionEmpty) return;
+            regressionEmpty.textContent = text;
+            regressionEmpty.style.display = '';
+          }
+          function showRegressionContent(){
+            if(regressionEmpty) regressionEmpty.style.display = 'none';
+            if(regressionContent) regressionContent.style.display = '';
+          }
+          function showRegressionEmpty(text){
+            setRegressionEmpty(text);
+            if(regressionContent) regressionContent.style.display = 'none';
+          }
+
 
 
           function setIosTypesEmpty(text){
@@ -6208,6 +6644,7 @@
               showChpTypesEmpty('Данные появятся после получения из источника');
               setChpTypesPlatforms(false);
               showCutEmpty('Данные появятся после получения из источника');
+              showRegressionEmpty('Данные появятся после получения из источника');
               showIosTypesEmpty('Данные появятся после получения из источника');
               showAndTypesEmpty('Данные появятся после получения из источника');
             }else{
@@ -6224,6 +6661,8 @@
             try{ localStorage.setItem(LS_TOKEN_KEY, inpAllureToken.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_DEPLOY_KEY, inpDeployToken.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_YT_TOKEN_KEY, inpYtToken.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_YT_ENABLED_KEY, String(isYtRequestsEnabled())); }catch(e){}
+            try{ localStorage.setItem(LS_GITLAB_COOKIE_KEY, inpGitlabCookie.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' })); }catch(e){}
           }
 
@@ -6239,6 +6678,14 @@
             try{
               const yt = localStorage.getItem(LS_YT_TOKEN_KEY) || '';
               if(inpYtToken) inpYtToken.value = yt;
+            }catch(e){}
+            try{
+              const ytEnabled = localStorage.getItem(LS_YT_ENABLED_KEY);
+              if(inpYtRequestsEnabled) inpYtRequestsEnabled.checked = ytEnabled === null ? true : ytEnabled !== 'false';
+            }catch(e){}
+            try{
+              const gl = localStorage.getItem(LS_GITLAB_COOKIE_KEY) || '';
+              if(inpGitlabCookie) inpGitlabCookie.value = gl;
             }catch(e){}
             try{
               const raw = localStorage.getItem(LS_RANGE_KEY);
@@ -6325,6 +6772,19 @@
               });
               cutChart.update();
             }
+            if(regressionChart){
+              regressionChart.data.labels = [];
+              regressionChart.data.datasets.forEach(d => {
+                d.data = [];
+                d._timeLabel = [];
+                d._timeMs = [];
+              });
+              regressionChart.update();
+            }
+            if(regressionTbody) regressionTbody.innerHTML = '';
+            if(regressionTableWrap) regressionTableWrap.style.display = 'none';
+            if(regressionContent) regressionContent.style.display = 'none';
+            if(regressionEmpty) regressionEmpty.style.display = '';
             window.__releaseRangeAll = [];
             window.__releaseTimelineByRelease = {};
           }
@@ -6966,13 +7426,15 @@
             }
           }
 
-          function populateReleaseSelect(sel, releases){
-            if(!sel) return;
-            sel.style.display = 'none';
-            sel.innerHTML = '';
-            if(!releases || !releases.length){
-              const opt = document.createElement('option');
-              opt.value = '';
+        function populateReleaseSelect(sel, releases){
+          if(!sel) return;
+          const prevState = readReleaseFilterState(sel);
+          const userTouched = sel.dataset.releaseFilterTouched === '1';
+          sel.style.display = 'none';
+          sel.innerHTML = '';
+          if(!releases || !releases.length){
+            const opt = document.createElement('option');
+            opt.value = '';
               opt.textContent = 'Нет релизов';
               opt.disabled = true;
               opt.selected = true;
@@ -6985,11 +7447,28 @@
             optAll.value = '__all__';
             optAll.textContent = 'выбрать все / снять все';
             sel.appendChild(optAll);
+            let selectedByDefault;
+            if(userTouched && prevState){
+              selectedByDefault = prevState.allSelected
+                ? new Set(releases.map(rel => String(rel)))
+                : new Set(
+                    releases
+                      .map(rel => String(rel))
+                      .filter(rel => prevState.selected.has(rel))
+                  );
+            }else{
+              const defaultCount = getDefaultReleaseFilterCount(sel);
+              selectedByDefault = new Set(
+                defaultCount > 0
+                  ? releases.slice(-defaultCount).map(rel => String(rel))
+                  : []
+              );
+            }
             for(const rel of releases){
               const opt = document.createElement('option');
               opt.value = rel;
               opt.textContent = formatReleaseShort(rel);
-              opt.selected = true;
+              opt.selected = selectedByDefault.has(String(rel));
               sel.appendChild(opt);
             }
             sel.disabled = false;
@@ -7123,6 +7602,7 @@
                 const selectId = dd.getAttribute('data-release-select');
                 const selEl = selectId ? document.getElementById(selectId) : null;
                 if(selEl){
+                  markReleaseFilterTouched(selEl);
                   syncSelectFromReleaseList(selEl, list);
                   applyAllReleaseFilters();
                 }
@@ -7153,6 +7633,7 @@
               chpReleaseFilter,
               chpTypesReleaseFilter,
               cutReleaseFilter,
+              regressionReleaseFilter,
               iosTypesReleaseFilter,
               andTypesReleaseFilter
             ].forEach(sel => populateReleaseSelect(sel, list));
@@ -7176,14 +7657,15 @@
             optAll.selected = allSelected;
           }
 
-          function attachSelectAllToggle(sel){
-            if(!sel || sel.dataset.selectAllInit === '1') return;
-            sel.dataset.selectAllInit = '1';
-            sel.addEventListener('change', () => {
-              const optAll = getSelectAllOption(sel);
-              if(!optAll) return;
-              const opts = getRealOptions(sel);
-              if(!opts.length) return;
+        function attachSelectAllToggle(sel){
+          if(!sel || sel.dataset.selectAllInit === '1') return;
+          sel.dataset.selectAllInit = '1';
+          sel.addEventListener('change', () => {
+            markReleaseFilterTouched(sel);
+            const optAll = getSelectAllOption(sel);
+            if(!optAll) return;
+            const opts = getRealOptions(sel);
+            if(!opts.length) return;
               const allSelected = opts.every(o => o.selected);
               if(optAll.selected && !allSelected){
                 opts.forEach(o => { o.selected = true; });
@@ -7219,12 +7701,7 @@
             renderTcStreamDeltaTable(deltas);
           }
 
-          function applyAllReleaseFilters(){
-            if(window.__tcRowsAll && window.__tcDeltaRowsAll){
-              applyReleaseFilter(window.__tcRowsAll, window.__tcDeltaRowsAll);
-            }else{
-              applyTbodyReleaseFilter(tcReleaseFilter, tcStreamDeltaTbody);
-            }
+          function applyTbodyReleaseFilters(){
             applyTbodyReleaseFilter(tcTableReleaseFilter, tbody);
             applyTbodyReleaseFilter(covReleaseFilter, covTbody);
             applyTbodyReleaseFilter(selReleaseFilter, selTbody);
@@ -7232,8 +7709,18 @@
             applyTbodyReleaseFilter(chpReleaseFilter, chpTbody);
             applyTbodyReleaseFilter(chpTypesReleaseFilter, chpTypesTbody);
             applyTbodyReleaseFilter(cutReleaseFilter, cutTbody);
+            applyTbodyReleaseFilter(regressionReleaseFilter, regressionTbody);
             applyTbodyReleaseFilter(iosTypesReleaseFilter, iosTypesTbody);
             applyTbodyReleaseFilter(andTypesReleaseFilter, andTypesTbody);
+          }
+
+          function applyAllReleaseFilters(){
+            if(window.__tcRowsAll && window.__tcDeltaRowsAll){
+              applyReleaseFilter(window.__tcRowsAll, window.__tcDeltaRowsAll);
+            }else{
+              applyTbodyReleaseFilter(tcReleaseFilter, tcStreamDeltaTbody);
+            }
+            applyTbodyReleaseFilters();
           }
 
           const __memberStatsCache = new Map();
@@ -7960,6 +8447,135 @@
             });
           }
 
+          function ensureRegressionChart(){
+            if(!regressionCanvas || !window.Chart) return;
+            if(regressionChart){
+              regressionChart.data.labels = [];
+              regressionChart.data.datasets.forEach(d => {
+                d.data = [];
+                d._timeLabel = [];
+                d._timeMs = [];
+              });
+              regressionChart.update();
+              return;
+            }
+
+            const cIos = cssVar('--regression-ios', '#38bdf8');
+            const cAnd = cssVar('--regression-android', '#8b5cf6');
+            const cOn = cssVar('--green', '#22c55e');
+            const cOff = cssVar('--red', '#f43f5e');
+            const makeDs = (label, color) => ({
+              label,
+              data: [],
+              borderColor: color,
+              backgroundColor: color,
+              tension: 0.25,
+              pointRadius: 4,
+              pointHoverRadius: 5,
+              pointBorderWidth: 2,
+              pointBackgroundColor: color,
+              pointBorderColor: color,
+              spanGaps: true,
+              _timeLabel: [],
+              _timeMs: []
+            });
+
+            regressionChart = new Chart(regressionCanvas, {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  makeDs('iOS', cIos),
+                  makeDs('Android', cAnd)
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  regressionTimeLabels: {
+                    datasets: [0, 1],
+                    startMinutes: 0,
+                    endMinutes: 15 * 60 + 10,
+                    onColor: cOn,
+                    offColor: cOff,
+                    useDatasetColor: false,
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    borderColor: 'rgba(148,163,184,0.35)',
+                    leaderColor: 'rgba(148,163,184,0.6)',
+                    offsetY: 18,
+                    minGap: 12,
+                    shiftStep: 14,
+                    minTop: 10,
+                    collisionGapX: 5,
+                    collisionGapY: 4
+                  },
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    itemSort: (a, b) => {
+                      const dsA = regressionChart.data.datasets[a.datasetIndex];
+                      const dsB = regressionChart.data.datasets[b.datasetIndex];
+                      const ta = Number(dsA?._timeMs?.[a.dataIndex]);
+                      const tb = Number(dsB?._timeMs?.[b.dataIndex]);
+                      const aInf = Number.isFinite(ta) ? ta : Number.POSITIVE_INFINITY;
+                      const bInf = Number.isFinite(tb) ? tb : Number.POSITIVE_INFINITY;
+                      return (aInf - bInf) || ((a.datasetIndex ?? 0) - (b.datasetIndex ?? 0));
+                    },
+                    callbacks: {
+                      title: (items) => {
+                        const lbl = items?.[0]?.label;
+                        return lbl ? `Релиз ${lbl}` : '';
+                      },
+                      labelColor: (ctx) => {
+                        const ds = regressionChart.data.datasets[ctx.datasetIndex];
+                        const color = (typeof ds?.borderColor === 'string' && ds.borderColor)
+                          || (typeof ds?.backgroundColor === 'string' && ds.backgroundColor)
+                          || '#94a3b8';
+                        return {
+                          borderColor: color,
+                          backgroundColor: color
+                        };
+                      },
+                      labelPointStyle: () => ({
+                        pointStyle: 'circle',
+                        rotation: 0
+                      }),
+                      label: (ctx) => {
+                        const ds = regressionChart.data.datasets[ctx.datasetIndex];
+                        const txt = ds?._timeLabel?.[ctx.dataIndex] || '-';
+                        return `${ctx.dataset.label}: ${txt}`;
+                      }
+                    }
+                  }
+                },
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: {
+                    bounds: 'data',
+                    ticks: { maxRotation: 0, autoSkip: true },
+                    grid: { color: 'rgba(148,163,184,.25)' }
+                  },
+                  y: {
+                    min: 8 * 60,
+                    max: 22 * 60,
+                    reverse: false,
+                    grid: { color: 'rgba(148,163,184,.25)' },
+                    ticks: {
+                      stepSize: 120,
+                      callback: (v) => {
+                        const vv = Math.round(Number(v) || 0);
+                        const hh = Math.floor(vv / 60);
+                        const mm = vv % 60;
+                        return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+
           function addChartPoint(release, manual, auto, total){
             if(!tcChart) return;
             tcChart.data.labels.push(release);
@@ -8005,6 +8621,37 @@
             chpChart.data.datasets[1].data.push(android);
             chpChart.data.datasets[2].data.push(total);
             chpChart.update();
+          }
+
+          function addRegressionPoint(release, dsIndex, yObjOrNull){
+            if(!regressionChart) return;
+            if(regressionChart.data.labels.length === 0 || regressionChart.data.labels[regressionChart.data.labels.length - 1] !== release){
+              regressionChart.data.labels.push(release);
+              for(const ds of regressionChart.data.datasets){
+                while(ds.data.length < regressionChart.data.labels.length - 1){
+                  ds.data.push(null);
+                  ds._timeLabel.push('');
+                  ds._timeMs.push(null);
+                }
+              }
+            }
+            const di = regressionChart.data.labels.length - 1;
+            const ds = regressionChart.data.datasets[dsIndex];
+            while(ds.data.length < di){
+              ds.data.push(null);
+              ds._timeLabel.push('');
+              ds._timeMs.push(null);
+            }
+
+            if(!yObjOrNull){
+              ds.data.push(null);
+              ds._timeLabel.push('');
+              ds._timeMs.push(null);
+            }else{
+              ds.data.push(yObjOrNull.y);
+              ds._timeLabel.push(yObjOrNull.label);
+              ds._timeMs.push(yObjOrNull.msLocal);
+            }
           }
 
           function updateChpTypesChartInstance(chart, labels, rows){
@@ -8239,6 +8886,19 @@
             cutTbody.appendChild(tr);
           }
 
+          function renderRegressionRow({ release, iosStart, andStart }){
+            if(!regressionTbody) return;
+            const relLabel = formatReleaseShort(release);
+            const tr = document.createElement('tr');
+            tr.dataset.release = release;
+            tr.innerHTML = `
+              <td class="mono text-left">${relLabel}</td>
+              <td class="mono">${iosStart || '—'}</td>
+              <td class="mono">${andStart || '—'}</td>
+            `;
+            regressionTbody.appendChild(tr);
+          }
+
           // ---- concurrency ----
           async function asyncPool(items, concurrency, iterator, signal){
             const results = [];
@@ -8319,6 +8979,7 @@
                 if(key === 'chpTypes') chpTypesIosChart?.resize();
                 if(key === 'chpTypes') chpTypesAndChart?.resize();
                 if(key === 'cut') cutChart?.resize();
+                if(key === 'regression') regressionChart?.resize();
                 if(key === 'iosTypes') iosTypesChart?.resize();
                 if(key === 'andTypes') andTypesChart?.resize();
               }catch(e){}
@@ -8392,14 +9053,19 @@
             ensureChpTypesChart();
             ensureChpTypesPlatformCharts();
             ensureCutChart();
+            ensureRegressionChart();
 
             showContent();
             showCovContent();
             showSelContent();
             showAvgContent();
             showChpContent();
-            showChpTypesContent();
             showCutContent();
+            if(getGitlabCookie()){
+              showRegressionContent();
+            }else{
+              showRegressionEmpty('Вставьте куки GitLab');
+            }
             showIosTypesContent();
             showAndTypesContent();
 
@@ -8748,10 +9414,36 @@
                 releaseTimelineByRelease[rel] = null;
               }
 
+              let iosRegressionStart = null;
+              let andRegressionStart = null;
+              try{
+                [iosRegressionStart, andRegressionStart] = await Promise.all([
+                  fetchRegressionStartPoint('IOS', rel, signal),
+                  fetchRegressionStartPoint('ANDROID', rel, signal)
+                ]);
+              }catch(e){
+                iosRegressionStart = null;
+                andRegressionStart = null;
+              }
+              addRegressionPoint(rel, 0, iosRegressionStart);
+              addRegressionPoint(rel, 1, andRegressionStart);
+              if(getGitlabCookie()){
+                showRegressionContent();
+              }
+
               if(cutTbody){
                 renderCutRow({ release: rel, iosCut: iosCutLbl, iosStore: iosStoreLbl, andCut: andCutLbl, andStore: andStoreLbl });
               }
+              if(regressionTbody){
+                renderRegressionRow({
+                  release: rel,
+                  iosStart: iosRegressionStart?.label || '',
+                  andStart: andRegressionStart?.label || ''
+                });
+                if(regressionTableWrap) regressionTableWrap.style.display = '';
+              }
               cutChart?.update();
+              regressionChart?.update();
 
               if(firstRow){
                 tbody.innerHTML = '';
@@ -8773,6 +9465,7 @@
               }
               selRowsData.push({ release: rel, swatCount: selSwat, swatPeople: swatPeopleSel, streamCount: selStream, total: (selSwat + selStream) });
               addSelectivePoint(rel, selSwat, selStream, swatPeopleSel);
+              applyTbodyReleaseFilters();
             }
 
             if(tcStreamByRelease.length){
@@ -8834,6 +9527,7 @@
             // Типы задач (Deploy-lab issues): iOS + Android
             const deployTok = getDeployToken();
             const ytTok = (inpYtToken?.value || '').trim();
+            const ytEnabled = isYtRequestsEnabled();
             if(!deployTok){
               showIosTypesEmpty('Вставьте токен Deploy-lab');
               showAndTypesEmpty('Вставьте токен Deploy-lab');
@@ -8848,8 +9542,10 @@
               const chpTypesRowsIos = [];
               const chpTypesRowsAnd = [];
               if(chpTypesTbody) chpTypesTbody.innerHTML = '';
-              const canChpTypes = Boolean(ytTok);
-              if(!canChpTypes){
+              const canChpTypes = ytEnabled && Boolean(ytTok);
+              if(!ytEnabled){
+                showChpTypesEmpty('Запросы в YT выключены');
+              }else if(!canChpTypes){
                 showChpTypesEmpty('Вставьте токен YouTrack');
               }
 
@@ -8931,6 +9627,7 @@
                   chpTypesRowsIos.push(rowIos);
                   chpTypesRowsAnd.push(rowAnd);
                   renderChpTypesRow(row);
+                  applyTbodyReleaseFilter(chpTypesReleaseFilter, chpTypesTbody);
 
                   // Incremental chart update right after each release is processed.
                   const doneLabels = chpTypesRows.map(r => r.release);
@@ -9037,6 +9734,9 @@
             if(cutTableWrap && cutTbody && cutTbody.children.length){
               cutTableWrap.style.display = '';
             }
+            if(regressionTableWrap && regressionTbody && regressionTbody.children.length){
+              regressionTableWrap.style.display = '';
+            }
             applyAllReleaseFilters();
 
             if(!tcRowsData.length) showEmpty('Данные появятся после получения из источника');
@@ -9057,6 +9757,7 @@
           showChpEmpty('Данные появятся после получения из источника');
           showChpTypesEmpty('Данные появятся после получения из источника');
           showCutEmpty('Данные появятся после получения из источника');
+          showRegressionEmpty('Данные появятся после получения из источника');
           showIosTypesEmpty('Данные появятся после получения из источника');
           showAndTypesEmpty('Данные появятся после получения из источника');
           initCollapsers();
@@ -9072,6 +9773,7 @@
             chpReleaseFilter,
             chpTypesReleaseFilter,
             cutReleaseFilter,
+            regressionReleaseFilter,
             iosTypesReleaseFilter,
             andTypesReleaseFilter
           ].forEach(sel => {
