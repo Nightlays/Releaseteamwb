@@ -1535,6 +1535,35 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   display:grid;
   gap:10px;
 }
+.wb-graphs .ml-overview-domain-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:14px;
+}
+.wb-graphs .ml-overview-domain-card{
+  padding:16px 18px;
+  gap:8px;
+}
+.wb-graphs .ml-overview-domain-head{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.wb-graphs .ml-overview-domain-title{
+  font-size:18px;
+  font-weight:900;
+  line-height:1.25;
+  color:#0f172a;
+}
+.wb-graphs .ml-overview-domain-lines{
+  display:grid;
+  gap:6px;
+}
+.wb-graphs .ml-overview-domain-line{
+  font-size:14px;
+  line-height:1.5;
+  color:#334155;
+}
 .wb-graphs .ml-summary-page{
   display:grid;
   gap:16px;
@@ -2040,6 +2069,16 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   background:#94a3b8;
   border-radius:999px;
   box-shadow:0 0 0 4px rgba(148,163,184,.14);
+  line-height:0;
+  overflow:visible;
+  vertical-align:top;
+}
+.wb-graphs .ml-signal-icon-svg{
+  width:14px;
+  height:14px;
+  display:block;
+  flex:none;
+  color:currentColor;
 }
 .wb-graphs .ml-signal-icon--good{
   background:#16a34a;
@@ -2698,6 +2737,7 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
 }
 
 @media (max-width: 1180px){
+  .wb-graphs .ml-overview-domain-grid,
   .wb-graphs .ml-brief-grid,
   .wb-graphs .ml-domain-grid,
   .wb-graphs .ml-secondary-grid,
@@ -2720,6 +2760,7 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   .wb-graphs .ml-domain-card{
     padding:14px;
   }
+  .wb-graphs .ml-overview-domain-card,
   .wb-graphs .ml-brief-card{
     padding:14px;
   }
@@ -2734,6 +2775,9 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   }
   .wb-graphs .ml-brief-title{
     font-size:18px;
+  }
+  .wb-graphs .ml-overview-domain-title{
+    font-size:17px;
   }
   .wb-graphs .ml-metric-grid,
   .wb-graphs .ml-metric-group--release-timeline .ml-metric-grid{
@@ -2827,6 +2871,17 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
 .pdf-export img{
   image-rendering:auto;
 }
+.pdf-export *,
+.pdf-export *::before,
+.pdf-export *::after{
+  animation:none !important;
+  transition:none !important;
+}
+.pdf-export .ml-signal-icon,
+.pdf-export .dot,
+.pdf-export .ml-status::before{
+  transform:none !important;
+}
 .pdf-export .ml-domain-card,
 .pdf-export .ml-brief-card,
 .pdf-export .ml-metric-card,
@@ -2845,7 +2900,13 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   box-shadow:none !important;
 }
 .pdf-export #mlSummaryCard > .ml-summary-toolbar,
-.pdf-export #mlSummaryCard .ml-summary-top{
+.pdf-export #mlSummaryCard .ml-summary-top,
+.pdf-export .ml-summary-top,
+.pdf-export .ml-summary-note--warn{
+  display:none !important;
+}
+.pdf-export .ml-status-row,
+.pdf-export .ml-meta-strip{
   display:none !important;
 }
 
@@ -2868,6 +2929,83 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   font-size: 13px;
   color: #475569;
   margin-bottom: 12px;
+}
+.pdf-sheet .pdf-grid-layout{
+  display:grid;
+  gap:14px;
+  align-items:start;
+}
+.pdf-sheet .pdf-grid-layout--cols-2{
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+}
+.pdf-sheet .pdf-grid-layout--cols-3{
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+}
+.pdf-sheet .pdf-grid-item{
+  min-width:0;
+}
+.pdf-export .pdf-grid-section{
+  display:grid;
+  gap:0;
+}
+.pdf-export .ml-domain-head,
+.pdf-export .ml-metric-group-head,
+.pdf-export .stream-insights-head,
+.pdf-export .chp-quarter-head,
+.pdf-export .ml-type-dynamics-card-head,
+.pdf-export .ml-type-dynamics-item-head{
+  display:grid !important;
+  grid-template-columns:minmax(0, 1fr) auto !important;
+  align-items:start !important;
+}
+.pdf-export .ml-metric-label-row,
+.pdf-export .ml-type-dynamics-item-title-row,
+.pdf-export .ml-overview-domain-head{
+  align-items:center !important;
+}
+.pdf-export .ml-domain-head > :first-child,
+.pdf-export .ml-metric-group-head > :first-child,
+.pdf-export .stream-insights-head > :first-child,
+.pdf-export .chp-quarter-head > :first-child,
+.pdf-export .ml-type-dynamics-card-head > :first-child,
+.pdf-export .ml-type-dynamics-item-head > :first-child{
+  min-width:0 !important;
+}
+.pdf-export .ml-signal-icon{
+  box-shadow:none !important;
+  transform:none !important;
+  line-height:0 !important;
+  overflow:visible !important;
+}
+.pdf-export .ml-signal-icon-svg{
+  display:block !important;
+  width:14px !important;
+  height:14px !important;
+}
+.pdf-export .ml-status::before{
+  display:none !important;
+}
+.pdf-export .ml-metric-card,
+.pdf-export .ml-outcome-card,
+.pdf-export .ml-type-dynamics-item,
+.pdf-export .stream-insight-item,
+.pdf-export .chp-quarter-item{
+  overflow:visible !important;
+}
+.pdf-export .pdf-grid-section .ml-overview-domain-grid,
+.pdf-export .pdf-grid-section .ml-brief-grid,
+.pdf-export .pdf-grid-section .ml-anoms-columns,
+.pdf-export .pdf-grid-section .stream-insights-grid,
+.pdf-export .pdf-grid-section .chp-quarter-grid,
+.pdf-export .pdf-grid-section .ml-type-dynamics-grid,
+.pdf-export .pdf-grid-section .ml-outcome-grid{
+  width:100% !important;
+}
+.pdf-export .pdf-grid-section .ml-brief-grid{
+  grid-template-columns:minmax(0, 1.25fr) repeat(2, minmax(0, 1fr));
+}
+.pdf-export .pdf-grid-section .ml-overview-domain-grid{
+  grid-template-columns:repeat(2, minmax(0, 1fr));
 }
 .pdf-sheet table{
   width: 100%;
