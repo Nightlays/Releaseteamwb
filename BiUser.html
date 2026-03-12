@@ -1335,9 +1335,42 @@ showCountEl.addEventListener('change', ()=>{ buildReleasesDropdown(); drawCharts
 orderDirectionEl.addEventListener('change', ()=>{ buildReleasesDropdown(); drawCharts(); renderGrowth(); });
 
 /* ---------- Δ-метки ---------- */
+const DELTA_LABEL_FONT = '600 16px Inter, system-ui, -apple-system, Segoe UI, Roboto';
+const GROUP_SUM_LABEL_FONT = '700 12px Inter, system-ui, -apple-system, Segoe UI, Roboto';
+const VALUE_LABEL_FONT = '600 12px Inter, system-ui, -apple-system, Segoe UI, Roboto';
+const GROUP_SUM_LABEL_OFFSET = 10;
+const VALUE_LABEL_PAD = 4;
+
+function getLabelClipBounds(chart){
+  const { chartArea } = chart;
+  const pad = chart.options?.layout?.padding || {};
+  const topPad = Math.max(0, Number(pad.top) || 0);
+  const bottomPad = Math.max(0, Number(pad.bottom) || 0);
+  return {
+    left: chartArea.left,
+    top: Math.max(0, chartArea.top - topPad),
+    right: chartArea.right,
+    bottom: Math.min(chart.height, chartArea.bottom + bottomPad)
+  };
+}
+
+function getFontPixelSize(font, fallback = 12){
+  const match = String(font || '').match(/(\d+(?:\.\d+)?)px/);
+  return match ? Math.ceil(Number(match[1])) : fallback;
+}
+
+function measureFontHeight(ctx, font, fallback = 12){
+  const prevFont = ctx.font;
+  ctx.font = font;
+  const metrics = ctx.measureText('0123456789');
+  ctx.font = prevFont;
+  const height = Math.ceil((metrics.actualBoundingBoxAscent || 0) + (metrics.actualBoundingBoxDescent || 0));
+  return height || getFontPixelSize(font, fallback);
+}
+
 function DeltaLabelsPlugin() {
-  const cfg = { offset: 13, font: '600 16px Inter, system-ui, -apple-system, Segoe UI, Roboto',
-    capsule: { padX: 6, padY: 3, radius: 6 }, minTopPad: 34 };
+  const cfg = { offset: 13, font: DELTA_LABEL_FONT,
+    capsule: { padX: 6, padY: 3, radius: 6 }, minTopPad: 64, gapAboveNominal: 4 };
   function groupBox(rows, i){
     let top=Infinity, left=Infinity, right=-Infinity, ok=false;
     for (const arr of rows) {
@@ -1375,13 +1408,21 @@ function DeltaLabelsPlugin() {
       const aboveGroup = !!(chart.options?.plugins?.deltaLabels?.aboveGroup);
       if (!Array.isArray(deltas) || !deltas.length) return;
       const { ctx, chartArea, scales:{x} } = chart;
+      const clip = getLabelClipBounds(chart);
       ctx.save();
       ctx.beginPath();
-      ctx.rect(chartArea.left, chartArea.top, chartArea.right-chartArea.left, chartArea.bottom-chartArea.top);
+      ctx.rect(clip.left, clip.top, clip.right-clip.left, clip.bottom-clip.top);
       ctx.clip();
       ctx.font = cfg.font;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      const groupSumEnabled = !!(chart.options?.plugins?.groupSumLabels?.enabled);
+      const valueOpts = chart.options?.plugins?.valueLabels || {};
+      const targetDatasetIndex = valueOpts.datasetIndex ?? (chart.data.datasets.length - 1);
+      const valueMeta = chart.getDatasetMeta(targetDatasetIndex);
+      const valueDrawAbove = !!(chart.$valuesAbove ?? valueOpts.above);
+      const groupSumHeight = measureFontHeight(ctx, GROUP_SUM_LABEL_FONT, 12);
+      const valueHeight = measureFontHeight(ctx, VALUE_LABEL_FONT, 12);
       const rows = chart.data.datasets.map((_,di)=>chart.getDatasetMeta(di)?.data || []);
       for (let i=0;i<chart.data.labels.length;i++){
         const d = Number(deltas[i]||0);
@@ -1394,20 +1435,33 @@ function DeltaLabelsPlugin() {
         const h = 14 + cfg.capsule.padY*2;
         const xC = Math.round(x.getPixelForValue(i));
 
-        // нижняя граница чёрной цифры суммы (GroupSumLabels использует offset = 10)
-        const ySumBottom = Math.max(Math.round(g.top - 10), chartArea.top + 2);
-
-        // куда поставить низ капсулы — ещё выше, чтобы не было наложений с чёрной суммой
-        let capBottom;
-        if (aboveGroup) {
-          // поднять Δ ещё выше суммы: +3px к прежнему запасу
-          capBottom = ySumBottom - 18;
-        } else {
-          // стандарт: отступ от верхушки группы
-          capBottom = Math.max(Math.round(g.top - cfg.offset), chartArea.top + 2);
+        let nominalTop = Math.round(g.top);
+        if (groupSumEnabled) {
+          const groupBaseline = Math.max(Math.round(g.top - GROUP_SUM_LABEL_OFFSET), chartArea.top + 2);
+          nominalTop = groupBaseline - groupSumHeight;
+        } else if (valueDrawAbove) {
+          const valueEl = valueMeta?.data?.[i];
+          if (valueEl?.getProps) {
+            const p = valueEl.getProps(['y','base'], true);
+            const valueBaseline = Math.max(Math.round(Math.min(p.y, p.base) - VALUE_LABEL_PAD - 4), clip.top + 2);
+            nominalTop = valueBaseline - valueHeight;
+          } else if (aboveGroup) {
+            nominalTop = Math.round(g.top - cfg.offset);
+          }
+        } else if (aboveGroup) {
+          nominalTop = Math.round(g.top - cfg.offset);
         }
 
-        const rect = { x: Math.round(xC - w/2), y: Math.round(capBottom - h), w, h };
+        let rectY;
+        if (!aboveGroup) {
+          rectY = Math.round(g.top - cfg.offset - h);
+        } else {
+          rectY = Math.round(nominalTop - cfg.gapAboveNominal - h);
+        }
+
+        const minY = Math.round(clip.top + 2);
+        rectY = Math.max(rectY, minY);
+        const rect = { x: Math.round(xC - w/2), y: rectY, w, h };
         ctx.fillStyle='rgba(255,255,255,.96)';
         ctx.strokeStyle='rgba(0,0,0,.06)';
         ctx.lineWidth=1;
@@ -1423,7 +1477,7 @@ function DeltaLabelsPlugin() {
 
 // === GroupSumLabelsPlugin: подписывает сумму пользователей над группой релизов, когда обе платформы активны ===
 function GroupSumLabelsPlugin(){
-  const cfg = { offset: 10, font: '700 12px Inter, system-ui, -apple-system, Segoe UI, Roboto', color: '#111', minTopPad: 40 };
+  const cfg = { offset: GROUP_SUM_LABEL_OFFSET, font: GROUP_SUM_LABEL_FONT, color: '#111', minTopPad: 40 };
   function groupBox(rows, i){
     let top=Infinity, left=Infinity, right=-Infinity, ok=false;
     for(const arr of rows){
@@ -1453,9 +1507,10 @@ function GroupSumLabelsPlugin(){
       const values = Array.isArray(opts.values) ? opts.values : [];
       if(!values.length) return;
       const { ctx, chartArea, scales:{x} } = chart;
+      const clip = getLabelClipBounds(chart);
       ctx.save();
       ctx.beginPath();
-      ctx.rect(chartArea.left, chartArea.top, chartArea.right-chartArea.left, chartArea.bottom-chartArea.top);
+      ctx.rect(clip.left, clip.top, clip.right-clip.left, clip.bottom-clip.top);
       ctx.clip();
       ctx.font = cfg.font;
       ctx.textAlign='center';
@@ -1477,7 +1532,7 @@ function GroupSumLabelsPlugin(){
 }
 
 function ValueLabelsPlugin(){
-  const cfg = { font: '600 12px Inter, system-ui, -apple-system, Segoe UI, Roboto', pad: 4, color: '#111', shadow: 'rgba(0,0,0,.12)' };
+  const cfg = { font: VALUE_LABEL_FONT, pad: VALUE_LABEL_PAD, color: '#111', shadow: 'rgba(0,0,0,.12)' };
   return {
     id:'valueLabels',
     afterDatasetsDraw(chart){
@@ -1487,11 +1542,12 @@ function ValueLabelsPlugin(){
       if(!Array.isArray(values) || !values.length) return;
       const meta = chart.getDatasetMeta(targetDatasetIndex);
       if(!meta || !meta.data) return;
-      const {ctx, chartArea} = chart;
+      const {ctx} = chart;
+      const clip = getLabelClipBounds(chart);
 
       ctx.save();
       ctx.beginPath();
-      ctx.rect(chartArea.left, chartArea.top, chartArea.right-chartArea.left, chartArea.bottom-chartArea.top);
+      ctx.rect(clip.left, clip.top, clip.right-clip.left, clip.bottom-clip.top);
       ctx.clip();
       ctx.font = cfg.font;
       ctx.textAlign='center';
@@ -1508,11 +1564,11 @@ function ValueLabelsPlugin(){
         let y;
         if(drawAbove){
           // над баром на 3–4px
-          y = Math.max(Math.round(Math.min(p.y, p.base)) - cfg.pad - 4, chartArea.top + 2);
+          y = Math.max(Math.round(Math.min(p.y, p.base)) - cfg.pad - 4, clip.top + 2);
           ctx.textBaseline = 'bottom';
         } else {
           // внутри бара (fallback)
-          y = Math.max(Math.round(Math.min(p.y, p.base)) + cfg.pad, chartArea.top + 2);
+          y = Math.max(Math.round(Math.min(p.y, p.base)) + cfg.pad, clip.top + 2);
           ctx.textBaseline = 'top';
         }
         ctx.shadowColor = cfg.shadow; ctx.shadowBlur = 0.5; ctx.shadowOffsetY = 0.5;
@@ -1656,7 +1712,7 @@ const agg = snap => {
         }
       }
     },
-    plugins:[deltaLabels, ValueLabelsPlugin(), groupSumLabels]
+    plugins:[ValueLabelsPlugin(), groupSumLabels, deltaLabels]
   });
   window.addEventListener('resize', ()=>{ if(deltaChart) deltaChart.update('none'); }, { passive:true });
 
