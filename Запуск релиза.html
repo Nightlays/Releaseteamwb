@@ -1225,10 +1225,17 @@
         return `${YT_BASE_URL}/issue/${encodeURIComponent(key)}`;
       }
 
-      async function fetchYtIssuesByQuery(query, authHeader, signal){
+      function normalizeReleaseTicketSummary(value){
+        return String(value || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toUpperCase();
+      }
+
+      async function fetchYtIssuesByQuery(query, authHeader, signal, top){
         const params = new URLSearchParams();
         params.set('query', query);
-        params.set('$top', '10');
+        params.set('$top', String(Math.max(1, Math.min(200, Number(top) || 10))));
         params.set('fields', 'id,idReadable,summary');
         const url = `${YT_BASE_URL}/api/issues?${params.toString()}`;
         const data = await ytProxyGetJson(url, authHeader, signal);
@@ -1257,9 +1264,10 @@
           throw new Error('Укажи YouTrack token.');
         }
 
-        const query = `(${meta.sprintField}: ${release}) AND summary: "${meta.summary}" AND State: -Rejected`;
-        const issues = await fetchYtIssuesByQuery(query, authHeader, signal);
-        const exact = issues.find((item) => String((item && item.summary) || '').trim().toUpperCase() === meta.summary.toUpperCase()) || issues[0];
+        const query = `(${meta.sprintField}: ${release})`;
+        const issues = await fetchYtIssuesByQuery(query, authHeader, signal, 100);
+        const targetSummary = normalizeReleaseTicketSummary(meta.summary);
+        const exact = issues.find((item) => normalizeReleaseTicketSummary(item && item.summary) === targetSummary);
         if(!exact || !exact.idReadable){
           throw new Error(`Не найден ${meta.summary} в YouTrack.`);
         }
