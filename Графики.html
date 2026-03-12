@@ -928,10 +928,10 @@
 
         const PDF_MAX_BYTES = 300 * 1024 * 1024;
         const PDF_EXPORT_PRESETS = [
-          { summaryScale: 1.8, cardScale: 1.6, imageType: 'JPEG', imageQuality: 0.88, imageCompression: 'MEDIUM', summaryWidth: 1200, cardWidth: 1320 },
-          { summaryScale: 1.55, cardScale: 1.35, imageType: 'JPEG', imageQuality: 0.78, imageCompression: 'MEDIUM', summaryWidth: 1120, cardWidth: 1240 },
-          { summaryScale: 1.3, cardScale: 1.15, imageType: 'JPEG', imageQuality: 0.68, imageCompression: 'FAST', summaryWidth: 1040, cardWidth: 1160 },
-          { summaryScale: 1.1, cardScale: 1.0, imageType: 'JPEG', imageQuality: 0.6, imageCompression: 'FAST', summaryWidth: 980, cardWidth: 1080 }
+          { summaryScale: 2.35, cardScale: 2.0, tableScale: 2.1, summaryImageType: 'PNG', cardImageType: 'JPEG', tableImageType: 'PNG', cardImageQuality: 0.94, imageCompression: 'MEDIUM', summaryWidth: 1360, cardWidth: 1480, tableWidth: 1480 },
+          { summaryScale: 2.0, cardScale: 1.72, tableScale: 1.82, summaryImageType: 'PNG', cardImageType: 'JPEG', tableImageType: 'PNG', cardImageQuality: 0.86, imageCompression: 'MEDIUM', summaryWidth: 1260, cardWidth: 1380, tableWidth: 1380 },
+          { summaryScale: 1.55, cardScale: 1.35, tableScale: 1.45, summaryImageType: 'JPEG', cardImageType: 'JPEG', tableImageType: 'JPEG', summaryImageQuality: 0.86, cardImageQuality: 0.76, tableImageQuality: 0.84, imageCompression: 'FAST', summaryWidth: 1100, cardWidth: 1240, tableWidth: 1240 },
+          { summaryScale: 1.3, cardScale: 1.15, tableScale: 1.2, summaryImageType: 'JPEG', cardImageType: 'JPEG', tableImageType: 'JPEG', summaryImageQuality: 0.74, cardImageQuality: 0.64, tableImageQuality: 0.72, imageCompression: 'FAST', summaryWidth: 1000, cardWidth: 1120, tableWidth: 1120 }
         ];
 
         function getPdfCaptureWidth(node, fallback = 1200, min = 920, max = 1400){
@@ -1098,6 +1098,7 @@
 
         async function renderNodeInPdfSandbox(source, scale, options = {}){
           if(!source || !window.html2canvas) return null;
+          const syncSource = options.syncSource || source;
           const host = document.createElement('div');
           host.setAttribute('aria-hidden', 'true');
           host.style.position = 'fixed';
@@ -1125,7 +1126,7 @@
           host.appendChild(scope);
           document.body.appendChild(host);
 
-          syncCanvasBitmaps(source, clone);
+          syncCanvasBitmaps(syncSource, clone);
           await waitForLayoutFrames(2);
           try{
             return await renderCardCanvas(clone, scale, {
@@ -1138,14 +1139,15 @@
           }
         }
 
-        function canvasToPdfImage(canvas, preset){
-          const imageType = String(preset?.imageType || 'JPEG').toUpperCase() === 'PNG' ? 'PNG' : 'JPEG';
+        function canvasToPdfImage(canvas, preset, options = {}){
+          const preferredType = String(options.imageType || preset?.imageType || 'JPEG').toUpperCase();
+          const imageType = preferredType === 'PNG' ? 'PNG' : 'JPEG';
           if(imageType === 'PNG'){
             return { imageType, dataUrl: canvas.toDataURL('image/png') };
           }
           return {
             imageType,
-            dataUrl: canvas.toDataURL('image/jpeg', Math.max(0.4, Math.min(0.95, Number(preset?.imageQuality) || 0.82)))
+            dataUrl: canvas.toDataURL('image/jpeg', Math.max(0.4, Math.min(0.98, Number(options.imageQuality ?? preset?.imageQuality ?? 0.82) || 0.82)))
           };
         }
 
@@ -1160,32 +1162,317 @@
           setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
 
+        function buildPdfWrapper(tagName, classNames = [], sourceNodes = []){
+          const node = document.createElement(tagName || 'section');
+          node.className = (Array.isArray(classNames) ? classNames : []).filter(Boolean).join(' ');
+          (Array.isArray(sourceNodes) ? sourceNodes : []).filter(Boolean).forEach(child => {
+            node.appendChild(child.cloneNode(true));
+          });
+          return node;
+        }
+
+        function chunkArray(items, size){
+          const list = Array.isArray(items) ? items.filter(Boolean) : [];
+          const chunkSize = Math.max(1, Number(size) || 1);
+          const chunks = [];
+          for(let i = 0; i < list.length; i += chunkSize){
+            chunks.push(list.slice(i, i + chunkSize));
+          }
+          return chunks;
+        }
+
+        function buildPdfGridSection(sourceNodes = [], options = {}){
+          const section = document.createElement('section');
+          section.className = ['pdf-grid-section', ...(Array.isArray(options.sectionClassNames) ? options.sectionClassNames : [])]
+            .filter(Boolean)
+            .join(' ');
+          const grid = document.createElement('div');
+          const columns = Math.max(1, Number(options.columns) || 1);
+          grid.className = [
+            'pdf-grid-layout',
+            `pdf-grid-layout--cols-${columns}`,
+            ...(Array.isArray(options.gridClassNames) ? options.gridClassNames : [])
+          ].filter(Boolean).join(' ');
+          (Array.isArray(sourceNodes) ? sourceNodes : []).filter(Boolean).forEach(node => {
+            const clone = node.cloneNode(true);
+            clone.classList.add('pdf-grid-item');
+            grid.appendChild(clone);
+          });
+          section.appendChild(grid);
+          return section;
+        }
+
+        function buildPdfGridRowSections(sourceNodes = [], options = {}){
+          const rows = chunkArray(sourceNodes, Math.max(1, Number(options.columns) || 1));
+          return rows.map(nodes => ({
+            node: buildPdfGridSection(nodes, options),
+            kind: options.kind || 'summary'
+          }));
+        }
+
+        function buildMlPdfCompareSection(overviewPage){
+          if(!overviewPage) return null;
+          const releaseStrip = overviewPage.querySelector('.ml-release-strip');
+          if(!releaseStrip) return null;
+          const section = document.createElement('section');
+          section.className = 'pdf-compare-sheet';
+          const title = document.createElement('div');
+          title.className = 'pdf-title';
+          title.textContent = 'Сравниваемые версии';
+          const meta = document.createElement('div');
+          meta.className = 'pdf-meta';
+          meta.textContent = 'Показываем диапазон релизов, текущий релиз и точную пару сравнения для этого PDF.';
+          section.appendChild(title);
+          section.appendChild(meta);
+          section.appendChild(releaseStrip.cloneNode(true));
+          return section;
+        }
+
+        function collectDomainCardPdfSections(card){
+          if(!card) return [];
+          const sections = [];
+          const classes = Array.from(card.classList);
+          const head = card.querySelector(':scope > .ml-domain-head');
+          const groups = Array.from(card.querySelectorAll(':scope > .ml-domain-groups > *'));
+          const outcomes = Array.from(card.querySelectorAll(':scope > .ml-outcome-grid > *'));
+          if(head && groups.length){
+            sections.push({ node: buildPdfWrapper('section', classes, [head, groups[0]]), kind: 'summary' });
+            groups.slice(1).forEach(group => sections.push({ node: buildPdfWrapper('section', classes, [group]), kind: 'summary' }));
+          }else if(head){
+            sections.push({ node: buildPdfWrapper('section', classes, [head]), kind: 'summary' });
+          }
+          if(!head && groups.length){
+            groups.forEach(group => sections.push({ node: buildPdfWrapper('section', classes, [group]), kind: 'summary' }));
+          }
+          if(outcomes.length){
+            buildPdfGridRowSections(outcomes, {
+              columns: 2,
+              gridClassNames: ['ml-outcome-grid'],
+              kind: 'summary'
+            }).forEach(section => sections.push(section));
+          }
+          if(!sections.length){
+            sections.push({ node: card, kind: 'summary' });
+          }
+          return sections;
+        }
+
+        function collectAnomalyCardPdfSections(card){
+          if(!card) return [];
+          const sections = [];
+          const classes = Array.from(card.classList);
+          const head = card.querySelector(':scope > .ml-domain-head');
+          const summary = card.querySelector(':scope > .ml-anoms-summary');
+          const subSections = Array.from(card.querySelectorAll(':scope > .ml-anoms-columns > .ml-anoms-section'));
+          if(head || summary){
+            sections.push({ node: buildPdfWrapper('section', classes, [head, summary]), kind: 'summary' });
+          }
+          if(subSections.length){
+            buildPdfGridRowSections(subSections, {
+              columns: 2,
+              gridClassNames: ['ml-anoms-columns'],
+              kind: 'summary'
+            }).forEach(section => sections.push(section));
+          }
+          if(!sections.length){
+            sections.push({ node: card, kind: 'summary' });
+          }
+          return sections;
+        }
+
+        function collectShellPdfSections(shell, headSelector, gridSelector, columns = 2){
+          if(!shell) return [];
+          const sections = [];
+          const classes = Array.from(shell.classList);
+          const head = shell.querySelector(headSelector);
+          if(head){
+            sections.push({ node: buildPdfWrapper('section', classes, [head]), kind: 'summary' });
+          }
+          const grid = shell.querySelector(gridSelector);
+          const items = Array.from(grid?.children || []);
+          if(items.length){
+            buildPdfGridRowSections(items, {
+              columns,
+              gridClassNames: Array.from(grid.classList),
+              kind: 'summary'
+            }).forEach(section => sections.push(section));
+          }
+          if(!sections.length){
+            sections.push({ node: shell, kind: 'summary' });
+          }
+          return sections;
+        }
+
+        function collectPlatformDynamicsCardPdfSections(card){
+          if(!card) return [];
+          const classes = Array.from(card.classList);
+          const sections = [];
+          const head = card.querySelector(':scope > .ml-type-dynamics-card-head');
+          const summary = card.querySelector(':scope > .ml-type-dynamics-summary');
+          const items = Array.from(card.querySelectorAll(':scope > .ml-type-dynamics-list > *'));
+          if(head || summary){
+            sections.push({ node: buildPdfWrapper('section', classes, [head, summary]), kind: 'summary' });
+          }
+          items.forEach(item => {
+            sections.push({ node: buildPdfWrapper('section', classes, [item]), kind: 'summary' });
+          });
+          if(!sections.length){
+            sections.push({ node: card, kind: 'summary' });
+          }
+          return sections;
+        }
+
+        function collectPlatformDynamicsShellPdfSections(shell){
+          if(!shell) return [];
+          const sections = [];
+          const head = shell.querySelector('.stream-insights-head');
+          if(head){
+            sections.push({ node: buildPdfWrapper('section', Array.from(shell.classList), [head]), kind: 'summary' });
+          }
+          const cardSections = Array.from(shell.querySelectorAll('.ml-type-dynamics-grid > .ml-type-dynamics-card'))
+            .map(card => collectPlatformDynamicsCardPdfSections(card));
+          const maxRows = cardSections.reduce((max, parts) => Math.max(max, parts.length), 0);
+          for(let rowIndex = 0; rowIndex < maxRows; rowIndex += 1){
+            const rowNodes = cardSections
+              .map(parts => parts[rowIndex]?.node)
+              .filter(Boolean);
+            if(!rowNodes.length) continue;
+            sections.push({
+              node: buildPdfGridSection(rowNodes, {
+                columns: Math.min(2, rowNodes.length),
+                gridClassNames: ['ml-type-dynamics-grid']
+              }),
+              kind: 'summary'
+            });
+          }
+          if(!sections.length){
+            sections.push({ node: shell, kind: 'summary' });
+          }
+          return sections;
+        }
+
         function collectMlSummaryPdfSections(summaryCard){
           if(!summaryCard) return [];
           const sections = [];
-          const pushSection = (node, classNames = []) => {
+          const pushSection = (node, classNames = [], extra = {}) => {
             if(!node) return;
-            sections.push({ node, classNames });
+            sections.push({ node, classNames, ...extra });
           };
 
           const overviewPage = summaryCard.querySelector('[data-ml-page="overview"]');
           if(overviewPage){
-            pushSection(overviewPage.querySelector('.ml-summary-top'), ['pdf-sheet']);
-            pushSection(overviewPage.querySelector('.ml-brief-grid'), ['pdf-sheet']);
+            pushSection(buildMlPdfCompareSection(overviewPage), ['pdf-sheet'], { kind: 'summary' });
+            pushSection(overviewPage.querySelector('.ml-overview-domain-grid'), ['pdf-sheet'], { kind: 'summary' });
+            pushSection(overviewPage.querySelector('.ml-brief-grid'), ['pdf-sheet'], { kind: 'summary' });
           }
 
           const regressStack = summaryCard.querySelector('[data-ml-page="regress"] .ml-summary-page-stack');
-          Array.from(regressStack?.children || []).forEach(node => pushSection(node, []));
+          Array.from(regressStack?.children || []).forEach(node => {
+            if(node.classList.contains('ml-domain-card')){
+              collectDomainCardPdfSections(node).forEach(section => pushSection(section.node, ['pdf-sheet'], section));
+              return;
+            }
+            if(node.classList.contains('stream-insights-shell')){
+              const columns = node.querySelector('.stream-insights-grid--lists') ? 2 : 3;
+              collectShellPdfSections(node, '.stream-insights-head', '.stream-insights-grid', columns).forEach(section => pushSection(section.node, ['pdf-sheet'], section));
+              return;
+            }
+            pushSection(node, ['pdf-sheet'], { kind: 'summary' });
+          });
 
           const releaseStack = summaryCard.querySelector('[data-ml-page="release"] .ml-summary-page-stack');
-          Array.from(releaseStack?.children || []).forEach(node => pushSection(node, []));
+          Array.from(releaseStack?.children || []).forEach(node => {
+            if(node.classList.contains('ml-domain-card')){
+              collectDomainCardPdfSections(node).forEach(section => pushSection(section.node, ['pdf-sheet'], section));
+              return;
+            }
+            if(node.classList.contains('chp-quarter-shell')){
+              collectShellPdfSections(node, '.chp-quarter-head', '.chp-quarter-grid', 2).forEach(section => pushSection(section.node, ['pdf-sheet'], section));
+              return;
+            }
+            if(node.classList.contains('ml-type-dynamics-shell')){
+              collectPlatformDynamicsShellPdfSections(node).forEach(section => pushSection(section.node, ['pdf-sheet'], section));
+              return;
+            }
+            pushSection(node, ['pdf-sheet'], { kind: 'summary' });
+          });
 
           const secondaryGrid = summaryCard.querySelector('[data-ml-page="secondary"] .ml-secondary-grid');
-          Array.from(secondaryGrid?.children || []).forEach(node => pushSection(node, []));
+          Array.from(secondaryGrid?.children || []).forEach(node => {
+            if(node.classList.contains('ml-domain-card--anoms')){
+              collectAnomalyCardPdfSections(node).forEach(section => pushSection(section.node, ['pdf-sheet'], section));
+              return;
+            }
+            if(node.classList.contains('ml-domain-card')){
+              collectDomainCardPdfSections(node).forEach(section => pushSection(section.node, ['pdf-sheet'], section));
+              return;
+            }
+            pushSection(node, ['pdf-sheet'], { kind: 'summary' });
+          });
 
           if(!sections.length){
-            pushSection(summaryCard, ['pdf-sheet', 'pdf-sheet--ml']);
+            pushSection(summaryCard, ['pdf-sheet', 'pdf-sheet--ml'], { kind: 'summary' });
           }
+          return sections;
+        }
+
+        function isVisiblePdfTableBlock(block){
+          if(!block) return false;
+          const style = window.getComputedStyle(block);
+          if(style.display === 'none' || style.visibility === 'hidden') return false;
+          return !!block.querySelector('table');
+        }
+
+        function isLargePdfTableBlock(block){
+          if(!block) return false;
+          const rows = block.querySelectorAll('tbody tr').length;
+          return rows > 12 || block.scrollHeight > 420;
+        }
+
+        function buildCardPdfFragment(card, mutateClone){
+          const clone = card.cloneNode(true);
+          clone.querySelectorAll('.ml-summary-toolbar, .ml-tooltip').forEach(el => el.remove());
+          if(typeof mutateClone === 'function'){
+            mutateClone(clone);
+          }
+          Array.from(clone.querySelectorAll('*')).reverse().forEach(el => {
+            if(el === clone) return;
+            if(el.classList.contains('table-block')) return;
+            const tag = el.tagName.toLowerCase();
+            if(['table','thead','tbody','tr','td','th','canvas'].includes(tag)) return;
+            const hasText = !!String(el.textContent || '').trim();
+            const hasChildren = el.children.length > 0;
+            if(!hasText && !hasChildren){
+              el.remove();
+            }
+          });
+          return clone;
+        }
+
+        function collectExportCardSections(card){
+          if(!card) return [];
+          const visibleTables = Array.from(card.querySelectorAll('.table-block')).filter(isVisiblePdfTableBlock);
+          const largeTableIndexes = visibleTables
+            .map((block, index) => (isLargePdfTableBlock(block) ? index : -1))
+            .filter(index => index >= 0);
+          if(!largeTableIndexes.length){
+            return [{ node: card, syncSource: card, kind: 'card' }];
+          }
+          const sections = [];
+          const chartFragment = buildCardPdfFragment(card, clone => {
+            const cloneTables = Array.from(clone.querySelectorAll('.table-block'));
+            largeTableIndexes.forEach(index => cloneTables[index]?.remove());
+          });
+          sections.push({ node: chartFragment, syncSource: card, kind: 'card' });
+          largeTableIndexes.forEach(index => {
+            const tableFragment = buildCardPdfFragment(card, clone => {
+              Array.from(clone.querySelectorAll('.table-block')).forEach((block, blockIndex) => {
+                if(blockIndex !== index) block.remove();
+              });
+              clone.querySelectorAll('.chart-viewport, canvas, .legend, .chart-notes').forEach(el => el.remove());
+            });
+            sections.push({ node: tableFragment, syncSource: card, kind: 'table' });
+          });
           return sections;
         }
 
@@ -1229,11 +1516,21 @@
                 let y = margin;
                 let hasBlocks = false;
 
-                const addCanvasToPdf = (canvas) => {
+                const addCanvasToPdf = (canvas, block = {}) => {
                   if(!canvas) return;
                   const imgW = pageW - margin * 2;
                   const imgH = imgW * (canvas.height / canvas.width);
-                  const image = canvasToPdfImage(canvas, preset);
+                  const imageType = block.kind === 'summary'
+                    ? (preset.summaryImageType || preset.imageType || 'JPEG')
+                    : (block.kind === 'table'
+                        ? (preset.tableImageType || preset.imageType || 'JPEG')
+                        : (preset.cardImageType || preset.imageType || 'JPEG'));
+                  const imageQuality = block.kind === 'summary'
+                    ? (preset.summaryImageQuality ?? preset.cardImageQuality ?? preset.imageQuality ?? 0.9)
+                    : (block.kind === 'table'
+                        ? (preset.tableImageQuality ?? preset.summaryImageQuality ?? preset.imageQuality ?? 0.88)
+                        : (preset.cardImageQuality ?? preset.imageQuality ?? 0.82));
+                  const image = canvasToPdfImage(canvas, preset, { imageType, imageQuality });
                   const compression = preset.imageCompression || 'MEDIUM';
 
                   if (imgH <= contentH) {
@@ -1262,7 +1559,7 @@
                         sctx.fillRect(0, 0, slice.width, slice.height);
                         sctx.drawImage(canvas, 0, sy, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
                       }
-                      const sliceImage = canvasToPdfImage(slice, preset);
+                      const sliceImage = canvasToPdfImage(slice, preset, { imageType, imageQuality });
                       const sliceH_mm = sliceH / pxPerMm;
                       pdf.addImage(sliceImage.dataUrl, sliceImage.imageType, margin, margin, imgW, sliceH_mm, undefined, compression);
                       sy += sliceH;
@@ -1279,18 +1576,15 @@
                     const summarySections = collectMlSummaryPdfSections(summaryCard);
                     for(let i = 0; i < summarySections.length; i += 1){
                       const section = summarySections[i];
-                      if(hasBlocks){
-                        pdf.addPage();
-                        y = margin;
-                      }
                       const summaryCanvas = await renderNodeInPdfSandbox(section.node, preset.summaryScale, {
                         width: preset.summaryWidth,
+                        syncSource: section.syncSource || section.node,
                         prepareClone(clone){
                           clone.classList.add(...(section.classNames || []));
                           clone.querySelector('.ml-summary-toolbar')?.remove();
                         }
                       });
-                      addCanvasToPdf(summaryCanvas);
+                      addCanvasToPdf(summaryCanvas, { kind: section.kind || 'summary' });
                       hasBlocks = true;
                     }
                   }catch(e){
@@ -1298,18 +1592,27 @@
                   }
                 }
 
-                for (const card of cards) {
-                  if(hasBlocks){
-                    pdf.addPage();
-                    y = margin;
-                  }
-                  const canvas = await renderNodeInPdfSandbox(card, preset.cardScale, {
-                    width: getPdfCaptureWidth(card, preset.cardWidth),
+                if(hasBlocks && cards.length){
+                  pdf.addPage();
+                  y = margin;
+                }
+
+                const cardSections = cards.flatMap(card => collectExportCardSections(card));
+                for (const block of cardSections) {
+                  const targetWidth = block.kind === 'table'
+                    ? (preset.tableWidth || preset.cardWidth)
+                    : preset.cardWidth;
+                  const targetScale = block.kind === 'table'
+                    ? (preset.tableScale || preset.cardScale)
+                    : preset.cardScale;
+                  const canvas = await renderNodeInPdfSandbox(block.node, targetScale, {
+                    width: getPdfCaptureWidth(block.node, targetWidth),
+                    syncSource: block.syncSource || block.node,
                     prepareClone(clone){
                       clone.querySelectorAll('.ml-summary-toolbar, .ml-tooltip').forEach(el => el.remove());
                     }
                   });
-                  addCanvasToPdf(canvas);
+                  addCanvasToPdf(canvas, { kind: block.kind || 'card' });
                   hasBlocks = true;
                 }
 
@@ -2801,7 +3104,40 @@
           ]);
           const normalizePlatformTypeKey = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
           const includePlatformTypeInSummary = (value) => !PLATFORM_TYPE_EXCLUDED_KEYS.has(normalizePlatformTypeKey(value));
-          const describeTypeAnomaly = (platform, typeName) => `Изменение количества задач типа «${translateTypeName(typeName)}» на платформе ${platform}. Для этого блока рост считаем позитивным сигналом, снижение — риском.`;
+          const isPlatformTypeRiskOnIncrease = (typeName) => {
+            const normalized = normalizePlatformTypeKey(typeName);
+            return normalized === 'bug' || normalized === 'vlet';
+          };
+          const buildPlatformTypeDelta = (current, base, typeName) => (
+            isPlatformTypeRiskOnIncrease(typeName)
+              ? buildNegativeDelta(current, base)
+              : buildPositiveDelta(current, base)
+          );
+          const getPlatformTypeRuleText = (typeName) => {
+            const normalized = normalizePlatformTypeKey(typeName);
+            if(normalized === 'vlet'){
+              return 'Для влетов рост считаем риском, снижение — позитивным сигналом.';
+            }
+            if(normalized === 'bug'){
+              return 'Для багов рост считаем риском, снижение — позитивным сигналом.';
+            }
+            return 'Для этого блока рост количества задач считаем позитивной динамикой, снижение — риском.';
+          };
+          const formatPlatformTypeBaseText = (row) => {
+            if(!row || !row.baseText) return '';
+            const prefix = row.basePrefix || 'значение';
+            return `${prefix} ${row.baseText}`;
+          };
+          const describeTypeAnomaly = (platform, typeName) => {
+            const normalized = normalizePlatformTypeKey(typeName);
+            if(normalized === 'vlet'){
+              return `Изменение количества влетов на платформе ${platform}. Для влетов рост считаем риском, снижение — позитивным сигналом.`;
+            }
+            if(normalized === 'bug'){
+              return `Изменение количества багов на платформе ${platform}. Для багов рост считаем риском, снижение — позитивным сигналом.`;
+            }
+            return `Изменение количества задач типа «${translateTypeName(typeName)}» на платформе ${platform}. Для этого блока рост считаем позитивным сигналом, снижение — риском.`;
+          };
           const presentMetricInfo = (label) => {
             const raw = String(label || '').trim();
             const l = raw.toLowerCase();
@@ -3048,15 +3384,51 @@
             if(!Number.isFinite(value)) return '—';
             return intFmt.format(Math.round(value));
           };
-          const buildPositiveDelta = (current, base) => {
+          const buildDirectionalDelta = (current, base, positiveOnIncrease = true) => {
             if(!Number.isFinite(base)) return { delta: null, pct: null, tone: 'neutral' };
             const delta = current - base;
             const pct = base !== 0 ? (delta / base * 100) : (current ? 100 : 0);
-            const tone = delta === 0 ? 'neutral' : (delta > 0 ? 'good' : 'bad');
+            let tone = 'neutral';
+            if(delta !== 0){
+              tone = positiveOnIncrease
+                ? (delta > 0 ? 'good' : 'bad')
+                : (delta < 0 ? 'good' : 'bad');
+            }
             return { delta, pct, tone };
           };
-          const buildPlatformTypeDynamics = (rows, platformLabel) => {
-            const list = Array.isArray(rows) ? rows : [];
+          const buildPositiveDelta = (current, base) => buildDirectionalDelta(current, base, true);
+          const buildNegativeDelta = (current, base) => buildDirectionalDelta(current, base, false);
+          const mergePlatformTypeRows = (rows, vletRows = []) => {
+            const merged = new Map();
+            const ensureReleaseRow = (release) => {
+              const key = String(release || '').trim() || `row_${merged.size}`;
+              if(!merged.has(key)){
+                merged.set(key, {
+                  release: release || '',
+                  counts: Object.create(null),
+                  details: Object.create(null),
+                  vletCount: null,
+                  hasVletData: false
+                });
+              }
+              return merged.get(key);
+            };
+            (Array.isArray(rows) ? rows : []).forEach(row => {
+              const target = ensureReleaseRow(row?.release);
+              target.release = row?.release || target.release;
+              target.counts = Object.assign(Object.create(null), target.counts, row?.counts || {});
+              target.details = Object.assign(Object.create(null), target.details, row?.details || {});
+            });
+            (Array.isArray(vletRows) ? vletRows : []).forEach(row => {
+              const target = ensureReleaseRow(row?.release);
+              target.release = row?.release || target.release;
+              target.vletCount = Number(row?.vlet || 0);
+              target.hasVletData = true;
+            });
+            return Array.from(merged.values());
+          };
+          const buildPlatformTypeDynamics = (rows, platformLabel, options = {}) => {
+            const list = mergePlatformTypeRows(rows, options?.vletRows || []);
             if(!list.length){
               return {
                 platform: platformLabel,
@@ -3076,6 +3448,7 @@
             const baselineRows = compareMode === 'prev'
               ? (list.length >= 2 ? [list[list.length - 2]] : [])
               : list.slice(0, -1);
+            const hasVletSeries = !!currentRow?.hasVletData || !!prevRow?.hasVletData || baselineRows.some(row => row?.hasVletData);
             const allTypeSet = new Set();
             [currentRow, prevRow, ...baselineRows].filter(Boolean).forEach(row => {
               Object.keys(row?.counts || {}).forEach(type => {
@@ -3083,7 +3456,7 @@
               });
             });
             const orderedTypes = sortTypesByCanon(allTypeSet);
-            if(!orderedTypes.length){
+            if(!orderedTypes.length && !hasVletSeries){
               return {
                 platform: platformLabel,
                 compareText: 'Нет учитываемых типов задач',
@@ -3116,8 +3489,8 @@
                     ? Number(baselineRows[0]?.counts?.[type] || 0)
                     : baselineRows.reduce((sum, row) => sum + Number(row?.counts?.[type] || 0), 0) / baselineRows.length)
                 : null;
-              const prevDiff = buildPositiveDelta(current, previous);
-              const historyDiff = buildPositiveDelta(current, history);
+              const prevDiff = buildPlatformTypeDelta(current, previous, type);
+              const historyDiff = buildPlatformTypeDelta(current, history, type);
               const primaryDiff = compareMode === 'prev' ? prevDiff : historyDiff;
               const title = translateTypeName(type);
               const currentText = formatTypeCountValue(current);
@@ -3133,6 +3506,7 @@
                   key: 'prev',
                   label: compareMode === 'prev' ? 'Разница к предыдущему релизу' : 'К предыдущему релизу',
                   baseText: previousText,
+                  basePrefix: 'было',
                   delta: prevDiff.delta,
                   pct: prevDiff.pct,
                   tone: prevDiff.tone
@@ -3143,6 +3517,7 @@
                   key: 'history',
                   label: 'К средней истории',
                   baseText: historyText,
+                  basePrefix: 'среднее',
                   delta: historyDiff.delta,
                   pct: historyDiff.pct,
                   tone: historyDiff.tone
@@ -3154,12 +3529,13 @@
                 `${currentReleaseLabel}: ${currentText}.`,
                 `${previousReleaseLabel}: ${previousText}.`,
                 `${baselineLabel}: ${historyText}.`,
-                'Для этого блока рост количества задач считаем позитивной динамикой, снижение — риском.',
+                getPlatformTypeRuleText(type),
                 compareNote
               ].join(' ');
               return {
                 platform: platformLabel,
                 rawType: type,
+                kind: 'task',
                 title,
                 current,
                 previous,
@@ -3174,10 +3550,85 @@
                 deltaPct: primaryDiff.pct,
                 tone,
                 statusText,
+                unitLabel: 'задач',
                 tooltipText,
                 deltaRows
               };
             });
+            if(currentRow?.hasVletData){
+              const current = Number(currentRow?.vletCount || 0);
+              const previous = prevRow?.hasVletData ? Number(prevRow?.vletCount || 0) : null;
+              const vletHistoryRows = baselineRows.filter(row => row?.hasVletData);
+              const history = vletHistoryRows.length
+                ? (compareMode === 'prev'
+                    ? previous
+                    : vletHistoryRows.reduce((sum, row) => sum + Number(row?.vletCount || 0), 0) / vletHistoryRows.length)
+                : null;
+              const prevDiff = buildNegativeDelta(current, previous);
+              const historyDiff = buildNegativeDelta(current, history);
+              const primaryDiff = compareMode === 'prev' ? prevDiff : historyDiff;
+              const currentText = formatTypeCountValue(current);
+              const previousText = Number.isFinite(previous) ? formatTypeCountValue(previous) : '—';
+              const historyText = Number.isFinite(history) ? formatTypeCountValue(history) : '—';
+              const tone = primaryDiff.tone;
+              const statusText = tone === 'good'
+                ? 'Позитив'
+                : (tone === 'bad' ? 'Риск' : 'Нейтрально');
+              const deltaRows = [];
+              if(Number.isFinite(previous)){
+                deltaRows.push({
+                  key: 'prev',
+                  label: compareMode === 'prev' ? 'Разница к предыдущему релизу' : 'К предыдущему релизу',
+                  baseText: previousText,
+                  basePrefix: 'было',
+                  delta: prevDiff.delta,
+                  pct: prevDiff.pct,
+                  tone: prevDiff.tone
+                });
+              }
+              if(compareMode !== 'prev' && Number.isFinite(history)){
+                deltaRows.push({
+                  key: 'history',
+                  label: 'К средней истории',
+                  baseText: historyText,
+                  basePrefix: 'среднее',
+                  delta: historyDiff.delta,
+                  pct: historyDiff.pct,
+                  tone: historyDiff.tone
+                });
+              }
+              const tooltipText = [
+                `Платформа: ${platformLabel}.`,
+                'Метрика: влеты.',
+                `${currentReleaseLabel}: ${currentText}.`,
+                `${previousReleaseLabel}: ${previousText}.`,
+                `${baselineLabel}: ${historyText}.`,
+                'Для влетов рост считаем негативной динамикой, снижение — позитивной.',
+                compareNote
+              ].join(' ');
+              items.push({
+                platform: platformLabel,
+                rawType: 'vlet',
+                kind: 'vlet',
+                title: 'влеты',
+                current,
+                previous,
+                baseline: history,
+                currentText,
+                currentLabel: currentReleaseLabel,
+                previousText,
+                previousLabel: previousReleaseLabel,
+                baselineText: historyText,
+                baselineLabel,
+                delta: primaryDiff.delta,
+                deltaPct: primaryDiff.pct,
+                tone,
+                statusText,
+                unitLabel: 'влетов',
+                tooltipText,
+                deltaRows
+              });
+            }
             const currentTotal = sumRowCounts(currentRow);
             const previousTotal = prevRow ? sumRowCounts(prevRow) : null;
             const baselineTotal = baselineRows.length
@@ -3207,16 +3658,23 @@
               : (managerTone === 'bad' ? 'В релиз вошло меньше задач' : 'Поток задач в релизе близок к базе');
             const managerLines = [`${currentReleaseLabel}: ${currentTotalText}`];
             if(Number.isFinite(prevTotalDiff.delta)){
-              managerLines.push(`К предыдущему релизу: ${formatDeltaWithUnit(`${platformLabel}: Total`, prevTotalDiff.delta, 0, 'задач', prevTotalDiff.pct)} · база ${previousTotalText}`);
+              managerLines.push(`К предыдущему релизу: ${formatDeltaWithUnit(`${platformLabel}: Total`, prevTotalDiff.delta, 0, 'задач', prevTotalDiff.pct)} · было ${previousTotalText}`);
             }
             if(compareMode !== 'prev' && Number.isFinite(historyTotalDiff.delta)){
               managerLines.push(`К средней истории: ${formatDeltaWithUnit(`${platformLabel}: Total`, historyTotalDiff.delta, 0, 'задач', historyTotalDiff.pct)} · среднее ${baselineTotalText}`);
             }
+            const vletItem = items.find(item => item.kind === 'vlet') || null;
+            if(vletItem){
+              const vletFacts = [`Влеты: текущий ${vletItem.currentText}`];
+              if(Number.isFinite(vletItem.previous)) vletFacts.push(`предыдущий ${vletItem.previousText}`);
+              if(compareMode !== 'prev' && Number.isFinite(vletItem.baseline)) vletFacts.push(`средняя история ${vletItem.baselineText}`);
+              managerLines.push(vletFacts.join(', '));
+            }
             if(topPositive){
-              managerLines.push(`Главный драйвер роста: ${topPositive.title} (${formatDeltaWithUnit(`${topPositive.platform}: ${topPositive.rawType}`, topPositive.delta, 0, 'задач', topPositive.deltaPct)})`);
+              managerLines.push(`Главный позитив: ${topPositive.title} (${formatDeltaWithUnit(`${topPositive.platform}: ${topPositive.rawType}`, topPositive.delta, 0, topPositive.unitLabel || 'задач', topPositive.deltaPct)})`);
             }
             if(topRisk){
-              managerLines.push(`Сильнее всего просел: ${topRisk.title} (${formatDeltaWithUnit(`${topRisk.platform}: ${topRisk.rawType}`, topRisk.delta, 0, 'задач', topRisk.deltaPct)})`);
+              managerLines.push(`Главный риск: ${topRisk.title} (${formatDeltaWithUnit(`${topRisk.platform}: ${topRisk.rawType}`, topRisk.delta, 0, topRisk.unitLabel || 'задач', topRisk.deltaPct)})`);
             }
             const totals = [
               { label: currentReleaseLabel, value: currentTotalText, emphasis: 'current' }
@@ -3246,7 +3704,7 @@
             const renderDeltaRow = (item, row) => {
               const rowText = row.delta == null || !Number.isFinite(row.delta)
                 ? 'Нет базы для сравнения'
-                : `${formatDeltaWithUnit(`${item.platform}: ${item.rawType}`, row.delta, 0, 'задач', row.pct)} · база ${row.baseText}`;
+                : `${formatDeltaWithUnit(`${item.platform}: ${item.rawType}`, row.delta, 0, item.unitLabel || 'задач', row.pct)} · ${formatPlatformTypeBaseText(row)}`;
               return `
                 <div class="ml-type-dynamics-diff-row ml-type-dynamics-diff-row--${row.tone}">
                   <span class="ml-type-dynamics-diff-label">${escHtml(row.label)}</span>
@@ -3317,7 +3775,7 @@
                 <div class="stream-insights-head">
                   <div>
                     <div class="stream-insights-title">Типы задач по платформам</div>
-                    <div class="stream-insights-subtitle">Учитываем только рабочие типы задач. Релизы, эпики, дефекты, документацию, автотесты, фичи и техдолг исключаем из расчета. Для этого блока рост считаем позитивной динамикой, снижение — риском.</div>
+                    <div class="stream-insights-subtitle">Учитываем только рабочие типы задач и влеты. Релизы, эпики, дефекты, документацию, автотесты, фичи и техдолг исключаем из расчета. Для большинства типов задач рост считаем позитивной динамикой, снижение — риском. Для багов и влетов наоборот: рост — риск, снижение — позитив.</div>
                   </div>
                 </div>
                 <div class="ml-type-dynamics-grid">
@@ -3333,31 +3791,53 @@
               const abs = Math.abs(item.delta);
               const pctAbs = Number.isFinite(item.deltaPct) ? Math.abs(item.deltaPct) : 0;
               const volume = Math.max(Number(item.current) || 0, Number(item.previous) || 0, Number(item.baseline) || 0);
-              const isMeaningful = abs >= 2 || (pctAbs >= 25 && volume >= 5);
+              const isVlet = item.kind === 'vlet';
+              const isMeaningful = isVlet
+                ? (abs >= 1 || (pctAbs >= 20 && volume >= 1))
+                : (abs >= 2 || (pctAbs >= 25 && volume >= 5));
               if(!isMeaningful) return null;
               const pctScore = Math.min(pctAbs, 120) * 0.15;
               const score = abs * 5 + pctScore;
-              const direction = item.delta > 0 ? 'good' : 'bad';
+              const direction = item.tone === 'good' ? 'good' : (item.tone === 'bad' ? 'bad' : 'neutral');
               const detailParts = [`${item.currentLabel}: ${item.currentText}`];
               (item.deltaRows || []).forEach(row => {
                 if(row.delta == null || !Number.isFinite(row.delta)) return;
-                detailParts.push(`${row.label}: ${formatDeltaWithUnit(`${item.platform}: ${item.rawType}`, row.delta, 0, 'задач', row.pct)} · база ${row.baseText}`);
+                detailParts.push(`${row.label}: ${formatDeltaWithUnit(`${item.platform}: ${item.rawType}`, row.delta, 0, item.unitLabel || 'задач', row.pct)} · ${formatPlatformTypeBaseText(row)}`);
               });
+              const isBug = normalizePlatformTypeKey(item.rawType) === 'bug';
+              const text = isVlet
+                ? `${item.platform}: ${direction === 'bad' ? 'влетов стало больше' : 'влетов стало меньше'}\n${detailParts.join('\n')}`
+                : (isBug
+                    ? `${item.platform}: ${direction === 'bad' ? 'багов стало больше' : 'багов стало меньше'}\n${detailParts.join('\n')}`
+                    : `${item.platform}: ${direction === 'good' ? 'в релиз вошло больше задач этого типа' : 'в релиз вошло меньше задач этого типа'}\n${detailParts.join('\n')}`);
+              const desc = isVlet
+                ? [
+                    `Изменение количества влетов на платформе ${item.platform}.`,
+                    'Для влетов рост считаем риском, снижение — позитивом.',
+                    compareNote
+                  ].join(' ')
+                : (isBug
+                    ? [
+                        `Изменение количества багов на платформе ${item.platform}.`,
+                        'Для багов рост считаем риском, снижение — позитивом.',
+                        compareNote
+                      ].join(' ')
+                    : [
+                        `Изменение количества задач типа «${item.title}» на платформе ${item.platform}.`,
+                        'Для этого блока рост считаем позитивной динамикой, снижение — риском.',
+                        compareNote
+                      ].join(' '));
               return signalWithDomain({
                 label: `${item.platform}: ${item.rawType}`,
                 group: 'release',
                 delta: item.delta,
                 pct: item.deltaPct,
                 digits: 0,
-                unit: 'задач',
+                unit: item.unitLabel || 'задач',
                 direction,
                 score,
-                text: `${item.platform}: ${direction === 'good' ? 'в релиз вошло больше задач этого типа' : 'в релиз вошло меньше задач этого типа'}\n${detailParts.join('\n')}`,
-                desc: [
-                  `Изменение количества задач типа «${item.title}» на платформе ${item.platform}.`,
-                  'Для этого блока рост считаем позитивной динамикой, снижение — риском.',
-                  compareNote
-                ].join(' ')
+                text,
+                desc
               });
             }).filter(Boolean));
           };
@@ -3598,8 +4078,8 @@
             });
           };
           const platformTypeSummaries = [
-            buildPlatformTypeDynamics(window.__iosTypesRowsAll || [], 'iOS'),
-            buildPlatformTypeDynamics(window.__andTypesRowsAll || [], 'Android')
+            buildPlatformTypeDynamics(window.__iosTypesRowsAll || [], 'iOS', { vletRows: window.__chpTypesRowsIosAll || [] }),
+            buildPlatformTypeDynamics(window.__andTypesRowsAll || [], 'Android', { vletRows: window.__chpTypesRowsAndAll || [] })
           ];
           const platformTypeSignals = buildPlatformTypeSignals(platformTypeSummaries);
 
@@ -3729,7 +4209,74 @@
               focus: topAnomaly ? `Единственный заметный фокус внимания: ${formatAnomalyBrief(topAnomaly)}.` : 'Аномалии не выбиваются из общего фона.'
             };
           };
+          const formatOverviewSignalLine = (item) => {
+            if(!item) return '';
+            const label = presentMetricInfo(item.label || '').label || item.label || 'Сигнал';
+            return `${label}: ${formatDeltaWithUnit(item.label || '', item.delta || 0, item.digits || 0, item.unit || '', Number.isFinite(item.pct) ? item.pct : item.deltaPct)}`;
+          };
+          const buildDomainOverviewBrief = (domainKey) => {
+            const positives = improvements[domainKey] || [];
+            const risks = declines[domainKey] || [];
+            const topPositive = positives[0] || null;
+            const topRisk = risks[0] || null;
+            const baseLabel = compareMode === 'prev' ? 'предыдущий релиз' : 'средняя история';
+            const topPositiveScore = Number(topPositive?.score || 0);
+            const topRiskScore = Number(topRisk?.score || 0);
+            let tone = 'neutral';
+            let title = domainKey === 'regress' ? 'Регресс без резких сдвигов' : 'Релиз близок к базе';
+            let intro = domainKey === 'regress'
+              ? 'По контуру регресса нет выраженного доминирования рисков или улучшений.'
+              : 'По релизному качеству нет выраженного отклонения от базы сравнения.';
+            if(topRisk && topPositive){
+              if(topRiskScore >= topPositiveScore + 8){
+                tone = 'bad';
+                title = domainKey === 'regress' ? 'По регрессу есть напряжение' : 'По релизу есть выраженные риски';
+                intro = domainKey === 'regress'
+                  ? 'Негативные сигналы по объему, покрытию или скорости сильнее позитивных.'
+                  : 'Негативные сигналы по качеству релиза и таймингам сильнее позитивных.';
+              }else if(topPositiveScore >= topRiskScore + 8){
+                tone = 'good';
+                title = domainKey === 'regress' ? 'Регресс под контролем' : 'Релиз выглядит устойчиво';
+                intro = domainKey === 'regress'
+                  ? 'Позитивные сигналы по регрессу сейчас сильнее точек контроля.'
+                  : 'Позитивные сигналы по релизу и качеству перевешивают риски.';
+              }else{
+                tone = 'warn';
+                title = domainKey === 'regress' ? 'По регрессу картина смешанная' : 'По релизу картина смешанная';
+                intro = domainKey === 'regress'
+                  ? 'Есть и улучшения, и точки контроля по регрессному контуру.'
+                  : 'Есть и улучшения, и зоны внимания по релизному качеству.';
+              }
+            }else if(topRisk){
+              tone = 'bad';
+              title = domainKey === 'regress' ? 'По регрессу есть риски' : 'По релизу есть риски';
+              intro = domainKey === 'regress'
+                ? 'Сильнее всего выделяются негативные сигналы по регрессу.'
+                : 'Сильнее всего выделяются негативные сигналы по релизному качеству.';
+            }else if(topPositive){
+              tone = 'good';
+              title = domainKey === 'regress' ? 'По регрессу есть улучшения' : 'По релизу есть улучшения';
+              intro = domainKey === 'regress'
+                ? 'Позитивные сигналы по регрессу сейчас заметнее рисков.'
+                : 'Позитивные сигналы по релизу сейчас заметнее рисков.';
+            }
+            const lines = [
+              `Позитивных сигналов: ${positives.length}. Рисков: ${risks.length}.`
+            ];
+            if(topPositive) lines.push(`Главный позитив: ${formatOverviewSignalLine(topPositive)}`);
+            if(topRisk) lines.push(`Главный риск: ${formatOverviewSignalLine(topRisk)}`);
+            if(!topPositive && !topRisk){
+              lines.push(`Сравнение: ${compareReleaseText}.`);
+            }else{
+              lines.push(domainKey === 'regress'
+                ? `База сравнения: ${baseLabel}.`
+                : `Сравнение релиза: ${compareReleaseText}.`);
+            }
+            return { tone, title, intro, lines };
+          };
           const executiveBrief = buildExecutiveBrief();
+          const regressOverviewBrief = buildDomainOverviewBrief('regress');
+          const releaseOverviewBrief = buildDomainOverviewBrief('release');
           const streamLeadersHtml = renderStreamLeaders(window.__streamInsightData || null);
           const chpQuarterHtml = renderChpQuarterSummary(window.__chpQuarterStats || null);
           const platformTypeDynamicsHtml = renderPlatformTypeDynamicsSection(platformTypeSummaries);
@@ -3768,6 +4315,19 @@
                 ${renderExecutiveSignalStack('Поддерживающие сигналы', brief.wins, 'Сильных позитивных сигналов нет.')}
               </div>
               <div class="ml-brief-focus">${escHtml(brief.focus)}</div>
+            </section>
+          `;
+          const renderOverviewDomainCard = (label, brief) => `
+            <section class="ml-brief-card ml-overview-domain-card ml-brief-card--${brief.tone}">
+              <div class="ml-brief-eyebrow">${escHtml(label)}</div>
+              <div class="ml-overview-domain-head">
+                ${renderToneIcon(brief.tone, brief.title)}
+                <div class="ml-overview-domain-title">${escHtml(brief.title)}</div>
+              </div>
+              <div class="ml-brief-body">${escHtml(brief.intro)}</div>
+              <div class="ml-overview-domain-lines">
+                ${(brief.lines || []).map(line => `<div class="ml-overview-domain-line">${escHtml(line)}</div>`).join('')}
+              </div>
             </section>
           `;
 
@@ -3842,6 +4402,10 @@
                   ${catboostWarnings.length
                     ? `<div class="ml-summary-note ml-summary-note--warn">${catboostWarnings.map(escHtml).join(' ')}</div>`
                     : ''}
+                </div>
+                <div class="ml-overview-domain-grid">
+                  ${renderOverviewDomainCard('Итог по регрессу', regressOverviewBrief)}
+                  ${renderOverviewDomainCard('Итог по релизу', releaseOverviewBrief)}
                 </div>
 
                 <div class="ml-brief-grid">
@@ -4894,7 +5458,12 @@
           }
           function renderToneIcon(tone, title = ''){
             const safeTitle = String(title || '').replace(/"/g, '&quot;');
-            return `<span class="ml-signal-icon ml-signal-icon--${tone}"${safeTitle ? ` title="${safeTitle}"` : ''} aria-hidden="true">${tone === 'good' ? '✓' : (tone === 'bad' ? '✕' : '•')}</span>`;
+            const iconMarkup = tone === 'good'
+              ? `<svg class="ml-signal-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.55 16.65 5.9 13l-1.4 1.4 5.05 5.05L19.5 9.5l-1.4-1.4z" fill="currentColor"/></svg>`
+              : (tone === 'bad'
+                  ? `<svg class="ml-signal-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7.41 6 4.59 4.59L16.59 6 18 7.41 13.41 12 18 16.59 16.59 18 12 13.41 7.41 18 6 16.59 10.59 12 6 7.41z" fill="currentColor"/></svg>`
+                  : `<svg class="ml-signal-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3.25" fill="currentColor"/></svg>`);
+            return `<span class="ml-signal-icon ml-signal-icon--${tone}"${safeTitle ? ` title="${safeTitle}"` : ''} aria-hidden="true">${iconMarkup}</span>`;
           }
           function renderStreamDeltaList(items, emptyText, unitLabel){
             const list = Array.isArray(items) ? items : [];
