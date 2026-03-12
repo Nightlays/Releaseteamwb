@@ -4158,3 +4158,266 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
     text-align:center;
   }
 }
+
+/* ===== Sync from style.css for current charts / ML / PDF ===== */
+.wb-graphs{
+  --dev-downtime:#dc2626;
+  --dev-downtime-android:#16a34a;
+}
+.wb-graphs .dot-dev-downtime{background:var(--dev-downtime, #dc2626)}
+.wb-graphs .dot-dev-downtime-android{background:var(--dev-downtime-android, #16a34a)}
+.wb-graphs .dev-downtime-table{
+  table-layout:fixed;
+  min-width:1220px;
+}
+.wb-graphs .dev-downtime-table--ios .dev-downtime-col--date{width:10%}
+.wb-graphs .dev-downtime-table--ios .dev-downtime-col--weekday{width:7%}
+.wb-graphs .dev-downtime-table--ios .dev-downtime-col--release{width:8%}
+.wb-graphs .dev-downtime-table--ios .dev-downtime-col--total{width:9%}
+.wb-graphs .dev-downtime-table--ios .dev-downtime-col--intervals{width:19%}
+.wb-graphs .dev-downtime-table--ios .dev-downtime-col--domain{width:11%}
+.wb-graphs .dev-downtime-table--ios .dev-downtime-col--owners{width:16%}
+.wb-graphs .dev-downtime-table--ios .dev-downtime-col--comment{width:20%}
+.wb-graphs .dev-downtime-table--android .dev-downtime-col--date{width:9%}
+.wb-graphs .dev-downtime-table--android .dev-downtime-col--weekday{width:7%}
+.wb-graphs .dev-downtime-table--android .dev-downtime-col--release{width:8%}
+.wb-graphs .dev-downtime-table--android .dev-downtime-col--total{width:9%}
+.wb-graphs .dev-downtime-table--android .dev-downtime-col--intervals{width:15%}
+.wb-graphs .dev-downtime-table--android .dev-downtime-col--broken{width:13%}
+.wb-graphs .dev-downtime-table--android .dev-downtime-col--fixed{width:13%}
+.wb-graphs .dev-downtime-table--android .dev-downtime-col--comment{width:26%}
+.wb-graphs .dev-downtime-table td,
+.wb-graphs .dev-downtime-table th{
+  overflow:hidden;
+}
+.wb-graphs .dev-downtime-cell{
+  min-width:0;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.wb-graphs .dev-downtime-cell--compact{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.wb-graphs .dev-downtime-warning{
+  color:#b45309;
+  font-weight:600;
+}
+.wb-graphs .ml-downtime-card--good{
+  border-color:rgba(34,197,94,.24);
+  background:linear-gradient(180deg,#ffffff 0%, rgba(240,253,244,.92) 100%);
+}
+.wb-graphs .ml-downtime-card--bad{
+  border-color:rgba(244,63,94,.22);
+  background:linear-gradient(180deg,#ffffff 0%, rgba(255,241,242,.94) 100%);
+}
+.wb-graphs .ml-downtime-card--warn{
+  border-color:rgba(245,158,11,.26);
+  background:linear-gradient(180deg,#ffffff 0%, rgba(255,251,235,.94) 100%);
+}
+.wb-graphs .ml-downtime-card--neutral{
+  border-color:#ecebff;
+}
+.wb-graphs .ml-downtime-kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+}
+.wb-graphs .ml-downtime-kpi{
+  display:grid;
+  gap:4px;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid #ecebff;
+  background:rgba(255,255,255,.82);
+}
+.wb-graphs .ml-downtime-kpi-label{
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:#64748b;
+}
+.wb-graphs .ml-downtime-kpi-value{
+  font-size:18px;
+  font-weight:900;
+  line-height:1.2;
+  color:#0f172a;
+}
+.wb-graphs .ml-downtime-lines{
+  display:grid;
+  gap:6px;
+}
+.wb-graphs .ml-downtime-line{
+  font-size:13px;
+  line-height:1.55;
+  color:#475569;
+}
+@media (max-width: 720px){
+  .wb-graphs .ml-downtime-kpi-grid{
+    grid-template-columns:1fr;
+  }
+}
+
+.pdf-export *{
+  -webkit-font-smoothing:antialiased;
+  text-rendering:geometricPrecision;
+}
+.pdf-export .table-filter-row,
+.pdf-export .release-select-hidden{
+  display:none !important;
+}
+.pdf-export [data-collapse-btn]{
+  display:none !important;
+}
+.pdf-export .table-scroll-x{
+  overflow:visible !important;
+}
+.pdf-export .ml-domain-card,
+.pdf-export .ml-brief-card,
+.pdf-export .ml-metric-group,
+.pdf-export .ml-metric-card,
+.pdf-export .ml-outcome-card,
+.pdf-export .ml-anoms-stat,
+.pdf-export .ml-anoms-section,
+.pdf-export .ml-summary-note,
+.pdf-export .ml-meta-pill,
+.pdf-export .ml-status,
+.pdf-export .stream-insights-shell,
+.pdf-export .stream-insight-card,
+.pdf-export .stream-insight-item,
+.pdf-export .chp-quarter-shell,
+.pdf-export .chp-quarter-card,
+.pdf-export .chp-quarter-stat,
+.pdf-export .chp-quarter-item,
+.pdf-export .ml-type-dynamics-shell,
+.pdf-export .ml-type-dynamics-card,
+.pdf-export .ml-type-dynamics-item{
+  box-shadow:none !important;
+  overflow:visible !important;
+  break-inside:avoid;
+  page-break-inside:avoid;
+}
+.pdf-sheet,
+.pdf-compare-sheet,
+.pdf-grid-section{
+  width:1280px;
+  max-width:none;
+  padding:28px 32px;
+  background:#ffffff;
+  color:#0f172a;
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  box-shadow:none;
+  box-sizing:border-box;
+}
+.pdf-export .pdf-sheet,
+.pdf-export .pdf-compare-sheet,
+.pdf-export .pdf-grid-section{
+  overflow:visible !important;
+}
+.pdf-sheet .pdf-grid-layout{
+  gap:16px;
+}
+.pdf-export .pdf-grid-layout,
+.pdf-export .ml-metric-grid,
+.pdf-export .ml-outcome-grid,
+.pdf-export .stream-insights-grid,
+.pdf-export .chp-quarter-grid,
+.pdf-export .ml-type-dynamics-grid{
+  align-items:start !important;
+  align-content:start !important;
+  grid-auto-rows:minmax(0, auto) !important;
+}
+.pdf-export .pdf-grid-layout > *,
+.pdf-export .ml-metric-grid > *,
+.pdf-export .ml-outcome-grid > *,
+.pdf-export .stream-insights-grid > *,
+.pdf-export .chp-quarter-grid > *,
+.pdf-export .ml-type-dynamics-grid > *{
+  align-self:start !important;
+  height:auto !important;
+  min-height:0 !important;
+}
+.pdf-export .pdf-sheet > .pdf-grid-layout{
+  width:100% !important;
+}
+.pdf-export .pdf-grid-layout > *,
+.pdf-export .ml-summary-shell > *,
+.pdf-export .ml-summary-page > *,
+.pdf-export .ml-summary-page-stack > *{
+  min-width:0 !important;
+}
+.pdf-export .ml-summary-shell,
+.pdf-export .ml-summary-page,
+.pdf-export .ml-summary-page-stack{
+  width:100% !important;
+  overflow:visible !important;
+}
+.pdf-export .pdf-grid-section .ml-overview-domain-grid,
+.pdf-export .pdf-grid-section .ml-brief-grid,
+.pdf-export .pdf-grid-section .ml-anoms-columns,
+.pdf-export .pdf-grid-section .stream-insights-grid,
+.pdf-export .pdf-grid-section .chp-quarter-grid,
+.pdf-export .pdf-grid-section .ml-type-dynamics-grid,
+.pdf-export .pdf-grid-section .ml-outcome-grid,
+.pdf-export .pdf-sheet > .ml-overview-domain-grid,
+.pdf-export .pdf-sheet > .ml-brief-grid,
+.pdf-export .pdf-sheet > .ml-anoms-columns,
+.pdf-export .pdf-sheet > .stream-insights-grid,
+.pdf-export .pdf-sheet > .chp-quarter-grid,
+.pdf-export .pdf-sheet > .ml-type-dynamics-grid,
+.pdf-export .pdf-sheet > .ml-outcome-grid{
+  width:100% !important;
+}
+.pdf-export .pdf-grid-section .ml-brief-grid,
+.pdf-export .pdf-sheet > .ml-brief-grid{
+  grid-template-columns:minmax(0, 1.25fr) repeat(2, minmax(0, 1fr));
+}
+.pdf-export .pdf-grid-section .ml-overview-domain-grid,
+.pdf-export .pdf-sheet > .ml-overview-domain-grid{
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+}
+.pdf-export .ml-domain-title,
+.pdf-export .ml-overview-domain-title,
+.pdf-export .ml-metric-group-title,
+.pdf-export .ml-brief-title,
+.pdf-export .stream-insights-title,
+.pdf-export .chp-quarter-title,
+.pdf-export .ml-type-dynamics-card-title,
+.pdf-export .ml-outcome-title{
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  line-height:1.2 !important;
+}
+.pdf-export .ml-domain-subtitle,
+.pdf-export .ml-brief-body,
+.pdf-export .ml-brief-focus,
+.pdf-export .ml-overview-domain-line,
+.pdf-export .stream-insights-subtitle,
+.pdf-export .stream-insight-card-subtitle,
+.pdf-export .chp-quarter-subtitle,
+.pdf-export .ml-metric-note,
+.pdf-export .ml-signal-row-desc{
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  line-height:1.45 !important;
+}
+.pdf-export table thead{
+  display:table-header-group;
+}
+.pdf-export table tfoot{
+  display:table-row-group;
+}
+.pdf-export table tr{
+  break-inside:avoid;
+  page-break-inside:avoid;
+}
+.pdf-export .table-block,
+.pdf-export .table-scroll-x,
+.pdf-export table{
+  break-inside:auto !important;
+  page-break-inside:auto !important;
+}
