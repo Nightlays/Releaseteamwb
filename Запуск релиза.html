@@ -189,6 +189,38 @@
 
           <section class="card p-5 space-y-4">
             <div class="flex items-center justify-between gap-3 flex-wrap">
+              <h2 class="text-lg font-semibold">Предварительный просмотр</h2>
+              <div class="release-launch-status release-launch-status-muted">Показываем текст, который уйдёт в Band</div>
+            </div>
+            <div class="release-launch-preview-grid">
+              <article class="release-launch-preview-card">
+                <div class="release-launch-preview-title">SWAT Team Only</div>
+                <div class="release-launch-preview-row">
+                  <div class="release-launch-preview-label">Тред</div>
+                  <pre class="release-launch-preview-body is-placeholder" data-preview-kind="swat" data-preview-field="thread">Пока пусто</pre>
+                </div>
+                <div class="release-launch-preview-row">
+                  <div class="release-launch-preview-label">Содержимое треда</div>
+                  <pre class="release-launch-preview-body is-placeholder" data-preview-kind="swat" data-preview-field="content">Пока пусто</pre>
+                </div>
+              </article>
+
+              <article class="release-launch-preview-card">
+                <div class="release-launch-preview-title">Лента релизов</div>
+                <div class="release-launch-preview-row">
+                  <div class="release-launch-preview-label">Тред</div>
+                  <pre class="release-launch-preview-body is-placeholder" data-preview-kind="feed" data-preview-field="thread">Пока пусто</pre>
+                </div>
+                <div class="release-launch-preview-row">
+                  <div class="release-launch-preview-label">Содержимое треда</div>
+                  <pre class="release-launch-preview-body is-placeholder" data-preview-kind="feed" data-preview-field="content">Пока пусто</pre>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="card p-5 space-y-4">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
               <h2 class="text-lg font-semibold">Пошаговый запуск</h2>
               <button id="workflowResetBtn" type="button" class="btn btn-soft">Сбросить шаги</button>
             </div>
@@ -222,6 +254,38 @@
           <h2 class="text-lg font-semibold">Результат</h2>
           <div id="runCreateError" class="release-launch-run-error" style="display:none;"></div>
           <div id="runCreateResultLog" class="release-launch-log" aria-live="polite" aria-atomic="false"></div>
+        </section>
+
+        <section class="card p-5 space-y-4">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold">Предварительный просмотр</h2>
+            <div class="release-launch-status release-launch-status-muted">Показываем текст, который уйдёт в Band</div>
+          </div>
+          <div class="release-launch-preview-grid">
+            <article class="release-launch-preview-card">
+              <div class="release-launch-preview-title">SWAT Team Only</div>
+              <div class="release-launch-preview-row">
+                <div class="release-launch-preview-label">Тред</div>
+                <pre class="release-launch-preview-body is-placeholder" data-preview-kind="swat" data-preview-field="thread">Пока пусто</pre>
+              </div>
+              <div class="release-launch-preview-row">
+                <div class="release-launch-preview-label">Содержимое треда</div>
+                <pre class="release-launch-preview-body is-placeholder" data-preview-kind="swat" data-preview-field="content">Пока пусто</pre>
+              </div>
+            </article>
+
+            <article class="release-launch-preview-card">
+              <div class="release-launch-preview-title">Лента релизов</div>
+              <div class="release-launch-preview-row">
+                <div class="release-launch-preview-label">Тред</div>
+                <pre class="release-launch-preview-body is-placeholder" data-preview-kind="feed" data-preview-field="thread">Пока пусто</pre>
+              </div>
+              <div class="release-launch-preview-row">
+                <div class="release-launch-preview-label">Содержимое треда</div>
+                <pre class="release-launch-preview-body is-placeholder" data-preview-kind="feed" data-preview-field="content">Пока пусто</pre>
+              </div>
+            </article>
+          </div>
         </section>
       </div>
     </main>
@@ -407,7 +471,9 @@
         currentMode: '',
         majorView: '',
         majorPingText: '',
-        ytBoardInfoCache: new Map()
+        ytBoardInfoCache: new Map(),
+        previewRefreshTimer: 0,
+        previewRequestSeq: 0
       };
 
       const WORKFLOW_STEPS = [
@@ -642,6 +708,7 @@
         }
 
         refreshModeControls();
+        schedulePreviewRefresh();
       }
 
       function runCreatorClearError(){
@@ -669,10 +736,12 @@
         }
         runCreateResultLog.appendChild(line);
         runCreateResultLog.scrollTop = runCreateResultLog.scrollHeight;
+        schedulePreviewRefresh();
       }
 
       function runCreatorResetLog(){
         if(runCreateResultLog) runCreateResultLog.innerHTML = '';
+        schedulePreviewRefresh();
       }
 
       function runCreatorInfo(message, options){
@@ -2297,6 +2366,165 @@
           .trim();
       }
 
+      function setPreviewField(kind, field, value, placeholder){
+        const text = String(value || '').trim();
+        const finalText = text || String(placeholder || 'Пока пусто');
+        const nodes = Array.from(document.querySelectorAll(`[data-preview-kind="${kind}"][data-preview-field="${field}"]`));
+        for(const node of nodes){
+          node.textContent = finalText;
+          node.classList.toggle('is-placeholder', !text);
+        }
+      }
+
+      function setPreviewCard(kind, thread, content, placeholders){
+        const cfg = placeholders || {};
+        setPreviewField(kind, 'thread', thread, cfg.threadPlaceholder);
+        setPreviewField(kind, 'content', content, cfg.contentPlaceholder);
+      }
+
+      function buildReleaseFeedPreviewText(posts){
+        const list = Array.isArray(posts) ? posts : [];
+        return {
+          thread: list.map((item) => normalizeBandMessageText(item.rootMessage)).filter(Boolean).join('\n\n'),
+          content: list.map((item) => normalizeBandMessageText(item.threadMessage)).filter(Boolean).join('\n\n')
+        };
+      }
+
+      async function refreshPreviewCards(){
+        const requestId = ++appState.previewRequestSeq;
+        const mode = String(appState.currentMode || '');
+        const isMajor = mode === RUN_MODE_MAJOR;
+        const isReleaseFeedBlockedMode = mode === '3' || mode === '4';
+        const hasRunLinks = collectRunCreatorLinks().length > 0;
+        const hasCopyMessage = !!collectRunCreatorCopyMessage();
+        const hasPublishData = mode && !isMajor && hasRunCreatorPublishData();
+
+        if(!mode || isMajor){
+          setPreviewCard('swat', '', '', {
+            threadPlaceholder: 'Пока пусто',
+            contentPlaceholder: 'Пока пусто'
+          });
+          setPreviewCard('feed', '', '', {
+            threadPlaceholder: 'Пока пусто',
+            contentPlaceholder: 'Пока пусто'
+          });
+          return;
+        }
+
+        if(!hasPublishData){
+          setPreviewCard('swat', '', '', {
+            threadPlaceholder: 'Сначала запустите сбор данных',
+            contentPlaceholder: 'Нет содержимого треда'
+          });
+          if(isReleaseFeedBlockedMode){
+            setPreviewCard('feed', '', '', {
+              threadPlaceholder: 'Недоступно для выбранного типа запуска',
+              contentPlaceholder: 'Недоступно для выбранного типа запуска'
+            });
+          }else{
+            setPreviewCard('feed', '', '', {
+              threadPlaceholder: 'Сначала запустите сбор данных',
+              contentPlaceholder: 'Сначала запустите сбор данных'
+            });
+          }
+          return;
+        }
+
+        if(appState.runCreateRunning && (!hasRunLinks || !hasCopyMessage)){
+          setPreviewCard('swat', 'Собираю превью...', '', {
+            threadPlaceholder: 'Собираю превью...',
+            contentPlaceholder: 'Нет содержимого треда'
+          });
+          if(isReleaseFeedBlockedMode){
+            setPreviewCard('feed', '', '', {
+              threadPlaceholder: 'Недоступно для выбранного типа запуска',
+              contentPlaceholder: 'Недоступно для выбранного типа запуска'
+            });
+          }else{
+            setPreviewCard('feed', 'Собираю превью...', 'Собираю превью...', {
+              threadPlaceholder: 'Собираю превью...',
+              contentPlaceholder: 'Собираю превью...'
+            });
+          }
+          return;
+        }
+
+        const cfg = collectSettings();
+        setPreviewCard('swat', 'Собираю превью...', '', {
+          threadPlaceholder: 'Собираю превью...',
+          contentPlaceholder: 'Нет содержимого треда'
+        });
+
+        try{
+          const swatText = normalizeBandMessageText(await buildSwatTeamOnlyPostText(cfg, null));
+          if(requestId !== appState.previewRequestSeq) return;
+          setPreviewCard('swat', swatText, '', {
+            threadPlaceholder: 'Пока пусто',
+            contentPlaceholder: 'Нет содержимого треда'
+          });
+        }catch(err){
+          if(requestId !== appState.previewRequestSeq) return;
+          setPreviewCard('swat', `Ошибка: ${err.message || err}`, '', {
+            threadPlaceholder: 'Пока пусто',
+            contentPlaceholder: 'Нет содержимого треда'
+          });
+        }
+
+        if(isReleaseFeedBlockedMode){
+          setPreviewCard('feed', '', '', {
+            threadPlaceholder: 'Недоступно для выбранного типа запуска',
+            contentPlaceholder: 'Недоступно для выбранного типа запуска'
+          });
+          return;
+        }
+
+        const release = runReleaseInput ? String(runReleaseInput.value || '').trim() : '';
+        if(!release){
+          setPreviewCard('feed', '', '', {
+            threadPlaceholder: 'Укажи номер релиза',
+            contentPlaceholder: 'Укажи номер релиза'
+          });
+          return;
+        }
+
+        setPreviewCard('feed', 'Собираю превью...', 'Собираю превью...', {
+          threadPlaceholder: 'Собираю превью...',
+          contentPlaceholder: 'Собираю превью...'
+        });
+
+        try{
+          const buildValue = getRunBuildValue();
+          const [boardUrl, releaseTaskRef] = await Promise.all([
+            fetchReleaseBoardUrl(mode, release, null),
+            fetchReleaseTicketRef(mode, release, null)
+          ]);
+          if(requestId !== appState.previewRequestSeq) return;
+          const posts = buildReleaseFeedPosts(mode, release, collectRunCreatorLinks(), boardUrl, releaseTaskRef, buildValue);
+          const preview = buildReleaseFeedPreviewText(posts);
+          setPreviewCard('feed', preview.thread, preview.content, {
+            threadPlaceholder: 'Пока пусто',
+            contentPlaceholder: 'Пока пусто'
+          });
+        }catch(err){
+          if(requestId !== appState.previewRequestSeq) return;
+          const errorText = `Ошибка: ${err.message || err}`;
+          setPreviewCard('feed', errorText, errorText, {
+            threadPlaceholder: 'Пока пусто',
+            contentPlaceholder: 'Пока пусто'
+          });
+        }
+      }
+
+      function schedulePreviewRefresh(){
+        if(appState.previewRefreshTimer){
+          clearTimeout(appState.previewRefreshTimer);
+        }
+        appState.previewRefreshTimer = window.setTimeout(() => {
+          appState.previewRefreshTimer = 0;
+          refreshPreviewCards().catch(() => { });
+        }, 180);
+      }
+
       async function bandCreatePost(message, cfg, signal, options){
         const opts = options || {};
         const channelId = String(opts.channelId || cfg.bandChannelId || '').trim();
@@ -2629,6 +2857,7 @@
           startBtn.textContent = running ? 'Запускаю...' : getStartButtonLabel(appState.currentMode);
         }
         refreshModeControls();
+        schedulePreviewRefresh();
       }
 
       function applyWorkflowAutoDoneForFoundDuties(rows, options){
@@ -3364,9 +3593,13 @@
           if(!el) continue;
           el.addEventListener('input', scheduleSave);
           el.addEventListener('change', saveSettings);
+          el.addEventListener('input', schedulePreviewRefresh);
+          el.addEventListener('change', schedulePreviewRefresh);
         }
         ytTokenInput?.addEventListener('input', saveYtToken);
         ytTokenInput?.addEventListener('change', saveYtToken);
+        ytTokenInput?.addEventListener('input', schedulePreviewRefresh);
+        ytTokenInput?.addEventListener('change', schedulePreviewRefresh);
 
         resultsCollapseBtn?.addEventListener('click', () => {
           appState.resultsCollapsed = !appState.resultsCollapsed;
@@ -3489,11 +3722,13 @@
           try{
             localStorage.setItem(LS_RUN_RELEASE_KEY, String(runReleaseInput.value || '').trim());
           }catch(_){ }
+          schedulePreviewRefresh();
         });
         runBuildInput?.addEventListener('input', () => {
           try{
             localStorage.setItem(LS_RUN_BUILD_KEY, String(runBuildInput.value || '').trim());
           }catch(_){ }
+          schedulePreviewRefresh();
         });
         document.addEventListener('click', (event) => {
           const target = event.target;
@@ -3510,13 +3745,16 @@
         });
         swatLeadViktor?.addEventListener('change', () => {
           handleSwatShiftLeadChange('viktor');
+          schedulePreviewRefresh();
         });
         swatLeadRoman?.addEventListener('change', () => {
           handleSwatShiftLeadChange('roman');
+          schedulePreviewRefresh();
         });
         pingMessage?.addEventListener('input', refreshButtons);
         resultsCopyBtn?.addEventListener('click', copyCurrentDutiesMessage);
         copyPingBtn?.addEventListener('click', copyPingMessage);
+        schedulePreviewRefresh();
       }
 
       init();
