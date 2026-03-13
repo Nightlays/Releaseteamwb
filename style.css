@@ -4158,6 +4158,66 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
     text-align:center;
   }
 }
+.release-launch .release-launch-preview-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:14px;
+}
+.release-launch .release-launch-preview-card{
+  display:grid;
+  grid-template-rows:auto minmax(0, 1fr) minmax(0, 1fr);
+  gap:14px;
+  min-height:280px;
+  padding:16px 18px;
+  border-radius:18px;
+  border:1px solid #ecebff;
+  background:linear-gradient(180deg,#fff,#faf8ff);
+}
+.release-launch .release-launch-preview-title{
+  font-size:15px;
+  font-weight:900;
+  color:#1f2937;
+}
+.release-launch .release-launch-preview-row{
+  display:grid;
+  grid-template-rows:auto minmax(0, 1fr);
+  gap:8px;
+  min-height:0;
+}
+.release-launch .release-launch-preview-label{
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:#64748b;
+}
+.release-launch .release-launch-preview-body{
+  margin:0;
+  min-height:0;
+  height:100%;
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid #ecebff;
+  background:#fff;
+  color:#1f2937;
+  font-family:ui-monospace, Menlo, Consolas, monospace;
+  font-size:12px;
+  line-height:1.5;
+  white-space:pre-wrap;
+  word-break:break-word;
+  overflow:auto;
+}
+.release-launch .release-launch-preview-body.is-placeholder{
+  color:#94a3b8;
+}
+@media (max-width: 980px){
+  .release-launch .release-launch-preview-grid{
+    grid-template-columns:1fr;
+  }
+  .release-launch .release-launch-preview-card{
+    min-height:0;
+  }
+}
 
 /* ===== Sync from style.css for current charts / ML / PDF ===== */
 .wb-graphs{
