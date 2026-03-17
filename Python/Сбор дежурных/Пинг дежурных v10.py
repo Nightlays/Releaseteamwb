@@ -75,9 +75,15 @@ THREAD_FROM_UPDATE_AT = 1565303257750
 
 # Ретраи для Allure
 ALLURE_HTTP_RETRIES = 200
+ALLURE_HTTP_RETRY_SLEEP = 0.2
+BAND_HTTP_RETRIES = 5
+BAND_HTTP_RETRY_SLEEP = 2.0
 
 MSK = ZoneInfo("Europe/Moscow")
 UTC = dt.timezone.utc
+
+ALLURE_SESSION = requests.Session()
+BAND_SESSION = requests.Session()
 
 
 # ---------------------------------------------------------------------------
@@ -278,41 +284,65 @@ def _check_secrets_or_die() -> None:
         raise SystemExit(2)
 
 
-def http_get_json(url: str, headers: dict, params: Optional[dict] = None) -> dict:
-    # Ретраи только для Allure
+def _http_session_for_url(url: str) -> requests.Session:
+    return ALLURE_SESSION if url.startswith(ALLURE_BASE) else BAND_SESSION
+
+
+def _http_retry_policy(url: str) -> Tuple[str, int, float]:
     if url.startswith(ALLURE_BASE):
-        last_exc: Optional[Exception] = None
-        for attempt in range(ALLURE_HTTP_RETRIES):
-            try:
-                r = requests.get(
-                    url, headers=headers, params=params, timeout=REQ_TIMEOUT
-                )
+        return "Allure", ALLURE_HTTP_RETRIES, ALLURE_HTTP_RETRY_SLEEP
+    return "Band", BAND_HTTP_RETRIES, BAND_HTTP_RETRY_SLEEP
+
+
+def _request_json(
+    method: str,
+    url: str,
+    *,
+    headers: dict,
+    params: Optional[dict] = None,
+    payload: Optional[dict] = None,
+) -> dict:
+    service_name, retries, retry_sleep = _http_retry_policy(url)
+    session = _http_session_for_url(url)
+    last_exc: Optional[Exception] = None
+
+    for attempt in range(1, retries + 1):
+        try:
+            with session.request(
+                method,
+                url,
+                headers=headers,
+                params=params,
+                json=payload,
+                timeout=REQ_TIMEOUT,
+            ) as r:
                 r.raise_for_status()
                 return r.json()
-            except Exception as e:
-                last_exc = e
-                if attempt + 1 >= ALLURE_HTTP_RETRIES:
-                    raise
-                time.sleep(0.2)
-        if last_exc:
-            raise last_exc
-        raise RuntimeError("http_get_json(Allure): непредвиденная ошибка")
-    else:
-        r = requests.get(url, headers=headers, params=params, timeout=REQ_TIMEOUT)
-        r.raise_for_status()
-        return r.json()
+        except requests.RequestException as e:
+            last_exc = e
+            if attempt >= retries:
+                raise
+            print(
+                f"[WARN][{service_name}] {method} {url} failed "
+                f"(attempt {attempt}/{retries}): {e}. Retry in {retry_sleep}s..."
+            )
+            time.sleep(retry_sleep)
+
+    if last_exc:
+        raise last_exc
+    raise RuntimeError(f"_request_json({service_name}): непредвиденная ошибка")
+
+
+def http_get_json(url: str, headers: dict, params: Optional[dict] = None) -> dict:
+    return _request_json("GET", url, headers=headers, params=params)
 
 
 def http_post_json(url: str, headers: dict, payload: dict) -> dict:
-    r = requests.post(url, headers=headers, json=payload, timeout=REQ_TIMEOUT)
-    r.raise_for_status()
-    return r.json()
+    return _request_json("POST", url, headers=headers, payload=payload)
 
 
 def http_put_json(url: str, headers: dict, payload: dict) -> dict:
-    r = requests.put(url, headers=headers, json=payload, timeout=REQ_TIMEOUT)
-    r.raise_for_status()
-    return r.json()
+    return _request_json("PUT", url, headers=headers, payload=payload)
 
 
 def allure_headers() -> dict:
@@ -925,32 +955,32 @@ def allure_testresult_exists_in_launch(
     """
     url = f"{ALLURE_BASE}/api/testresult/{testresult_id}"
     headers = allure_headers()
+    session = _http_session_for_url(url)
 
     for attempt in range(ALLURE_HTTP_RETRIES):
         try:
-            r = requests.get(url, headers=headers, timeout=REQ_TIMEOUT)
-        except Exception:
+            with session.get(url, headers=headers, timeout=REQ_TIMEOUT) as r:
+                if r.status_code == 404:
+                    return False
+
+                try:
+                    r.raise_for_status()
+                except requests.RequestException:
+                    if attempt + 1 >= ALLURE_HTTP_RETRIES:
+                        return True
+                    time.sleep(ALLURE_HTTP_RETRY_SLEEP)
+                    continue
+
+                try:
+                    data = r.json()
+                except Exception:
+                    return True
+        except requests.RequestException:
             if attempt + 1 >= ALLURE_HTTP_RETRIES:
                 # при сетевых ошибках считаем, что кейс существует, чтобы не удалить по ошибке
                 return True
-            time.sleep(0.2)
+            time.sleep(ALLURE_HTTP_RETRY_SLEEP)
             continue
-
-        if r.status_code == 404:
-            return False
-
-        try:
-            r.raise_for_status()
-        except Exception:
-            if attempt + 1 >= ALLURE_HTTP_RETRIES:
-                return True
-            time.sleep(0.2)
-            continue
-
-        try:
-            data = r.json()
-        except Exception:
-            return True
 
         lid = data.get("launchId") or data.get("launch_id")
         try:
