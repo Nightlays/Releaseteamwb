@@ -6694,24 +6694,60 @@
                 release,
                 fromMs: ms,
                 toMs: ms,
-                sources: new Set(source ? [source] : [])
+                sources: new Set(source ? [source] : []),
+                // regression = дата старта первого regression-pipeline (GitLab).
+                // Это «начало календаря релиза» — самый точный источник.
+                regressionFromMs: source === 'regression' ? ms : Infinity,
+                // deploy = cutoff/store из deploy-lab. Резервный источник.
+                deployFromMs: source === 'deploy' ? ms : Infinity,
+                deployToMs:   source === 'deploy' ? ms : -Infinity
               });
               return;
             }
             if(ms < prev.fromMs) prev.fromMs = ms;
             if(ms > prev.toMs) prev.toMs = ms;
+            if(source === 'regression'){
+              if(ms < prev.regressionFromMs) prev.regressionFromMs = ms;
+            }
+            if(source === 'deploy'){
+              if(ms < prev.deployFromMs) prev.deployFromMs = ms;
+              if(ms > prev.deployToMs)   prev.deployToMs   = ms;
+            }
             if(source) prev.sources.add(source);
           }
+
+          // Максимальное окно релиза: 45 дней (запасной cap, если нет regression/deploy-дат).
+          const RELEASE_MARKER_MAX_WINDOW_MS = 45 * 24 * 60 * 60 * 1000;
 
           function buildReleaseMarkersList(releaseMarkersMap){
             return Array.from(releaseMarkersMap.values())
               .filter(item => item && Number.isFinite(item.fromMs) && Number.isFinite(item.toMs) && item.release)
-              .map(item => ({
-                release: item.release,
-                fromMs: normalizeReleaseWindowStart(item.fromMs),
-                toMs: normalizeReleaseWindowEnd(item.toMs),
-                source: Array.from(item.sources || []).join(', ')
-              }))
+              .map(item => {
+                const rawTo = normalizeReleaseWindowEnd(item.toMs);
+                // Приоритет fromMs:
+                // 1. regressionFromMs — дата старта регресса (GitLab pipeline). Самый точный.
+                // 2. deployFromMs — дата cutoff из deploy-lab. Резерв при отсутствии GitLab кук.
+                // 3. Allure-min с ограничением 45 дней. Последний резерв.
+                const hasRegression = Number.isFinite(item.regressionFromMs) && item.regressionFromMs !== Infinity;
+                const hasDeploy     = Number.isFinite(item.deployFromMs)     && item.deployFromMs !== Infinity;
+                let rawFrom;
+                if(hasRegression){
+                  rawFrom = normalizeReleaseWindowStart(item.regressionFromMs);
+                }else if(hasDeploy){
+                  rawFrom = normalizeReleaseWindowStart(item.deployFromMs);
+                }else{
+                  rawFrom = normalizeReleaseWindowStart(item.fromMs);
+                }
+                const fromMs = (rawTo - rawFrom > RELEASE_MARKER_MAX_WINDOW_MS)
+                  ? rawTo - RELEASE_MARKER_MAX_WINDOW_MS
+                  : rawFrom;
+                return {
+                  release: item.release,
+                  fromMs,
+                  toMs: rawTo,
+                  source: Array.from(item.sources || []).join(', ')
+                };
+              })
               .sort((a, b) => (a.fromMs - b.fromMs) || compareReleaseAsc(a.release, b.release));
           }
 
@@ -6728,7 +6764,12 @@
 
             return (rows || []).map(row => {
               const { startMs, endMs } = getDevDowntimeRowRange(row);
-              const matchedMarkers = markers.filter(candidate => Number.isFinite(startMs) && Number.isFinite(endMs) && startMs <= candidate.toMs && endMs >= candidate.fromMs);
+              // Матчим по НАЧАЛУ поломки: строка относится к тому релизу, в котором она НАЧАЛАСЬ.
+              // Для iOS wiki-строк startMs = endMs = дата (полночь), поведение не меняется.
+              // Для Android (Band) это исключает кейсы когда поломка началась до релиза,
+              // но восстановление произошло уже в окне релиза (иначе получается гигантский интервал).
+              const anchorMs = Number.isFinite(startMs) ? startMs : endMs;
+              const matchedMarkers = markers.filter(candidate => Number.isFinite(anchorMs) && anchorMs >= candidate.fromMs && anchorMs <= candidate.toMs);
               let marker = null;
               if(matchedMarkers.length === 1){
                 marker = matchedMarkers[0];
@@ -7805,8 +7846,14 @@
               return td;
             };
 
-            const dateCell = makeCell(row.rawDate, 'mono text-left dev-downtime-cell dev-downtime-cell--compact');
-            const weekdayCell = makeCell(formatDevDowntimeWeekdayLabel(row) || '—', 'mono text-center dev-downtime-cell dev-downtime-cell--compact');
+            const weekdayLabel = formatDevDowntimeWeekdayLabel(row);
+            const isWeekend = weekdayLabel === 'сб' || weekdayLabel === 'вс';
+            const dateCell = document.createElement('td');
+            dateCell.className = 'mono text-left dev-downtime-cell dev-downtime-cell--compact';
+            dateCell.innerHTML = `<span class="dev-downtime-date-text">${row.rawDate || '—'}</span>`;
+            const weekdayCell = document.createElement('td');
+            weekdayCell.className = `mono text-center dev-downtime-cell dev-downtime-cell--compact${isWeekend ? ' dev-downtime-weekend' : ''}`;
+            weekdayCell.textContent = weekdayLabel || '—';
             const releaseCell = makeCell(row.releaseShort || '—', 'mono text-center dev-downtime-cell dev-downtime-cell--compact');
             const totalCell = makeCell(formatDevDowntimeMinutes(row.totalMinutes), 'mono text-center font-semibold dev-downtime-cell dev-downtime-cell--compact');
             const intervalLines = row.intervals.length
@@ -7865,7 +7912,6 @@
                 return [];
               }
 
-              renderDevDowntimeData(rows);
               return rows;
             }catch(e){
               if(signal?.aborted) return [];
@@ -8270,8 +8316,16 @@
               commentLines.push(`Не удалось полностью распарсить: ${row.warnings.join('; ')}`);
             }
 
-            tr.appendChild(makeCell(row.rawDate, 'mono text-left dev-downtime-cell dev-downtime-cell--compact'));
-            tr.appendChild(makeCell(formatDevDowntimeWeekdayLabel(row) || '—', 'mono text-center dev-downtime-cell dev-downtime-cell--compact'));
+            const andWeekdayLabel = formatDevDowntimeWeekdayLabel(row);
+            const andIsWeekend = andWeekdayLabel === 'сб' || andWeekdayLabel === 'вс';
+            const andDateCell = document.createElement('td');
+            andDateCell.className = 'mono text-left dev-downtime-cell dev-downtime-cell--compact';
+            andDateCell.innerHTML = `<span class="dev-downtime-date-text">${row.rawDate || '—'}</span>`;
+            const andWeekdayCell = document.createElement('td');
+            andWeekdayCell.className = `mono text-center dev-downtime-cell dev-downtime-cell--compact${andIsWeekend ? ' dev-downtime-weekend' : ''}`;
+            andWeekdayCell.textContent = andWeekdayLabel || '—';
+            tr.appendChild(andDateCell);
+            tr.appendChild(andWeekdayCell);
             tr.appendChild(makeCell(row.releaseShort || '—', 'mono text-center dev-downtime-cell dev-downtime-cell--compact'));
             tr.appendChild(makeCell(formatDevDowntimeMinutes(row.totalMinutes), 'mono text-center font-semibold dev-downtime-cell dev-downtime-cell--compact'));
             tr.appendChild(makeCell(intervalLines));
@@ -11162,10 +11216,11 @@
             const ensureStandaloneDowntimeCharts = async () => {
               ensureDevDowntimeChart();
               ensureAndroidDevDowntimeChart();
-              await Promise.all([
+              const [iosRows] = await Promise.all([
                 loadDevDowntimeData(window.__wbAbortController?.signal),
                 loadAndroidDevDowntimeData(window.__wbAbortController?.signal)
               ]);
+              if(iosRows?.length) renderDevDowntimeData(iosRows);
             };
 
             const tok = (inpAllureToken?.value || '').trim();
@@ -11582,6 +11637,9 @@
               }
               addRegressionPoint(rel, 0, iosRegressionStart);
               addRegressionPoint(rel, 1, andRegressionStart);
+              // Дата старта регресса = начало «календаря релиза» для окна поломанного дева
+              if(iosRegressionStart?.msLocal) collectReleaseMarker(releaseMarkersMap, rel, iosRegressionStart.msLocal, 'regression');
+              if(andRegressionStart?.msLocal) collectReleaseMarker(releaseMarkersMap, rel, andRegressionStart.msLocal, 'regression');
               if(getGitlabCookie()){
                 showRegressionContent();
               }
@@ -11899,7 +11957,13 @@
                 applyReleaseMarkersToDevDowntimeRows(devDowntimeRows, releaseMarkers),
                 releaseMarkers
               );
-              renderDevDowntimeData(matchedDevDowntimeRows);
+              if(matchedDevDowntimeRows.length){
+                renderDevDowntimeData(matchedDevDowntimeRows);
+              }else{
+                showDevDowntimeEmpty(releaseMarkers.length
+                  ? 'Нет простоев DEV iOS в выбранном диапазоне релизов'
+                  : 'Не удалось получить строки из таблицы wiki');
+              }
             }
             await loadAndroidDevDowntimeData(signal, { releaseMarkers });
             applyAllReleaseFilters();
