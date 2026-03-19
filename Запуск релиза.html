@@ -1278,13 +1278,13 @@
         if(mode === '2'){
           return {
             sprintField: YT_SPRINT_FIELD_IOS,
-            summary: `Релизный тикет IOS ${release}`
+            summaryMarker: 'Релизный тикет'
           };
         }
         if(mode === '1' || mode === '5' || mode === '6'){
           return {
             sprintField: YT_SPRINT_FIELD_ANDROID,
-            summary: `Релизный тикет ANDROID ${release}`
+            summaryMarker: 'Релизный тикет'
           };
         }
         return null;
@@ -1299,6 +1299,29 @@
           .replace(/\s+/g, ' ')
           .trim()
           .toUpperCase();
+      }
+
+      function escapeYouTrackQueryPhrase(value){
+        return String(value || '')
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
+      function buildReleaseTicketQuery(meta, release){
+        const parts = [];
+        const releaseValue = escapeYouTrackQueryPhrase(release);
+        const summaryMarker = escapeYouTrackQueryPhrase(meta && meta.summaryMarker);
+        if(releaseValue) parts.push(`(${meta.sprintField}: ${releaseValue})`);
+        if(summaryMarker) parts.push(`(summary: "${summaryMarker}")`);
+        return parts.join(' AND ');
+      }
+
+      function isReleaseTicketSummaryMatch(summary, meta){
+        const summaryNorm = normalizeReleaseTicketSummary(summary);
+        const summaryMarkerNorm = normalizeReleaseTicketSummary(meta && meta.summaryMarker);
+        return !summaryMarkerNorm || summaryNorm.includes(summaryMarkerNorm);
       }
 
       async function fetchYtIssuesByQuery(query, authHeader, signal, top){
@@ -1333,12 +1356,11 @@
           throw new Error('Укажи YouTrack token.');
         }
 
-        const query = `(${meta.sprintField}: ${release})`;
+        const query = buildReleaseTicketQuery(meta, release);
         const issues = await fetchYtIssuesByQuery(query, authHeader, signal, 100);
-        const targetSummary = normalizeReleaseTicketSummary(meta.summary);
-        const exact = issues.find((item) => normalizeReleaseTicketSummary(item && item.summary) === targetSummary);
+        const exact = issues.find((item) => isReleaseTicketSummaryMatch(item && item.summary, meta));
         if(!exact || !exact.idReadable){
-          throw new Error(`Не найден ${meta.summary} в YouTrack.`);
+          throw new Error(`Не найден релизный тикет для релиза ${release} в YouTrack.`);
         }
 
         return {
