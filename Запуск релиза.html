@@ -338,6 +338,13 @@
       const NAPI_HOSTS_CHANNEL_ID = 'y14x9xytq7y7uduux8worartmh';
       const SWAT_TEAM_ONLY_CHANNEL_ID = 'nq1amqo347gy9d46oe14zgs44w';
       const RELEASE_FEED_CHANNEL_ID = 'tdj9ns46eprx8n5neupw8ejw9c';
+      const RELEASE_FEED_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
+      const RELEASE_ANDROID_BOT_CHANNEL_ID = 'd6wrzqk5cp8fu8hef1rnn9dcxw';
+      const RELEASE_ANDROID_BOT_USER_ID = 'xf8gtz3ypbgbjfhdn6uybf3mby';
+      const RELEASE_ANDROID_BOT_REPLY_DELAY_MS = 10000;
+      const RELEASE_ANDROID_BOT_POLL_MS = 2000;
+      const RELEASE_ANDROID_BOT_TIMEOUT_MS = 30000;
+      const IOS_BUILDS_CHANNEL_ID = 'sm7z55bao7gmumy7cbxq31159y';
       const GROUP_ANDROID_ID_FIXED = 'bbtekcuhfjykmm9awe56gebj9y';
       const GROUP_IOS_ID_FIXED = '6skkxrr3ufrkmy1u3paepd35ar';
       const YT_BASE_URL = 'https://youtrack.wildberries.ru';
@@ -468,12 +475,15 @@
         workflowRunning: false,
         workflowPingFound: false,
         runCreateRunning: false,
+        startButtonBusy: false,
         currentMode: '',
         majorView: '',
         majorPingText: '',
+        resolvedRunBuildValue: '',
         ytBoardInfoCache: new Map(),
         previewRefreshTimer: 0,
-        previewRequestSeq: 0
+        previewRequestSeq: 0,
+        previewRefreshInFlight: 0
       };
 
       const WORKFLOW_STEPS = [
@@ -593,12 +603,78 @@
         return 'Запустить';
       }
 
+      function syncStartButtonLabel(){
+        if(!startBtn) return;
+        const isBusy = !!(appState.runCreateRunning || appState.startButtonBusy);
+        startBtn.textContent = isBusy ? 'Запускаю...' : getStartButtonLabel(appState.currentMode);
+      }
+
+      function releaseStartButtonBusyIfIdle(){
+        if(appState.runCreateRunning) return;
+        if(appState.previewRefreshTimer) return;
+        if(Number(appState.previewRefreshInFlight || 0) > 0) return;
+        appState.startButtonBusy = false;
+        syncStartButtonLabel();
+        refreshModeControls();
+      }
+
+      function setButtonBusyText(button, text){
+        if(!button) return;
+        button.textContent = String(text || '').trim();
+      }
+
       function isRunBuildMode(mode){
         return mode === '1' || mode === '2' || mode === '5' || mode === '6';
       }
 
-      function getRunBuildValue(){
+      function isBuildAutoResolvedMode(mode){
+        return mode === '1' || mode === '2' || mode === '5' || mode === '6';
+      }
+
+      function getRunBuildRawValue(){
         return runBuildInput ? String(runBuildInput.value || '').trim() : '';
+      }
+
+      function setResolvedRunBuildValue(value){
+        appState.resolvedRunBuildValue = String(value || '').trim();
+        schedulePreviewRefresh();
+      }
+
+      function clearResolvedRunBuildValue(){
+        if(!appState.resolvedRunBuildValue) return;
+        appState.resolvedRunBuildValue = '';
+        schedulePreviewRefresh();
+      }
+
+      function clearRunBuildInputValue(){
+        if(runBuildInput) runBuildInput.value = '';
+        try{
+          localStorage.setItem(LS_RUN_BUILD_KEY, '');
+        }catch(_){ }
+      }
+
+      function getRunBuildValue(){
+        const resolved = String(appState.resolvedRunBuildValue || '').trim();
+        return resolved || getRunBuildRawValue();
+      }
+
+      function isGitlabPipelineUrl(value){
+        return /^https:\/\/gitlab\.wildberries\.ru\/.+\/-\/pipelines\/\d+(?:[/?#].*)?$/i.test(String(value || '').trim());
+      }
+
+      function formatReleaseShort(value){
+        const s = String(value || '').trim();
+        if(!s) return '';
+        const parts = s.split('.').map((part) => String(part || '').trim()).filter(Boolean);
+        if(parts.length < 3) return s;
+        const last = parts[parts.length - 1].replace(/0+$/,'');
+        parts[parts.length - 1] = last || '0';
+        return parts.join('.');
+      }
+
+      function buildRuStoreHuaweiReleaseNumber(release){
+        const shortRelease = formatReleaseShort(release);
+        return String(shortRelease || '').replace(/\./g, '').trim();
       }
 
       function getMajorPingText(){
@@ -661,6 +737,14 @@
         const prevMode = appState.currentMode;
         const value = isRunModeSupported(mode) ? mode : '';
         appState.currentMode = value;
+        if(prevMode !== value){
+          appState.resolvedRunBuildValue = '';
+          runCreatorClearError();
+          if(runCreateResultLog) runCreateResultLog.innerHTML = '';
+          if(isBuildAutoResolvedMode(prevMode)){
+            clearRunBuildInputValue();
+          }
+        }
         const isMajor = value === RUN_MODE_MAJOR;
         const isEmpty = value === '';
         const isNonMajor = !isMajor && !isEmpty;
@@ -687,8 +771,8 @@
         }
         if(startBtn){
           startBtn.style.display = isEmpty ? 'none' : '';
-          startBtn.textContent = getStartButtonLabel(value);
         }
+        syncStartButtonLabel();
 
         if(isNonMajor || isEmpty){
           if(baseInfo) baseInfo.style.display = 'none';
@@ -736,7 +820,9 @@
         }
         runCreateResultLog.appendChild(line);
         runCreateResultLog.scrollTop = runCreateResultLog.scrollHeight;
-        schedulePreviewRefresh();
+        if(!cfg.skipPreviewRefresh){
+          schedulePreviewRefresh();
+        }
       }
 
       function runCreatorResetLog(){
@@ -746,7 +832,11 @@
 
       function runCreatorInfo(message, options){
         const cfg = options || {};
-        runCreatorAppendLog(cfg.html ? message : escHtml(message), { html: true, kind: cfg.kind || '' });
+        runCreatorAppendLog(cfg.html ? message : escHtml(message), {
+          html: true,
+          kind: cfg.kind || '',
+          skipPreviewRefresh: !!cfg.skipPreviewRefresh
+        });
       }
 
       function runCreatorAmsNowStr(){
@@ -923,6 +1013,13 @@
         runCreatorInfo(`Время (AMS): ${runCreatorAmsNowStr()}`);
         runCreatorInfo(`Режим: ${mode} • Релиз: ${release}`);
         runCreatorInfo('──────────────────────────────────────────────────────');
+
+        if(isBuildAutoResolvedMode(mode)){
+          const cfg = collectSettings();
+          buildValue = await resolveBuildValueAutomatically(mode, release, cfg, signal);
+        }else{
+          clearResolvedRunBuildValue();
+        }
 
         runCreatorInfo('Создаю тег релиза...');
         const tagRelease = await runCreatorCreateTag(release, signal);
@@ -1370,6 +1467,28 @@
         };
       }
 
+      function formatReleaseTaskErrorText(error){
+        const text = String((error && error.message) ? error.message : (error || 'Неизвестная ошибка'))
+          .replace(/\s+/g, ' ')
+          .trim();
+        if(!text) return 'Неизвестная ошибка';
+        return text.length > 220 ? `${text.slice(0, 217)}...` : text;
+      }
+
+      async function fetchOptionalReleaseTicketRef(mode, release, signal){
+        try{
+          return {
+            ref: await fetchReleaseTicketRef(mode, release, signal),
+            error: ''
+          };
+        }catch(error){
+          return {
+            ref: null,
+            error: formatReleaseTaskErrorText(error)
+          };
+        }
+      }
+
       function collectSettings(){
         const cfg = {};
         for(const key of SETTINGS_FIELDS){
@@ -1657,6 +1776,26 @@
         return '';
       }
 
+      function extractProxyErrorText(raw){
+        const txt = String(raw || '').trim();
+        if(!txt) return '';
+        const parsed = safeJson(txt);
+        if(parsed && typeof parsed === 'object'){
+          const parts = [
+            parsed.message,
+            parsed.error_description,
+            parsed.error,
+            parsed.details
+          ]
+            .map((item) => String(item || '').trim())
+            .filter(Boolean);
+          if(parts.length){
+            return parts.join(' | ');
+          }
+        }
+        return txt.replace(/\s+/g, ' ').trim().slice(0, 300);
+      }
+
       async function proxyRequestJson(method, targetUrl, headers, body, signal){
         const p = new URL(PROXY_BASE + '/proxy');
         p.searchParams.set('url', targetUrl);
@@ -1675,9 +1814,12 @@
         }
 
         if(!r.ok){
-          const err = new Error(`Proxy HTTP ${r.status}`);
+          let rawBody = '';
+          try{ rawBody = await r.text(); }catch(_){}
+          const detail = extractProxyErrorText(rawBody);
+          const err = new Error(detail ? `Proxy HTTP ${r.status}: ${detail}` : `Proxy HTTP ${r.status}`);
           err.status = r.status;
-          try{ err.body = await r.text(); }catch(_){}
+          err.body = rawBody;
           throw err;
         }
 
@@ -2414,126 +2556,144 @@
 
       async function refreshPreviewCards(){
         const requestId = ++appState.previewRequestSeq;
+        const trackBusy = !!appState.startButtonBusy;
+        if(trackBusy){
+          appState.previewRefreshInFlight += 1;
+          syncStartButtonLabel();
+        }
         const mode = String(appState.currentMode || '');
         const isMajor = mode === RUN_MODE_MAJOR;
         const isReleaseFeedBlockedMode = mode === '3' || mode === '4';
         const hasRunLinks = collectRunCreatorLinks().length > 0;
         const hasCopyMessage = !!collectRunCreatorCopyMessage();
         const hasPublishData = mode && !isMajor && hasRunCreatorPublishData();
-
-        if(!mode || isMajor){
-          setPreviewCard('swat', '', '', {
-            threadPlaceholder: 'Пока пусто',
-            contentPlaceholder: 'Пока пусто'
-          });
-          setPreviewCard('feed', '', '', {
-            threadPlaceholder: 'Пока пусто',
-            contentPlaceholder: 'Пока пусто'
-          });
-          return;
-        }
-
-        if(!hasPublishData){
-          setPreviewCard('swat', '', '', {
-            threadPlaceholder: 'Сначала запустите сбор данных',
-            contentPlaceholder: 'Нет содержимого треда'
-          });
-          if(isReleaseFeedBlockedMode){
-            setPreviewCard('feed', '', '', {
-              threadPlaceholder: 'Недоступно для выбранного типа запуска',
-              contentPlaceholder: 'Недоступно для выбранного типа запуска'
+        try{
+          if(!mode || isMajor){
+            setPreviewCard('swat', '', '', {
+              threadPlaceholder: 'Пока пусто',
+              contentPlaceholder: 'Пока пусто'
             });
-          }else{
             setPreviewCard('feed', '', '', {
-              threadPlaceholder: 'Сначала запустите сбор данных',
-              contentPlaceholder: 'Сначала запустите сбор данных'
+              threadPlaceholder: 'Пока пусто',
+              contentPlaceholder: 'Пока пусто'
             });
+            return;
           }
-          return;
-        }
 
-        if(appState.runCreateRunning && (!hasRunLinks || !hasCopyMessage)){
+          if(!hasPublishData){
+            setPreviewCard('swat', '', '', {
+              threadPlaceholder: 'Сначала запустите сбор данных',
+              contentPlaceholder: 'Нет содержимого треда'
+            });
+            if(isReleaseFeedBlockedMode){
+              setPreviewCard('feed', '', '', {
+                threadPlaceholder: 'Недоступно для выбранного типа запуска',
+                contentPlaceholder: 'Недоступно для выбранного типа запуска'
+              });
+            }else{
+              setPreviewCard('feed', '', '', {
+                threadPlaceholder: 'Сначала запустите сбор данных',
+                contentPlaceholder: 'Сначала запустите сбор данных'
+              });
+            }
+            return;
+          }
+
+          if(appState.runCreateRunning && (!hasRunLinks || !hasCopyMessage)){
+            setPreviewCard('swat', 'Собираю превью...', '', {
+              threadPlaceholder: 'Собираю превью...',
+              contentPlaceholder: 'Нет содержимого треда'
+            });
+            if(isReleaseFeedBlockedMode){
+              setPreviewCard('feed', '', '', {
+                threadPlaceholder: 'Недоступно для выбранного типа запуска',
+                contentPlaceholder: 'Недоступно для выбранного типа запуска'
+              });
+            }else{
+              setPreviewCard('feed', 'Собираю превью...', 'Собираю превью...', {
+                threadPlaceholder: 'Собираю превью...',
+                contentPlaceholder: 'Собираю превью...'
+              });
+            }
+            return;
+          }
+
+          const cfg = collectSettings();
           setPreviewCard('swat', 'Собираю превью...', '', {
             threadPlaceholder: 'Собираю превью...',
             contentPlaceholder: 'Нет содержимого треда'
           });
+
+          try{
+            const swatText = normalizeBandMessageText(await buildSwatTeamOnlyPostText(cfg, null));
+            if(requestId !== appState.previewRequestSeq) return;
+            setPreviewCard('swat', swatText, '', {
+              threadPlaceholder: 'Пока пусто',
+              contentPlaceholder: 'Нет содержимого треда'
+            });
+          }catch(err){
+            if(requestId !== appState.previewRequestSeq) return;
+            setPreviewCard('swat', `Ошибка: ${err.message || err}`, '', {
+              threadPlaceholder: 'Пока пусто',
+              contentPlaceholder: 'Нет содержимого треда'
+            });
+          }
+
           if(isReleaseFeedBlockedMode){
             setPreviewCard('feed', '', '', {
               threadPlaceholder: 'Недоступно для выбранного типа запуска',
               contentPlaceholder: 'Недоступно для выбранного типа запуска'
             });
-          }else{
-            setPreviewCard('feed', 'Собираю превью...', 'Собираю превью...', {
-              threadPlaceholder: 'Собираю превью...',
-              contentPlaceholder: 'Собираю превью...'
+            return;
+          }
+
+          const release = runReleaseInput ? String(runReleaseInput.value || '').trim() : '';
+          if(!release){
+            setPreviewCard('feed', '', '', {
+              threadPlaceholder: 'Укажи номер релиза',
+              contentPlaceholder: 'Укажи номер релиза'
+            });
+            return;
+          }
+
+          setPreviewCard('feed', 'Собираю превью...', 'Собираю превью...', {
+            threadPlaceholder: 'Собираю превью...',
+            contentPlaceholder: 'Собираю превью...'
+          });
+
+          try{
+            const buildValue = getRunBuildValue();
+            const [boardUrl, releaseTaskInfo] = await Promise.all([
+              fetchReleaseBoardUrl(mode, release, null),
+              fetchOptionalReleaseTicketRef(mode, release, null)
+            ]);
+            if(requestId !== appState.previewRequestSeq) return;
+            const posts = buildReleaseFeedPosts(
+              mode,
+              release,
+              collectRunCreatorLinks(),
+              boardUrl,
+              releaseTaskInfo.ref,
+              buildValue
+            );
+            const preview = buildReleaseFeedPreviewText(posts);
+            setPreviewCard('feed', preview.thread, preview.content, {
+              threadPlaceholder: 'Пока пусто',
+              contentPlaceholder: 'Пока пусто'
+            });
+          }catch(err){
+            if(requestId !== appState.previewRequestSeq) return;
+            const errorText = `Ошибка: ${err.message || err}`;
+            setPreviewCard('feed', errorText, errorText, {
+              threadPlaceholder: 'Пока пусто',
+              contentPlaceholder: 'Пока пусто'
             });
           }
-          return;
-        }
-
-        const cfg = collectSettings();
-        setPreviewCard('swat', 'Собираю превью...', '', {
-          threadPlaceholder: 'Собираю превью...',
-          contentPlaceholder: 'Нет содержимого треда'
-        });
-
-        try{
-          const swatText = normalizeBandMessageText(await buildSwatTeamOnlyPostText(cfg, null));
-          if(requestId !== appState.previewRequestSeq) return;
-          setPreviewCard('swat', swatText, '', {
-            threadPlaceholder: 'Пока пусто',
-            contentPlaceholder: 'Нет содержимого треда'
-          });
-        }catch(err){
-          if(requestId !== appState.previewRequestSeq) return;
-          setPreviewCard('swat', `Ошибка: ${err.message || err}`, '', {
-            threadPlaceholder: 'Пока пусто',
-            contentPlaceholder: 'Нет содержимого треда'
-          });
-        }
-
-        if(isReleaseFeedBlockedMode){
-          setPreviewCard('feed', '', '', {
-            threadPlaceholder: 'Недоступно для выбранного типа запуска',
-            contentPlaceholder: 'Недоступно для выбранного типа запуска'
-          });
-          return;
-        }
-
-        const release = runReleaseInput ? String(runReleaseInput.value || '').trim() : '';
-        if(!release){
-          setPreviewCard('feed', '', '', {
-            threadPlaceholder: 'Укажи номер релиза',
-            contentPlaceholder: 'Укажи номер релиза'
-          });
-          return;
-        }
-
-        setPreviewCard('feed', 'Собираю превью...', 'Собираю превью...', {
-          threadPlaceholder: 'Собираю превью...',
-          contentPlaceholder: 'Собираю превью...'
-        });
-
-        try{
-          const buildValue = getRunBuildValue();
-          const [boardUrl, releaseTaskRef] = await Promise.all([
-            fetchReleaseBoardUrl(mode, release, null),
-            fetchReleaseTicketRef(mode, release, null)
-          ]);
-          if(requestId !== appState.previewRequestSeq) return;
-          const posts = buildReleaseFeedPosts(mode, release, collectRunCreatorLinks(), boardUrl, releaseTaskRef, buildValue);
-          const preview = buildReleaseFeedPreviewText(posts);
-          setPreviewCard('feed', preview.thread, preview.content, {
-            threadPlaceholder: 'Пока пусто',
-            contentPlaceholder: 'Пока пусто'
-          });
-        }catch(err){
-          if(requestId !== appState.previewRequestSeq) return;
-          const errorText = `Ошибка: ${err.message || err}`;
-          setPreviewCard('feed', errorText, errorText, {
-            threadPlaceholder: 'Пока пусто',
-            contentPlaceholder: 'Пока пусто'
-          });
+        }finally{
+          if(trackBusy){
+            appState.previewRefreshInFlight = Math.max(0, Number(appState.previewRefreshInFlight || 0) - 1);
+            releaseStartButtonBusyIfIdle();
+          }
         }
       }
 
@@ -2545,6 +2705,7 @@
           appState.previewRefreshTimer = 0;
           refreshPreviewCards().catch(() => { });
         }, 180);
+        syncStartButtonLabel();
       }
 
       async function bandCreatePost(message, cfg, signal, options){
@@ -2583,6 +2744,364 @@
           [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
         };
         return proxyRequestJson('POST', 'https://band.wb.ru/api/v4/posts', headers, payload, signal);
+      }
+
+      async function bandPatchPost(postId, message, cfg, signal){
+        const targetPostId = String(postId || '').trim();
+        const normalizedMessage = normalizeBandMessageText(message);
+        if(!targetPostId) throw new Error('Не задан id поста для обновления.');
+        if(!normalizedMessage) throw new Error('Текст сообщения для обновления пуст.');
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesRead);
+        const headers = {
+          'Accept': '*/*',
+          'Accept-Language': 'ru',
+          'Content-Type': 'application/json',
+          'Origin': 'https://band.wb.ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+        return proxyRequestJson('PUT', `https://band.wb.ru/api/v4/posts/${encodeURIComponent(targetPostId)}/patch`, headers, {
+          message: normalizedMessage
+        }, signal);
+      }
+
+      function syncResolvedBuildToInput(value){
+        const buildValue = String(value || '').trim();
+        if(runBuildInput) runBuildInput.value = buildValue;
+        try{
+          localStorage.setItem(LS_RUN_BUILD_KEY, buildValue);
+        }catch(_){ }
+      }
+
+      function buildBuildResolverBotCommand(mode, release){
+        const releaseValue = String(release || '').trim();
+        if(mode === '1'){
+          if(!releaseValue){
+            throw new Error('Не удалось собрать команду lastpipe из поля "Номер релиза".');
+          }
+          return `lastpipe ${releaseValue}`;
+        }
+
+        const shortValue = buildRuStoreHuaweiReleaseNumber(release);
+        if(!shortValue){
+          throw new Error('Не удалось собрать команду для release-android-bot из поля "Номер релиза".');
+        }
+        return `руху все ${shortValue}`;
+      }
+
+      function extractGitlabPipelineUrl(text){
+        const match = String(text || '').match(/https:\/\/gitlab\.wildberries\.ru\/[^\s)]+\/-\/pipelines\/\d+(?:[^\s)]*)?/i);
+        return match ? match[0] : '';
+      }
+
+      function escapeRegExp(value){
+        return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+
+      async function bandFetchThreadPosts(rootPostId, cfg, signal){
+        const rootId = String(rootPostId || '').trim();
+        if(!rootId) throw new Error('Не задан root id треда.');
+        const url = `https://band.wb.ru/api/v4/posts/${encodeURIComponent(rootId)}/thread?skipFetchThreads=false&collapsedThreads=true&collapsedThreadsExtended=false&direction=down&perPage=60`;
+        const headers = {
+          'Accept': 'application/json',
+          'Accept-Language': 'ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+        const data = await proxyRequestJson('GET', url, headers, undefined, signal);
+        const payload = unwrapBandPostsPayload(data);
+        return collectBandPosts(payload);
+      }
+
+      async function bandFetchChannelPostsSince(channelId, sinceMs, cfg, signal){
+        const channel = String(channelId || '').trim();
+        if(!channel) throw new Error('Не задан канал Band для чтения постов.');
+        const url = `https://band.wb.ru/api/v4/channels/${encodeURIComponent(channel)}/posts?since=${Number(sinceMs) || 0}&skipFetchThreads=false&collapsedThreads=true&collapsedThreadsExtended=false`;
+        const headers = {
+          'Accept': 'application/json',
+          'Accept-Language': 'ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+        const data = await proxyRequestJson('GET', url, headers, undefined, signal);
+        const payload = unwrapBandPostsPayload(data);
+        return collectBandPosts(payload);
+      }
+
+      function getBandPostCreateAt(post){
+        const createdAt = Number(post && post.create_at);
+        return Number.isFinite(createdAt) ? createdAt : 0;
+      }
+
+      function normalizeBandMessageKey(message){
+        return norm(normalizeBandMessageText(message));
+      }
+
+      function isActiveBandRootPost(post){
+        if(!post || typeof post !== 'object') return false;
+        const deletedAt = Number(post.delete_at);
+        if(Number.isFinite(deletedAt) && deletedAt > 0) return false;
+        return !String(post.root_id || '').trim();
+      }
+
+      function findLatestOwnRootPostByMessage(posts, message, userId){
+        const list = Array.isArray(posts) ? posts : [];
+        const targetMessage = normalizeBandMessageKey(message);
+        const targetUserId = String(userId || '').trim();
+        let found = null;
+
+        for(const post of list){
+          if(!isActiveBandRootPost(post)) continue;
+          if(targetUserId && String(post.user_id || '').trim() !== targetUserId) continue;
+          if(normalizeBandMessageKey(post.message) !== targetMessage) continue;
+          if(!found || getBandPostCreateAt(post) > getBandPostCreateAt(found)){
+            found = post;
+          }
+        }
+
+        return found;
+      }
+
+      function findLatestOwnThreadPost(posts, rootPostId, userId){
+        const list = Array.isArray(posts) ? posts : [];
+        const rootId = String(rootPostId || '').trim();
+        const targetUserId = String(userId || '').trim();
+        let found = null;
+
+        for(const post of list){
+          if(!post || typeof post !== 'object') continue;
+          const deletedAt = Number(post.delete_at);
+          if(Number.isFinite(deletedAt) && deletedAt > 0) continue;
+          if(String(post.root_id || '').trim() !== rootId) continue;
+          if(targetUserId && String(post.user_id || '').trim() !== targetUserId) continue;
+          if(!found || getBandPostCreateAt(post) > getBandPostCreateAt(found)){
+            found = post;
+          }
+        }
+
+        return found;
+      }
+
+      async function upsertReleaseFeedPost(item, cfg, channelPosts, signal){
+        const rootMessage = normalizeBandMessageText(item && item.rootMessage);
+        const threadMessage = normalizeBandMessageText(item && item.threadMessage);
+        if(!rootMessage) throw new Error('Пустой root-текст для ленты релизов.');
+        if(!threadMessage) throw new Error('Пустой thread-текст для ленты релизов.');
+
+        const cachedPosts = Array.isArray(channelPosts) ? channelPosts : [];
+        let rootPost = findLatestOwnRootPostByMessage(cachedPosts, rootMessage, BAND_POST_USER_ID);
+        let rootAction = 'reused';
+        if(rootPost){
+          console.info('[Release Feed] Existing thread found', {
+            channelId: RELEASE_FEED_CHANNEL_ID,
+            release: rootMessage,
+            rootId: String(rootPost.id || '').trim()
+          });
+        }
+
+        if(!rootPost){
+          rootPost = await bandCreatePost(rootMessage, cfg, signal, {
+            channelId: RELEASE_FEED_CHANNEL_ID
+          });
+          if(rootPost && typeof rootPost === 'object'){
+            cachedPosts.push(rootPost);
+          }
+          rootAction = 'created';
+        }
+
+        const rootId = String((rootPost && rootPost.id) || '').trim();
+        if(!rootId){
+          throw new Error(`Не удалось получить id root-поста для '${rootMessage}'.`);
+        }
+
+        const threadPosts = await bandFetchThreadPosts(rootId, cfg, signal);
+        const existingThreadPost = findLatestOwnThreadPost(threadPosts, rootId, BAND_POST_USER_ID);
+        if(existingThreadPost){
+          const existingText = normalizeBandMessageText(existingThreadPost.message);
+          if(existingText === threadMessage){
+            return {
+              rootId,
+              rootAction,
+              threadAction: 'unchanged',
+              threadPostId: String(existingThreadPost.id || '').trim()
+            };
+          }
+
+          await bandPatchPost(existingThreadPost.id, threadMessage, cfg, signal);
+          return {
+            rootId,
+            rootAction,
+            threadAction: 'updated',
+            threadPostId: String(existingThreadPost.id || '').trim()
+          };
+        }
+
+        if(rootAction === 'created'){
+          await sleep(120);
+        }
+        const threadPost = await bandCreatePost(threadMessage, cfg, signal, {
+          channelId: RELEASE_FEED_CHANNEL_ID,
+          rootId
+        });
+        return {
+          rootId,
+          rootAction,
+          threadAction: 'created',
+          threadPostId: String((threadPost && threadPost.id) || '').trim()
+        };
+      }
+
+      function findRuStoreHuaweiPipelineReply(posts, rootPostId){
+        const rootId = String(rootPostId || '').trim();
+        const list = Array.isArray(posts) ? posts : [];
+        let lastBotMessage = '';
+
+        for(let i = list.length - 1; i >= 0; i -= 1){
+          const post = list[i];
+          if(!post || typeof post !== 'object') continue;
+          const deletedAt = Number(post.delete_at);
+          if(Number.isFinite(deletedAt) && deletedAt > 0) continue;
+          if(String(post.root_id || '').trim() !== rootId) continue;
+
+          const isBot = String(post.user_id || '').trim() === RELEASE_ANDROID_BOT_USER_ID
+            || String((post.props && post.props.from_bot) || '').trim().toLowerCase() === 'true';
+          if(!isBot) continue;
+
+          const message = String(post.message || '').trim();
+          if(message && !lastBotMessage){
+            lastBotMessage = message;
+          }
+
+          const pipelineUrl = extractGitlabPipelineUrl(message);
+          if(pipelineUrl){
+            return { pipelineUrl, lastBotMessage: message };
+          }
+        }
+
+        return { pipelineUrl: '', lastBotMessage };
+      }
+
+      function extractIosTestFlightBuildValue(message, release){
+        const releaseValue = String(release || '').trim();
+        if(!releaseValue) return '';
+        const re = new RegExp(`${escapeRegExp(releaseValue)}\\s*\\((\\d+)\\)`, 'i');
+        const match = String(message || '').match(re);
+        return match ? `${releaseValue}(${match[1]})` : '';
+      }
+
+      function isIosBuildAnnouncementPost(post){
+        if(!post || typeof post !== 'object') return false;
+        const deletedAt = Number(post.delete_at);
+        if(Number.isFinite(deletedAt) && deletedAt > 0) return false;
+        if(String(post.root_id || '').trim()) return false;
+        const text = normalizeBandMessageText(post.message);
+        return /testflight/i.test(text);
+      }
+
+      async function resolveIosBuildFromBand(release, cfg, signal){
+        runCreatorInfo(`Сборка: ищу iOS сборку по релизу ${release} в канале сборок...`);
+        let found = null;
+        const windowInfo = buildSinceWindow();
+        const sinceMs = Number(windowInfo.sinceMs) || 0;
+        const tryPickBuild = (posts) => {
+          const list = Array.isArray(posts) ? posts : [];
+          for(const post of list){
+            if(!isIosBuildAnnouncementPost(post)) continue;
+
+            const buildValue = extractIosTestFlightBuildValue(post.message, release);
+            if(!buildValue) continue;
+
+            const createdAt = Number(post.create_at);
+            if(!found || createdAt > found.createdAt){
+              found = {
+                buildValue,
+                createdAt: Number.isFinite(createdAt) ? createdAt : 0
+              };
+            }
+          }
+        };
+
+        try{
+          tryPickBuild(await bandFetchChannelPostsSince(IOS_BUILDS_CHANNEL_ID, sinceMs, cfg, signal));
+        }catch(err){
+          console.warn('[iOS Build] Failed to read builds channel', {
+            release: String(release || '').trim(),
+            channelId: IOS_BUILDS_CHANNEL_ID,
+            sinceMs,
+            error: String(err && err.message ? err.message : err)
+          });
+        }
+
+        if(!found || !found.buildValue){
+          console.info('[iOS Build] Build not found, skip step', {
+            release: String(release || '').trim(),
+            channelId: IOS_BUILDS_CHANNEL_ID,
+            sinceMs
+          });
+          clearResolvedRunBuildValue();
+          syncResolvedBuildToInput('');
+          return '';
+        }
+
+        setResolvedRunBuildValue(found.buildValue);
+        syncResolvedBuildToInput(found.buildValue);
+        runCreatorInfo(`Сборка найдена: ${found.buildValue}`, { kind: 'ok' });
+        return found.buildValue;
+      }
+
+      async function resolveBuildValueAutomatically(mode, release, cfg, signal){
+        if(!isBuildAutoResolvedMode(mode)){
+          return '';
+        }
+        if(!String((cfg && cfg.bandCookiesRead) || '').trim()){
+          throw new Error('Заполни Cookies (чтение/поиск users и post) для запроса сборки у release-android-bot.');
+        }
+
+        if(mode === '2'){
+          clearResolvedRunBuildValue();
+          return resolveIosBuildFromBand(release, cfg, signal);
+        }
+
+        clearResolvedRunBuildValue();
+        const command = buildBuildResolverBotCommand(mode, release);
+        runCreatorInfo(`Сборка: отправляю запрос боту: ${command}`);
+        const rootPost = await bandCreatePost(command, cfg, signal, {
+          channelId: RELEASE_ANDROID_BOT_CHANNEL_ID
+        });
+        const rootId = String((rootPost && rootPost.id) || '').trim();
+        if(!rootId){
+          throw new Error('Не удалось создать тред запроса к release-android-bot.');
+        }
+
+        runCreatorInfo('Сборка: жду ответ release-android-bot...');
+        const startedAt = Date.now();
+        let lastBotMessage = '';
+
+        await sleep(RELEASE_ANDROID_BOT_REPLY_DELAY_MS);
+
+        while(Date.now() - startedAt <= RELEASE_ANDROID_BOT_TIMEOUT_MS){
+          const posts = await bandFetchThreadPosts(rootId, cfg, signal);
+          const found = findRuStoreHuaweiPipelineReply(posts, rootId);
+          if(found.lastBotMessage){
+            lastBotMessage = found.lastBotMessage;
+          }
+          if(found.pipelineUrl){
+            setResolvedRunBuildValue(found.pipelineUrl);
+            syncResolvedBuildToInput(found.pipelineUrl);
+            runCreatorInfo(`Сборка найдена: <a href="${found.pipelineUrl}" target="_blank" rel="noopener noreferrer">${escHtml(found.pipelineUrl)}</a>`, {
+              html: true,
+              kind: 'ok'
+            });
+            return found.pipelineUrl;
+          }
+          await sleep(RELEASE_ANDROID_BOT_POLL_MS);
+        }
+
+        const tail = lastBotMessage
+          ? ` Последний ответ бота: ${lastBotMessage.replace(/\s+/g, ' ').trim().slice(0, 220)}`
+          : '';
+        throw new Error(`Не удалось получить ссылку на pipeline от release-android-bot.${tail}`);
       }
 
       async function bandSchedulePost(message, cfg, scheduledAtMs, signal, options){
@@ -2835,8 +3354,10 @@
       function refreshModeControls(){
         const isMajor = appState.currentMode === RUN_MODE_MAJOR;
         const hasMode = String(appState.currentMode || '').length > 0;
-        const locked = appState.running || appState.workflowRunning || appState.runCreateRunning;
         const isNonMajor = hasMode && !isMajor;
+        const majorLocked = appState.running || appState.workflowRunning;
+        const nonMajorLocked = appState.runCreateRunning || appState.startButtonBusy;
+        const locked = isMajor ? majorLocked : (isNonMajor ? nonMajorLocked : (majorLocked || nonMajorLocked));
         const isReleaseFeedBlockedMode = appState.currentMode === '3' || appState.currentMode === '4';
         const isBuildMode = isRunBuildMode(appState.currentMode);
         const hasPublishData = isNonMajor && hasRunCreatorPublishData();
@@ -2852,31 +3373,32 @@
         if(swatLeadViktor) swatLeadViktor.disabled = locked || !isNonMajor;
         if(swatLeadRoman) swatLeadRoman.disabled = locked || !isNonMajor;
         if(runPushSwatBtn){
-          runPushSwatBtn.disabled = locked || !isNonMajor || !hasPublishData;
-          runPushSwatBtn.title = (!locked && isNonMajor && !hasPublishData) ? collectHint : '';
+          runPushSwatBtn.disabled = nonMajorLocked || !isNonMajor || !hasPublishData;
+          runPushSwatBtn.title = (!nonMajorLocked && isNonMajor && !hasPublishData) ? collectHint : '';
         }
         if(runPushSwatScheduleBtn){
-          runPushSwatScheduleBtn.disabled = locked || !isNonMajor || !hasPublishData;
-          runPushSwatScheduleBtn.title = (!locked && isNonMajor && !hasPublishData) ? collectHint : '';
+          runPushSwatScheduleBtn.disabled = nonMajorLocked || !isNonMajor || !hasPublishData;
+          runPushSwatScheduleBtn.title = (!nonMajorLocked && isNonMajor && !hasPublishData) ? collectHint : '';
         }
         if(runPushSwatSplit){
-          runPushSwatSplit.title = (!locked && isNonMajor && !hasPublishData) ? collectHint : '';
+          runPushSwatSplit.title = (!nonMajorLocked && isNonMajor && !hasPublishData) ? collectHint : '';
         }
         if(runPushReleaseFeedBtn){
-          runPushReleaseFeedBtn.disabled = locked || !isNonMajor || isReleaseFeedBlockedMode || !hasPublishData;
-          runPushReleaseFeedBtn.title = (!locked && isNonMajor && !hasPublishData)
+          runPushReleaseFeedBtn.disabled = nonMajorLocked || !isNonMajor || isReleaseFeedBlockedMode || !hasPublishData;
+          runPushReleaseFeedBtn.title = (!nonMajorLocked && isNonMajor && !hasPublishData)
             ? collectHint
-            : ((!locked && isNonMajor && isReleaseFeedBlockedMode) ? 'Недоступно для выбранного типа запуска' : '');
+            : ((!nonMajorLocked && isNonMajor && isReleaseFeedBlockedMode) ? 'Недоступно для выбранного типа запуска' : '');
         }
-        if((locked || !isNonMajor) && !appState.runCreateRunning){
+        if((nonMajorLocked || !isNonMajor) && !appState.runCreateRunning){
           closeSwatScheduleMenu();
         }
       }
 
       function setRunCreateRunning(running){
         appState.runCreateRunning = !!running;
-        if(startBtn){
-          startBtn.textContent = running ? 'Запускаю...' : getStartButtonLabel(appState.currentMode);
+        syncStartButtonLabel();
+        if(!running){
+          releaseStartButtonBusyIfIdle();
         }
         refreshModeControls();
         schedulePreviewRefresh();
@@ -2957,7 +3479,7 @@
         appState.running = !!running;
         if(startBtn){
           startBtn.style.display = running ? 'none' : (String(appState.currentMode || '') ? '' : 'none');
-          startBtn.textContent = getStartButtonLabel(appState.currentMode);
+          syncStartButtonLabel();
         }
         stopBtn.style.display = running ? '' : 'none';
         if(checkProxyBtn) checkProxyBtn.disabled = running;
@@ -3097,7 +3619,7 @@
         }
 
         const release = runReleaseInput ? String(runReleaseInput.value || '').trim() : '';
-        const buildValue = getRunBuildValue();
+        const buildValue = getRunBuildRawValue();
         if(!release){
           throw new Error('Номер релиза не должен быть пустым.');
         }
@@ -3107,6 +3629,8 @@
           localStorage.setItem(LS_RUN_BUILD_KEY, buildValue);
         }catch(_){ }
 
+        appState.startButtonBusy = true;
+        syncStartButtonLabel();
         setRunCreateRunning(true);
         runCreatorClearError();
         try{
@@ -3269,11 +3793,14 @@
       function buildReleaseFeedThreadMessage(release, runRef, boardUrl, releaseTaskRef, buildValue){
         const today = formatMskDateDot(new Date());
         const buildText = String(buildValue || '').trim();
+        const releaseTaskLine = releaseTaskRef
+          ? `Релизный таск: [${releaseTaskRef.key}](${releaseTaskRef.url})`
+          : 'Релизный таск: -';
         const lines = [
           `OS версия: ${release}`,
           `Ссылка на доску: ${String(boardUrl || '').trim()}`,
           '',
-          `Релизный таск: ${releaseTaskRef ? `[${releaseTaskRef.key}](${releaseTaskRef.url})` : ''}`,
+          releaseTaskLine,
           '',
           `Сроки готовности сборок: ${today}`,
           `Сроки выкатки: ${today}`,
@@ -3341,31 +3868,47 @@
         ensureReleaseFeedFields(cfg);
         const buildValue = getRunBuildValue();
 
-        const [boardUrl, releaseTaskRef] = await Promise.all([
+        const [boardUrl, releaseTaskInfo] = await Promise.all([
           fetchReleaseBoardUrl(mode, release, null),
-          fetchReleaseTicketRef(mode, release, null)
+          fetchOptionalReleaseTicketRef(mode, release, null)
         ]);
-        const posts = buildReleaseFeedPosts(mode, release, collectRunCreatorLinks(), boardUrl, releaseTaskRef, buildValue);
+        if(releaseTaskInfo.error){
+          runCreatorInfo(`Лента релизов: релизный тикет не получен: ${releaseTaskInfo.error}`, { skipPreviewRefresh: true });
+        }
+        const posts = buildReleaseFeedPosts(
+          mode,
+          release,
+          collectRunCreatorLinks(),
+          boardUrl,
+          releaseTaskInfo.ref,
+          buildValue
+        );
         if(!posts.length){
           throw new Error('Нет данных для публикации в ленту релизов.');
         }
 
+        const feedPosts = await bandFetchChannelPostsSince(
+          RELEASE_FEED_CHANNEL_ID,
+          Date.now() - RELEASE_FEED_LOOKBACK_MS,
+          cfg,
+          null
+        );
+        const hasExistingThread = posts.some((item) => findLatestOwnRootPostByMessage(feedPosts, item.rootMessage, BAND_POST_USER_ID));
+        if(hasExistingThread){
+          setButtonBusyText(runPushReleaseFeedBtn, 'Обновляю...');
+        }
+
         for(const item of posts){
-          const rootPost = await bandCreatePost(item.rootMessage, cfg, null, {
-            channelId: RELEASE_FEED_CHANNEL_ID
-          });
-          const rootId = String((rootPost && rootPost.id) || '');
-          if(!rootId){
-            throw new Error(`Не удалось получить id root-поста для '${item.rootMessage}'.`);
+          const result = await upsertReleaseFeedPost(item, cfg, feedPosts, null);
+          if(result.threadAction === 'updated'){
+            runCreatorInfo(`Лента релизов: обновлен тред <b>${escHtml(item.rootMessage)}</b>`, { html: true, kind: 'ok', skipPreviewRefresh: true });
+          }else if(result.threadAction === 'unchanged'){
+            runCreatorInfo(`Лента релизов: тред уже актуален <b>${escHtml(item.rootMessage)}</b>`, { html: true, kind: 'ok', skipPreviewRefresh: true });
+          }else if(result.rootAction === 'created'){
+            runCreatorInfo(`Лента релизов: опубликован тред <b>${escHtml(item.rootMessage)}</b>`, { html: true, kind: 'ok', skipPreviewRefresh: true });
+          }else{
+            runCreatorInfo(`Лента релизов: добавлено сообщение в существующий тред <b>${escHtml(item.rootMessage)}</b>`, { html: true, kind: 'ok', skipPreviewRefresh: true });
           }
-
-          await sleep(120);
-          await bandCreatePost(item.threadMessage, cfg, null, {
-            channelId: RELEASE_FEED_CHANNEL_ID,
-            rootId
-          });
-
-          runCreatorInfo(`Лента релизов: опубликован тред <b>${escHtml(item.rootMessage)}</b>`, { html: true, kind: 'ok' });
           await sleep(120);
         }
 
@@ -3397,7 +3940,7 @@
           channelId: SWAT_TEAM_ONLY_CHANNEL_ID
         });
 
-        runCreatorInfo('SWAT Team Only: сообщение опубликовано', { kind: 'ok' });
+        runCreatorInfo('SWAT Team Only: сообщение опубликовано', { kind: 'ok', skipPreviewRefresh: true });
         showToast('Опубликовано в SWAT Team Only');
       }
 
@@ -3412,7 +3955,7 @@
           channelId: SWAT_TEAM_ONLY_CHANNEL_ID
         });
         const human = formatMskDateTimeHuman(targetMs);
-        runCreatorInfo(`SWAT Team Only: сообщение запланировано на <b>${escHtml(human)}</b>`, { html: true, kind: 'ok' });
+        runCreatorInfo(`SWAT Team Only: сообщение запланировано на <b>${escHtml(human)}</b>`, { html: true, kind: 'ok', skipPreviewRefresh: true });
         showToast(`Запланировано на ${human}`);
       }
 
@@ -3679,7 +4222,7 @@
           showToast('Прокси не отвечает', false);
         }));
         runPushSwatBtn?.addEventListener('click', () => withButtonBusy(runPushSwatBtn, 'Публикую...', publishSwatTeamOnlyPost).catch((err) => {
-          runCreatorInfo(`SWAT Team Only: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
+          runCreatorInfo(`SWAT Team Only: ${escHtml(err.message || err)}`, { html: true, kind: 'err', skipPreviewRefresh: true });
           showToast(err.message || 'Ошибка публикации', false);
         }));
         runPushSwatScheduleBtn?.addEventListener('click', () => {
@@ -3688,7 +4231,7 @@
         runPushSwatScheduleDefaultBtn?.addEventListener('click', () => {
           closeSwatScheduleMenu();
           withButtonBusy(runPushSwatScheduleBtn, '...', () => scheduleSwatTeamOnlyPost(buildDefaultSwatScheduleMs(Date.now()))).catch((err) => {
-            runCreatorInfo(`SWAT Team Only: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
+            runCreatorInfo(`SWAT Team Only: ${escHtml(err.message || err)}`, { html: true, kind: 'err', skipPreviewRefresh: true });
             showToast(err.message || 'Ошибка планирования', false);
           });
         });
@@ -3697,7 +4240,7 @@
           openSwatScheduleModal(buildDefaultSwatScheduleMs(Date.now()));
         });
         runPushReleaseFeedBtn?.addEventListener('click', () => withButtonBusy(runPushReleaseFeedBtn, 'Публикую...', publishReleaseFeedPosts).catch((err) => {
-          runCreatorInfo(`Лента релизов: ${escHtml(err.message || err)}`, { html: true, kind: 'err' });
+          runCreatorInfo(`Лента релизов: ${escHtml(err.message || err)}`, { html: true, kind: 'err', skipPreviewRefresh: true });
           showToast(err.message || 'Ошибка публикации', false);
         }));
         swatScheduleModalClose?.addEventListener('click', closeSwatScheduleModal);
@@ -3741,12 +4284,17 @@
           setRunMode(runModeSelect.value);
         });
         runReleaseInput?.addEventListener('input', () => {
+          clearResolvedRunBuildValue();
+          if(isBuildAutoResolvedMode(appState.currentMode)){
+            clearRunBuildInputValue();
+          }
           try{
             localStorage.setItem(LS_RUN_RELEASE_KEY, String(runReleaseInput.value || '').trim());
           }catch(_){ }
           schedulePreviewRefresh();
         });
         runBuildInput?.addEventListener('input', () => {
+          clearResolvedRunBuildValue();
           try{
             localStorage.setItem(LS_RUN_BUILD_KEY, String(runBuildInput.value || '').trim());
           }catch(_){ }
