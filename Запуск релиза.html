@@ -1021,15 +1021,21 @@
           clearResolvedRunBuildValue();
         }
 
-        runCreatorInfo('Создаю тег релиза...');
-        const tagRelease = await runCreatorCreateTag(release, signal);
-        runCreatorInfo(`Тег релиза создан: id=${tagRelease}`);
-        runCreatorInfo('');
+        let tagRelease = 0;
+        async function ensureReleaseTag(){
+          if(tagRelease) return tagRelease;
+          runCreatorInfo('Создаю тег релиза...');
+          tagRelease = await runCreatorCreateTag(release, signal);
+          runCreatorInfo(`Тег релиза создан: id=${tagRelease}`);
+          runCreatorInfo('');
+          return tagRelease;
+        }
 
         if(mode === '1'){
+          const releaseTag = await ensureReleaseTag();
           const ln = `[SWAT][Крит-путь][Android] ${release}`;
           runCreatorInfo(`Запускаю тест-план ${RUN_TP_CP_ANDROID} → ${ln}`);
-          const run = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, ln, [RUN_TAG_ANDROID, tagRelease], signal);
+          const run = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, ln, [RUN_TAG_ANDROID, releaseTag], signal);
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
           runCreatorInfo(`Привет, новый крит-путь для ХФ Android, релиз ${release}`);
@@ -1038,9 +1044,10 @@
         }
 
         if(mode === '2'){
+          const releaseTag = await ensureReleaseTag();
           const ln = `[SWAT][Крит-путь][iOS] ${release}`;
           runCreatorInfo(`Запускаю тест-план ${RUN_TP_CP_IOS} → ${ln}`);
-          const run = await runCreatorRunTestplan(RUN_TP_CP_IOS, ln, [tagRelease, RUN_TAG_IOS], signal);
+          const run = await runCreatorRunTestplan(RUN_TP_CP_IOS, ln, [releaseTag, RUN_TAG_IOS], signal);
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
           runCreatorInfo(`Привет, новый крит-путь для ХФ iOS, релиз ${release}`);
@@ -1049,49 +1056,88 @@
         }
 
         if(mode === '3'){
-          runCreatorInfo(`Синхронизирую тест-кейсы NAPI (${RUN_TP_NAPI_BASE}, ${RUN_TP_NAPI_IOS}, ${RUN_TP_NAPI_ANDROID})...`);
-          for(const tp of [RUN_TP_NAPI_BASE, RUN_TP_NAPI_IOS, RUN_TP_NAPI_ANDROID]){
-            runCreatorInfo(`  sync testplan ${tp} ...`);
-            await runCreatorSyncTestplan(tp, signal);
-            await sleep(300);
-          }
-          const tagNapi = await runCreatorCreateTag('napi', signal);
-
           const ln1 = `[SWAT][Android и iOS] Релиз Napi ${release}`;
-          runCreatorInfo('');
-          runCreatorInfo(`Запускаю ${RUN_TP_NAPI_BASE} → ${ln1}`);
-          const run1 = await runCreatorRunTestplan(RUN_TP_NAPI_BASE, ln1, [RUN_TAG_ANDROID, RUN_TAG_IOS, tagRelease, tagNapi], signal);
-
           const ln2 = `[SWAT][Финтех + Корзина][iOS] Релиз Napi ${release}`;
-          runCreatorInfo(`Запускаю ${RUN_TP_NAPI_IOS} → ${ln2}`);
-          const run2 = await runCreatorRunTestplan(RUN_TP_NAPI_IOS, ln2, [RUN_TAG_IOS, tagRelease, tagNapi], signal);
-
           const ln3 = `[SWAT][Финтех + Корзина][Android] Релиз Napi ${release}`;
-          runCreatorInfo(`Запускаю ${RUN_TP_NAPI_ANDROID} → ${ln3}`);
-          const run3 = await runCreatorRunTestplan(RUN_TP_NAPI_ANDROID, ln3, [tagRelease, RUN_TAG_ANDROID, tagNapi], signal);
+          const plans = [
+            {
+              tpId: RUN_TP_NAPI_BASE,
+              launchName: ln1,
+              buildTags: (releaseTag, tagNapi) => [RUN_TAG_ANDROID, RUN_TAG_IOS, releaseTag, tagNapi]
+            },
+            {
+              tpId: RUN_TP_NAPI_IOS,
+              launchName: ln2,
+              buildTags: (releaseTag, tagNapi) => [RUN_TAG_IOS, releaseTag, tagNapi]
+            },
+            {
+              tpId: RUN_TP_NAPI_ANDROID,
+              launchName: ln3,
+              buildTags: (releaseTag, tagNapi) => [releaseTag, RUN_TAG_ANDROID, tagNapi]
+            }
+          ];
+
+          runCreatorInfo('Проверяю существующие раны NAPI...');
+          for(const plan of plans){
+            plan.existingLaunch = await runCreatorFindExistingLaunchByName(plan.launchName, signal);
+          }
+
+          const missingPlans = plans.filter((plan) => !(plan.existingLaunch && plan.existingLaunch.id));
+          let tagNapi = 0;
+          if(missingPlans.length){
+            const releaseTag = await ensureReleaseTag();
+            const syncIds = missingPlans.map((plan) => plan.tpId).join(', ');
+            runCreatorInfo(`Синхронизирую тест-кейсы NAPI (${syncIds})...`);
+            for(const plan of missingPlans){
+              runCreatorInfo(`  sync testplan ${plan.tpId} ...`);
+              await runCreatorSyncTestplan(plan.tpId, signal);
+              await sleep(300);
+            }
+            tagNapi = await runCreatorCreateTag('napi', signal);
+            for(const plan of plans){
+              runCreatorInfo(`Запускаю ${plan.tpId} → ${plan.launchName}`);
+              if(plan.existingLaunch && plan.existingLaunch.id){
+                runCreatorInfo(`Найден существующий ран, переиспользую: id=${plan.existingLaunch.id}`, { kind: 'ok' });
+                plan.run = Object.assign({}, plan.existingLaunch, { reused: true });
+                continue;
+              }
+              plan.run = await runCreatorRunTestplan(plan.tpId, plan.launchName, plan.buildTags(releaseTag, tagNapi), signal);
+            }
+          }else{
+            runCreatorInfo('Все NAPI раны уже найдены, синхронизация тест-планов не требуется.', { kind: 'ok' });
+            for(const plan of plans){
+              runCreatorInfo(`Запускаю ${plan.tpId} → ${plan.launchName}`);
+              runCreatorInfo(`Найден существующий ран, переиспользую: id=${plan.existingLaunch.id}`, { kind: 'ok' });
+              plan.run = Object.assign({}, plan.existingLaunch, { reused: true });
+            }
+          }
 
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
           runCreatorInfo(`Привет, новый регресс для NAPI, релиз ${release}`);
+          for(const run of plans.map((plan) => plan.run)){
+            if(run) runCreatorInfo(runCreatorLaunchLink(run), { html: true });
+          }
           return;
         }
 
         if(mode === '4'){
+          const releaseTag = await ensureReleaseTag();
           const lnAOld = `[SWAT][Крит-путь][Android] Тест UI Старых устройств ${release}`;
           runCreatorInfo(`Запускаю ${RUN_TP_CP_ANDROID} → ${lnAOld}`);
-          const runAOld = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnAOld, [RUN_TAG_ANDROID, tagRelease], signal);
+          const runAOld = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnAOld, [RUN_TAG_ANDROID, releaseTag], signal);
 
           const lnAFold = `[SWAT][Крит-путь][Android] Раскладушки (FOLD) ${release}`;
           runCreatorInfo(`Запускаю ${RUN_TP_CP_ANDROID} → ${lnAFold}`);
-          const runAFold = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnAFold, [RUN_TAG_ANDROID, tagRelease], signal);
+          const runAFold = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnAFold, [RUN_TAG_ANDROID, releaseTag], signal);
 
           const lnIOld = `[SWAT][Крит-путь][IOS] Тест UI Старых устройств ${release}`;
           runCreatorInfo(`Запускаю ${RUN_TP_CP_IOS} → ${lnIOld}`);
-          const runIOld = await runCreatorRunTestplan(RUN_TP_CP_IOS, lnIOld, [RUN_TAG_IOS, tagRelease], signal);
+          const runIOld = await runCreatorRunTestplan(RUN_TP_CP_IOS, lnIOld, [RUN_TAG_IOS, releaseTag], signal);
 
           const lnIpad = `[SWAT][Крит-путь][IOS] iPAD ${release}`;
           runCreatorInfo(`Запускаю ${RUN_TP_CP_IOS} → ${lnIpad}`);
-          const runIpad = await runCreatorRunTestplan(RUN_TP_CP_IOS, lnIpad, [RUN_TAG_IOS, tagRelease], signal);
+          const runIpad = await runCreatorRunTestplan(RUN_TP_CP_IOS, lnIpad, [RUN_TAG_IOS, releaseTag], signal);
 
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
@@ -1101,16 +1147,17 @@
         }
 
         if(mode === '5'){
+          const releaseTag = await ensureReleaseTag();
           const tagApp = await runCreatorCreateTag('AppGallery', signal);
           const tagRu = await runCreatorCreateTag('RuStore', signal);
 
           const lnApp = `[SWAT][Крит-путь] AppGallery ${release}`;
           runCreatorInfo(`Запускаю ${RUN_TP_CP_ANDROID} → ${lnApp}`);
-          const runApp = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnApp, [RUN_TAG_ANDROID, tagRelease, tagApp], signal);
+          const runApp = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnApp, [RUN_TAG_ANDROID, releaseTag, tagApp], signal);
 
           const lnRu = `[SWAT][Крит-путь] RuStore ${release}`;
           runCreatorInfo(`Запускаю ${RUN_TP_CP_ANDROID} → ${lnRu}`);
-          const runRu = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnRu, [RUN_TAG_ANDROID, tagRelease, tagRu], signal);
+          const runRu = await runCreatorRunTestplan(RUN_TP_CP_ANDROID, lnRu, [RUN_TAG_ANDROID, releaseTag, tagRu], signal);
 
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
@@ -1120,16 +1167,17 @@
         }
 
         if(mode === '6'){
+          const releaseTag = await ensureReleaseTag();
           const tagApp = await runCreatorCreateTag('AppGallery', signal);
           const tagRu = await runCreatorCreateTag('RuStore', signal);
 
           const lnRuSmoke = `[SWAT][Android][Smoke] RuStore ${release}`;
           runCreatorInfo(`Запускаю ${RUN_TP_SMOKE_RUSTORE} → ${lnRuSmoke}`);
-          const runRuSmoke = await runCreatorRunTestplan(RUN_TP_SMOKE_RUSTORE, lnRuSmoke, [RUN_TAG_ANDROID, tagRelease, tagRu], signal);
+          const runRuSmoke = await runCreatorRunTestplan(RUN_TP_SMOKE_RUSTORE, lnRuSmoke, [RUN_TAG_ANDROID, releaseTag, tagRu], signal);
 
           const lnAppSmoke = `[SWAT][Android][Smoke] AppGallery ${release}`;
           runCreatorInfo(`Запускаю ${RUN_TP_SMOKE_APPGALLERY} → ${lnAppSmoke}`);
-          const runAppSmoke = await runCreatorRunTestplan(RUN_TP_SMOKE_APPGALLERY, lnAppSmoke, [RUN_TAG_ANDROID, tagRelease, tagApp], signal);
+          const runAppSmoke = await runCreatorRunTestplan(RUN_TP_SMOKE_APPGALLERY, lnAppSmoke, [RUN_TAG_ANDROID, releaseTag, tagApp], signal);
 
           runCreatorInfo('');
           runCreatorInfo('Готово. Сформировано сообщение:');
