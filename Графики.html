@@ -31,6 +31,10 @@
               class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
               📄 Экспорт PDF
             </button>
+            <button id="exportChartsOnlyPdfBtn"
+              class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
+              📊 Только графики
+            </button>
           </div>
         </div>
       </div>
@@ -1078,7 +1082,9 @@
           }
 
           document.getElementById('exportPdfBtn')
-            ?.addEventListener('click', exportAllChartsToPDF);
+            ?.addEventListener('click', () => exportAllChartsToPDF());
+          document.getElementById('exportChartsOnlyPdfBtn')
+            ?.addEventListener('click', () => exportAllChartsToPDF({ chartsOnly: true }));
         // Экспорт всей карточки графика целиком (заголовок + расшифровка + график) в PDF
         function disableChartTooltips(){
           const list = [
@@ -2003,7 +2009,7 @@
           return sections;
         }
 
-        async function exportAllChartsToPDF(){
+        async function exportAllChartsToPDF({ chartsOnly = false } = {}){
           try{
             if (!window.jspdf || !window.html2canvas){
               showToast('PDF библиотеки не загрузились', false);
@@ -2024,7 +2030,7 @@
               await waitForPdfFonts(document);
               await waitForLayoutFrames(2);
               const summaryCard = document.getElementById('mlSummaryCard');
-              const summarySections = collectMlSummaryPdfSections(summaryCard);
+              const summarySections = chartsOnly ? [] : collectMlSummaryPdfSections(summaryCard);
               const cards = Array.from(document.querySelectorAll('section.card'))
                 .filter(card => card.id !== 'mlSummaryCard')
                 .filter(card => (card.querySelector('canvas') || card.hasAttribute('data-export-card')) && window.getComputedStyle(card).display !== 'none');
@@ -2129,6 +2135,17 @@
                 }
 
                 for (const card of cards) {
+                  if(chartsOnly){
+                    // Strip all table-blocks, render only the chart+header part
+                    const chartOnlyFragment = buildCardPdfFragment(card, clone => {
+                      clone.querySelectorAll('.table-block').forEach(el => el.remove());
+                    });
+                    const canvas = await renderExportBlockCanvas({ node: chartOnlyFragment, syncSource: card, kind: 'card' }, 'card');
+                    addCanvasToPdf(canvas, { kind: 'card' });
+                    hasBlocks = true;
+                    continue;
+                  }
+
                   const largeTableIndexes = getLargePdfTableIndexes(card);
                   if(!largeTableIndexes.length){
                     const canvas = await renderExportBlockCanvas({ node: card, syncSource: card, kind: 'card' }, 'card');
@@ -2190,7 +2207,7 @@
               console.warn('PDF size exceeds target after fallback', finalBlob.size, usedPreset);
               showToast(`PDF собран, но вес ${Math.round(finalBlob.size / (1024 * 1024))} МБ. Применен максимальный режим сжатия.`, false);
             }
-            downloadBlob(finalBlob, 'WB_All_Charts.pdf');
+            downloadBlob(finalBlob, chartsOnly ? 'WB_Charts_Only.pdf' : 'WB_All_Charts.pdf');
           }catch(e){
             console.error('PDF export failed', e);
             showToast(`PDF ошибка: ${e?.message || e}`, false);
