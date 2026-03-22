@@ -27,14 +27,26 @@
             <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
               <span aria-hidden="true">🏷️</span><span>v0.2.27</span>
             </span>
-            <button id="exportPdfBtn"
-              class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
-              📄 Экспорт PDF
-            </button>
-            <button id="exportChartsOnlyPdfBtn"
-              class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
-              📊 Только графики
-            </button>
+            <div class="pdf-export-dropdown" id="pdfExportDropdown">
+              <button type="button" id="pdfExportTrigger"
+                class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
+                📄 PDF <span class="pdf-drop-arrow">▾</span>
+              </button>
+              <div class="pdf-export-menu" id="pdfExportMenu" style="display:none;">
+                <button type="button" class="pdf-export-item" id="exportPdfBtn">
+                  <span class="pdf-export-item-icon">📄</span>
+                  <span>Всё (графики + таблицы + ML)</span>
+                </button>
+                <button type="button" class="pdf-export-item" id="exportChartsAndMlPdfBtn">
+                  <span class="pdf-export-item-icon">📊</span>
+                  <span>Только графики + ML</span>
+                </button>
+                <button type="button" class="pdf-export-item" id="exportChartsOnlyPdfBtn">
+                  <span class="pdf-export-item-icon">📈</span>
+                  <span>Только графики</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1081,10 +1093,23 @@
             Chart.defaults.plugins.tooltip.displayColors = true;
           }
 
+          // PDF dropdown toggle
+          const _pdfTrigger = document.getElementById('pdfExportTrigger');
+          const _pdfMenu = document.getElementById('pdfExportMenu');
+          _pdfTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = _pdfMenu.style.display !== 'none';
+            _pdfMenu.style.display = open ? 'none' : '';
+          });
+          document.addEventListener('click', () => {
+            if(_pdfMenu) _pdfMenu.style.display = 'none';
+          });
           document.getElementById('exportPdfBtn')
-            ?.addEventListener('click', () => exportAllChartsToPDF());
+            ?.addEventListener('click', () => { if(_pdfMenu) _pdfMenu.style.display = 'none'; exportAllChartsToPDF(); });
+          document.getElementById('exportChartsAndMlPdfBtn')
+            ?.addEventListener('click', () => { if(_pdfMenu) _pdfMenu.style.display = 'none'; exportAllChartsToPDF({ chartsOnly: true, includeMl: true }); });
           document.getElementById('exportChartsOnlyPdfBtn')
-            ?.addEventListener('click', () => exportAllChartsToPDF({ chartsOnly: true }));
+            ?.addEventListener('click', () => { if(_pdfMenu) _pdfMenu.style.display = 'none'; exportAllChartsToPDF({ chartsOnly: true, includeMl: false }); });
         // Экспорт всей карточки графика целиком (заголовок + расшифровка + график) в PDF
         function disableChartTooltips(){
           const list = [
@@ -2009,7 +2034,7 @@
           return sections;
         }
 
-        async function exportAllChartsToPDF({ chartsOnly = false } = {}){
+        async function exportAllChartsToPDF({ chartsOnly = false, includeMl = true } = {}){
           try{
             if (!window.jspdf || !window.html2canvas){
               showToast('PDF библиотеки не загрузились', false);
@@ -2030,7 +2055,7 @@
               await waitForPdfFonts(document);
               await waitForLayoutFrames(2);
               const summaryCard = document.getElementById('mlSummaryCard');
-              const summarySections = chartsOnly ? [] : collectMlSummaryPdfSections(summaryCard);
+              const summarySections = (chartsOnly && !includeMl) ? [] : collectMlSummaryPdfSections(summaryCard);
               const cards = Array.from(document.querySelectorAll('section.card'))
                 .filter(card => card.id !== 'mlSummaryCard')
                 .filter(card => (card.querySelector('canvas') || card.hasAttribute('data-export-card')) && window.getComputedStyle(card).display !== 'none');
@@ -2207,7 +2232,8 @@
               console.warn('PDF size exceeds target after fallback', finalBlob.size, usedPreset);
               showToast(`PDF собран, но вес ${Math.round(finalBlob.size / (1024 * 1024))} МБ. Применен максимальный режим сжатия.`, false);
             }
-            downloadBlob(finalBlob, chartsOnly ? 'WB_Charts_Only.pdf' : 'WB_All_Charts.pdf');
+            const filename = !chartsOnly ? 'WB_All_Charts.pdf' : (includeMl ? 'WB_Charts_ML.pdf' : 'WB_Charts_Only.pdf');
+            downloadBlob(finalBlob, filename);
           }catch(e){
             console.error('PDF export failed', e);
             showToast(`PDF ошибка: ${e?.message || e}`, false);
