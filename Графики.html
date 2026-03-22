@@ -684,6 +684,14 @@
               </div>
 
               <div id="devDowntimeTableWrap" class="table-block" style="display:none;">
+                <div class="table-filter-row flex items-center gap-2 flex-wrap pt-2 justify-end">
+                  <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                  <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="devDowntimeReleaseFilter">
+                    <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="devDowntimeReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
+                </div>
                 <div class="table-scroll-x">
                   <table id="devDowntimeTable" class="dev-downtime-table dev-downtime-table--ios">
                     <colgroup>
@@ -749,6 +757,14 @@
               </div>
 
               <div id="androidDevDowntimeTableWrap" class="table-block" style="display:none;">
+                <div class="table-filter-row flex items-center gap-2 flex-wrap pt-2 justify-end">
+                  <div class="text-xs text-slate-500 release-filter-label">Релиз</div>
+                  <div class="dropdown dropdown--slim input release-filter-dropdown" data-release-select="androidDevDowntimeReleaseFilter">
+                    <div class="dropdown-selected truncate">Все релизы</div>
+                    <div class="dropdown-list release-filter-list"></div>
+                  </div>
+                  <select id="androidDevDowntimeReleaseFilter" class="input text-xs release-select-hidden" multiple size="1"></select>
+                </div>
                 <div class="table-scroll-x">
                   <table id="androidDevDowntimeTable" class="dev-downtime-table dev-downtime-table--android">
                     <colgroup>
@@ -5247,11 +5263,13 @@
           const devDowntimeTbody = document.getElementById('devDowntimeTbody');
           const devDowntimeTableWrap = document.getElementById('devDowntimeTableWrap');
           const devDowntimeCanvas = document.getElementById('devDowntimeChart');
+          const devDowntimeReleaseFilter = document.getElementById('devDowntimeReleaseFilter');
           const androidDevDowntimeEmpty = document.getElementById('androidDevDowntimeEmpty');
           const androidDevDowntimeContent = document.getElementById('androidDevDowntimeContent');
           const androidDevDowntimeTbody = document.getElementById('androidDevDowntimeTbody');
           const androidDevDowntimeTableWrap = document.getElementById('androidDevDowntimeTableWrap');
           const androidDevDowntimeCanvas = document.getElementById('androidDevDowntimeChart');
+          const androidDevDowntimeReleaseFilter = document.getElementById('androidDevDowntimeReleaseFilter');
 
           // Types (Deploy-lab issues) — iOS/Android
           const iosTypesEmpty = document.getElementById('iosTypesEmpty');
@@ -7894,6 +7912,7 @@
           function renderDevDowntimeRow(row){
             if(!devDowntimeTbody || !row) return;
             const tr = document.createElement('tr');
+            tr.dataset.release = row.release || '';
 
             const makeCell = (text, className = 'text-left dev-downtime-cell') => {
               const td = document.createElement('td');
@@ -7940,6 +7959,31 @@
             devDowntimeChart.update();
           }
 
+          function getDowntimeUniqueReleases(rows){
+            const seen = new Set();
+            const out = [];
+            for(const r of (rows || [])){
+              if(r.release && !seen.has(r.release)){ seen.add(r.release); out.push(r.release); }
+            }
+            return out.sort(compareReleaseAsc);
+          }
+
+          function applyDevDowntimeReleaseFilter(){
+            const selected = getSelectedReleasesFromSelect(devDowntimeReleaseFilter);
+            const allRows = window.__devDowntimeRowsAll || [];
+            const filtered = !selected ? allRows : allRows.filter(r => selected.size ? selected.has(r.release) : false);
+            updateDevDowntimeChart(filtered.length ? filtered : []);
+            applyTbodyReleaseFilter(devDowntimeReleaseFilter, devDowntimeTbody);
+          }
+
+          function applyAndroidDevDowntimeReleaseFilter(){
+            const selected = getSelectedReleasesFromSelect(androidDevDowntimeReleaseFilter);
+            const allRows = window.__androidDevDowntimeRowsAll || [];
+            const filtered = !selected ? allRows : allRows.filter(r => selected.size ? selected.has(r.release) : false);
+            updateAndroidDevDowntimeChart(filtered.length ? filtered : []);
+            applyTbodyReleaseFilter(androidDevDowntimeReleaseFilter, androidDevDowntimeTbody);
+          }
+
           function renderDevDowntimeData(rows){
             window.__devDowntimeRowsAll = Array.isArray(rows) ? rows.slice() : [];
             if(!rows?.length){
@@ -7951,6 +7995,8 @@
             if(devDowntimeTbody) devDowntimeTbody.innerHTML = '';
             rows.forEach(renderDevDowntimeRow);
             if(devDowntimeTableWrap) devDowntimeTableWrap.style.display = rows.length ? '' : 'none';
+            populateReleaseSelect(devDowntimeReleaseFilter, getDowntimeUniqueReleases(rows));
+            syncReleaseDropdown(devDowntimeReleaseFilter);
           }
 
           async function loadDevDowntimeData(signal){
@@ -8335,6 +8381,7 @@
           function renderAndroidDevDowntimeRow(row){
             if(!androidDevDowntimeTbody || !row) return;
             const tr = document.createElement('tr');
+            tr.dataset.release = row.release || '';
 
             const makeCell = (text, className = 'text-left dev-downtime-cell') => {
               const td = document.createElement('td');
@@ -8410,6 +8457,8 @@
             if(androidDevDowntimeTbody) androidDevDowntimeTbody.innerHTML = '';
             rows.forEach(renderAndroidDevDowntimeRow);
             if(androidDevDowntimeTableWrap) androidDevDowntimeTableWrap.style.display = rows.length ? '' : 'none';
+            populateReleaseSelect(androidDevDowntimeReleaseFilter, getDowntimeUniqueReleases(rows));
+            syncReleaseDropdown(androidDevDowntimeReleaseFilter);
           }
 
           async function loadAndroidDevDowntimeData(signal, options = {}){
@@ -12270,6 +12319,15 @@
             attachSelectAllToggle(sel);
             sel.addEventListener('change', applyAllReleaseFilters);
           });
+
+          if(devDowntimeReleaseFilter){
+            attachSelectAllToggle(devDowntimeReleaseFilter);
+            devDowntimeReleaseFilter.addEventListener('change', applyDevDowntimeReleaseFilter);
+          }
+          if(androidDevDowntimeReleaseFilter){
+            attachSelectAllToggle(androidDevDowntimeReleaseFilter);
+            androidDevDowntimeReleaseFilter.addEventListener('change', applyAndroidDevDowntimeReleaseFilter);
+          }
           setChpTypesPlatforms(true);
 
           proxyBtn?.addEventListener('click', async () => {
