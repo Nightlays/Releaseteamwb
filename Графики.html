@@ -9708,7 +9708,7 @@
                 if(selEl){
                   markReleaseFilterTouched(selEl);
                   syncSelectFromReleaseList(selEl, list);
-                  applyAllReleaseFilters();
+                  selEl.dispatchEvent(new Event('change'));
                 }
               });
             }
