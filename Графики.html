@@ -123,6 +123,19 @@
         <div id="mlSummaryBody" class="ml-summary-body">—</div>
       </section>
 
+      <!-- ===== Global Release Filter ===== -->
+      <section class="card p-3" id="globalReleaseFilterBar" style="display:none;">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-xs font-semibold text-slate-600 shrink-0">Фильтр релизов:</span>
+          <div id="globalReleasePills" class="flex flex-wrap gap-1.5 flex-1 min-w-0"></div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button type="button" id="globalReleaseSelectAll" class="btn btn-ghost text-xs py-0.5 px-2.5">Все</button>
+            <button type="button" id="globalReleaseDeselectAll" class="btn btn-ghost text-xs py-0.5 px-2.5">Убрать все</button>
+          </div>
+          <span id="globalReleaseFilterCount" class="text-xs text-slate-400 shrink-0 mono"></span>
+        </div>
+      </section>
+
       <!-- 1) Тест кейсы -->
       <section class="card p-5 space-y-4">
         <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -8673,6 +8686,17 @@
             setStreamCatalog('');
             window.__streamInsightData = null;
             window.__chpQuarterStats = null;
+            // Reset global release filter
+            window.__chartSnapshotFull = null;
+            window.__globalSelectedReleases = null;
+            window.__iosTypesList = null;
+            window.__andTypesList = null;
+            const _filterBar = document.getElementById('globalReleaseFilterBar');
+            if(_filterBar) _filterBar.style.display = 'none';
+            const _pills = document.getElementById('globalReleasePills');
+            if(_pills) _pills.innerHTML = '';
+            const _cnt = document.getElementById('globalReleaseFilterCount');
+            if(_cnt) _cnt.textContent = '';
             if(tcChart){
               tcChart.data.labels = [];
               tcChart.data.datasets.forEach(d => d.data = []);
@@ -11206,6 +11230,182 @@
           }
 
 
+          // ---- GLOBAL RELEASE FILTER ----
+
+          function snapshotChartForFilter(chart){
+            if(!chart) return null;
+            return {
+              labels: chart.data.labels.slice(),
+              datasets: chart.data.datasets.map(ds => {
+                const snap = { data: (ds.data || []).slice() };
+                if(Array.isArray(ds._timeLabel))    snap._timeLabel    = ds._timeLabel.slice();
+                if(Array.isArray(ds._timeMs))       snap._timeMs       = ds._timeMs.slice();
+                if(Array.isArray(ds._lastChpLabel)) snap._lastChpLabel = ds._lastChpLabel.slice();
+                return snap;
+              }),
+              _swatPeople: Array.isArray(chart._swatPeople) ? chart._swatPeople.slice() : undefined
+            };
+          }
+
+          function snapshotChartsFull(){
+            window.__chartSnapshotFull = {
+              tc:         snapshotChartForFilter(tcChart),
+              cov:        snapshotChartForFilter(covChart),
+              sel:        snapshotChartForFilter(selChart),
+              avg:        snapshotChartForFilter(avgChart),
+              chp:        snapshotChartForFilter(chpChart),
+              cut:        snapshotChartForFilter(cutChart),
+              regression: snapshotChartForFilter(regressionChart)
+            };
+          }
+
+          function renderGlobalReleaseFilter(){
+            const releases = window.__releaseRangeAll;
+            if(!releases || !releases.length) return;
+            const bar = document.getElementById('globalReleaseFilterBar');
+            if(bar) bar.style.display = '';
+            const pillsEl = document.getElementById('globalReleasePills');
+            if(!pillsEl) return;
+            const selected = window.__globalSelectedReleases; // null = all on
+            pillsEl.innerHTML = '';
+            for(const rel of releases){
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              const isOn = !selected || selected.has(rel);
+              btn.className = 'release-pill' + (isOn ? '' : ' release-pill--off');
+              btn.textContent = formatReleaseShort(rel);
+              btn.title = rel;
+              btn.dataset.release = rel;
+              btn.addEventListener('click', () => {
+                if(!window.__globalSelectedReleases){
+                  // All were on — deselect only this one
+                  window.__globalSelectedReleases = new Set(releases.filter(r => r !== rel));
+                } else {
+                  const s = window.__globalSelectedReleases;
+                  if(s.has(rel)) s.delete(rel); else s.add(rel);
+                  if(s.size === releases.length) window.__globalSelectedReleases = null;
+                }
+                applyGlobalReleaseFilter();
+              });
+              pillsEl.appendChild(btn);
+            }
+            updateGlobalReleaseFilterUI();
+          }
+
+          function updateGlobalReleaseFilterUI(){
+            const releases = window.__releaseRangeAll || [];
+            const selected = window.__globalSelectedReleases;
+            const pillsEl = document.getElementById('globalReleasePills');
+            const countEl = document.getElementById('globalReleaseFilterCount');
+            if(pillsEl){
+              Array.from(pillsEl.querySelectorAll('.release-pill')).forEach(btn => {
+                const on = !selected || selected.has(btn.dataset.release);
+                btn.classList.toggle('release-pill--off', !on);
+              });
+            }
+            if(countEl){
+              const n = selected ? selected.size : releases.length;
+              countEl.textContent = n + ' / ' + releases.length;
+            }
+          }
+
+          function filterTableRowsByGlobalRelease(selected){
+            const tbodies = [
+              tbody, covTbody, selTbody, avgTbody, chpTbody,
+              chpTypesTbody, cutTbody, regressionTbody,
+              iosTypesTbody, andTypesTbody
+            ];
+            tbodies.forEach(tb => {
+              if(!tb) return;
+              Array.from(tb.children).forEach(tr => {
+                const rel = tr.dataset.release;
+                const show = !selected || !rel || selected.has(rel);
+                tr.style.display = show ? '' : 'none';
+              });
+            });
+          }
+
+          function applyGlobalReleaseFilter(){
+            const snap = window.__chartSnapshotFull;
+            const releases = window.__releaseRangeAll || [];
+            const selected = window.__globalSelectedReleases;
+
+            updateGlobalReleaseFilterUI();
+
+            // helper: get indices to keep from a snapshot's labels
+            const keepIndices = (labels) => {
+              if(!selected) return null;
+              const out = [];
+              labels.forEach((lbl, i) => { if(selected.has(lbl)) out.push(i); });
+              return out;
+            };
+
+            // Rebuild a main chart from its snapshot
+            const rebuildFromSnap = (chart, snapData) => {
+              if(!chart || !snapData) return;
+              const indices = keepIndices(snapData.labels);
+              if(!indices){
+                chart.data.labels = snapData.labels.slice();
+                chart.data.datasets.forEach((ds, di) => {
+                  const s = snapData.datasets[di]; if(!s) return;
+                  ds.data = s.data.slice();
+                  if(s._timeLabel)    ds._timeLabel    = s._timeLabel.slice();
+                  if(s._timeMs)       ds._timeMs       = s._timeMs.slice();
+                  if(s._lastChpLabel) ds._lastChpLabel = s._lastChpLabel.slice();
+                });
+                if(snapData._swatPeople) chart._swatPeople = snapData._swatPeople.slice();
+              } else {
+                chart.data.labels = indices.map(i => snapData.labels[i]);
+                chart.data.datasets.forEach((ds, di) => {
+                  const s = snapData.datasets[di]; if(!s) return;
+                  ds.data = indices.map(i => s.data[i]);
+                  if(s._timeLabel)    ds._timeLabel    = indices.map(i => s._timeLabel[i]);
+                  if(s._timeMs)       ds._timeMs       = indices.map(i => s._timeMs[i]);
+                  if(s._lastChpLabel) ds._lastChpLabel = indices.map(i => s._lastChpLabel[i]);
+                });
+                if(snapData._swatPeople) chart._swatPeople = indices.map(i => snapData._swatPeople[i]);
+              }
+              chart.update();
+            };
+
+            if(snap){
+              rebuildFromSnap(tcChart,         snap.tc);
+              rebuildFromSnap(covChart,        snap.cov);
+              rebuildFromSnap(selChart,        snap.sel);
+              rebuildFromSnap(avgChart,        snap.avg);
+              rebuildFromSnap(chpChart,        snap.chp);
+              rebuildFromSnap(cutChart,        snap.cut);
+              rebuildFromSnap(regressionChart, snap.regression);
+            }
+
+            // ChpTypes — rebuild from stored rows
+            const filteredChpRows    = (window.__chpTypesRowsAll    || []).filter(r => !selected || selected.has(r.release));
+            const filteredChpIosRows = (window.__chpTypesRowsIosAll || []).filter(r => !selected || selected.has(r.release));
+            const filteredChpAndRows = (window.__chpTypesRowsAndAll || []).filter(r => !selected || selected.has(r.release));
+            const chpTypesLabels = filteredChpRows.map(r => r.release);
+            if(chpTypesLabels.length){
+              updateChpTypesChart(chpTypesLabels, filteredChpRows);
+              updateChpTypesPlatformCharts(chpTypesLabels, filteredChpIosRows, filteredChpAndRows);
+            }
+
+            // IosTypes / AndTypes — rebuild from stored rows
+            const filteredIosRows = (window.__iosTypesRowsAll || []).filter(r => !selected || selected.has(r.release));
+            const filteredAndRows = (window.__andTypesRowsAll || []).filter(r => !selected || selected.has(r.release));
+            const filteredReleases = releases.filter(r => !selected || selected.has(r));
+            if((window.__iosTypesList || []).length){
+              iosTypesChart = buildOrUpdateTypesChart(iosTypesChart, iosTypesCanvas, iosTypesLegend, window.__iosTypesList, filteredReleases, filteredIosRows);
+            }
+            if((window.__andTypesList || []).length){
+              andTypesChart = buildOrUpdateTypesChart(andTypesChart, andTypesCanvas, andTypesLegend, window.__andTypesList, filteredReleases, filteredAndRows);
+            }
+
+            // Tables
+            filterTableRowsByGlobalRelease(selected);
+
+            // ML model reads from chart.data directly
+            renderMlSummary();
+          }
+
           // ---- RUN ----
           async function run(){
             validateAndNormalizeReleaseInput(inpFrom);
@@ -11852,6 +12052,8 @@
 
               const iosTypes = sortTypesByCanon(iosSet);
               const andTypes = sortTypesByCanon(andSet);
+              window.__iosTypesList = iosTypes;
+              window.__andTypesList = andTypes;
               window.__iosTypesRowsAll = iosRows.slice();
               window.__andTypesRowsAll = andRows.slice();
               window.__chpTypesRowsAll = chpTypesRows.slice();
@@ -11970,6 +12172,10 @@
 
             if(!tcRowsData.length) showEmpty('Данные появятся после получения из источника');
             if(!selRowsData.length) showSelEmpty('Данные появятся после получения из источника');
+            // Snapshot full chart state and show the global release filter bar
+            window.__globalSelectedReleases = null;
+            snapshotChartsFull();
+            renderGlobalReleaseFilter();
             renderMlSummary();
           }
 
@@ -11992,7 +12198,16 @@
           showIosTypesEmpty('Данные появятся после получения из источника');
           showAndTypesEmpty('Данные появятся после получения из источника');
           initCollapsers();
-          
+
+          document.getElementById('globalReleaseSelectAll')?.addEventListener('click', () => {
+            window.__globalSelectedReleases = null;
+            applyGlobalReleaseFilter();
+          });
+          document.getElementById('globalReleaseDeselectAll')?.addEventListener('click', () => {
+            window.__globalSelectedReleases = new Set();
+            applyGlobalReleaseFilter();
+          });
+
           initReleaseDropdowns();
 
           [
