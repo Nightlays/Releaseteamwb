@@ -250,31 +250,32 @@
         </div>
 
         <div id="majorReleaseSection" class="space-y-4" style="display:none;">
-          <!-- Редактор iOS -->
-          <section class="card p-5 space-y-3">
-            <h2 class="text-lg font-semibold">iOS — ввод данных</h2>
-            <label class="release-launch-field">
-              <span class="release-launch-label">Версия iOS (тред: #IOS #Release [версия])</span>
-              <input id="majorIosReleaseVersion" class="input" type="text" placeholder="например: 7.5.5" />
-            </label>
-            <label class="release-launch-field">
-              <span class="release-launch-label">Сообщение в тред (редактируй перед публикацией)</span>
-              <textarea id="majorIosThreadText" class="input release-launch-mono-input" rows="20" spellcheck="false"></textarea>
-            </label>
-          </section>
+          <!-- Редакторы iOS и Android рядом -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <section class="card p-5 space-y-3">
+              <h2 class="text-lg font-semibold">iOS</h2>
+              <label class="release-launch-field">
+                <span class="release-launch-label">Версия (тред: #IOS #Release [версия])</span>
+                <input id="majorIosReleaseVersion" class="input" type="text" placeholder="например: 7.5.5" />
+              </label>
+              <label class="release-launch-field">
+                <span class="release-launch-label">Сообщение в тред</span>
+                <textarea id="majorIosThreadText" class="input release-launch-mono-input" rows="20" spellcheck="false"></textarea>
+              </label>
+            </section>
 
-          <!-- Редактор Android -->
-          <section class="card p-5 space-y-3">
-            <h2 class="text-lg font-semibold">Android — ввод данных</h2>
-            <label class="release-launch-field">
-              <span class="release-launch-label">Версия Android (тред: #Android #Release [версия])</span>
-              <input id="majorAndroidReleaseVersion" class="input" type="text" placeholder="например: 7.5.5" />
-            </label>
-            <label class="release-launch-field">
-              <span class="release-launch-label">Сообщение в тред (редактируй перед публикацией)</span>
-              <textarea id="majorAndroidThreadText" class="input release-launch-mono-input" rows="20" spellcheck="false"></textarea>
-            </label>
-          </section>
+            <section class="card p-5 space-y-3">
+              <h2 class="text-lg font-semibold">Android</h2>
+              <label class="release-launch-field">
+                <span class="release-launch-label">Версия (тред: #Android #Release [версия])</span>
+                <input id="majorAndroidReleaseVersion" class="input" type="text" placeholder="например: 7.5.5" />
+              </label>
+              <label class="release-launch-field">
+                <span class="release-launch-label">Сообщение в тред</span>
+                <textarea id="majorAndroidThreadText" class="input release-launch-mono-input" rows="20" spellcheck="false"></textarea>
+              </label>
+            </section>
+          </div>
 
           <!-- Редактор опроса -->
           <section class="card p-5 space-y-3">
@@ -3926,17 +3927,13 @@
       const MAJOR_POLL_DEFAULT = '/poll "Облако компонентов" "Core" "Заказы" "Главная и акции" "Поиск и Каталог" "Корзина 1ШК" "Payments" "Карточка товара" "Корзина 2ШК" "Корзина кроссбордер" "Корзина способы доставок" "Отзывы" "Профиль" "Stream Корзина (Преордер)" "Рекомендации" "Кор Кошелька" "Корзина Курьер WB" "Финтех внешние оплаты" "Финтех Частями" "Платежи и Переводы" "Открытие счетов" "Финтех оплаты и ценообразование" "Stream Финтех (Инвестпродукты)" "Финтех Карты" "Чаты" "С2С" "Travel.Avia" "Travel.Hotels" "Travel.Главная" "Travel.Туры" "WB Club" "Спецпроекты" "Auth" "Недвижимость" "Страница продавца" "Крипта. Копилка. ЦФТ" "Депозиты и накопления" "Stream Корзина (B2B)" "Трансграничные переводы" "Комиссионные и инвестиционные продукты" "Реклама"  --progress --votes=39';
 
       const PUSH_WORKFLOW_STEPS = [
-        { code: 'Шаг 1', title: 'Загрузить данные для iOS из YouTrack', action: 'loadIosYt',
-          hint: 'Заполни версию iOS выше и нажми Да — загрузим ссылку на доску и релизный тикет' },
-        { code: 'Шаг 2', title: 'Опубликовать iOS в ленту релизов', action: 'publishIos',
-          hint: 'Отредактируй сообщение в треде выше (если нужно), затем нажми Да' },
-        { code: 'Шаг 3', title: 'Загрузить данные для Android из YouTrack', action: 'loadAndYt',
-          hint: 'Заполни версию Android выше и нажми Да' },
-        { code: 'Шаг 4', title: 'Опубликовать Android в ленту релизов', action: 'publishAndroid',
-          hint: 'Отредактируй сообщение в треде Android выше (если нужно), затем нажми Да' },
-        { code: 'Шаг 5', title: 'Отправить опрос по стримам в оба треда', action: 'publishPolls',
+        { code: 'Шаг 1', title: 'Опубликовать iOS в ленту релизов', action: 'publishIos',
+          hint: 'Заполни версию iOS, отредактируй сообщение (если нужно) и нажми Да — данные из YouTrack подтянутся автоматически' },
+        { code: 'Шаг 2', title: 'Опубликовать Android в ленту релизов', action: 'publishAndroid',
+          hint: 'Заполни версию Android, отредактируй сообщение (если нужно) и нажми Да' },
+        { code: 'Шаг 3', title: 'Отправить опрос по стримам в оба треда', action: 'publishPolls',
           hint: 'Отредактируй текст опроса выше (если нужно), затем нажми Да — опрос уйдёт в треды iOS и Android' },
-        { code: 'Шаг 6', title: 'Напоминание о проверке АТ в ранах ХБ', action: 'publishAtReminder',
+        { code: 'Шаг 4', title: 'Напоминание о проверке АТ в ранах ХБ', action: 'publishAtReminder',
           hint: 'Нажми Да — в каждый тред уйдёт напоминание @qadutyios / @qadutyandr о проверке АТ' }
       ];
 
@@ -4196,6 +4193,10 @@
         const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
         const release = verInput ? String(verInput.value || '').trim() : '';
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
+
+        // Загружаем данные из YouTrack перед публикацией
+        await fetchAndFillMajorYtData(platform);
+
         const threadText = textarea ? String(textarea.value || '').trim() : '';
         if(!threadText) throw new Error('Текст сообщения в треде пуст.');
 
@@ -4253,16 +4254,8 @@
       }
 
       async function runPushWorkflowStepAction(action){
-        if(action === 'loadIosYt'){
-          await fetchAndFillMajorYtData('ios');
-          return;
-        }
         if(action === 'publishIos'){
           await publishMajorReleaseFeedPost('ios');
-          return;
-        }
-        if(action === 'loadAndYt'){
-          await fetchAndFillMajorYtData('android');
           return;
         }
         if(action === 'publishAndroid'){
