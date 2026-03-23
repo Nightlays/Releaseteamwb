@@ -3935,7 +3935,9 @@
         { code: 'Шаг 4', title: 'Опубликовать Android в ленту релизов', action: 'publishAndroid',
           hint: 'Отредактируй сообщение в треде Android выше (если нужно), затем нажми Да' },
         { code: 'Шаг 5', title: 'Отправить опрос по стримам в оба треда', action: 'publishPolls',
-          hint: 'Отредактируй текст опроса выше (если нужно), затем нажми Да — опрос уйдёт в треды iOS и Android' }
+          hint: 'Отредактируй текст опроса выше (если нужно), затем нажми Да — опрос уйдёт в треды iOS и Android' },
+        { code: 'Шаг 6', title: 'Напоминание о проверке АТ в ранах ХБ', action: 'publishAtReminder',
+          hint: 'Нажми Да — в каждый тред уйдёт напоминание @qadutyios / @qadutyandr о проверке АТ' }
       ];
 
       function getNextTuesdayMsk(){
@@ -4231,6 +4233,25 @@
         logMajorPush(`Опрос отправлен в тред ${isIos ? 'iOS' : 'Android'} (${rootMessage})`, 'ok');
       }
 
+      async function publishAtReminderToThread(platform, feedPosts, cfg){
+        const isIos = platform === 'ios';
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
+
+        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
+        const rootPost = findLatestOwnRootPostByMessage(feedPosts, rootMessage, BAND_POST_USER_ID);
+        if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден. Сначала опубликуй основное сообщение.`);
+        const rootId = String(rootPost.id || '').trim();
+
+        const text = isIos
+          ? '@qadutyios - проверка тега :) Ребят напоминаю, нужно будет проверить запустились ли АТ в ранах ХБ по вашему стриму и все ли ок'
+          : '@qadutyandr - проверка тега :) Ребят напоминаю, нужно будет проверить запустились ли АТ в ранах ХБ по вашему стриму и все ли ок';
+
+        await bandCreatePost(text, cfg, null, { channelId: RELEASE_FEED_CHANNEL_ID, rootId });
+        logMajorPush(`Напоминание отправлено в тред ${isIos ? 'iOS' : 'Android'} (${rootMessage})`, 'ok');
+      }
+
       async function runPushWorkflowStepAction(action){
         if(action === 'loadIosYt'){
           await fetchAndFillMajorYtData('ios');
@@ -4258,6 +4279,18 @@
           await sleep(200);
           await publishMajorPollToThread('android', feedPosts, cfg);
           showToast('Опросы отправлены');
+          return;
+        }
+        if(action === 'publishAtReminder'){
+          const cfg = collectSettings();
+          ensureReleaseFeedFields(cfg);
+          const feedPosts = await bandFetchChannelPostsSince(
+            RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
+          );
+          await publishAtReminderToThread('ios', feedPosts, cfg);
+          await sleep(200);
+          await publishAtReminderToThread('android', feedPosts, cfg);
+          showToast('Напоминания отправлены');
           return;
         }
         throw new Error('Неизвестный шаг пуша');
