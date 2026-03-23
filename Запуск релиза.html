@@ -286,15 +286,21 @@
             </label>
           </section>
 
-          <!-- Пошаговый запуск публикации -->
-          <section class="card p-3 space-y-3">
-            <div class="flex items-center justify-between gap-3 flex-wrap">
-              <h2 class="text-lg font-semibold">Пошаговая публикация в ленту релизов</h2>
-              <button id="pushWorkflowResetBtn" type="button" class="btn btn-soft">Сбросить шаги</button>
-            </div>
-            <div id="pushWorkflowHint" class="release-launch-status release-launch-status-muted">Заполни версии iOS и Android выше, затем проходи шаги по порядку.</div>
-            <div id="pushWorkflowList" class="space-y-2"></div>
-          </section>
+          <!-- Пошаговый запуск публикации — iOS и Android рядом -->
+          <div class="flex items-center justify-between gap-3 flex-wrap px-1">
+            <h2 class="text-lg font-semibold">Пошаговая публикация в ленту релизов</h2>
+            <button id="pushWorkflowResetBtn" type="button" class="btn btn-soft">Сбросить шаги</button>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <section class="card p-3 space-y-2">
+              <div class="text-sm font-semibold text-slate-600 px-1">iOS</div>
+              <div id="pushIosWorkflowList" class="space-y-2"></div>
+            </section>
+            <section class="card p-3 space-y-2">
+              <div class="text-sm font-semibold text-slate-600 px-1">Android</div>
+              <div id="pushAndWorkflowList" class="space-y-2"></div>
+            </section>
+          </div>
 
           <section class="card p-5 space-y-3">
             <h2 class="text-lg font-semibold">Лог публикации</h2>
@@ -541,9 +547,12 @@
         previewRefreshTimer: 0,
         previewRequestSeq: 0,
         previewRefreshInFlight: 0,
-        pushWorkflowCurrentIndex: 0,
-        pushWorkflowStatuses: [],
-        pushWorkflowRunning: false
+        pushIosCurrentIndex: 0,
+        pushIosStatuses: [],
+        pushIosRunning: false,
+        pushAndCurrentIndex: 0,
+        pushAndStatuses: [],
+        pushAndRunning: false
       };
 
       const WORKFLOW_STEPS = [
@@ -3926,15 +3935,15 @@
 
       const MAJOR_POLL_DEFAULT = '/poll "Облако компонентов" "Core" "Заказы" "Главная и акции" "Поиск и Каталог" "Корзина 1ШК" "Payments" "Карточка товара" "Корзина 2ШК" "Корзина кроссбордер" "Корзина способы доставок" "Отзывы" "Профиль" "Stream Корзина (Преордер)" "Рекомендации" "Кор Кошелька" "Корзина Курьер WB" "Финтех внешние оплаты" "Финтех Частями" "Платежи и Переводы" "Открытие счетов" "Финтех оплаты и ценообразование" "Stream Финтех (Инвестпродукты)" "Финтех Карты" "Чаты" "С2С" "Travel.Avia" "Travel.Hotels" "Travel.Главная" "Travel.Туры" "WB Club" "Спецпроекты" "Auth" "Недвижимость" "Страница продавца" "Крипта. Копилка. ЦФТ" "Депозиты и накопления" "Stream Корзина (B2B)" "Трансграничные переводы" "Комиссионные и инвестиционные продукты" "Реклама"  --progress --votes=39';
 
-      const PUSH_WORKFLOW_STEPS = [
-        { code: 'Шаг 1', title: 'Опубликовать iOS в ленту релизов', action: 'publishIos',
-          hint: 'Заполни версию iOS, отредактируй сообщение (если нужно) и нажми Да — данные из YouTrack подтянутся автоматически' },
-        { code: 'Шаг 2', title: 'Опубликовать Android в ленту релизов', action: 'publishAndroid',
-          hint: 'Заполни версию Android, отредактируй сообщение (если нужно) и нажми Да' },
-        { code: 'Шаг 3', title: 'Отправить опрос по стримам в оба треда', action: 'publishPolls',
-          hint: 'Отредактируй текст опроса выше (если нужно), затем нажми Да — опрос уйдёт в треды iOS и Android' },
-        { code: 'Шаг 4', title: 'Напоминание о проверке АТ в ранах ХБ', action: 'publishAtReminder',
-          hint: 'Нажми Да — в каждый тред уйдёт напоминание @qadutyios / @qadutyandr о проверке АТ' }
+      const PUSH_IOS_STEPS = [
+        { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishIos' },
+        { code: '2', title: 'Отправить опрос в тред', action: 'publishPollIos' },
+        { code: '3', title: 'Напоминание @qadutyios', action: 'publishAtReminderIos' }
+      ];
+      const PUSH_AND_STEPS = [
+        { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishAndroid' },
+        { code: '2', title: 'Отправить опрос в тред', action: 'publishPollAnd' },
+        { code: '3', title: 'Напоминание @qadutyandr', action: 'publishAtReminderAnd' }
       ];
 
       function getNextTuesdayMsk(){
@@ -3988,35 +3997,35 @@
         el.scrollTop = el.scrollHeight;
       }
 
-      function resetPushWorkflow(){
-        appState.pushWorkflowCurrentIndex = 0;
-        appState.pushWorkflowStatuses = PUSH_WORKFLOW_STEPS.map(() => 'pending');
-        appState.pushWorkflowRunning = false;
+      function resetPushWorkflow(platform){
+        if(!platform || platform === 'ios'){
+          appState.pushIosCurrentIndex = 0;
+          appState.pushIosStatuses = PUSH_IOS_STEPS.map(() => 'pending');
+          appState.pushIosRunning = false;
+        }
+        if(!platform || platform === 'android'){
+          appState.pushAndCurrentIndex = 0;
+          appState.pushAndStatuses = PUSH_AND_STEPS.map(() => 'pending');
+          appState.pushAndRunning = false;
+        }
         renderPushWorkflow();
       }
 
-      function renderPushWorkflow(){
-        const list = $('pushWorkflowList');
-        const hint = $('pushWorkflowHint');
-        const resetBtn = $('pushWorkflowResetBtn');
+      function renderPushWorkflowPlatform(platform){
+        const isIos = platform === 'ios';
+        const steps = isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS;
+        const currentIndex = isIos ? appState.pushIosCurrentIndex : appState.pushAndCurrentIndex;
+        const statuses = isIos ? appState.pushIosStatuses : appState.pushAndStatuses;
+        const running = isIos ? appState.pushIosRunning : appState.pushAndRunning;
+        const listId = isIos ? 'pushIosWorkflowList' : 'pushAndWorkflowList';
+        const list = $(listId);
         if(!list) return;
 
-        const finished = appState.pushWorkflowCurrentIndex >= PUSH_WORKFLOW_STEPS.length;
-        if(hint){
-          if(finished){
-            hint.textContent = 'Все шаги пройдены!';
-            hint.className = 'release-launch-status release-launch-status-ok';
-          }else{
-            const cur = PUSH_WORKFLOW_STEPS[appState.pushWorkflowCurrentIndex];
-            hint.textContent = cur.hint || `Текущий шаг: ${cur.code} — ${cur.title}`;
-            hint.className = 'release-launch-status release-launch-status-muted';
-          }
-        }
-
-        list.innerHTML = PUSH_WORKFLOW_STEPS.map((step, idx) => {
-          const status = appState.pushWorkflowStatuses[idx] || 'pending';
-          const isCurrent = !finished && idx === appState.pushWorkflowCurrentIndex;
-          const isLocked = !finished && status === 'pending' && idx > appState.pushWorkflowCurrentIndex;
+        const finished = currentIndex >= steps.length;
+        list.innerHTML = steps.map((step, idx) => {
+          const status = statuses[idx] || 'pending';
+          const isCurrent = !finished && idx === currentIndex;
+          const isLocked = !finished && status === 'pending' && idx > currentIndex;
           let icon, text, badgeClass;
           if(isLocked){
             icon = '🔒'; text = 'Заблокирован';
@@ -4039,16 +4048,15 @@
             : isCurrent ? 'ring-1 ring-[#d9d8ff] bg-white release-launch-workflow-row-current'
             : isLocked ? 'ring-1 ring-slate-200 bg-slate-100/80 release-launch-workflow-row-locked'
             : 'ring-1 ring-[#ecebff] bg-slate-50/70';
-          const globalLocked = appState.pushWorkflowRunning;
-          const actionDis = (globalLocked || !isCurrent || status !== 'pending') ? 'disabled' : '';
-          const retryDis = (globalLocked || isLocked || status === 'pending' || status === 'running') ? 'disabled' : '';
+          const actionDis = (running || !isCurrent || status !== 'pending') ? 'disabled' : '';
+          const retryDis = (running || isLocked || status === 'pending' || status === 'running') ? 'disabled' : '';
           const retryBtn = (status === 'done' || status === 'skipped')
-            ? `<button type="button" class="btn btn-soft" data-push-step="${idx}" data-push-decision="retry" ${retryDis}>Повторить</button>`
+            ? `<button type="button" class="btn btn-soft" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="retry" ${retryDis}>Повторить</button>`
             : '';
           return `
             <div class="rounded-2xl p-3 release-launch-workflow-row ${rowClass}">
               <div class="flex items-start justify-between gap-3 flex-wrap">
-                <div class="flex items-start gap-3 min-w-[260px]">
+                <div class="flex items-start gap-3 min-w-[200px]">
                   <span class="text-base leading-6">${icon}</span>
                   <div>
                     <div class="text-sm font-semibold text-slate-800">${step.code}. ${escHtml(step.title)}</div>
@@ -4057,14 +4065,19 @@
                 </div>
                 <div class="flex items-center gap-2">
                   ${retryBtn}
-                  <button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-step="${idx}" data-push-decision="yes" ${actionDis}>Да</button>
-                  <button type="button" class="btn btn-soft" data-push-step="${idx}" data-push-decision="no" ${actionDis}>Нет</button>
+                  <button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="yes" ${actionDis}>Да</button>
+                  <button type="button" class="btn btn-soft" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="no" ${actionDis}>Нет</button>
                 </div>
               </div>
             </div>`;
         }).join('');
+      }
 
-        if(resetBtn) resetBtn.disabled = appState.pushWorkflowRunning;
+      function renderPushWorkflow(){
+        renderPushWorkflowPlatform('ios');
+        renderPushWorkflowPlatform('android');
+        const resetBtn = $('pushWorkflowResetBtn');
+        if(resetBtn) resetBtn.disabled = appState.pushIosRunning || appState.pushAndRunning;
       }
 
       async function fetchAndFillMajorYtData(platform){
@@ -4180,11 +4193,9 @@
           });
         }
 
-        if(!appState.pushWorkflowStatuses.length){
-          resetPushWorkflow();
-        }else{
-          renderPushWorkflow();
-        }
+        if(!appState.pushIosStatuses.length) resetPushWorkflow('ios');
+        if(!appState.pushAndStatuses.length) resetPushWorkflow('android');
+        renderPushWorkflow();
       }
 
       async function publishMajorReleaseFeedPost(platform){
@@ -4262,85 +4273,107 @@
           await publishMajorReleaseFeedPost('android');
           return;
         }
-        if(action === 'publishPolls'){
+        if(action === 'publishPollIos'){
           const cfg = collectSettings();
           ensureReleaseFeedFields(cfg);
           const feedPosts = await bandFetchChannelPostsSince(
             RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
           );
           await publishMajorPollToThread('ios', feedPosts, cfg);
-          await sleep(200);
-          await publishMajorPollToThread('android', feedPosts, cfg);
-          showToast('Опросы отправлены');
+          showToast('Опрос iOS отправлен');
           return;
         }
-        if(action === 'publishAtReminder'){
+        if(action === 'publishPollAnd'){
+          const cfg = collectSettings();
+          ensureReleaseFeedFields(cfg);
+          const feedPosts = await bandFetchChannelPostsSince(
+            RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
+          );
+          await publishMajorPollToThread('android', feedPosts, cfg);
+          showToast('Опрос Android отправлен');
+          return;
+        }
+        if(action === 'publishAtReminderIos'){
           const cfg = collectSettings();
           ensureReleaseFeedFields(cfg);
           const feedPosts = await bandFetchChannelPostsSince(
             RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
           );
           await publishAtReminderToThread('ios', feedPosts, cfg);
-          await sleep(200);
+          showToast('Напоминание iOS отправлено');
+          return;
+        }
+        if(action === 'publishAtReminderAnd'){
+          const cfg = collectSettings();
+          ensureReleaseFeedFields(cfg);
+          const feedPosts = await bandFetchChannelPostsSince(
+            RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
+          );
           await publishAtReminderToThread('android', feedPosts, cfg);
-          showToast('Напоминания отправлены');
+          showToast('Напоминание Android отправлено');
           return;
         }
         throw new Error('Неизвестный шаг пуша');
       }
 
-      async function applyPushWorkflowDecision(stepIdx, decision){
-        if(appState.pushWorkflowRunning) return;
-        if(!Number.isFinite(stepIdx)) return;
-        if(stepIdx < 0 || stepIdx >= PUSH_WORKFLOW_STEPS.length) return;
+      async function applyPushWorkflowDecision(platform, stepIdx, decision){
+        const isIos = platform === 'ios';
+        const steps = isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS;
+        const runningKey = isIos ? 'pushIosRunning' : 'pushAndRunning';
+        const statusesKey = isIos ? 'pushIosStatuses' : 'pushAndStatuses';
+        const currentKey = isIos ? 'pushIosCurrentIndex' : 'pushAndCurrentIndex';
+        const label = isIos ? 'iOS' : 'Android';
 
-        // Повторить: сбросить статус шага и откатить текущий индекс к нему
+        if(appState[runningKey]) return;
+        if(!Number.isFinite(stepIdx)) return;
+        if(stepIdx < 0 || stepIdx >= steps.length) return;
+
         if(decision === 'retry'){
-          const s = appState.pushWorkflowStatuses[stepIdx];
+          const s = appState[statusesKey][stepIdx];
           if(s !== 'done' && s !== 'skipped') return;
-          appState.pushWorkflowStatuses[stepIdx] = 'pending';
-          appState.pushWorkflowCurrentIndex = stepIdx;
-          logMajorPush(`[${PUSH_WORKFLOW_STEPS[stepIdx].code}] Повтор шага.`, 'warn');
+          appState[statusesKey][stepIdx] = 'pending';
+          appState[currentKey] = stepIdx;
+          logMajorPush(`[${label}][${steps[stepIdx].code}] Повтор шага.`, 'warn');
           renderPushWorkflow();
           return;
         }
 
-        if(stepIdx !== appState.pushWorkflowCurrentIndex) return;
-        if(appState.pushWorkflowStatuses[stepIdx] !== 'pending') return;
+        if(stepIdx !== appState[currentKey]) return;
+        if(appState[statusesKey][stepIdx] !== 'pending') return;
 
-        const step = PUSH_WORKFLOW_STEPS[stepIdx];
+        const step = steps[stepIdx];
 
         if(decision === 'no'){
-          appState.pushWorkflowStatuses[stepIdx] = 'skipped';
-          appState.pushWorkflowCurrentIndex += 1;
-          logMajorPush(`[${step.code}] Пропущено.`, 'warn');
+          appState[statusesKey][stepIdx] = 'skipped';
+          appState[currentKey] += 1;
+          logMajorPush(`[${label}][${step.code}] Пропущено.`, 'warn');
           renderPushWorkflow();
-          if(appState.pushWorkflowCurrentIndex >= PUSH_WORKFLOW_STEPS.length){
-            showToast('Все шаги пройдены');
+          if(appState[currentKey] >= steps.length){
+            showToast(`Все шаги ${label} пройдены`);
           }
           return;
         }
 
         if(decision !== 'yes') return;
 
-        appState.pushWorkflowRunning = true;
-        appState.pushWorkflowStatuses[stepIdx] = 'running';
+        appState[runningKey] = true;
+        appState[statusesKey][stepIdx] = 'running';
         renderPushWorkflow();
 
         try{
           await runPushWorkflowStepAction(step.action);
-          appState.pushWorkflowStatuses[stepIdx] = 'done';
-          appState.pushWorkflowCurrentIndex += 1;
-          logMajorPush(`[${step.code}] Выполнено.`, 'ok');
-          if(appState.pushWorkflowCurrentIndex >= PUSH_WORKFLOW_STEPS.length){
-            showToast('Все шаги публикации пройдены!');
+          appState[statusesKey][stepIdx] = 'done';
+          appState[currentKey] += 1;
+          logMajorPush(`[${label}][${step.code}] Выполнено.`, 'ok');
+          if(appState[currentKey] >= steps.length){
+            showToast(`Все шаги ${label} пройдены!`);
           }
         }catch(err){
-          appState.pushWorkflowStatuses[stepIdx] = 'pending';
-          logMajorPush(`[${step.code}] Ошибка: ${err.message || err}`, 'err');
+          appState[statusesKey][stepIdx] = 'pending';
+          logMajorPush(`[${label}][${step.code}] Ошибка: ${err.message || err}`, 'err');
           showToast(err.message || 'Ошибка', false);
         }finally{
-          appState.pushWorkflowRunning = false;
+          appState[runningKey] = false;
           renderPushWorkflow();
         }
       }
@@ -4862,9 +4895,10 @@
         document.addEventListener('click', (e) => {
           const btn = e.target.closest('[data-push-step]');
           if(!btn) return;
+          const platform = String(btn.getAttribute('data-push-platform') || 'ios');
           const stepIdx = Number(btn.getAttribute('data-push-step'));
           const decision = String(btn.getAttribute('data-push-decision') || '');
-          applyPushWorkflowDecision(stepIdx, decision);
+          applyPushWorkflowDecision(platform, stepIdx, decision);
         });
         $('pushWorkflowResetBtn')?.addEventListener('click', () => resetPushWorkflow());
 
