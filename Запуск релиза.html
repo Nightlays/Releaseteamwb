@@ -242,9 +242,48 @@
         </div>
 
         <div id="majorPushSection" class="space-y-4" style="display:none;">
+          <section class="card p-5 space-y-4">
+            <h2 class="text-lg font-semibold">Публикация iOS в ленту релизов</h2>
+            <label class="release-launch-field">
+              <span class="release-launch-label">Версия iOS — будет опубликовано как #IOS #Release [версия]</span>
+              <input id="majorIosReleaseVersion" class="input" type="text" placeholder="например: 7.5.5" />
+            </label>
+            <label class="release-launch-field">
+              <span class="release-launch-label">Сообщение в тред (можно редактировать перед отправкой)</span>
+              <textarea id="majorIosThreadText" class="input release-launch-mono-input" rows="20" spellcheck="false"></textarea>
+            </label>
+            <button id="majorPublishIosBtn" type="button" class="btn btn-soft">Опубликовать iOS в ленту</button>
+          </section>
+
+          <section class="card p-5 space-y-4">
+            <h2 class="text-lg font-semibold">Публикация Android в ленту релизов</h2>
+            <label class="release-launch-field">
+              <span class="release-launch-label">Версия Android — будет опубликовано как #Android #Release [версия]</span>
+              <input id="majorAndroidReleaseVersion" class="input" type="text" placeholder="например: 7.5.5" />
+            </label>
+            <label class="release-launch-field">
+              <span class="release-launch-label">Сообщение в тред (можно редактировать перед отправкой)</span>
+              <textarea id="majorAndroidThreadText" class="input release-launch-mono-input" rows="20" spellcheck="false"></textarea>
+            </label>
+            <button id="majorPublishAndroidBtn" type="button" class="btn btn-soft">Опубликовать Android в ленту</button>
+          </section>
+
+          <section class="card p-5 space-y-4">
+            <h2 class="text-lg font-semibold">Голосование по стримам</h2>
+            <div class="release-launch-status release-launch-status-muted">Отправляется отдельным сообщением в каждый тред</div>
+            <label class="release-launch-field">
+              <span class="release-launch-label">Текст опроса (можно редактировать)</span>
+              <textarea id="majorPollText" class="input release-launch-mono-input" rows="4" spellcheck="false"></textarea>
+            </label>
+            <div class="flex gap-2 flex-wrap">
+              <button id="majorPublishPollIosBtn" type="button" class="btn btn-soft">Отправить опрос в тред iOS</button>
+              <button id="majorPublishPollAndroidBtn" type="button" class="btn btn-soft">Отправить опрос в тред Android</button>
+            </div>
+          </section>
+
           <section class="card p-5 space-y-3">
-            <h2 class="text-lg font-semibold">Пуш</h2>
-            <div class="release-launch-status release-launch-status-muted">Пока пусто</div>
+            <h2 class="text-lg font-semibold">Лог публикации</h2>
+            <div id="majorPushLogs" class="release-launch-log"></div>
           </section>
         </div>
       </div>
@@ -729,8 +768,12 @@
 
       function setMajorView(view){
         const value = view === 'collection' || view === 'message' || view === 'push' ? view : '';
+        const prevView = appState.majorView;
         appState.majorView = value;
         syncMajorViewState();
+        if(value === 'push' && prevView !== 'push'){
+          initMajorPushTab();
+        }
       }
 
       function setRunMode(mode){
@@ -3859,6 +3902,148 @@
         return lines.join('\n');
       }
 
+      const MAJOR_POLL_DEFAULT = '/poll "Облако компонентов" "Core" "Заказы" "Главная и акции" "Поиск и Каталог" "Корзина 1ШК" "Payments" "Карточка товара" "Корзина 2ШК" "Корзина кроссбордер" "Корзина способы доставок" "Отзывы" "Профиль" "Stream Корзина (Преордер)" "Рекомендации" "Кор Кошелька" "Корзина Курьер WB" "Финтех внешние оплаты" "Финтех Частями" "Платежи и Переводы" "Открытие счетов" "Финтех оплаты и ценообразование" "Stream Финтех (Инвестпродукты)" "Финтех Карты" "Чаты" "С2С" "Travel.Avia" "Travel.Hotels" "Travel.Главная" "Travel.Туры" "WB Club" "Спецпроекты" "Auth" "Недвижимость" "Страница продавца" "Крипта. Копилка. ЦФТ" "Депозиты и накопления" "Stream Корзина (B2B)" "Трансграничные переводы" "Комиссионные и инвестиционные продукты" "Реклама"  --progress --votes=39';
+
+      function getNextTuesdayMsk(){
+        const mskNow = new Date(Date.now() + MSK_OFFSET_MS);
+        const dayOfWeek = mskNow.getUTCDay(); // 0=вс … 6=сб, 2=вт
+        const daysUntil = ((2 - dayOfWeek + 7) % 7) || 7;
+        return new Date(mskNow.getTime() + daysUntil * 24 * 60 * 60 * 1000);
+      }
+
+      function buildMajorReleaseThreadMessage(platform, release){
+        const today = formatMskDateDot(new Date());
+        const nextTue = formatMskDateDot(getNextTuesdayMsk());
+        const devDuty = platform === 'ios' ? '@mp-ios-release-dev-duty' : '@mp-release-android-dev-duty';
+        return [
+          `OS версия: ${release}`,
+          'Релиз',
+          'Ссылка на доску: ',
+          '',
+          'Ссылка на релизный таск:',
+          '',
+          `Сроки готовности сборок: ${today}`,
+          `Сроки выкатки: ${nextTue}`,
+          `Ориентировочное время старта регресса: ${today}`,
+          `Ожидаемое время окончания проверки: ${nextTue}`,
+          'Время старта регресс: Таблица для стримов: https://docs.google.com/spreadsheets/d/1W7fNhN5BD-ItG03za-U2-uPotvDfiZbt_baiyZXgLpI/edit?gid=557393962#gid=557393962',
+          'Сборка: ',
+          '',
+          'Финальный ран: ',
+          '',
+          `Ответственный разработчик: ${devDuty}`,
+          '',
+          '',
+          'Ссылки на прогоны+ дежурные:',
+          'Blocker + High',
+          '',
+          '',
+          'Normal',
+          '',
+          '',
+          'Дежурные:'
+        ].join('\n');
+      }
+
+      function logMajorPush(message, kind){
+        const el = $('majorPushLogs');
+        if(!el) return;
+        const line = document.createElement('div');
+        line.className = 'release-launch-log-line' + (kind ? ` ${kind}` : '');
+        line.textContent = `[${new Date().toLocaleTimeString('ru-RU')}] ${message}`;
+        el.appendChild(line);
+        el.scrollTop = el.scrollHeight;
+      }
+
+      function initMajorPushTab(){
+        const iosVerInput = $('majorIosReleaseVersion');
+        const andVerInput = $('majorAndroidReleaseVersion');
+        const iosTextarea = $('majorIosThreadText');
+        const andTextarea = $('majorAndroidThreadText');
+        const pollTextarea = $('majorPollText');
+
+        function refreshIosText(){
+          if(!iosTextarea) return;
+          const ver = String(iosVerInput ? iosVerInput.value : '').trim();
+          iosTextarea.value = buildMajorReleaseThreadMessage('ios', ver || '[версия]');
+        }
+        function refreshAndText(){
+          if(!andTextarea) return;
+          const ver = String(andVerInput ? andVerInput.value : '').trim();
+          andTextarea.value = buildMajorReleaseThreadMessage('android', ver || '[версия]');
+        }
+
+        if(iosTextarea) iosTextarea.value = buildMajorReleaseThreadMessage('ios', '');
+        if(andTextarea) andTextarea.value = buildMajorReleaseThreadMessage('android', '');
+        if(pollTextarea) pollTextarea.value = MAJOR_POLL_DEFAULT;
+
+        iosVerInput?.addEventListener('input', refreshIosText);
+        andVerInput?.addEventListener('input', refreshAndText);
+      }
+
+      async function publishMajorReleaseFeedPost(platform){
+        const isIos = platform === 'ios';
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error('Укажи версию релиза.');
+
+        const threadText = textarea ? String(textarea.value || '').trim() : '';
+        if(!threadText) throw new Error('Текст сообщения в треде пуст.');
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+
+        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
+        const item = { rootMessage, threadMessage: threadText };
+
+        const feedPosts = await bandFetchChannelPostsSince(
+          RELEASE_FEED_CHANNEL_ID,
+          Date.now() - RELEASE_FEED_LOOKBACK_MS,
+          cfg,
+          null
+        );
+        const result = await upsertReleaseFeedPost(item, cfg, feedPosts, null);
+        const action = result.threadAction === 'updated' ? 'обновлён'
+          : result.threadAction === 'unchanged' ? 'не изменён (актуален)'
+          : 'опубликован';
+        logMajorPush(`${isIos ? 'iOS' : 'Android'}: тред "${rootMessage}" — ${action}`, 'ok');
+        showToast(`${isIos ? 'iOS' : 'Android'} опубликовано в ленту`);
+        return result;
+      }
+
+      async function publishMajorPoll(platform){
+        const isIos = platform === 'ios';
+        const pollTextarea = $('majorPollText');
+        const pollText = pollTextarea ? String(pollTextarea.value || '').trim() : '';
+        if(!pollText) throw new Error('Текст опроса пуст.');
+
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'} чтобы найти тред.`);
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+
+        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
+        const feedPosts = await bandFetchChannelPostsSince(
+          RELEASE_FEED_CHANNEL_ID,
+          Date.now() - RELEASE_FEED_LOOKBACK_MS,
+          cfg,
+          null
+        );
+        const rootPost = findLatestOwnRootPostByMessage(feedPosts, rootMessage, BAND_POST_USER_ID);
+        if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден. Сначала опубликуй основное сообщение.`);
+        const rootId = String(rootPost.id || '').trim();
+
+        await bandCreatePost(pollText, cfg, null, {
+          channelId: RELEASE_FEED_CHANNEL_ID,
+          rootId
+        });
+        logMajorPush(`Опрос отправлен в тред ${isIos ? 'iOS' : 'Android'} (${rootMessage})`, 'ok');
+        showToast(`Опрос отправлен в тред ${isIos ? 'iOS' : 'Android'}`);
+      }
+
       function buildReleaseFeedPosts(mode, release, runRefs, boardUrl, releaseTaskRef, buildValue){
         const refs = Array.isArray(runRefs) ? runRefs : [];
         const findBy = (predicate) => refs.find((item) => predicate(String(item.name || '')));
@@ -4371,6 +4556,32 @@
         pingMessage?.addEventListener('input', refreshButtons);
         resultsCopyBtn?.addEventListener('click', copyCurrentDutiesMessage);
         copyPingBtn?.addEventListener('click', copyPingMessage);
+
+        $('majorPublishIosBtn')?.addEventListener('click', () => {
+          withButtonBusy($('majorPublishIosBtn'), 'Публикую...', () => publishMajorReleaseFeedPost('ios')).catch((err) => {
+            logMajorPush(`iOS: ${err.message || err}`, 'err');
+            showToast(err.message || 'Ошибка', false);
+          });
+        });
+        $('majorPublishAndroidBtn')?.addEventListener('click', () => {
+          withButtonBusy($('majorPublishAndroidBtn'), 'Публикую...', () => publishMajorReleaseFeedPost('android')).catch((err) => {
+            logMajorPush(`Android: ${err.message || err}`, 'err');
+            showToast(err.message || 'Ошибка', false);
+          });
+        });
+        $('majorPublishPollIosBtn')?.addEventListener('click', () => {
+          withButtonBusy($('majorPublishPollIosBtn'), 'Отправляю...', () => publishMajorPoll('ios')).catch((err) => {
+            logMajorPush(`Опрос iOS: ${err.message || err}`, 'err');
+            showToast(err.message || 'Ошибка', false);
+          });
+        });
+        $('majorPublishPollAndroidBtn')?.addEventListener('click', () => {
+          withButtonBusy($('majorPublishPollAndroidBtn'), 'Отправляю...', () => publishMajorPoll('android')).catch((err) => {
+            logMajorPush(`Опрос Android: ${err.message || err}`, 'err');
+            showToast(err.message || 'Ошибка', false);
+          });
+        });
+
         schedulePreviewRefresh();
       }
 
