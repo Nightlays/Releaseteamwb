@@ -4040,8 +4040,12 @@
             : isCurrent ? 'ring-1 ring-[#d9d8ff] bg-white release-launch-workflow-row-current'
             : isLocked ? 'ring-1 ring-slate-200 bg-slate-100/80 release-launch-workflow-row-locked'
             : 'ring-1 ring-[#ecebff] bg-slate-50/70';
-          const locked = appState.pushWorkflowRunning || finished || !isCurrent || status !== 'pending';
-          const dis = locked ? 'disabled' : '';
+          const globalLocked = appState.pushWorkflowRunning;
+          const actionDis = (globalLocked || !isCurrent || status !== 'pending') ? 'disabled' : '';
+          const retryDis = (globalLocked || isLocked || status === 'pending' || status === 'running') ? 'disabled' : '';
+          const retryBtn = (status === 'done' || status === 'skipped')
+            ? `<button type="button" class="btn btn-soft" data-push-step="${idx}" data-push-decision="retry" ${retryDis}>Повторить</button>`
+            : '';
           return `
             <div class="rounded-2xl p-3 release-launch-workflow-row ${rowClass}">
               <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -4053,8 +4057,9 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
-                  <button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-step="${idx}" data-push-decision="yes" ${dis}>Да</button>
-                  <button type="button" class="btn btn-soft" data-push-step="${idx}" data-push-decision="no" ${dis}>Нет</button>
+                  ${retryBtn}
+                  <button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-step="${idx}" data-push-decision="yes" ${actionDis}>Да</button>
+                  <button type="button" class="btn btn-soft" data-push-step="${idx}" data-push-decision="no" ${actionDis}>Нет</button>
                 </div>
               </div>
             </div>`;
@@ -4083,13 +4088,23 @@
 
         logMajorPush('Ищу релизный тикет...');
         const meta = { sprintField, summaryMarker: 'Релизный тикет' };
-        const query = buildReleaseTicketQuery(meta, release);
         let ticketLine = '';
         try{
-          const issues = await fetchYtIssuesByQuery(query, authHeader, null, 100);
-          const exact = issues.find((item) => isReleaseTicketSummaryMatch(item && item.summary, meta));
-          if(exact && exact.idReadable){
-            const key = String(exact.idReadable).trim();
+          // Попытка 1: по спринт-полю + marker summary
+          const q1 = buildReleaseTicketQuery(meta, release);
+          let issues = await fetchYtIssuesByQuery(q1, authHeader, null, 100);
+          let found = issues.find((item) => isReleaseTicketSummaryMatch(item && item.summary, meta));
+
+          // Попытка 2: по summary с версией без фильтра спринта (другой формат поля на доске)
+          if(!found){
+            const releaseEsc = escapeYouTrackQueryPhrase(release);
+            const q2 = `summary: "Релизный тикет" AND summary: "${releaseEsc}"`;
+            issues = await fetchYtIssuesByQuery(q2, authHeader, null, 50);
+            found = issues.find((item) => isReleaseTicketSummaryMatch(item && item.summary, meta));
+          }
+
+          if(found && found.idReadable){
+            const key = String(found.idReadable).trim();
             ticketLine = `[${key}](${issueLink(key)})`;
             logMajorPush(`Тикет: ${key}`, 'ok');
           }else{
@@ -4233,6 +4248,18 @@
         if(appState.pushWorkflowRunning) return;
         if(!Number.isFinite(stepIdx)) return;
         if(stepIdx < 0 || stepIdx >= PUSH_WORKFLOW_STEPS.length) return;
+
+        // Повторить: сбросить статус шага и откатить текущий индекс к нему
+        if(decision === 'retry'){
+          const s = appState.pushWorkflowStatuses[stepIdx];
+          if(s !== 'done' && s !== 'skipped') return;
+          appState.pushWorkflowStatuses[stepIdx] = 'pending';
+          appState.pushWorkflowCurrentIndex = stepIdx;
+          logMajorPush(`[${PUSH_WORKFLOW_STEPS[stepIdx].code}] Повтор шага.`, 'warn');
+          renderPushWorkflow();
+          return;
+        }
+
         if(stepIdx !== appState.pushWorkflowCurrentIndex) return;
         if(appState.pushWorkflowStatuses[stepIdx] !== 'pending') return;
 
