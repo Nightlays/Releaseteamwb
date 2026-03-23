@@ -4087,28 +4087,47 @@
         logMajorPush(`Доска: ${boardUrl}`, 'ok');
 
         logMajorPush('Ищу релизный тикет...');
-        const meta = { sprintField, summaryMarker: 'Релизный тикет' };
+        const platformLabel = isIos ? 'IOS' : 'Android';
+        // Точное название тикета: "Релизный тикет IOS 7.5.6000" / "Релизный тикет Android 7.5.6000"
+        const exactSummary = `Релизный тикет ${platformLabel} ${release}`;
+        const exactSummaryNorm = exactSummary.toUpperCase();
         let ticketLine = '';
         try{
-          // Попытка 1: по спринт-полю + marker summary
-          const q1 = buildReleaseTicketQuery(meta, release);
-          let issues = await fetchYtIssuesByQuery(q1, authHeader, null, 100);
-          let found = issues.find((item) => isReleaseTicketSummaryMatch(item && item.summary, meta));
+          const releaseEsc = escapeYouTrackQueryPhrase(release);
+          const platformEsc = escapeYouTrackQueryPhrase(platformLabel);
 
-          // Попытка 2: по summary с версией без фильтра спринта (другой формат поля на доске)
+          // Попытка 1: точная фраза summary
+          let issues = await fetchYtIssuesByQuery(
+            `summary: "${escapeYouTrackQueryPhrase(exactSummary)}"`, authHeader, null, 20
+          );
+          let found = issues.find((item) =>
+            String(item && item.summary || '').toUpperCase().includes(exactSummaryNorm)
+          );
+
+          // Попытка 2: по словам summary — платформа + версия
           if(!found){
-            const releaseEsc = escapeYouTrackQueryPhrase(release);
-            const q2 = `summary: "Релизный тикет" AND summary: "${releaseEsc}"`;
+            const q2 = `summary: "Релизный тикет" AND summary: "${platformEsc}" AND summary: "${releaseEsc}"`;
             issues = await fetchYtIssuesByQuery(q2, authHeader, null, 50);
-            found = issues.find((item) => isReleaseTicketSummaryMatch(item && item.summary, meta));
+            found = issues.find((item) =>
+              String(item && item.summary || '').toUpperCase().includes(exactSummaryNorm)
+            );
+          }
+
+          // Попытка 3: только версия (если доска другая или платформа записана иначе)
+          if(!found){
+            const q3 = `summary: "Релизный тикет" AND summary: "${releaseEsc}"`;
+            issues = await fetchYtIssuesByQuery(q3, authHeader, null, 50);
+            found = issues.find((item) =>
+              String(item && item.summary || '').toUpperCase().includes('РЕЛИЗНЫЙ ТИКЕТ')
+            );
           }
 
           if(found && found.idReadable){
             const key = String(found.idReadable).trim();
             ticketLine = `[${key}](${issueLink(key)})`;
-            logMajorPush(`Тикет: ${key}`, 'ok');
+            logMajorPush(`Тикет: ${key} — ${found.summary}`, 'ok');
           }else{
-            logMajorPush('Тикет не найден — заполни поле вручную', 'warn');
+            logMajorPush(`Тикет "${exactSummary}" не найден — заполни поле вручную`, 'warn');
           }
         }catch(e){
           logMajorPush(`Ошибка поиска тикета: ${e.message || e}`, 'warn');
