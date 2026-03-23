@@ -5138,6 +5138,75 @@
         showToast('Кандидаты добавлены в группы');
       }
 
+      function initCollapsibleCards(){
+        const LS_KEY = 'wb_collapse_v1';
+        let state = {};
+        try { state = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch(e){}
+
+        document.querySelectorAll('section.card').forEach(card => {
+          const children = Array.from(card.children);
+          if(children.length < 2) return;
+
+          // Find the header: first child that is or contains an h2
+          const headerEl = children.find(el => el.tagName === 'H2' || el.querySelector('h2'));
+          if(!headerEl) return;
+
+          // Skip cards that already have a collapse mechanism (aria-expanded button)
+          if(headerEl.querySelector('[aria-expanded]') || card.querySelector('.card-collapse-btn')) return;
+
+          const headerIdx = children.indexOf(headerEl);
+          const bodyChildren = children.slice(headerIdx + 1);
+          if(!bodyChildren.length) return;
+
+          // Detect spacing class to preserve layout inside body
+          const spaceClass = Array.from(card.classList).find(c => c.startsWith('space-y-')) || 'space-y-3';
+
+          // Generate a stable localStorage key from heading text
+          const h2 = card.querySelector('h2');
+          const key = 'card_' + (h2 ? h2.textContent.trim() : String(Math.random())).replace(/\s+/g,'_').slice(0,40);
+
+          // Wrap body children
+          const body = document.createElement('div');
+          body.className = `card-collapse-body ${spaceClass}`;
+          bodyChildren.forEach(child => body.appendChild(child));
+          card.appendChild(body);
+
+          // Create toggle button
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'card-collapse-btn';
+          btn.title = 'Свернуть / развернуть';
+          btn.textContent = '▾';
+
+          if(headerEl.tagName === 'H2'){
+            // Wrap standalone h2 in a flex row
+            const wrap = document.createElement('div');
+            wrap.className = 'flex items-center justify-between gap-2';
+            headerEl.replaceWith(wrap);
+            wrap.appendChild(headerEl);
+            wrap.appendChild(btn);
+          } else {
+            // Header is already a flex row — append button to it
+            headerEl.appendChild(btn);
+          }
+
+          // Restore saved state
+          if(state[key]){
+            body.classList.add('is-collapsed');
+            btn.classList.add('is-collapsed');
+            btn.textContent = '▸';
+          }
+
+          btn.addEventListener('click', () => {
+            const collapsed = body.classList.toggle('is-collapsed');
+            btn.classList.toggle('is-collapsed', collapsed);
+            btn.textContent = collapsed ? '▸' : '▾';
+            state[key] = collapsed;
+            try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){}
+          });
+        });
+      }
+
       function init(){
         applySettings(loadSettings());
         applyDetailsState(loadDetailsState());
@@ -5368,6 +5437,7 @@
         $('pushWorkflowResetBtn')?.addEventListener('click', () => resetPushWorkflow());
 
         schedulePreviewRefresh();
+        initCollapsibleCards();
       }
 
       init();
