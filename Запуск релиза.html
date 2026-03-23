@@ -4136,10 +4136,10 @@
         if(textarea){
           let text = String(textarea.value || '');
           if(boardUrl){
-            text = text.replace(/^(Ссылка на доску:)\s*.*$/m, `$1 ${boardUrl}`);
+            text = text.replace(/^(Ссылка на доску:)[ \t]*[^\n]*$/m, `$1 ${boardUrl}`);
           }
           if(ticketLine){
-            text = text.replace(/^(Ссылка на релизный таск:)\s*.*$/m, `$1 ${ticketLine}`);
+            text = text.replace(/^(Ссылка на релизный таск:)[ \t]*[^\n]*$/m, `$1 ${ticketLine}`);
           }
           textarea.value = text;
         }
