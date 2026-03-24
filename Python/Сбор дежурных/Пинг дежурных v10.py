@@ -64,6 +64,15 @@ EXCLUDED_STREAMS = {
     "Релизный стрим (мигра, вшитки, сват)",
 }
 
+STREAM_ALIASES: Dict[str, List[str]] = {
+    "Core": ["Core Android", "Core iOS"],
+    "C2C": ["С2С", "С2C", "C2С"],
+    "Корзина (B2B)": ["B2B", "Корзина B2B", "Корзина (B2B)"],
+    "Способы доставки": ["Способы доставок"],
+    "ДБО Депозиты и накопления": ["Депозиты и накопления"],
+    "WB Клуб": ["wb club", "WB Club", "ВБ Клуб", "вб клуб"],
+}
+
 REQ_TIMEOUT = 30
 POLL_SECONDS = 5  # опрос треда и Allure каждые N секунд
 
@@ -81,6 +90,7 @@ BAND_HTTP_RETRY_SLEEP = 2.0
 
 MSK = ZoneInfo("Europe/Moscow")
 UTC = dt.timezone.utc
+FINTECH_PREFIX_RE = re.compile(r"^\[Финтех\]\s*", re.IGNORECASE)
 
 ALLURE_SESSION = requests.Session()
 BAND_SESSION = requests.Session()
@@ -189,6 +199,7 @@ _NUM_WORDS: Dict[str, float] = {
     "двух": 2,
     "пару": 2,
     "пара": 2,
+    "пары": 2,
     "три": 3,
     "трех": 3,
     "трёх": 3,
@@ -210,11 +221,11 @@ _NUM_WORDS: Dict[str, float] = {
 }
 
 _WORD_HOURS = re.compile(
-    r"(?i)\b(?:через\s*)?(?:около\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\s*"
+    r"(?i)\b(?:через\s*)?(?:около\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\s*"
     r"(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b"
 )
 _WORD_HOURS_REV = re.compile(
-    r"(?i)\b(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\s*(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\b"
+    r"(?i)\b(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\s*(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\b"
 )
 _WORD_MIN = re.compile(
     r"(?i)\b(?:через\s*)?(?:около\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)\s*"
@@ -223,6 +234,20 @@ _WORD_MIN = re.compile(
 _WORD_MIN_REV = re.compile(
     r"(?i)\b(?:минут(?:ок|ак)?|мин|m|м)\s*(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)\b"
 )
+_WITHIN_WORD_HOURS = re.compile(
+    r"(?i)\b(?:в\s+течение|в\s+течении)\s*"
+    r"(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\s*"
+    r"(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b"
+)
+_WITHIN_HOURS = re.compile(
+    r"(?i)\b(?:в\s+течение|в\s+течении)\s*(\d+(?:[.,]\d+)?)\s*"
+    r"(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b"
+)
+_REPLY_STREAM_SPLIT = re.compile(r"\s*(?:[-—:–|]|->|=>)\s*")
+_REPLY_TIME_BOUNDARY = re.compile(
+    r"(?i)\b(?:до|в|к|через|около|минут(?:ок|ак)?|мин|час(?:а|ов)?|ч\.?|полтора|полчаса|полчасика|пол-часа|пол часа)\b"
+)
+_REPLY_QUOTED_STREAM = re.compile(r"[\"«]([^\"»]{2,120})[\"»]")
 
 
 # ---------------------------------------------------------------------------
@@ -238,6 +263,16 @@ def _pause_exit(msg: str) -> None:
 
 def _norm(s: str) -> str:
     return " ".join((s or "").strip().split()).casefold()
+
+
+def _display_stream_name(s: str) -> str:
+    return FINTECH_PREFIX_RE.sub("", (s or "").strip()).strip()
+
+
+def _norm_loose(s: str) -> str:
+    value = _display_stream_name(s).casefold().replace("ё", "е")
+    value = re.sub(r"[\W_]+", " ", value, flags=re.UNICODE)
+    return " ".join(value.split())
 
 
 def _b64_search(obj: object) -> str:
@@ -264,6 +299,126 @@ def _cookie_get(cookie_str: str, key: str) -> str:
         if k.strip() == key:
             return v.strip()
     return ""
+
+
+def _build_stream_norm2canonical(all_streams: List[str]) -> Dict[str, str]:
+    norm2orig: Dict[str, str] = {}
+    for stream in all_streams:
+        for key in (
+            _norm(stream),
+            _norm_loose(stream),
+            _norm(_display_stream_name(stream)),
+            _norm_loose(_display_stream_name(stream)),
+        ):
+            if key and key not in norm2orig:
+                norm2orig[key] = stream
+
+    out: Dict[str, str] = dict(norm2orig)
+
+    for canonical, aliases in STREAM_ALIASES.items():
+        canonical_real = (
+            norm2orig.get(_norm(canonical))
+            or norm2orig.get(_norm_loose(canonical))
+        )
+        if not canonical_real:
+            for alias in aliases or []:
+                canonical_real = (
+                    norm2orig.get(_norm(alias))
+                    or norm2orig.get(_norm_loose(alias))
+                )
+                if canonical_real:
+                    break
+        if not canonical_real:
+            continue
+
+        for variant in [canonical, canonical_real, *(aliases or [])]:
+            for key in (
+                _norm(variant),
+                _norm_loose(variant),
+                _norm(_display_stream_name(variant)),
+                _norm_loose(_display_stream_name(variant)),
+            ):
+                if key:
+                    out[key] = canonical_real
+
+    return out
+
+
+def _match_stream(
+    raw_name: str, stream_norm2canonical: Dict[str, str]
+) -> Optional[str]:
+    cleaned = re.sub(r"^[«\"'\s]+|[»\"'\s]+$", "", raw_name or "").strip()
+    if not cleaned:
+        return None
+
+    key_norm = _norm(cleaned)
+    if key_norm in stream_norm2canonical:
+        return stream_norm2canonical[key_norm]
+
+    key_loose = _norm_loose(cleaned)
+    if key_loose and key_loose in stream_norm2canonical:
+        return stream_norm2canonical[key_loose]
+
+    best = ""
+    best_len = -1
+    for alias_norm, canonical in stream_norm2canonical.items():
+        if not alias_norm:
+            continue
+        strict_hit = key_norm and (
+            key_norm in alias_norm or alias_norm in key_norm
+        )
+        loose_hit = key_loose and (
+            key_loose in alias_norm or alias_norm in key_loose
+        )
+        if not strict_hit and not loose_hit:
+            continue
+        if len(alias_norm) > best_len:
+            best = canonical
+            best_len = len(alias_norm)
+
+    return best or None
+
+
+def _extract_reply_streams(
+    text: str,
+    allowed_streams: List[str],
+    stream_norm2canonical: Dict[str, str],
+) -> List[str]:
+    allowed_set = set(allowed_streams)
+    if not text or not allowed_set:
+        return []
+
+    candidates: List[str] = []
+    for line in (text or "").splitlines():
+        line_clean = " ".join(line.strip().split())
+        if not line_clean:
+            continue
+
+        for m in _REPLY_QUOTED_STREAM.finditer(line_clean):
+            quoted = " ".join((m.group(1) or "").split())
+            if quoted:
+                candidates.append(quoted)
+
+        prefix_sep = _REPLY_STREAM_SPLIT.split(line_clean, maxsplit=1)[0].strip()
+        if prefix_sep and prefix_sep != line_clean:
+            candidates.append(prefix_sep)
+
+        boundary = _REPLY_TIME_BOUNDARY.search(line_clean)
+        if boundary:
+            prefix_time = line_clean[: boundary.start()].strip(" -—:–|,.;")
+            if prefix_time and prefix_time != line_clean:
+                candidates.append(prefix_time)
+
+    resolved: List[str] = []
+    seen: Set[str] = set()
+    for candidate in candidates:
+        matched = _match_stream(candidate, stream_norm2canonical)
+        if not matched or matched not in allowed_set or matched in seen:
+            continue
+        seen.add(matched)
+        resolved.append(matched)
+
+    return resolved
 
 
 def _check_secrets_or_die() -> None:
@@ -406,7 +561,7 @@ def parse_duties_v4(
     messages: List[dict], catalog_streams: List[str], since_ms: int
 ) -> Dict[str, Dict[str, Optional[str]]]:
     duties: Dict[str, Dict[str, Optional[str]]] = {}
-    norm2orig = {_norm(s): s for s in catalog_streams}
+    stream_norm2canonical = _build_stream_norm2canonical(catalog_streams)
 
     for msg_obj in messages:
         ts = (msg_obj or {}).get("create_at") or 0
@@ -421,10 +576,9 @@ def parse_duties_v4(
         for m in RE_BLOCK_QUOTED.finditer(msg):
             s_name_raw = m.group(1).strip()
             body = m.group(2) or ""
-            key_norm = _norm(s_name_raw)
-            if key_norm not in norm2orig:
+            stream_name = _match_stream(s_name_raw, stream_norm2canonical)
+            if not stream_name:
                 continue
-            stream_name = norm2orig[key_norm]
             row = duties.setdefault(stream_name, {"Android": None, "iOS": None})
 
             ma = RE_ANDROID.search(body)
@@ -438,10 +592,9 @@ def parse_duties_v4(
         for m in RE_BLOCK_OT.finditer(msg):
             s_name_raw = m.group(1).strip()
             body = m.group(2) or ""
-            key_norm = _norm(s_name_raw)
-            if key_norm not in norm2orig:
+            stream_name = _match_stream(s_name_raw, stream_norm2canonical)
+            if not stream_name:
                 continue
-            stream_name = norm2orig[key_norm]
             row = duties.setdefault(stream_name, {"Android": None, "iOS": None})
 
             ma = RE_ANDROID.search(body)
@@ -455,10 +608,9 @@ def parse_duties_v4(
         for m in RE_BLOCK_HEADER.finditer(msg):
             header = (m.group(1) or "").strip()
             body = (m.group(2) or "")
-            key_norm = _norm(header)
-            if key_norm not in norm2orig:
+            stream_name = _match_stream(header, stream_norm2canonical)
+            if not stream_name:
                 continue
-            stream_name = norm2orig[key_norm]
             row = duties.setdefault(stream_name, {"Android": None, "iOS": None})
 
             ma = RE_ANDROID.search(body)
@@ -483,11 +635,17 @@ def parse_duties_v4(
                     base_stream = " ".join(tokens[:-1]).strip()
 
             if platform:
-                stream_name = norm2orig.get(_norm(base_stream), base_stream)
+                stream_name = (
+                    _match_stream(base_stream, stream_norm2canonical)
+                    or base_stream
+                )
                 row = duties.setdefault(stream_name, {"Android": None, "iOS": None})
                 row[platform] = person
             else:
-                stream_name = norm2orig.get(_norm(raw_name), raw_name)
+                stream_name = (
+                    _match_stream(raw_name, stream_norm2canonical)
+                    or raw_name
+                )
                 duties.setdefault(stream_name, {"Android": None, "iOS": None})
 
     return duties
@@ -538,6 +696,18 @@ def _parse_minutes_like_text(t: str) -> Optional[int]:
     # plain "час" like "профиль - час"
     if _ONE_HOUR_PLAIN.search(t):
         return 60
+
+    m = _WITHIN_WORD_HOURS.search(t)
+    if m:
+        v = _word_val(m.group(1))
+        if v is not None:
+            return int(round(v * 60))
+
+    m = _WITHIN_HOURS.search(t)
+    if m:
+        val = float(m.group(1).replace(",", "."))
+        return int(round(val * 60))
+
     # словесные часы "два часа", "часа два"
     m = _WORD_HOURS.search(t)
     if m:
@@ -1426,6 +1596,10 @@ def main() -> None:
                         f"(пример id: {pending_hits[:3]})"
                     )
 
+            active_stream_norm2canonical = _build_stream_norm2canonical(
+                stream_order
+            )
+
             # ---------------------- 3) Читаем тред -------------------------
             thr = http_get_json(
                 f"{BAND_BASE}/posts/{root_id}/thread",
@@ -1517,6 +1691,13 @@ def main() -> None:
                         _msg = (_p.get("message") or "")
                         if not isinstance(_msg, str):
                             continue
+                        _explicit_streams = _extract_reply_streams(
+                            _msg,
+                            _matched_streams,
+                            active_stream_norm2canonical,
+                        )
+                        if _explicit_streams and _need_s not in _explicit_streams:
+                            continue
                         _base_dt = _dt_from_ms_msk(_created_ms)
                         _eta = parse_reply_to_eta(_msg, _base_dt)
                         if not _eta:
@@ -1589,12 +1770,19 @@ def main() -> None:
                 if not isinstance(msg, str):
                     continue
 
+                reply_streams = streams
+                explicit_streams = _extract_reply_streams(
+                    msg, streams, active_stream_norm2canonical
+                )
+                if explicit_streams:
+                    reply_streams = explicit_streams
+
                 base_dt = _dt_from_ms_msk(created_ms)
                 eta_hhmm = parse_reply_to_eta(msg, base_dt)
 
                 if eta_hhmm:
                     changed_streams: List[str] = []
-                    for stream in streams:
+                    for stream in reply_streams:
                         if stream_eta.get(stream) != eta_hhmm:
                             stream_eta[stream] = eta_hhmm
                             changed_streams.append(stream)
@@ -1619,7 +1807,7 @@ def main() -> None:
                         snippet = snippet[:120] + "…"
                     print(
                         f"[INFO][ETA] Не смог разобрать время в ответе "
-                        f"для стримов {', '.join(streams)} (@{username}): '{snippet}'"
+                        f"для стримов {', '.join(reply_streams)} (@{username}): '{snippet}'"
                     )
 
             # ---------------------- 5) Формируем статусы -------------------
