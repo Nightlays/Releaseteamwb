@@ -55,6 +55,7 @@
 
             <div id="bandCookiesDetails">
               <input id="bandChannelId" type="hidden" />
+              <input id="releaseAndroidBotChannelId" type="hidden" />
               <div class="release-launch-cookies-layout">
                 <label class="release-launch-field">
                   <span class="release-launch-label">Cookies (чтение/поиск users и post)</span>
@@ -406,9 +407,10 @@
       const BAND_CHANNEL_ID_FIXED = '6sqki85urpbfbqdkcdfen33owh';
       const NAPI_HOSTS_CHANNEL_ID = 'y14x9xytq7y7uduux8worartmh';
       const SWAT_TEAM_ONLY_CHANNEL_ID = 'nq1amqo347gy9d46oe14zgs44w';
+      const RELEASE_FEED_CHANNEL_ID = 'tdj9ns46eprx8n5neupw8ejw9c';
+      const RELEASE_ANDROID_BOT_CHANNEL_ID = 'pq7tbocbdpde9cmot1d3e18gbe';
       const RELEASE_FEED_CHANNEL_ID = 'xofy3mzmijbxxmongme4pke4bc';
       const RELEASE_FEED_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
-      const RELEASE_ANDROID_BOT_CHANNEL_ID = 'd6wrzqk5cp8fu8hef1rnn9dcxw';
       const RELEASE_ANDROID_BOT_USER_ID = 'xf8gtz3ypbgbjfhdn6uybf3mby';
       const RELEASE_ANDROID_BOT_REPLY_DELAY_MS = 10000;
       const RELEASE_ANDROID_BOT_POLL_MS = 2000;
@@ -458,6 +460,7 @@
 
       const DEFAULTS = {
         bandChannelId: BAND_CHANNEL_ID_FIXED,
+        releaseAndroidBotChannelId: RELEASE_ANDROID_BOT_CHANNEL_ID,
         bandCookiesRead: '',
         bandCookiesAdmin: ''
       };
@@ -1663,6 +1666,7 @@
           cfg[key] = el ? String(el.value || '') : '';
         }
         cfg.bandChannelId = BAND_CHANNEL_ID_FIXED;
+        cfg.releaseAndroidBotChannelId = String(cfg.releaseAndroidBotChannelId || DEFAULTS.releaseAndroidBotChannelId || '').trim();
         return cfg;
       }
 
@@ -1674,6 +1678,10 @@
         }
         const channelInput = $('bandChannelId');
         if(channelInput) channelInput.value = BAND_CHANNEL_ID_FIXED;
+        const releaseAndroidBotChannelInput = $('releaseAndroidBotChannelId');
+        if(releaseAndroidBotChannelInput){
+          releaseAndroidBotChannelInput.value = String((values && values.releaseAndroidBotChannelId) || DEFAULTS.releaseAndroidBotChannelId || '').trim();
+        }
       }
 
       function loadSettings(){
@@ -1690,6 +1698,7 @@
           saved.bandCookiesRead = String(saved.bandCookiesPost || '');
         }
         saved.bandChannelId = BAND_CHANNEL_ID_FIXED;
+        saved.releaseAndroidBotChannelId = String(saved.releaseAndroidBotChannelId || DEFAULTS.releaseAndroidBotChannelId || '').trim();
         delete saved.bandCookiesPost;
         delete saved.bandCsrfPost;
         delete saved.bandCsrfSearch;
@@ -3301,7 +3310,7 @@
         const command = buildBuildResolverBotCommand(mode, release);
         runCreatorInfo(`Сборка: отправляю запрос боту: ${command}`);
         const rootPost = await bandCreatePost(command, cfg, signal, {
-          channelId: RELEASE_ANDROID_BOT_CHANNEL_ID
+          channelId: String((cfg && cfg.releaseAndroidBotChannelId) || DEFAULTS.releaseAndroidBotChannelId || '').trim()
         });
         const rootId = String((rootPost && rootPost.id) || '').trim();
         if(!rootId){
