@@ -23,6 +23,9 @@
         radial-gradient(900px 580px at 100% 0%, rgba(255,90,200,.10), transparent 55%),
         var(--wb-bg);
       color:#0f172a;
+      font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      -webkit-font-smoothing:antialiased;
+      -webkit-text-size-adjust:100%;
     }
     .brand-badge{display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;border-radius:999px;background:linear-gradient(180deg,#fff,#f8f7ff);box-shadow:var(--card)}
     .brand-dot{width:14px;height:14px;border-radius:999px;background:radial-gradient(55% 55% at 35% 35%, #fff 0%, #ffd6f2 30%, var(--wb-primary) 100%);box-shadow:0 0 0 6px rgba(155,92,255,.15), 0 8px 22px rgba(155,92,255,.45) inset}
@@ -39,7 +42,7 @@
       background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
       border-radius:2px;
     }
-    .btn{border:none;border-radius:16px;padding:.65rem 1rem;font-weight:700;transition:.15s}
+    .btn{border:none;border-radius:16px;padding:.65rem 1rem;font-weight:700;transition:.15s;cursor:pointer}
     .btn-ghost{background:#f5f3ff;color:#6d28d9;border:1px solid #ede9fe}
     .btn-soft{background:#fff;border:1px solid #ede9fe;box-shadow:0 8px 22px rgba(124,58,237,.08);color:#6d28d9}
     .btn-grad{background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));color:#fff;box-shadow:var(--ring)}
@@ -47,6 +50,25 @@
       color:#fff;
       background:linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95));
       box-shadow:0 10px 30px rgba(244,63,94,.20);
+    }
+    button#runBtn,
+    button#filterSave{
+      -webkit-appearance:none;
+      appearance:none;
+      border:none;
+      background:#9b5cff !important;
+      background-image:linear-gradient(90deg,#9b5cff,#ff5ac8) !important;
+      color:#fff !important;
+      -webkit-text-fill-color:#fff;
+    }
+    button#stopBtn{
+      -webkit-appearance:none;
+      appearance:none;
+      border:none;
+      background:#f43f5e !important;
+      background-image:linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95)) !important;
+      color:#fff !important;
+      -webkit-text-fill-color:#fff;
     }
     .btn-danger:hover{filter:saturate(1.05);transform:translateY(-1px)}
     .btn-circle{width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;border:1px solid #e5defe;background:#f9f8ff;color:#6d28d9;font-size:.78rem}
@@ -94,7 +116,7 @@
     .bar>div{height:100%;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));width:0%}
     .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.75rem 1rem;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s;z-index:50}
     .toast.show{opacity:1;transform:translateY(0)}
-    .overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:40}
+    .overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:40}
     .popover{
       position:fixed; background:#111827; color:#e5e7eb; border-radius:12px; padding:.5rem .75rem;
       font-size:.75rem; max-width:260px; box-shadow:0 12px 30px rgba(15,23,42,.35); z-index:30;
@@ -125,15 +147,19 @@
       background:#1f2937; color:#fff; border:1px solid #334155; border-radius:10px;
       box-shadow:0 10px 26px rgba(2,6,23,.35); padding:8px 10px; font-size:12px; line-height:1.35;
       min-width:260px; max-width:360px;
+      font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      -webkit-font-smoothing:antialiased;
+      -webkit-text-fill-color:#fff;
     }
-    .day-chart-tooltip .t-title{ font-weight:700; margin-bottom:6px; }
+    .day-chart-tooltip .t-title{ color:#fff !important; -webkit-text-fill-color:#fff; font-weight:700; margin-bottom:6px; }
     .day-chart-tooltip .t-table{ width:auto; border-collapse:collapse; table-layout:fixed; }
     .day-chart-tooltip .t-table th{
-      color:#cbd5e1; font-size:11px; font-weight:600; padding:0 0 4px 0;
+      color:#cbd5e1 !important; -webkit-text-fill-color:#cbd5e1; font-size:11px; font-weight:600; padding:0 0 4px 0;
       background:transparent !important;
       border-bottom:1px solid rgba(148,163,184,.35);
     }
     .day-chart-tooltip .t-table td{
+      color:#fff !important; -webkit-text-fill-color:#fff;
       padding:1px 0; vertical-align:baseline;
       background:transparent !important;
       border-bottom:none !important;
@@ -142,15 +168,15 @@
     .day-chart-tooltip .t-table td:first-child{ text-align:left; padding-right:8px; }
     .day-chart-tooltip .t-table th:nth-child(n+2),
     .day-chart-tooltip .t-table td:nth-child(n+2){ text-align:center; }
-    .day-chart-tooltip .t-name{ color:#e5e7eb; white-space:normal; overflow-wrap:anywhere; display:inline-flex; align-items:center; gap:6px; }
-    .day-chart-tooltip .t-dot{ width:9px; height:9px; border-radius:2px; flex:0 0 9px; display:inline-block; }
+    .day-chart-tooltip .t-name{ color:#e5e7eb !important; -webkit-text-fill-color:#e5e7eb; white-space:normal; overflow-wrap:anywhere; word-break:break-word; display:inline-flex; align-items:center; }
+    .day-chart-tooltip .t-dot{ width:9px; height:9px; border-radius:2px; flex:0 0 9px; display:inline-block; margin-right:6px; }
     .day-chart-tooltip .t-sum,
     .day-chart-tooltip .t-delta,
     .day-chart-tooltip .t-hours{
-      color:#fff; font-weight:600; font-family:ui-monospace,Menlo,Consolas,monospace;
+      color:#fff !important; -webkit-text-fill-color:#fff; font-weight:600; font-family:ui-monospace,Menlo,Consolas,monospace;
       font-variant-numeric:tabular-nums;
     }
-    .day-chart-tooltip .t-delta,.day-chart-tooltip .t-hours{ color:inherit; }
+    .day-chart-tooltip .t-delta,.day-chart-tooltip .t-hours{ color:#fff !important; -webkit-text-fill-color:#fff; }
     .day-chart-tooltip .t-sep td{ border-top:2px dashed #94a3b8; padding-top:6px; }
     .day-chart-card{ border:1px solid #ecebff; border-radius:14px; background:#fff; overflow:visible; }
     .day-chart-card h4{ padding:.65rem .85rem; margin:0; background:#f7f5ff; color:#5b21b6; font-weight:700; font-size:.9rem; }
@@ -257,7 +283,7 @@
 
         <label class="block text-sm">
           Версия релиза
-          <input id="relVersion" class="input mt-1" placeholder="например 7.3.5000">
+          <input id="relVersion" class="input mt-1" placeholder="например 7.5.0000 или 755">
         </label>
 
         <label class="block text-sm">
@@ -663,6 +689,45 @@
 
   function normalizeLogin(s) {
     return (s || '').trim().toLowerCase();
+  }
+
+  function normalizeReleaseVersion(value) {
+    const raw = String(value || '').trim().replace(/,/g, '.').replace(/\s+/g, '');
+    if (!raw) return '';
+
+    const normalizeBuildPart = (build) => {
+      const digits = String(build || '').trim();
+      if (!digits) return '0000';
+      if (!/^\d{1,4}$/.test(digits)) return digits;
+      return digits.padEnd(4, '0');
+    };
+
+    let match = raw.match(/^(\d+)\.(\d+)\.(\d{4})$/);
+    if (match) {
+      return `${Number(match[1])}.${Number(match[2])}.${match[3]}`;
+    }
+
+    match = raw.match(/^(\d+)\.(\d+)(?:\.(\d{1,3}))?$/);
+    if (match) {
+      return `${Number(match[1])}.${Number(match[2])}.${normalizeBuildPart(match[3])}`;
+    }
+
+    match = raw.match(/^(\d)(\d)(\d)$/);
+    if (match) {
+      return `${Number(match[1])}.${Number(match[2])}.${normalizeBuildPart(match[3])}`;
+    }
+
+    return raw;
+  }
+
+  function applyReleaseVersionNormalization(saveToStorage = true) {
+    if (!versionInput) return '';
+    const normalized = normalizeReleaseVersion(versionInput.value || '');
+    versionInput.value = normalized;
+    if (saveToStorage) {
+      try { localStorage.setItem(LS_RELEASE, normalized); } catch (e) {}
+    }
+    return normalized;
   }
 
   function toMskDateKeyFromEpochMs(ms) {
@@ -2671,7 +2736,7 @@
     if (isRunning) return;
 
     const token = (tokenInput.value || '').trim();
-    const version = (versionInput.value || '').trim();
+    const version = applyReleaseVersionNormalization();
 
     if (!token || !version) {
       alert('Нужны и версия релиза, и API токен.');
@@ -3051,7 +3116,7 @@
 
   if (exportExcelBtn) {
     exportExcelBtn.addEventListener('click', () => {
-      const version = (versionInput.value || '').trim();
+      const version = applyReleaseVersionNormalization();
       if (activeTab === 'days') exportDaysPdf(version);
       else buildGlobalExcel(version);
     });
@@ -3062,6 +3127,12 @@
   });
   versionInput?.addEventListener('input', () => {
     try { localStorage.setItem(LS_RELEASE, versionInput.value || ''); } catch (e) {}
+  });
+  versionInput?.addEventListener('blur', () => {
+    applyReleaseVersionNormalization();
+  });
+  versionInput?.addEventListener('change', () => {
+    applyReleaseVersionNormalization();
   });
 
   // Подсказка "i"
@@ -3106,7 +3177,10 @@
     } catch(e) {}
     try {
       const savedRelease = localStorage.getItem(LS_RELEASE);
-      if (savedRelease) versionInput.value = savedRelease;
+      if (savedRelease) {
+        versionInput.value = savedRelease;
+        applyReleaseVersionNormalization();
+      }
     } catch(e) {}
 
     try {
