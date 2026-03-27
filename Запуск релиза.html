@@ -3342,39 +3342,86 @@
       }
 
       function findLatestRootPostByUserIds(posts, message, userIds){
-        const ids = Array.isArray(userIds) ? userIds : [];
-        let found = null;
-        for(const userId of ids.length ? ids : ['']){
-          const candidate = findLatestOwnRootPostByMessage(posts, message, userId);
-          if(candidate && (!found || getBandPostCreateAt(candidate) > getBandPostCreateAt(found))){
-            found = candidate;
-          }
-        }
-        return found;
+        const matches = findMatchingRootPostsByUserIds(posts, message, userIds);
+        return matches[0] || null;
       }
 
-      function resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts){
+      function findMatchingRootPostsByUserIds(posts, message, userIds){
+        const ids = Array.isArray(userIds) ? userIds : [];
+        const targetMessage = normalizeBandMessageKey(message);
+        const idSet = new Set(ids.map((item) => String(item || '').trim()).filter(Boolean));
+        return (Array.isArray(posts) ? posts : [])
+          .filter((post) => {
+            if(!isActiveBandRootPost(post)) return false;
+            if(idSet.size && !idSet.has(String(post.user_id || '').trim())) return false;
+            return normalizeBandMessageKey(post.message) === targetMessage;
+          })
+          .sort((a, b) => getBandPostCreateAt(b) - getBandPostCreateAt(a));
+      }
+
+      function scoreReleaseFeedRootCandidate(platform, threadPosts, rootPostId, userIds, preferredThreadMessage){
+        const rootId = String(rootPostId || '').trim();
+        const reminderNeedle = platform === 'ios' ? '@qadutyios - проверка тега' : '@qadutyandr - проверка тега';
+        const mainPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
+        const mainText = normalizeBandMessageText(mainPost && mainPost.message);
+        const dutyLines = getTextSectionLines(mainText, 'Дежурные:');
+        const hbLines = getTextSectionLines(mainText, 'Blocker + High', 'Normal');
+        const normalLines = getTextSectionLines(mainText, 'Normal', 'Дежурные:');
+        let score = 0;
+
+        if(mainPost) score += 10;
+        if(preferredThreadMessage && mainText === preferredThreadMessage) score += 100;
+        if(dutyLines.length) score += 20;
+        if(hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (_, post) => isBandPollPost(post))) score += 30;
+        if(hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.includes(reminderNeedle))) score += 15;
+        if(hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.startsWith('Компоненты:'))) score += 40;
+        if(hbLines.length && normalLines.length) score += 25;
+
+        return score;
+      }
+
+      async function resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts, signal, options){
         const rootMessage = buildMajorReleaseRootMessage(platform, release);
         const userIds = collectBandAuthorUserIds(cfg);
         const list = Array.isArray(feedPosts) ? feedPosts : [];
+        const preferredThreadMessage = normalizeBandMessageText(options && options.preferredThreadMessage || '');
+        const candidates = findMatchingRootPostsByUserIds(list, rootMessage, userIds);
         const anchor = loadMajorPushRootAnchor(platform);
 
+        if(!candidates.length) return null;
+
         if(anchor && anchor.release === String(release || '').trim()){
-          const anchoredPost = list.find((post) => {
-            if(!isActiveBandRootPost(post)) return false;
-            if(String(post.id || '').trim() !== anchor.rootId) return false;
-            return normalizeBandMessageKey(post.message) === normalizeBandMessageKey(rootMessage);
-          });
+          const anchoredPost = candidates.find((post) => String(post.id || '').trim() === anchor.rootId);
           if(anchoredPost){
             saveMajorPushRootAnchor(platform, release, String(anchoredPost.id || '').trim());
             return anchoredPost;
           }
         }
 
-        const rootPost = findLatestRootPostByUserIds(list, rootMessage, userIds);
-        if(rootPost){
-          saveMajorPushRootAnchor(platform, release, String(rootPost.id || '').trim());
+        if(candidates.length === 1){
+          saveMajorPushRootAnchor(platform, release, String(candidates[0].id || '').trim());
+          return candidates[0];
         }
+
+        const scoredCandidates = await Promise.all(candidates.map(async (rootPost) => {
+          const rootId = String(rootPost && rootPost.id || '').trim();
+          let threadPosts = [];
+          try{
+            threadPosts = await bandFetchThreadPosts(rootId, cfg, signal);
+          }catch(_){ }
+          return {
+            rootPost,
+            score: scoreReleaseFeedRootCandidate(platform, threadPosts, rootId, userIds, preferredThreadMessage)
+          };
+        }));
+
+        scoredCandidates.sort((a, b) =>
+          (b.score - a.score)
+          || (getBandPostCreateAt(b.rootPost) - getBandPostCreateAt(a.rootPost))
+        );
+
+        const rootPost = scoredCandidates[0] ? scoredCandidates[0].rootPost : candidates[0];
+        if(rootPost) saveMajorPushRootAnchor(platform, release, String(rootPost.id || '').trim());
         return rootPost;
       }
 
@@ -3456,7 +3503,9 @@
         const cachedPosts = Array.isArray(channelPosts) ? channelPosts : [];
         const userIds = collectBandAuthorUserIds(cfg);
         let rootPost = (platform && release)
-          ? resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, cachedPosts)
+          ? await resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, cachedPosts, signal, {
+              preferredThreadMessage: threadMessage
+            })
           : findLatestRootPostByUserIds(cachedPosts, rootMessage, userIds);
         let rootAction = 'reused';
         if(rootPost){
@@ -4593,11 +4642,17 @@
         logMajorPush(`[${label}] Тред обновлён (patch ${mainPost.id}).`, 'ok');
       }
 
-      async function publishComponentsToThread(platform, cfg, components){
+      function isPushComponentsAction(action){
+        return action === 'publishComponentsIos' || action === 'publishComponentsAnd';
+      }
+
+      async function publishComponentsToThread(platform, cfg, components, options){
         const isIos = platform === 'ios';
+        const updateExisting = !!(options && options.updateExisting);
+        const label = isIos ? 'iOS' : 'Android';
         const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
         const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
+        if(!release) throw new Error(`Укажи версию ${label}.`);
         const rootPost = await findReleaseFeedRootPost(platform, release, cfg);
         const rootId = String(rootPost.id || '').trim();
         const orderedComponents = sortComponentDisplayTexts(components);
@@ -4614,19 +4669,31 @@
         if(existingPost){
           const existingText = normalizeBandMessageText(existingPost.message);
           if(existingText === text){
-            logMajorPush(`Компоненты в треде ${isIos ? 'iOS' : 'Android'} уже актуальны (${orderedComponents.length} шт.)`, 'ok');
-            return;
+            if(updateExisting){
+              logMajorPush(`Сообщение с компонентами для ${label} уже актуально`, 'ok');
+              return { mode: 'unchanged', count: orderedComponents.length, rootId, postId: String(existingPost.id || '') };
+            }
+            const noticeText = 'Предыдущий список компонентов актуален, новых компонентов нет.';
+            await bandCreatePost(noticeText, cfg, null, { channelId: RELEASE_FEED_CHANNEL_ID, rootId });
+            logMajorPush(`Новых компонентов для ${label} нет — отправлено уведомление в тред`, 'ok');
+            return { mode: 'notice', count: orderedComponents.length, rootId, postId: String(existingPost.id || '') };
           }
-          await bandPatchPost(existingPost, text, cfg, null);
-          logMajorPush(`Компоненты обновлены в треде ${isIos ? 'iOS' : 'Android'} (${orderedComponents.length} шт.)`, 'ok');
-          return;
+          if(updateExisting){
+            await bandPatchPost(existingPost, text, cfg, null);
+            logMajorPush(`Сообщение с компонентами обновлено в треде ${label} (${orderedComponents.length} шт.)`, 'ok');
+            return { mode: 'updated', count: orderedComponents.length, rootId, postId: String(existingPost.id || '') };
+          }
+          await bandCreatePost(text, cfg, null, { channelId: RELEASE_FEED_CHANNEL_ID, rootId });
+          logMajorPush(`Опубликован новый список компонентов в тред ${label} (${orderedComponents.length} шт.)`, 'ok');
+          return { mode: 'created_new', count: orderedComponents.length, rootId, postId: String(existingPost.id || '') };
         }
 
         await bandCreatePost(text, cfg, null, { channelId: RELEASE_FEED_CHANNEL_ID, rootId });
-        logMajorPush(`Компоненты опубликованы в тред ${isIos ? 'iOS' : 'Android'} (${orderedComponents.length} шт.)`, 'ok');
+        logMajorPush(`Компоненты опубликованы в тред ${label} (${orderedComponents.length} шт.)`, 'ok');
+        return { mode: 'created', count: orderedComponents.length, rootId, postId: '' };
       }
 
-      async function runComponentsFetchAndPublish(platform){
+      async function runComponentsFetchAndPublish(platform, options){
         const isIos = platform === 'ios';
         const token = getDeployLabTokenFromStorage();
         if(!token) throw new Error('Не найден Deploy Lab token (заполни поле в настройках).');
@@ -4639,7 +4706,7 @@
         logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Получено компонентов: ${components.length}`, 'ok');
         const cfg = collectSettings();
         ensureReleaseFeedFields(cfg);
-        await publishComponentsToThread(platform, cfg, components);
+        return publishComponentsToThread(platform, cfg, components, options);
       }
 
       function getNextHourTwoMs(){
@@ -4788,6 +4855,9 @@
           const retryBtn = (status === 'done' || status === 'skipped')
             ? `<button type="button" class="btn btn-soft" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="retry" ${retryDis}>Повторить</button>`
             : '';
+          const updateComponentsBtn = (isPushComponentsAction(step.action) && status === 'done')
+            ? `<button type="button" class="btn btn-soft text-xs" data-push-platform="${platform}" data-push-step="${idx}" data-push-manual-action="update-components-message" ${running ? 'disabled' : ''}>Обновить сообщение</button>`
+            : '';
           const timerKey = isIos ? 'pushIosComponentsTimerId' : 'pushAndComponentsTimerId';
           const nextKey = isIos ? 'pushIosComponentsNextFireMs' : 'pushAndComponentsNextFireMs';
           const lastHourKey = isIos ? 'pushIosComponentsLastHour' : 'pushAndComponentsLastHour';
@@ -4830,6 +4900,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                   ${retryBtn}
+                  ${updateComponentsBtn}
                   ${status === 'pending' ? `<button type="button" class="btn btn-soft text-slate-500" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="no" ${skipDis}>Пропустить</button>` : ''}
                   <button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="yes" ${actionDis}>Выполнить</button>
                 </div>
@@ -4914,7 +4985,7 @@
           );
           if(syncSeq !== appState[seqKey]) return;
 
-          const rootPost = resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts);
+          const rootPost = await resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts, null);
           if(!rootPost){
             applyResolvedPushWorkflowState(platform, baselineStatuses);
             return;
@@ -5141,7 +5212,7 @@
           RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
         );
         const rootMessage = buildMajorReleaseRootMessage(platform, release);
-        const rootPost = resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts);
+        const rootPost = await resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts, null);
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден в ленте релизов — сначала выполни шаг 1.`);
         logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Тред найден в ленте: ${rootPost.id}`, 'ok');
         return rootPost;
@@ -5158,7 +5229,7 @@
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
 
         const rootMessage = buildMajorReleaseRootMessage(platform, release);
-        const rootPost = resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts);
+        const rootPost = await resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts, null);
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден. Сначала опубликуй основное сообщение.`);
         const rootId = String(rootPost.id || '').trim();
         await bandExecuteCommand(pollText, RELEASE_FEED_CHANNEL_ID, rootId, cfg, null);
@@ -5172,7 +5243,7 @@
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
 
         const rootMessage = buildMajorReleaseRootMessage(platform, release);
-        const rootPost = resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts);
+        const rootPost = await resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts, null);
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден. Сначала опубликуй основное сообщение.`);
         const rootId = String(rootPost.id || '').trim();
 
@@ -5264,6 +5335,43 @@
           return;
         }
         throw new Error('Неизвестный шаг пуша');
+      }
+
+      async function runPushWorkflowManualAction(platform, stepIdx, manualAction){
+        const isIos = platform === 'ios';
+        const steps = isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS;
+        const runningKey = isIos ? 'pushIosRunning' : 'pushAndRunning';
+        const label = isIos ? 'iOS' : 'Android';
+
+        if(appState[runningKey]) return;
+        if(!Number.isFinite(stepIdx)) return;
+        if(stepIdx < 0 || stepIdx >= steps.length) return;
+
+        const step = steps[stepIdx];
+        if(manualAction !== 'update-components-message') return;
+        if(!isPushComponentsAction(step.action)) return;
+
+        appState[runningKey] = true;
+        renderPushWorkflow();
+
+        try{
+          const result = await runComponentsFetchAndPublish(platform, { updateExisting: true });
+          if(result && result.mode === 'unchanged'){
+            showToast(`Сообщение компонентов ${label} уже актуально`);
+          }else if(result && result.mode === 'created'){
+            showToast(`Сообщение компонентов ${label} опубликовано`);
+          }else if(result && result.mode === 'created_new'){
+            showToast(`Новый список компонентов ${label} опубликован`);
+          }else{
+            showToast(`Сообщение компонентов ${label} обновлено`);
+          }
+        }catch(err){
+          logMajorPush(`[${label}][${step.code}] Ошибка ручного обновления компонентов: ${err.message || err}`, 'err');
+          showToast(err.message || 'Ошибка', false);
+        }finally{
+          appState[runningKey] = false;
+          renderPushWorkflow();
+        }
       }
 
       async function applyPushWorkflowDecision(platform, stepIdx, decision){
@@ -5876,6 +5984,14 @@
             const action = timerBtn.getAttribute('data-push-timer');
             if(action === 'start') startComponentsTimer(tp);
             else if(action === 'stop') stopComponentsTimer(tp);
+            return;
+          }
+          const manualBtn = e.target.closest('[data-push-manual-action]');
+          if(manualBtn){
+            const platform = String(manualBtn.getAttribute('data-push-platform') || 'ios');
+            const stepIdx = Number(manualBtn.getAttribute('data-push-step'));
+            const manualAction = String(manualBtn.getAttribute('data-push-manual-action') || '');
+            runPushWorkflowManualAction(platform, stepIdx, manualAction);
             return;
           }
           const btn = e.target.closest('[data-push-step]');
