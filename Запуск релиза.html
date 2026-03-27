@@ -467,7 +467,7 @@
       const SETTINGS_FIELDS = Object.keys(DEFAULTS);
       const FINTECH_PREFIX_RE = /^\[Финтех\]\s*/i;
 
-      const PLATFORM_SEP = '(?:\\s*[-—:–.]+\\s*)*';
+      const PLATFORM_SEP = '(?:\\s*[-—:–.]+\\s*|\\s+)*';
       const DUTY_WORD = 'Дежурн[\\p{L}\\p{N}_]*';
       const RE_BLOCK_QUOTED = new RegExp(`${DUTY_WORD}\\s*"([^"]+)"([\\s\\S]*?)(?=${DUTY_WORD}\\s*"|$)`, 'giu');
       const RE_BLOCK_OT = new RegExp(`${DUTY_WORD}\\s+от\\s+([^\\n\\r"]+)\\s*([\\s\\S]*?)(?=${DUTY_WORD}|$)`, 'giu');
