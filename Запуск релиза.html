@@ -1509,17 +1509,81 @@
         }catch(_){ }
       }
 
-      async function fetchReleaseComponents(platform, version, token){
+      function buildDeployLabReleaseId(platform, version){
         const platformUp = platform === 'ios' ? 'IOS' : 'ANDROID';
-        const releaseNorm = normalizeDeployLabRelease(version);
-        const url = `${DEPLOY_LAB_BASE_URL}/releaseboss/admin_panel/release/${platformUp}_${releaseNorm}/components`;
-        const data = await proxyRequestJson('GET', url, {
+        const releaseNorm = normalizeDeployLabRelease(version).replace(/^(IOS|ANDROID)_/i, '');
+        return `${platformUp}_${releaseNorm}`;
+      }
+
+      function buildDeployLabHeaders(token){
+        const bearer = asBearer(token);
+        return {
           'accept': '*/*',
-          'authorization-deploy-lab': `Bearer ${token}`,
+          'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.6,en;q=0.5',
+          'authorization-deploy-lab': bearer,
+          'Authorization-Deploy-Lab': bearer,
+          'Authorization': bearer,
+          'X-Authorization': bearer,
           'origin': 'https://deploy-lab.wb.ru',
           'referer': 'https://deploy-lab.wb.ru/'
-        }, undefined, null);
-        return Array.isArray(data && data.components) ? data.components : [];
+        };
+      }
+
+      function unwrapDeployLabPayload(payload){
+        let node = payload;
+        for(let i = 0; i < 4; i += 1){
+          if(Array.isArray(node)) return node;
+          if(node && typeof node === 'object' && Array.isArray(node.components)) return node;
+
+          if(node && typeof node === 'object' && node.body !== undefined){
+            if(typeof node.body === 'string'){
+              const parsed = safeJson(node.body);
+              if(parsed !== null){
+                node = parsed;
+                continue;
+              }
+            }else if(node.body && typeof node.body === 'object'){
+              node = node.body;
+              continue;
+            }
+          }
+
+          if(node && typeof node === 'object' && node.data !== undefined){
+            if(typeof node.data === 'string'){
+              const parsed = safeJson(node.data);
+              if(parsed !== null){
+                node = parsed;
+                continue;
+              }
+            }else if(node.data && typeof node.data === 'object'){
+              node = node.data;
+              continue;
+            }
+          }
+
+          break;
+        }
+        return node;
+      }
+
+      function extractDeployLabComponents(payload){
+        const node = unwrapDeployLabPayload(payload);
+        const list = Array.isArray(node)
+          ? node
+          : (Array.isArray(node && node.components) ? node.components : []);
+        return dedupKeepOrder(list.map((item) => {
+          if(typeof item === 'string') return item.trim();
+          if(item && typeof item.name === 'string') return item.name.trim();
+          if(item && typeof item.component === 'string') return item.component.trim();
+          return '';
+        }).filter(Boolean));
+      }
+
+      async function fetchReleaseComponents(platform, version, token){
+        const releaseId = buildDeployLabReleaseId(platform, version);
+        const url = `${DEPLOY_LAB_BASE_URL}/releaseboss/admin_panel/release/${encodeURIComponent(releaseId)}/components`;
+        const data = await proxyRequestJson('GET', url, buildDeployLabHeaders(token), undefined, null);
+        return extractDeployLabComponents(data);
       }
 
       function getMajorPushReleaseStorageKey(platform){
@@ -3223,6 +3287,25 @@
         return false;
       }
 
+      function findLatestOwnThreadReplyByUserIds(posts, rootPostId, userIds, predicate){
+        const ids = new Set((Array.isArray(userIds) ? userIds : []).map((item) => String(item || '').trim()).filter(Boolean));
+        const rootId = String(rootPostId || '').trim();
+        const matcher = typeof predicate === 'function' ? predicate : () => false;
+        let found = null;
+        for(const post of Array.isArray(posts) ? posts : []){
+          if(!post || typeof post !== 'object') continue;
+          const deletedAt = Number(post.delete_at);
+          if(Number.isFinite(deletedAt) && deletedAt > 0) continue;
+          if(String(post.root_id || '').trim() !== rootId) continue;
+          if(ids.size && !ids.has(String(post.user_id || '').trim())) continue;
+          if(!matcher(normalizeBandMessageText(post.message), post)) continue;
+          if(!found || getBandPostCreateAt(post) > getBandPostCreateAt(found)){
+            found = post;
+          }
+        }
+        return found;
+      }
+
       function isBandPollPost(post){
         if(!post || typeof post !== 'object') return false;
         const text = normalizeBandMessageText(post.message);
@@ -4400,7 +4483,27 @@
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
         const rootPost = await findReleaseFeedRootPost(platform, release, cfg);
         const rootId = String(rootPost.id || '').trim();
-        const text = `Компоненты:\n${components.map((c) => `- ${c}`).join('\n')}`;
+        const text = normalizeBandMessageText(`Компоненты:\n${components.map((c) => `- ${c}`).join('\n')}`);
+        const userIds = collectBandAuthorUserIds(cfg);
+        const threadPosts = await bandFetchThreadPosts(rootId, cfg, null);
+        const existingPost = findLatestOwnThreadReplyByUserIds(
+          threadPosts,
+          rootId,
+          userIds,
+          (message) => message.startsWith('Компоненты:')
+        );
+
+        if(existingPost){
+          const existingText = normalizeBandMessageText(existingPost.message);
+          if(existingText === text){
+            logMajorPush(`Компоненты в треде ${isIos ? 'iOS' : 'Android'} уже актуальны (${components.length} шт.)`, 'ok');
+            return;
+          }
+          await bandPatchPost(existingPost, text, cfg, null);
+          logMajorPush(`Компоненты обновлены в треде ${isIos ? 'iOS' : 'Android'} (${components.length} шт.)`, 'ok');
+          return;
+        }
+
         await bandCreatePost(text, cfg, null, { channelId: RELEASE_FEED_CHANNEL_ID, rootId });
         logMajorPush(`Компоненты опубликованы в тред ${isIos ? 'iOS' : 'Android'} (${components.length} шт.)`, 'ok');
       }
@@ -4412,8 +4515,8 @@
         const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
         const release = verInput ? String(verInput.value || '').trim() : '';
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
-        const releaseNorm = normalizeDeployLabRelease(release);
-        logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Запрашиваю компоненты для ${isIos ? 'IOS' : 'ANDROID'}_${releaseNorm}...`);
+        const releaseId = buildDeployLabReleaseId(platform, release);
+        logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Запрашиваю компоненты для ${releaseId}...`);
         const components = await fetchReleaseComponents(platform, release, token);
         logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Получено компонентов: ${components.length}`, 'ok');
         const cfg = collectSettings();
@@ -5068,15 +5171,18 @@
         if(appState[statusesKey][stepIdx] !== 'pending') return;
 
         const step = steps[stepIdx];
+        const advanceCurrentIndex = () => {
+          appState[currentKey] += 1;
+          while(appState[currentKey] < steps.length && appState[statusesKey][appState[currentKey]] !== 'pending'){
+            appState[currentKey] += 1;
+          }
+        };
 
         if(decision === 'no'){
           appState[statusesKey][stepIdx] = 'skipped';
           logMajorPush(`[${label}][${step.code}] Пропущено.`, 'warn');
           if(stepIdx === appState[currentKey]){
-            appState[currentKey] += 1;
-            while(appState[currentKey] < steps.length && appState[statusesKey][appState[currentKey]] === 'skipped'){
-              appState[currentKey] += 1;
-            }
+            advanceCurrentIndex();
             if(appState[currentKey] >= steps.length){
               showToast(`Все шаги ${label} пройдены`);
             }
@@ -5095,10 +5201,7 @@
         try{
           await runPushWorkflowStepAction(step.action);
           appState[statusesKey][stepIdx] = 'done';
-          appState[currentKey] += 1;
-          while(appState[currentKey] < steps.length && appState[statusesKey][appState[currentKey]] === 'skipped'){
-            appState[currentKey] += 1;
-          }
+          advanceCurrentIndex();
           logMajorPush(`[${label}][${step.code}] Выполнено.`, 'ok');
           if(appState[currentKey] >= steps.length){
             showToast(`Все шаги ${label} пройдены!`);
