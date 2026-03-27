@@ -397,6 +397,8 @@
       const LS_RUN_BUILD_KEY = 'wb_release_launch_run_build_v1';
       const LS_YT_TOKEN_KEY = 'wb_all_table_yt_token';
       const LS_DEPLOY_LAB_TOKEN_KEY = 'wb_release_launch_deploy_lab_token';
+      const LS_MAJOR_PUSH_IOS_RELEASE_KEY = 'wb_release_launch_major_push_ios_release_v1';
+      const LS_MAJOR_PUSH_ANDROID_RELEASE_KEY = 'wb_release_launch_major_push_android_release_v1';
       const DEPLOY_LAB_BASE_URL = 'https://deploy-lab-api.wb.ru';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
       const PROXY_BASE = 'http://localhost:8787';
@@ -568,7 +570,13 @@
         pushIosComponentsNextFireMs: 0,
         pushAndComponentsNextFireMs: 0,
         pushIosComponentsLastHour: 0,
-        pushAndComponentsLastHour: 0
+        pushAndComponentsLastHour: 0,
+        pushIosSyncing: false,
+        pushAndSyncing: false,
+        pushIosSyncSeq: 0,
+        pushAndSyncSeq: 0,
+        pushIosSyncTimerId: 0,
+        pushAndSyncTimerId: 0
       };
 
       const WORKFLOW_STEPS = [
@@ -1492,6 +1500,30 @@
           'referer': 'https://deploy-lab.wb.ru/'
         }, undefined, null);
         return Array.isArray(data && data.components) ? data.components : [];
+      }
+
+      function getMajorPushReleaseStorageKey(platform){
+        return platform === 'ios' ? LS_MAJOR_PUSH_IOS_RELEASE_KEY : LS_MAJOR_PUSH_ANDROID_RELEASE_KEY;
+      }
+
+      function loadMajorPushReleaseFromStorage(platform){
+        try{
+          return String(localStorage.getItem(getMajorPushReleaseStorageKey(platform)) || '').trim();
+        }catch(_){
+          return '';
+        }
+      }
+
+      function saveMajorPushReleaseToStorage(platform, value){
+        try{
+          localStorage.setItem(getMajorPushReleaseStorageKey(platform), String(value || '').trim());
+        }catch(_){ }
+      }
+
+      function buildMajorReleaseRootMessage(platform, release){
+        return platform === 'ios'
+          ? `#IOS #Release ${release}`
+          : `#Android #Release ${release}`;
       }
 
       async function ytProxyGetJson(url, authHeader, signal){
@@ -3101,6 +3133,53 @@
         return found;
       }
 
+      function collectBandAuthorUserIds(cfg){
+        const ids = new Set();
+        const cookieUserId = getMmUserIdFromCookies(cfg && cfg.bandCookiesRead);
+        if(cookieUserId) ids.add(String(cookieUserId).trim());
+        if(BAND_POST_USER_ID) ids.add(String(BAND_POST_USER_ID).trim());
+        return Array.from(ids).filter(Boolean);
+      }
+
+      function findLatestRootPostByUserIds(posts, message, userIds){
+        const ids = Array.isArray(userIds) ? userIds : [];
+        let found = null;
+        for(const userId of ids.length ? ids : ['']){
+          const candidate = findLatestOwnRootPostByMessage(posts, message, userId);
+          if(candidate && (!found || getBandPostCreateAt(candidate) > getBandPostCreateAt(found))){
+            found = candidate;
+          }
+        }
+        return found;
+      }
+
+      function findEarliestThreadPostByUserIds(posts, rootPostId, userIds){
+        const ids = Array.isArray(userIds) ? userIds : [];
+        let found = null;
+        for(const userId of ids.length ? ids : ['']){
+          const candidate = findEarliestOwnThreadPost(posts, rootPostId, userId);
+          if(candidate && (!found || getBandPostCreateAt(candidate) < getBandPostCreateAt(found))){
+            found = candidate;
+          }
+        }
+        return found;
+      }
+
+      function hasOwnThreadReplyByUserIds(posts, rootPostId, userIds, predicate){
+        const ids = new Set((Array.isArray(userIds) ? userIds : []).map((item) => String(item || '').trim()).filter(Boolean));
+        const rootId = String(rootPostId || '').trim();
+        const matcher = typeof predicate === 'function' ? predicate : () => false;
+        for(const post of Array.isArray(posts) ? posts : []){
+          if(!post || typeof post !== 'object') continue;
+          const deletedAt = Number(post.delete_at);
+          if(Number.isFinite(deletedAt) && deletedAt > 0) continue;
+          if(String(post.root_id || '').trim() !== rootId) continue;
+          if(ids.size && !ids.has(String(post.user_id || '').trim())) continue;
+          if(matcher(normalizeBandMessageText(post.message), post)) return true;
+        }
+        return false;
+      }
+
       async function upsertReleaseFeedPost(item, cfg, channelPosts, signal){
         const rootMessage = normalizeBandMessageText(item && item.rootMessage);
         const threadMessage = normalizeBandMessageText(item && item.threadMessage);
@@ -3108,7 +3187,8 @@
         if(!threadMessage) throw new Error('Пустой thread-текст для ленты релизов.');
 
         const cachedPosts = Array.isArray(channelPosts) ? channelPosts : [];
-        let rootPost = findLatestOwnRootPostByMessage(cachedPosts, rootMessage, BAND_POST_USER_ID);
+        const userIds = collectBandAuthorUserIds(cfg);
+        let rootPost = findLatestRootPostByUserIds(cachedPosts, rootMessage, userIds);
         let rootAction = 'reused';
         if(rootPost){
           console.info('[Release Feed] Existing thread found', {
@@ -3134,7 +3214,7 @@
         }
 
         const threadPosts = await bandFetchThreadPosts(rootId, cfg, signal);
-        const existingThreadPost = findLatestOwnThreadPost(threadPosts, rootId, BAND_POST_USER_ID);
+        const existingThreadPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
         if(existingThreadPost){
           const existingText = normalizeBandMessageText(existingThreadPost.message);
           if(existingText === threadMessage){
@@ -4352,12 +4432,24 @@
       function resetPushWorkflow(platform){
         if(!platform || platform === 'ios'){
           stopComponentsTimer('ios');
+          if(appState.pushIosSyncTimerId){
+            clearTimeout(appState.pushIosSyncTimerId);
+            appState.pushIosSyncTimerId = 0;
+          }
+          appState.pushIosSyncSeq += 1;
+          appState.pushIosSyncing = false;
           appState.pushIosCurrentIndex = 0;
           appState.pushIosStatuses = PUSH_IOS_STEPS.map(() => 'pending');
           appState.pushIosRunning = false;
         }
         if(!platform || platform === 'android'){
           stopComponentsTimer('android');
+          if(appState.pushAndSyncTimerId){
+            clearTimeout(appState.pushAndSyncTimerId);
+            appState.pushAndSyncTimerId = 0;
+          }
+          appState.pushAndSyncSeq += 1;
+          appState.pushAndSyncing = false;
           appState.pushAndCurrentIndex = 0;
           appState.pushAndStatuses = PUSH_AND_STEPS.map(() => 'pending');
           appState.pushAndRunning = false;
@@ -4370,7 +4462,9 @@
         const steps = isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS;
         const currentIndex = isIos ? appState.pushIosCurrentIndex : appState.pushAndCurrentIndex;
         const statuses = isIos ? appState.pushIosStatuses : appState.pushAndStatuses;
-        const running = isIos ? appState.pushIosRunning : appState.pushAndRunning;
+        const running = isIos
+          ? (appState.pushIosRunning || appState.pushIosSyncing)
+          : (appState.pushAndRunning || appState.pushAndSyncing);
         const listId = isIos ? 'pushIosWorkflowList' : 'pushAndWorkflowList';
         const list = $(listId);
         if(!list) return;
@@ -4462,7 +4556,134 @@
         renderPushWorkflowPlatform('ios');
         renderPushWorkflowPlatform('android');
         const resetBtn = $('pushWorkflowResetBtn');
-        if(resetBtn) resetBtn.disabled = appState.pushIosRunning || appState.pushAndRunning;
+        if(resetBtn) resetBtn.disabled = appState.pushIosRunning || appState.pushAndRunning || appState.pushIosSyncing || appState.pushAndSyncing;
+      }
+
+      function getTextSectionLines(text, sectionHeader, nextSectionHeader){
+        const normalized = normalizeBandMessageText(text);
+        const startMarker = sectionHeader + '\n';
+        const startIdx = normalized.indexOf(startMarker);
+        if(startIdx === -1) return [];
+        const contentStart = startIdx + startMarker.length;
+        const endIdx = nextSectionHeader
+          ? normalized.indexOf('\n' + nextSectionHeader, startIdx + sectionHeader.length)
+          : -1;
+        const content = endIdx === -1
+          ? normalized.slice(contentStart)
+          : normalized.slice(contentStart, endIdx);
+        return String(content || '')
+          .split('\n')
+          .map((line) => String(line || '').trim())
+          .filter(Boolean);
+      }
+
+      function applyResolvedPushWorkflowState(platform, statuses){
+        const steps = platform === 'ios' ? PUSH_IOS_STEPS : PUSH_AND_STEPS;
+        const nextStatuses = steps.map((_, idx) => (statuses[idx] === 'done' ? 'done' : 'pending'));
+        let nextIndex = nextStatuses.findIndex((status) => status !== 'done');
+        if(nextIndex === -1) nextIndex = steps.length;
+
+        if(platform === 'ios'){
+          appState.pushIosStatuses = nextStatuses;
+          appState.pushIosCurrentIndex = nextIndex;
+        }else{
+          appState.pushAndStatuses = nextStatuses;
+          appState.pushAndCurrentIndex = nextIndex;
+        }
+      }
+
+      async function syncPushWorkflowStateFromBand(platform){
+        const isIos = platform === 'ios';
+        const seqKey = isIos ? 'pushIosSyncSeq' : 'pushAndSyncSeq';
+        const syncingKey = isIos ? 'pushIosSyncing' : 'pushAndSyncing';
+        const label = isIos ? 'iOS' : 'Android';
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        const baselineStatuses = (isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS).map(() => 'pending');
+
+        appState[seqKey] += 1;
+        const syncSeq = appState[seqKey];
+        appState[syncingKey] = true;
+        renderPushWorkflow();
+
+        try{
+          if(!release){
+            applyResolvedPushWorkflowState(platform, baselineStatuses);
+            return;
+          }
+
+          const cfg = collectSettings();
+          if(!String(cfg.bandCookiesRead || '').trim()){
+            applyResolvedPushWorkflowState(platform, baselineStatuses);
+            return;
+          }
+
+          const rootMessage = buildMajorReleaseRootMessage(platform, release);
+          const userIds = collectBandAuthorUserIds(cfg);
+          const feedPosts = await bandFetchChannelPostsSince(
+            RELEASE_FEED_CHANNEL_ID,
+            Date.now() - RELEASE_FEED_LOOKBACK_MS,
+            cfg,
+            null
+          );
+          if(syncSeq !== appState[seqKey]) return;
+
+          const rootPost = findLatestRootPostByUserIds(feedPosts, rootMessage, userIds);
+          if(!rootPost){
+            applyResolvedPushWorkflowState(platform, baselineStatuses);
+            return;
+          }
+
+          const rootId = String(rootPost.id || '').trim();
+          const threadPosts = await bandFetchThreadPosts(rootId, cfg, null);
+          if(syncSeq !== appState[seqKey]) return;
+
+          const mainPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
+          const mainText = normalizeBandMessageText(mainPost && mainPost.message);
+          const dutyLines = getTextSectionLines(mainText, 'Дежурные:');
+          const hbLines = getTextSectionLines(mainText, 'Blocker + High', 'Normal');
+          const normalLines = getTextSectionLines(mainText, 'Normal', 'Дежурные:');
+          const reminderNeedle = isIos ? '@qadutyios - проверка тега' : '@qadutyandr - проверка тега';
+
+          const statuses = [
+            'done',
+            dutyLines.length ? 'done' : 'pending',
+            hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => /^\/poll\b/i.test(text)) ? 'done' : 'pending',
+            hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.includes(reminderNeedle)) ? 'done' : 'pending',
+            hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.startsWith('Компоненты:')) ? 'done' : 'pending',
+            (hbLines.length && normalLines.length) ? 'done' : 'pending'
+          ];
+
+          applyResolvedPushWorkflowState(platform, statuses);
+          console.info(`[Release workflow sync] ${label}`, {
+            release,
+            rootId,
+            restoredStatuses: statuses
+          });
+        }catch(error){
+          if(syncSeq === appState[seqKey]){
+            console.warn(`[Release workflow sync] ${label} failed`, error);
+            applyResolvedPushWorkflowState(platform, baselineStatuses);
+          }
+        }finally{
+          if(syncSeq === appState[seqKey]){
+            appState[syncingKey] = false;
+            renderPushWorkflow();
+          }
+        }
+      }
+
+      function schedulePushWorkflowSync(platform){
+        const isIos = platform === 'ios';
+        const timerKey = isIos ? 'pushIosSyncTimerId' : 'pushAndSyncTimerId';
+        if(appState[timerKey]){
+          clearTimeout(appState[timerKey]);
+          appState[timerKey] = 0;
+        }
+        appState[timerKey] = window.setTimeout(() => {
+          appState[timerKey] = 0;
+          syncPushWorkflowStateFromBand(platform).catch(() => { });
+        }, 260);
       }
 
       async function fetchAndFillMajorYtData(platform){
@@ -4549,6 +4770,13 @@
         const andTextarea = $('majorAndroidThreadText');
         const pollTextarea = $('majorPollText');
 
+        if(iosVerInput && !String(iosVerInput.value || '').trim()){
+          iosVerInput.value = loadMajorPushReleaseFromStorage('ios');
+        }
+        if(andVerInput && !String(andVerInput.value || '').trim()){
+          andVerInput.value = loadMajorPushReleaseFromStorage('android');
+        }
+
         if(iosTextarea && !String(iosTextarea.value || '').trim()){
           iosTextarea.value = buildMajorReleaseThreadMessage('ios', String(iosVerInput ? iosVerInput.value : '').trim() || '[версия]');
         }
@@ -4566,7 +4794,9 @@
           iosVerInput.addEventListener('input', () => {
             if(!iosTextarea) return;
             const ver = String(iosVerInput.value || '').trim();
+            saveMajorPushReleaseToStorage('ios', ver);
             iosTextarea.value = buildMajorReleaseThreadMessage('ios', ver || '[версия]');
+            schedulePushWorkflowSync('ios');
           });
         }
         if(andVerInput && !andVerInput[andListenerKey]){
@@ -4574,12 +4804,16 @@
           andVerInput.addEventListener('input', () => {
             if(!andTextarea) return;
             const ver = String(andVerInput.value || '').trim();
+            saveMajorPushReleaseToStorage('android', ver);
             andTextarea.value = buildMajorReleaseThreadMessage('android', ver || '[версия]');
+            schedulePushWorkflowSync('android');
           });
         }
 
         if(!appState.pushIosStatuses.length) resetPushWorkflow('ios');
         if(!appState.pushAndStatuses.length) resetPushWorkflow('android');
+        schedulePushWorkflowSync('ios');
+        schedulePushWorkflowSync('android');
         renderPushWorkflow();
       }
 
@@ -4599,7 +4833,7 @@
         const cfg = collectSettings();
         ensureReleaseFeedFields(cfg);
 
-        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
+        const rootMessage = buildMajorReleaseRootMessage(platform, release);
         const feedPosts = await bandFetchChannelPostsSince(
           RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
         );
@@ -4614,12 +4848,12 @@
 
       async function findReleaseFeedRootPost(platform, release, cfg){
         const isIos = platform === 'ios';
-        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
-        const userId = getMmUserIdFromCookies(cfg.bandCookiesRead) || BAND_POST_USER_ID;
+        const rootMessage = buildMajorReleaseRootMessage(platform, release);
+        const userIds = collectBandAuthorUserIds(cfg);
         const feedPosts = await bandFetchChannelPostsSince(
           RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
         );
-        const rootPost = findLatestOwnRootPostByMessage(feedPosts, rootMessage, userId);
+        const rootPost = findLatestRootPostByUserIds(feedPosts, rootMessage, userIds);
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден в ленте релизов — сначала выполни шаг 1.`);
         logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Тред найден в ленте: ${rootPost.id}`, 'ok');
         return rootPost;
@@ -4635,8 +4869,8 @@
         const release = verInput ? String(verInput.value || '').trim() : '';
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
 
-        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
-        const rootPost = findLatestOwnRootPostByMessage(feedPosts, rootMessage, BAND_POST_USER_ID);
+        const rootMessage = buildMajorReleaseRootMessage(platform, release);
+        const rootPost = findLatestRootPostByUserIds(feedPosts, rootMessage, collectBandAuthorUserIds(cfg));
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден. Сначала опубликуй основное сообщение.`);
         const rootId = String(rootPost.id || '').trim();
         await bandCreatePost(pollText, cfg, null, { channelId: RELEASE_FEED_CHANNEL_ID, rootId });
@@ -4649,8 +4883,8 @@
         const release = verInput ? String(verInput.value || '').trim() : '';
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
 
-        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
-        const rootPost = findLatestOwnRootPostByMessage(feedPosts, rootMessage, BAND_POST_USER_ID);
+        const rootMessage = buildMajorReleaseRootMessage(platform, release);
+        const rootPost = findLatestRootPostByUserIds(feedPosts, rootMessage, collectBandAuthorUserIds(cfg));
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден. Сначала опубликуй основное сообщение.`);
         const rootId = String(rootPost.id || '').trim();
 
@@ -4895,7 +5129,8 @@
           cfg,
           null
         );
-        const hasExistingThread = posts.some((item) => findLatestOwnRootPostByMessage(feedPosts, item.rootMessage, BAND_POST_USER_ID));
+        const userIds = collectBandAuthorUserIds(cfg);
+        const hasExistingThread = posts.some((item) => findLatestRootPostByUserIds(feedPosts, item.rootMessage, userIds));
         if(hasExistingThread){
           setButtonBusyText(runPushReleaseFeedBtn, 'Обновляю...');
         }
