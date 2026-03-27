@@ -404,6 +404,7 @@
       const PROXY_BASE = 'http://localhost:8787';
       const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
       const BAND_POST_USER_ID = 'zs6su5ntnbdw886tc4c1dnjd9c';
+      const BAND_TEAM_ID = 'dp75hbjcibyjdjzt7x3m68auic';
       const BAND_CHANNEL_ID_FIXED = '6sqki85urpbfbqdkcdfen33owh';
       const NAPI_HOSTS_CHANNEL_ID = 'y14x9xytq7y7uduux8worartmh';
       const SWAT_TEAM_ONLY_CHANNEL_ID = 'nq1amqo347gy9d46oe14zgs44w';
@@ -768,6 +769,24 @@
       function buildRuStoreHuaweiReleaseNumber(release){
         const shortRelease = formatReleaseShort(release);
         return String(shortRelease || '').replace(/\./g, '').trim();
+      }
+
+      function normalizeDeployLabRelease(release){
+        const raw = String(release || '').trim();
+        const match = raw.match(/^(\d+)\.(\d+)\.(\d{1,4})$/);
+        if(!match) return raw;
+
+        const major = String(Number(match[1]));
+        const minor = String(Number(match[2]));
+        const buildRaw = String(match[3] || '').trim();
+        if(buildRaw.length >= 4){
+          return `${major}.${minor}.${buildRaw.padStart(4, '0')}`;
+        }
+
+        const buildNum = Number(buildRaw);
+        if(!Number.isFinite(buildNum)) return raw;
+        const buildNorm = String(buildNum * Math.pow(10, 4 - buildRaw.length)).padStart(4, '0');
+        return `${major}.${minor}.${buildNorm}`;
       }
 
       function getMajorPingText(){
@@ -1492,7 +1511,8 @@
 
       async function fetchReleaseComponents(platform, version, token){
         const platformUp = platform === 'ios' ? 'IOS' : 'ANDROID';
-        const url = `${DEPLOY_LAB_BASE_URL}/releaseboss/admin_panel/release/${platformUp}_${version}/components`;
+        const releaseNorm = normalizeDeployLabRelease(version);
+        const url = `${DEPLOY_LAB_BASE_URL}/releaseboss/admin_panel/release/${platformUp}_${releaseNorm}/components`;
         const data = await proxyRequestJson('GET', url, {
           'accept': '*/*',
           'authorization-deploy-lab': `Bearer ${token}`,
@@ -2996,6 +3016,29 @@
         return proxyRequestJson('PUT', `https://band.wb.ru/api/v4/posts/${encodeURIComponent(targetPostId)}/patch`, headers, body, signal);
       }
 
+      async function bandExecuteCommand(command, channelId, rootId, cfg, signal){
+        const normalizedCommand = String(command || '')
+          .replace(/[“”«»]/g, '"')
+          .trim();
+        if(!normalizedCommand) throw new Error('Команда пуста.');
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesRead);
+        const headers = {
+          'Accept': '*/*',
+          'Accept-Language': 'en',
+          'Content-Type': 'application/json',
+          'Origin': 'https://band.wb.ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+        return proxyRequestJson('POST', 'https://band.wb.ru/api/v4/commands/execute', headers, {
+          command: normalizedCommand,
+          channel_id: String(channelId || ''),
+          team_id: BAND_TEAM_ID,
+          root_id: String(rootId || '')
+        }, signal);
+      }
+
       function syncResolvedBuildToInput(value){
         const buildValue = String(value || '').trim();
         if(runBuildInput) runBuildInput.value = buildValue;
@@ -3178,6 +3221,27 @@
           if(matcher(normalizeBandMessageText(post.message), post)) return true;
         }
         return false;
+      }
+
+      function isBandPollPost(post){
+        if(!post || typeof post !== 'object') return false;
+        const text = normalizeBandMessageText(post.message);
+        if(/^\/poll\b/i.test(text)) return true;
+        if(text.includes('Настройки опроса:') && text.includes('Всего ответов:')) return true;
+
+        const props = post.props && typeof post.props === 'object' ? post.props : {};
+        if(props.poll_id || props.pollId || props['poll-id']) return true;
+
+        const attachments = Array.isArray(props.attachments) ? props.attachments : [];
+        return attachments.some((item) => {
+          if(!item || typeof item !== 'object') return false;
+          const title = String(item.title || '').trim();
+          const textValue = String(item.text || '').trim();
+          if(title.includes('Опрос') || title.includes('Poll')) return true;
+          if(textValue.includes('Настройки опроса:') || textValue.includes('Всего ответов:')) return true;
+          const actions = Array.isArray(item.actions) ? item.actions : [];
+          return actions.some((action) => /удалить ответы|добавить вариант ответа|завершить опрос|удалить опрос/i.test(String(action && action.name || '').trim()));
+        });
       }
 
       async function upsertReleaseFeedPost(item, cfg, channelPosts, signal){
@@ -4110,7 +4174,7 @@
         return lines.join('\n');
       }
 
-      const MAJOR_POLL_DEFAULT = '/poll "Облако компонентов" "Core" "Заказы" "Главная и акции" "Поиск и Каталог" "Корзина 1ШК" "Payments" "Карточка товара" "Корзина 2ШК" "Корзина кроссбордер" "Корзина способы доставок" "Отзывы" "Профиль" "Stream Корзина (Преордер)" "Рекомендации" "Кор Кошелька" "Корзина Курьер WB" "Финтех внешние оплаты" "Финтех Частями" "Платежи и Переводы" "Открытие счетов" "Финтех оплаты и ценообразование" "Stream Финтех (Инвестпродукты)" "Финтех Карты" "Чаты" "С2С" "Travel.Avia" "Travel.Hotels" "Travel.Главная" "Travel.Туры" "WB Club" "Спецпроекты" "Auth" "Недвижимость" "Страница продавца" "Крипта. Копилка. ЦФТ" "Депозиты и накопления" "Stream Корзина (B2B)" "Трансграничные переводы" "Комиссионные и инвестиционные продукты" "Реклама"  --progress --votes=39';
+      const MAJOR_POLL_DEFAULT = '/poll "Облако компонентов" "Core" "Заказы" "Главная и акции" "Поиск и Каталог" "Корзина 1ШК" "Payments" "Карточка товара" "Корзина 2ШК" "Корзина кроссбордер" "Корзина способы доставок" "Отзывы" "Профиль" "Stream Корзина (Преордер)" "Рекомендации" "Кор Кошелька" "Корзина Курьер WB" "Финтех Партнерское кредитование" "Финтех Частями" "Платежи и Переводы" "Открытие счетов" "Финтех оплаты и ценообразование" "Stream Финтех (Инвестпродукты)" "Финтех Карты" "Чаты" "С2С" "Travel.Avia" "Travel.Hotels" "Travel.Главная" "Travel.Туры" "WB Club" "Спецпроекты" "Auth" "Недвижимость" "Страница продавца" "Крипта. Копилка. ЦФТ" "Депозиты и накопления" "Stream Корзина (B2B)" "Трансграничные переводы" "Комиссионные и инвестиционные продукты" "Реклама"  --progress --votes=39';
 
       const PUSH_IOS_STEPS = [
         { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishIos' },
@@ -4348,7 +4412,8 @@
         const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
         const release = verInput ? String(verInput.value || '').trim() : '';
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
-        logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Запрашиваю компоненты для ${isIos ? 'IOS' : 'ANDROID'}_${release}...`);
+        const releaseNorm = normalizeDeployLabRelease(release);
+        logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Запрашиваю компоненты для ${isIos ? 'IOS' : 'ANDROID'}_${releaseNorm}...`);
         const components = await fetchReleaseComponents(platform, release, token);
         logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Получено компонентов: ${components.length}`, 'ok');
         const cfg = collectSettings();
@@ -4648,7 +4713,7 @@
           const statuses = [
             'done',
             dutyLines.length ? 'done' : 'pending',
-            hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => /^\/poll\b/i.test(text)) ? 'done' : 'pending',
+            hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (_, post) => isBandPollPost(post)) ? 'done' : 'pending',
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.includes(reminderNeedle)) ? 'done' : 'pending',
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.startsWith('Компоненты:')) ? 'done' : 'pending',
             (hbLines.length && normalLines.length) ? 'done' : 'pending'
@@ -4873,7 +4938,7 @@
         const rootPost = findLatestRootPostByUserIds(feedPosts, rootMessage, collectBandAuthorUserIds(cfg));
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден. Сначала опубликуй основное сообщение.`);
         const rootId = String(rootPost.id || '').trim();
-        await bandCreatePost(pollText, cfg, null, { channelId: RELEASE_FEED_CHANNEL_ID, rootId });
+        await bandExecuteCommand(pollText, RELEASE_FEED_CHANNEL_ID, rootId, cfg, null);
         logMajorPush(`Опрос отправлен в тред ${isIos ? 'iOS' : 'Android'} (${rootMessage})`, 'ok');
       }
 
