@@ -399,6 +399,8 @@
       const LS_DEPLOY_LAB_TOKEN_KEY = 'wb_release_launch_deploy_lab_token';
       const LS_MAJOR_PUSH_IOS_RELEASE_KEY = 'wb_release_launch_major_push_ios_release_v1';
       const LS_MAJOR_PUSH_ANDROID_RELEASE_KEY = 'wb_release_launch_major_push_android_release_v1';
+      const LS_MAJOR_PUSH_IOS_ROOT_ANCHOR_KEY = 'wb_release_launch_major_push_ios_root_anchor_v1';
+      const LS_MAJOR_PUSH_ANDROID_ROOT_ANCHOR_KEY = 'wb_release_launch_major_push_android_root_anchor_v1';
       const DEPLOY_LAB_BASE_URL = 'https://deploy-lab-api.wb.ru';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
       const PROXY_BASE = 'http://localhost:8787';
@@ -647,6 +649,44 @@
           }
         }
         return out;
+      }
+
+      function getComponentTextSortBucket(value){
+        const text = String(value || '').trim();
+        const match = text.match(/[\p{L}\p{N}]/u);
+        const ch = match ? match[0] : '';
+        if(/[A-Za-z]/.test(ch)) return 0;
+        if(/[А-Яа-яЁё]/.test(ch)) return 1;
+        if(/[0-9]/.test(ch)) return 2;
+        return 3;
+      }
+
+      function compareComponentDisplayText(a, b){
+        const aa = String(a || '').trim();
+        const bb = String(b || '').trim();
+        const bucketDiff = getComponentTextSortBucket(aa) - getComponentTextSortBucket(bb);
+        if(bucketDiff) return bucketDiff;
+
+        const bucket = getComponentTextSortBucket(aa);
+        const locales = bucket === 0 ? ['en', 'ru'] : ['ru', 'en'];
+        const primary = aa.localeCompare(bb, locales, {
+          sensitivity: 'base',
+          numeric: true,
+          ignorePunctuation: true
+        });
+        if(primary) return primary;
+
+        return aa.localeCompare(bb, locales, {
+          sensitivity: 'variant',
+          numeric: true
+        });
+      }
+
+      function sortComponentDisplayTexts(items){
+        return (Array.isArray(items) ? items : [])
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+          .sort(compareComponentDisplayText);
       }
 
       function sleep(ms){
@@ -1452,8 +1492,25 @@
         document.body.classList.add('release-launch-modal-open');
       }
 
+      function normalizeDeployLabToken(rawToken){
+        const text = String(rawToken || '').trim();
+        if(!text) return '';
+
+        const compact = text.replace(/[\r\n\t]+/g, ' ').trim();
+        const headerMatch = compact.match(/authorization-deploy-lab\s*:\s*Bearer\s+([A-Za-z0-9._-]+)/i);
+        if(headerMatch && headerMatch[1]) return headerMatch[1].trim();
+
+        const bearerMatch = compact.match(/(?:^|\s)Bearer\s+([A-Za-z0-9._-]+)/i);
+        if(bearerMatch && bearerMatch[1]) return bearerMatch[1].trim();
+
+        const jwtMatch = compact.match(/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+        if(jwtMatch && jwtMatch[0]) return jwtMatch[0].trim();
+
+        return compact.replace(/^['"]+|['"]+$/g, '').trim();
+      }
+
       function asBearer(rawToken){
-        const token = String(rawToken || '').trim();
+        const token = normalizeDeployLabToken(rawToken);
         if(!token) return '';
         return /^bearer\s+/i.test(token) ? token : `Bearer ${token}`;
       }
@@ -1493,10 +1550,10 @@
 
       function getDeployLabTokenFromStorage(){
         const el = $('deployLabTokenInput');
-        const direct = el ? String(el.value || '').trim() : '';
+        const direct = el ? normalizeDeployLabToken(el.value || '') : '';
         if(direct) return direct;
         try{
-          return String(localStorage.getItem(LS_DEPLOY_LAB_TOKEN_KEY) || '').trim();
+          return normalizeDeployLabToken(localStorage.getItem(LS_DEPLOY_LAB_TOKEN_KEY) || '');
         }catch(_){
           return '';
         }
@@ -1505,7 +1562,7 @@
       function saveDeployLabToken(){
         try{
           const el = $('deployLabTokenInput');
-          localStorage.setItem(LS_DEPLOY_LAB_TOKEN_KEY, el ? String(el.value || '') : '');
+          localStorage.setItem(LS_DEPLOY_LAB_TOKEN_KEY, el ? normalizeDeployLabToken(el.value || '') : '');
         }catch(_){ }
       }
 
@@ -1519,11 +1576,8 @@
         const bearer = asBearer(token);
         return {
           'accept': '*/*',
-          'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.6,en;q=0.5',
+          'accept-language': 'ru-RU,ru;q=0.9,tr-CY;q=0.8,tr;q=0.7,en-US;q=0.6,en;q=0.5,uk-UA;q=0.4,uk;q=0.3,be-BY;q=0.2,be;q=0.1,kk-KZ;q=0.1,kk;q=0.1',
           'authorization-deploy-lab': bearer,
-          'Authorization-Deploy-Lab': bearer,
-          'Authorization': bearer,
-          'X-Authorization': bearer,
           'origin': 'https://deploy-lab.wb.ru',
           'referer': 'https://deploy-lab.wb.ru/'
         };
@@ -1590,6 +1644,10 @@
         return platform === 'ios' ? LS_MAJOR_PUSH_IOS_RELEASE_KEY : LS_MAJOR_PUSH_ANDROID_RELEASE_KEY;
       }
 
+      function getMajorPushRootAnchorStorageKey(platform){
+        return platform === 'ios' ? LS_MAJOR_PUSH_IOS_ROOT_ANCHOR_KEY : LS_MAJOR_PUSH_ANDROID_ROOT_ANCHOR_KEY;
+      }
+
       function loadMajorPushReleaseFromStorage(platform){
         try{
           return String(localStorage.getItem(getMajorPushReleaseStorageKey(platform)) || '').trim();
@@ -1601,6 +1659,41 @@
       function saveMajorPushReleaseToStorage(platform, value){
         try{
           localStorage.setItem(getMajorPushReleaseStorageKey(platform), String(value || '').trim());
+        }catch(_){ }
+      }
+
+      function loadMajorPushRootAnchor(platform){
+        try{
+          const raw = String(localStorage.getItem(getMajorPushRootAnchorStorageKey(platform)) || '').trim();
+          if(!raw) return null;
+          const parsed = safeJson(raw);
+          const release = String(parsed && parsed.release || '').trim();
+          const rootId = String(parsed && parsed.rootId || '').trim();
+          if(!release || !rootId) return null;
+          return { release, rootId };
+        }catch(_){
+          return null;
+        }
+      }
+
+      function saveMajorPushRootAnchor(platform, release, rootId){
+        try{
+          const nextRelease = String(release || '').trim();
+          const nextRootId = String(rootId || '').trim();
+          if(!nextRelease || !nextRootId){
+            localStorage.removeItem(getMajorPushRootAnchorStorageKey(platform));
+            return;
+          }
+          localStorage.setItem(getMajorPushRootAnchorStorageKey(platform), JSON.stringify({
+            release: nextRelease,
+            rootId: nextRootId
+          }));
+        }catch(_){ }
+      }
+
+      function clearMajorPushRootAnchor(platform){
+        try{
+          localStorage.removeItem(getMajorPushRootAnchorStorageKey(platform));
         }catch(_){ }
       }
 
@@ -3260,6 +3353,31 @@
         return found;
       }
 
+      function resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts){
+        const rootMessage = buildMajorReleaseRootMessage(platform, release);
+        const userIds = collectBandAuthorUserIds(cfg);
+        const list = Array.isArray(feedPosts) ? feedPosts : [];
+        const anchor = loadMajorPushRootAnchor(platform);
+
+        if(anchor && anchor.release === String(release || '').trim()){
+          const anchoredPost = list.find((post) => {
+            if(!isActiveBandRootPost(post)) return false;
+            if(String(post.id || '').trim() !== anchor.rootId) return false;
+            return normalizeBandMessageKey(post.message) === normalizeBandMessageKey(rootMessage);
+          });
+          if(anchoredPost){
+            saveMajorPushRootAnchor(platform, release, String(anchoredPost.id || '').trim());
+            return anchoredPost;
+          }
+        }
+
+        const rootPost = findLatestRootPostByUserIds(list, rootMessage, userIds);
+        if(rootPost){
+          saveMajorPushRootAnchor(platform, release, String(rootPost.id || '').trim());
+        }
+        return rootPost;
+      }
+
       function findEarliestThreadPostByUserIds(posts, rootPostId, userIds){
         const ids = Array.isArray(userIds) ? userIds : [];
         let found = null;
@@ -3330,12 +3448,16 @@
       async function upsertReleaseFeedPost(item, cfg, channelPosts, signal){
         const rootMessage = normalizeBandMessageText(item && item.rootMessage);
         const threadMessage = normalizeBandMessageText(item && item.threadMessage);
+        const platform = String(item && item.platform || '').trim();
+        const release = String(item && item.release || '').trim();
         if(!rootMessage) throw new Error('Пустой root-текст для ленты релизов.');
         if(!threadMessage) throw new Error('Пустой thread-текст для ленты релизов.');
 
         const cachedPosts = Array.isArray(channelPosts) ? channelPosts : [];
         const userIds = collectBandAuthorUserIds(cfg);
-        let rootPost = findLatestRootPostByUserIds(cachedPosts, rootMessage, userIds);
+        let rootPost = (platform && release)
+          ? resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, cachedPosts)
+          : findLatestRootPostByUserIds(cachedPosts, rootMessage, userIds);
         let rootAction = 'reused';
         if(rootPost){
           console.info('[Release Feed] Existing thread found', {
@@ -4448,21 +4570,16 @@
 
         const release = verInput ? String(verInput.value || '').trim() : '';
         if(!release) throw new Error(`Укажи версию ${label}.`);
-        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
 
         const cfg = collectSettings();
         ensureReleaseFeedFields(cfg);
-        const userId = getMmUserIdFromCookies(cfg.bandCookiesRead) || BAND_POST_USER_ID;
-        const feedPosts = await bandFetchChannelPostsSince(
-          RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
-        );
-        const rootPost = findLatestOwnRootPostByMessage(feedPosts, rootMessage, userId);
-        if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден в ленте релизов — сначала выполни шаг 1.`);
+        const userIds = collectBandAuthorUserIds(cfg);
+        const rootPost = await findReleaseFeedRootPost(platform, release, cfg);
         const rootId = String(rootPost.id || '').trim();
         logMajorPush(`[${label}] Тред найден в ленте: ${rootId}`, 'ok');
 
         const threadPosts = await bandFetchThreadPosts(rootId, cfg, null);
-        const mainPost = findEarliestOwnThreadPost(threadPosts, rootId, userId);
+        const mainPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
         if(!mainPost) throw new Error('Основное сообщение в треде не найдено — сначала выполни шаг 1.');
         logMajorPush(`[${label}] Найден пост для обновления: ${mainPost.id} (создан: ${new Date(mainPost.create_at).toLocaleTimeString('ru-RU')})`, 'ok');
 
@@ -4483,7 +4600,8 @@
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
         const rootPost = await findReleaseFeedRootPost(platform, release, cfg);
         const rootId = String(rootPost.id || '').trim();
-        const text = normalizeBandMessageText(`Компоненты:\n${components.map((c) => `- ${c}`).join('\n')}`);
+        const orderedComponents = sortComponentDisplayTexts(components);
+        const text = normalizeBandMessageText(`Компоненты:\n${orderedComponents.map((c) => `- ${c}`).join('\n')}`);
         const userIds = collectBandAuthorUserIds(cfg);
         const threadPosts = await bandFetchThreadPosts(rootId, cfg, null);
         const existingPost = findLatestOwnThreadReplyByUserIds(
@@ -4496,16 +4614,16 @@
         if(existingPost){
           const existingText = normalizeBandMessageText(existingPost.message);
           if(existingText === text){
-            logMajorPush(`Компоненты в треде ${isIos ? 'iOS' : 'Android'} уже актуальны (${components.length} шт.)`, 'ok');
+            logMajorPush(`Компоненты в треде ${isIos ? 'iOS' : 'Android'} уже актуальны (${orderedComponents.length} шт.)`, 'ok');
             return;
           }
           await bandPatchPost(existingPost, text, cfg, null);
-          logMajorPush(`Компоненты обновлены в треде ${isIos ? 'iOS' : 'Android'} (${components.length} шт.)`, 'ok');
+          logMajorPush(`Компоненты обновлены в треде ${isIos ? 'iOS' : 'Android'} (${orderedComponents.length} шт.)`, 'ok');
           return;
         }
 
         await bandCreatePost(text, cfg, null, { channelId: RELEASE_FEED_CHANNEL_ID, rootId });
-        logMajorPush(`Компоненты опубликованы в тред ${isIos ? 'iOS' : 'Android'} (${components.length} шт.)`, 'ok');
+        logMajorPush(`Компоненты опубликованы в тред ${isIos ? 'iOS' : 'Android'} (${orderedComponents.length} шт.)`, 'ok');
       }
 
       async function runComponentsFetchAndPublish(platform){
@@ -4796,7 +4914,7 @@
           );
           if(syncSeq !== appState[seqKey]) return;
 
-          const rootPost = findLatestRootPostByUserIds(feedPosts, rootMessage, userIds);
+          const rootPost = resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts);
           if(!rootPost){
             applyResolvedPushWorkflowState(platform, baselineStatuses);
             return;
@@ -4963,6 +5081,7 @@
             if(!iosTextarea) return;
             const ver = String(iosVerInput.value || '').trim();
             saveMajorPushReleaseToStorage('ios', ver);
+            clearMajorPushRootAnchor('ios');
             iosTextarea.value = buildMajorReleaseThreadMessage('ios', ver || '[версия]');
             schedulePushWorkflowSync('ios');
           });
@@ -4973,6 +5092,7 @@
             if(!andTextarea) return;
             const ver = String(andVerInput.value || '').trim();
             saveMajorPushReleaseToStorage('android', ver);
+            clearMajorPushRootAnchor('android');
             andTextarea.value = buildMajorReleaseThreadMessage('android', ver || '[версия]');
             schedulePushWorkflowSync('android');
           });
@@ -5005,7 +5125,8 @@
         const feedPosts = await bandFetchChannelPostsSince(
           RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
         );
-        const result = await upsertReleaseFeedPost({ rootMessage, threadMessage: threadText }, cfg, feedPosts, null);
+        const result = await upsertReleaseFeedPost({ platform, release, rootMessage, threadMessage: threadText }, cfg, feedPosts, null);
+        saveMajorPushRootAnchor(platform, release, result && result.rootId);
         const action = result.threadAction === 'updated' ? 'обновлён'
           : result.threadAction === 'unchanged' ? 'не изменён (актуален)'
           : 'опубликован';
@@ -5016,12 +5137,11 @@
 
       async function findReleaseFeedRootPost(platform, release, cfg){
         const isIos = platform === 'ios';
-        const rootMessage = buildMajorReleaseRootMessage(platform, release);
-        const userIds = collectBandAuthorUserIds(cfg);
         const feedPosts = await bandFetchChannelPostsSince(
           RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
         );
-        const rootPost = findLatestRootPostByUserIds(feedPosts, rootMessage, userIds);
+        const rootMessage = buildMajorReleaseRootMessage(platform, release);
+        const rootPost = resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts);
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден в ленте релизов — сначала выполни шаг 1.`);
         logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Тред найден в ленте: ${rootPost.id}`, 'ok');
         return rootPost;
@@ -5038,7 +5158,7 @@
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
 
         const rootMessage = buildMajorReleaseRootMessage(platform, release);
-        const rootPost = findLatestRootPostByUserIds(feedPosts, rootMessage, collectBandAuthorUserIds(cfg));
+        const rootPost = resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts);
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден. Сначала опубликуй основное сообщение.`);
         const rootId = String(rootPost.id || '').trim();
         await bandExecuteCommand(pollText, RELEASE_FEED_CHANNEL_ID, rootId, cfg, null);
@@ -5052,7 +5172,7 @@
         if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
 
         const rootMessage = buildMajorReleaseRootMessage(platform, release);
-        const rootPost = findLatestRootPostByUserIds(feedPosts, rootMessage, collectBandAuthorUserIds(cfg));
+        const rootPost = resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts);
         if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден. Сначала опубликуй основное сообщение.`);
         const rootId = String(rootPost.id || '').trim();
 
@@ -5545,7 +5665,7 @@
         const deployLabTokenInput = $('deployLabTokenInput');
         if(deployLabTokenInput){
           try{
-            deployLabTokenInput.value = String(localStorage.getItem(LS_DEPLOY_LAB_TOKEN_KEY) || '');
+            deployLabTokenInput.value = normalizeDeployLabToken(localStorage.getItem(LS_DEPLOY_LAB_TOKEN_KEY) || '');
           }catch(_){ }
           deployLabTokenInput.addEventListener('input', saveDeployLabToken);
           deployLabTokenInput.addEventListener('change', saveDeployLabToken);
