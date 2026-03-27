@@ -73,6 +73,11 @@
               <input id="ytTokenInput" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="Вставьте токен" />
             </label>
 
+            <label class="release-launch-field release-launch-run-release-field">
+              <span class="release-launch-label">Deploy Lab token (authorization-deploy-lab)</span>
+              <input id="deployLabTokenInput" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="Вставьте токен" />
+            </label>
+
             <div id="runExtraControls" class="release-launch-run-main" style="display:none;">
               <div class="release-launch-run-fields">
                 <label class="release-launch-field release-launch-run-release-field">
@@ -391,6 +396,8 @@
       const LS_RUN_RELEASE_KEY = 'wb_release_launch_run_release_v1';
       const LS_RUN_BUILD_KEY = 'wb_release_launch_run_build_v1';
       const LS_YT_TOKEN_KEY = 'wb_all_table_yt_token';
+      const LS_DEPLOY_LAB_TOKEN_KEY = 'wb_release_launch_deploy_lab_token';
+      const DEPLOY_LAB_BASE_URL = 'https://deploy-lab-api.wb.ru';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
       const PROXY_BASE = 'http://localhost:8787';
       const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
@@ -418,6 +425,7 @@
 
       const ALLURE_API_TOKEN = 'c60f6235-440d-4657-983a-51dc71c53cf2';
       const ALLURE_TESTPLAN_LEAF_URL = 'https://allure-testops.wb.ru/api/testplan/3918/tree/leaf?treeId=987&projectId=7&path=7904&sort=name%2Casc&size=100';
+      const ALLURE_LAUNCHES_BASE = 'https://allure-testops.wb.ru/launch';
       const QA_LEADS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxPTT8Gc8rQLKV7tIrtwsUQd_ciUOkESbS7WoQ3JfPEoBtxB0gr6GpOs640uBIaPTCy8A/exec';
       const RUN_MODE_MAJOR = 'major';
       const RUN_CREATOR_BASE_URL = 'https://allure-testops.wb.ru';
@@ -554,7 +562,13 @@
         pushIosRunning: false,
         pushAndCurrentIndex: 0,
         pushAndStatuses: [],
-        pushAndRunning: false
+        pushAndRunning: false,
+        pushIosComponentsTimerId: 0,
+        pushAndComponentsTimerId: 0,
+        pushIosComponentsNextFireMs: 0,
+        pushAndComponentsNextFireMs: 0,
+        pushIosComponentsLastHour: 0,
+        pushAndComponentsLastHour: 0
       };
 
       const WORKFLOW_STEPS = [
@@ -1450,6 +1464,36 @@
         }catch(_){ }
       }
 
+      function getDeployLabTokenFromStorage(){
+        const el = $('deployLabTokenInput');
+        const direct = el ? String(el.value || '').trim() : '';
+        if(direct) return direct;
+        try{
+          return String(localStorage.getItem(LS_DEPLOY_LAB_TOKEN_KEY) || '').trim();
+        }catch(_){
+          return '';
+        }
+      }
+
+      function saveDeployLabToken(){
+        try{
+          const el = $('deployLabTokenInput');
+          localStorage.setItem(LS_DEPLOY_LAB_TOKEN_KEY, el ? String(el.value || '') : '');
+        }catch(_){ }
+      }
+
+      async function fetchReleaseComponents(platform, version, token){
+        const platformUp = platform === 'ios' ? 'IOS' : 'ANDROID';
+        const url = `${DEPLOY_LAB_BASE_URL}/releaseboss/admin_panel/release/${platformUp}_${version}/components`;
+        const data = await proxyRequestJson('GET', url, {
+          'accept': '*/*',
+          'authorization-deploy-lab': `Bearer ${token}`,
+          'origin': 'https://deploy-lab.wb.ru',
+          'referer': 'https://deploy-lab.wb.ru/'
+        }, undefined, null);
+        return Array.isArray(data && data.components) ? data.components : [];
+      }
+
       async function ytProxyGetJson(url, authHeader, signal){
         return proxyRequestJson('GET', url, {
           'Accept': 'application/json',
@@ -1901,6 +1945,18 @@
           const k = p.slice(0, i).trim();
           const v = p.slice(i + 1).trim();
           if(k === 'MMCSRF') return v;
+        }
+        return '';
+      }
+
+      function getMmUserIdFromCookies(cookieStr){
+        const parts = String(cookieStr || '').split(';').map((s) => s.trim()).filter(Boolean);
+        for(const p of parts){
+          const i = p.indexOf('=');
+          if(i === -1) continue;
+          const k = p.slice(0, i).trim();
+          const v = p.slice(i + 1).trim();
+          if(k === 'MMUSERID') return v;
         }
         return '';
       }
@@ -2875,8 +2931,9 @@
         return proxyRequestJson('POST', 'https://band.wb.ru/api/v4/posts', headers, payload, signal);
       }
 
-      async function bandPatchPost(postId, message, cfg, signal){
-        const targetPostId = String(postId || '').trim();
+      async function bandPatchPost(post, message, cfg, signal){
+        const postObj = (post && typeof post === 'object') ? post : { id: String(post || '') };
+        const targetPostId = String(postObj.id || '').trim();
         const normalizedMessage = normalizeBandMessageText(message);
         if(!targetPostId) throw new Error('Не задан id поста для обновления.');
         if(!normalizedMessage) throw new Error('Текст сообщения для обновления пуст.');
@@ -2890,9 +2947,21 @@
           ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
           [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
         };
-        return proxyRequestJson('PUT', `https://band.wb.ru/api/v4/posts/${encodeURIComponent(targetPostId)}/patch`, headers, {
-          message: normalizedMessage
-        }, signal);
+        const channelId = String(postObj.channel_id || postObj.channelId || '').trim();
+        const rootId = String(postObj.root_id || postObj.rootId || '').trim();
+        const body = (channelId || rootId)
+          ? {
+              ...postObj,
+              message: normalizedMessage,
+              channelId,
+              rootId,
+              fileInfos: [],
+              uploadsInProgress: [],
+              createAt: 0,
+              updateAt: 0
+            }
+          : { message: normalizedMessage };
+        return proxyRequestJson('PUT', `https://band.wb.ru/api/v4/posts/${encodeURIComponent(targetPostId)}/patch`, headers, body, signal);
       }
 
       function syncResolvedBuildToInput(value){
@@ -2985,6 +3054,26 @@
           if(targetUserId && String(post.user_id || '').trim() !== targetUserId) continue;
           if(normalizeBandMessageKey(post.message) !== targetMessage) continue;
           if(!found || getBandPostCreateAt(post) > getBandPostCreateAt(found)){
+            found = post;
+          }
+        }
+
+        return found;
+      }
+
+      function findEarliestOwnThreadPost(posts, rootPostId, userId){
+        const list = Array.isArray(posts) ? posts : [];
+        const rootId = String(rootPostId || '').trim();
+        const targetUserId = String(userId || '').trim();
+        let found = null;
+
+        for(const post of list){
+          if(!post || typeof post !== 'object') continue;
+          const deletedAt = Number(post.delete_at);
+          if(Number.isFinite(deletedAt) && deletedAt > 0) continue;
+          if(String(post.root_id || '').trim() !== rootId) continue;
+          if(targetUserId && String(post.user_id || '').trim() !== targetUserId) continue;
+          if(!found || getBandPostCreateAt(post) < getBandPostCreateAt(found)){
             found = post;
           }
         }
@@ -3945,13 +4034,19 @@
 
       const PUSH_IOS_STEPS = [
         { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishIos' },
-        { code: '2', title: 'Отправить опрос в тред', action: 'publishPollIos' },
-        { code: '3', title: 'Напоминание @qadutyios', action: 'publishAtReminderIos' }
+        { code: '2', title: 'Добавить дежурных из сбора', action: 'fillDutyIos' },
+        { code: '3', title: 'Отправить опрос в тред', action: 'publishPollIos' },
+        { code: '4', title: 'Напоминание @qadutyios', action: 'publishAtReminderIos' },
+        { code: '5', title: 'Опубликовать компоненты', action: 'publishComponentsIos', hasTimer: true },
+        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsIos' }
       ];
       const PUSH_AND_STEPS = [
         { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishAndroid' },
-        { code: '2', title: 'Отправить опрос в тред', action: 'publishPollAnd' },
-        { code: '3', title: 'Напоминание @qadutyandr', action: 'publishAtReminderAnd' }
+        { code: '2', title: 'Добавить дежурных из сбора', action: 'fillDutyAnd' },
+        { code: '3', title: 'Отправить опрос в тред', action: 'publishPollAnd' },
+        { code: '4', title: 'Напоминание @qadutyandr', action: 'publishAtReminderAnd' },
+        { code: '5', title: 'Опубликовать компоненты', action: 'publishComponentsAnd', hasTimer: true },
+        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsAnd' }
       ];
 
       function getNextTuesdayMsk(){
@@ -3995,6 +4090,255 @@
         ].join('\n');
       }
 
+      // Replaces the content between sectionHeader and nextSectionHeader with the given lines.
+      // Works even when normalizeBandMessageText has stripped empty lines (sections adjacent).
+      function fillTextSection(text, sectionHeader, nextSectionHeader, lines){
+        const startMarker = sectionHeader + '\n';
+        const endMarker = '\n' + nextSectionHeader;
+        const startIdx = text.indexOf(startMarker);
+        if(startIdx === -1) return text;
+        const contentStart = startIdx + startMarker.length;
+        const endIdx = text.indexOf(endMarker, startIdx + sectionHeader.length);
+        if(endIdx === -1) return text;
+        const newContent = lines.length ? lines.join('\n') + '\n' : '';
+        return text.slice(0, contentStart) + newContent + text.slice(endIdx);
+      }
+
+      function allureB64Query(filters){
+        return btoa(unescape(encodeURIComponent(JSON.stringify(filters))));
+      }
+
+      async function fetchAllureLaunchesByName(nameTerm){
+        const search = allureB64Query([{ id: 'name', type: 'string', value: nameTerm }]);
+        const url = `https://allure-testops.wb.ru/api/launch?page=0&size=100&projectId=7&preview=true&sort=createdDate%2Cdesc&search=${encodeURIComponent(search)}`;
+        const data = await proxyRequestJson('GET', url, allureHeaders(), undefined, null);
+        return (data && Array.isArray(data.content)) ? data.content : [];
+      }
+
+      async function fetchAllureRunsForPlatform(version, platform){
+        const platformTag = platform === 'ios' ? '[iOS]' : '[Android]';
+        const hbTerms = [
+          `[High/Blocker][DeployLab] Регресс ${version}`,
+          `[High/Blocker] Регресс ${version}`
+        ];
+        const selTerms = [
+          `[Selective][DeployLab] Регресс ${version}`,
+          `[Selective] Регресс ${version}`
+        ];
+
+        const byIdHB = new Map();
+        for(const term of hbTerms){
+          const items = await fetchAllureLaunchesByName(term);
+          for(const it of items){
+            const id = Number(it && it.id);
+            const name = String(it && it.name || '');
+            if(Number.isFinite(id) && name.includes(platformTag)) byIdHB.set(id, it);
+          }
+        }
+
+        const byIdSel = new Map();
+        for(const term of selTerms){
+          const items = await fetchAllureLaunchesByName(term);
+          for(const it of items){
+            const id = Number(it && it.id);
+            const name = String(it && it.name || '');
+            if(Number.isFinite(id) && name.includes(platformTag)) byIdSel.set(id, it);
+          }
+        }
+
+        const toUrl = (id) => `${ALLURE_LAUNCHES_BASE}/${id}`;
+        return {
+          blockerHigh: Array.from(byIdHB.values()).map(it => ({ id: it.id, url: toUrl(it.id), name: String(it.name || '') })),
+          selective: Array.from(byIdSel.values()).map(it => ({ id: it.id, url: toUrl(it.id), name: String(it.name || '') }))
+        };
+      }
+
+      async function fillRunsInThreadText(platform){
+        const isIos = platform === 'ios';
+        const label = isIos ? 'iOS' : 'Android';
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${label}.`);
+
+        logMajorPush(`[${label}] Ищу раны Allure для версии ${release}...`);
+        const { blockerHigh, selective } = await fetchAllureRunsForPlatform(release, platform);
+        logMajorPush(`[${label}] Blocker+High: ${blockerHigh.length} ран(а), Selective: ${selective.length} ран(а)`, 'ok');
+        for(const r of blockerHigh) logMajorPush(`  [H/B] ${r.name}`);
+        for(const r of selective) logMajorPush(`  [Sel] ${r.name}`);
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+        const userId = getMmUserIdFromCookies(cfg.bandCookiesRead) || BAND_POST_USER_ID;
+        const rootPost = await findReleaseFeedRootPost(platform, release, cfg);
+        const rootId = String(rootPost.id || '').trim();
+
+        const threadPosts = await bandFetchThreadPosts(rootId, cfg, null);
+        const mainPost = findEarliestOwnThreadPost(threadPosts, rootId, userId);
+        if(!mainPost) throw new Error('Основное сообщение в треде не найдено.');
+
+        const baseText = normalizeBandMessageText(mainPost.message);
+        const hbLines = blockerHigh.map((r) => `[${r.name}](${r.url})`);
+        const selLines = selective.map((r) => `[${r.name}](${r.url})`);
+
+        const textWithHB = fillTextSection(baseText, 'Blocker + High', 'Normal', hbLines);
+        logMajorPush(`[${label}] Патч 1/2: Blocker+High (${hbLines.length} ранов, ${textWithHB.length} симв.)...`);
+        await bandPatchPost(mainPost, textWithHB, cfg, null);
+        logMajorPush(`[${label}] Патч 1 OK.`, 'ok');
+
+        const textWithSel = fillTextSection(textWithHB, 'Normal', 'Дежурные:', selLines);
+        logMajorPush(`[${label}] Патч 2/2: Normal/Selective (${selLines.length} ранов, ${textWithSel.length} симв.)...`);
+        await bandPatchPost(mainPost, textWithSel, cfg, null);
+        logMajorPush(`[${label}] Патч 2 OK — раны вставлены.`, 'ok');
+      }
+
+      async function fillDutyOfficersInThreadText(platform){
+        const isIos = platform === 'ios';
+        const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        if(!textarea) throw new Error('Не найдено поле текста сообщения.');
+
+        const rows = (appState.lastRun && Array.isArray(appState.lastRun.rows)) ? appState.lastRun.rows : [];
+        if(!rows.length) throw new Error('Сначала выполни сбор дежурных во вкладке «Мажорный релиз».');
+
+        const lines = [];
+        for(const row of rows){
+          const stream = String(row.streamDisplay || row.stream || '').trim();
+          if(!stream) continue;
+          const duty = isIos ? (row.iosDuty || '') : (row.androidDuty || '');
+          if(duty) lines.push(`${stream} ${duty}`);
+        }
+
+        const text = String(textarea.value || '');
+        const marker = 'Дежурные:';
+        const markerIdx = text.indexOf(marker);
+        if(markerIdx === -1) throw new Error('В тексте не найдена строка «Дежурные:» — обнови шаблон.');
+
+        textarea.value = text.slice(0, markerIdx + marker.length)
+          + (lines.length ? '\n' + lines.join('\n') : '');
+
+        const label = isIos ? 'iOS' : 'Android';
+        logMajorPush(`[${label}] Дежурные вставлены (${lines.length} стримов), обновляю тред...`);
+
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${label}.`);
+        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+        const userId = getMmUserIdFromCookies(cfg.bandCookiesRead) || BAND_POST_USER_ID;
+        const feedPosts = await bandFetchChannelPostsSince(
+          RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
+        );
+        const rootPost = findLatestOwnRootPostByMessage(feedPosts, rootMessage, userId);
+        if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден в ленте релизов — сначала выполни шаг 1.`);
+        const rootId = String(rootPost.id || '').trim();
+        logMajorPush(`[${label}] Тред найден в ленте: ${rootId}`, 'ok');
+
+        const threadPosts = await bandFetchThreadPosts(rootId, cfg, null);
+        const mainPost = findEarliestOwnThreadPost(threadPosts, rootId, userId);
+        if(!mainPost) throw new Error('Основное сообщение в треде не найдено — сначала выполни шаг 1.');
+        logMajorPush(`[${label}] Найден пост для обновления: ${mainPost.id} (создан: ${new Date(mainPost.create_at).toLocaleTimeString('ru-RU')})`, 'ok');
+
+        const newText = normalizeBandMessageText(String(textarea.value || ''));
+        const existingText = normalizeBandMessageText(mainPost.message);
+        if(existingText === newText){
+          logMajorPush(`[${label}] Тред не изменён (актуален).`, 'ok');
+          return;
+        }
+        await bandPatchPost(mainPost, newText, cfg, null);
+        logMajorPush(`[${label}] Тред обновлён (patch ${mainPost.id}).`, 'ok');
+      }
+
+      async function publishComponentsToThread(platform, cfg, components){
+        const isIos = platform === 'ios';
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
+        const rootPost = await findReleaseFeedRootPost(platform, release, cfg);
+        const rootId = String(rootPost.id || '').trim();
+        const text = `Компоненты:\n${components.map((c) => `- ${c}`).join('\n')}`;
+        await bandCreatePost(text, cfg, null, { channelId: RELEASE_FEED_CHANNEL_ID, rootId });
+        logMajorPush(`Компоненты опубликованы в тред ${isIos ? 'iOS' : 'Android'} (${components.length} шт.)`, 'ok');
+      }
+
+      async function runComponentsFetchAndPublish(platform){
+        const isIos = platform === 'ios';
+        const token = getDeployLabTokenFromStorage();
+        if(!token) throw new Error('Не найден Deploy Lab token (заполни поле в настройках).');
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
+        logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Запрашиваю компоненты для ${isIos ? 'IOS' : 'ANDROID'}_${release}...`);
+        const components = await fetchReleaseComponents(platform, release, token);
+        logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Получено компонентов: ${components.length}`, 'ok');
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+        await publishComponentsToThread(platform, cfg, components);
+      }
+
+      function getNextHourTwoMs(){
+        const now = new Date();
+        const next = new Date(now);
+        next.setHours(now.getHours() + 1, 2, 0, 0);
+        return next.getTime();
+      }
+
+      async function fireComponentsTimer(platform){
+        const isIos = platform === 'ios';
+        const timerKey = isIos ? 'pushIosComponentsTimerId' : 'pushAndComponentsTimerId';
+        const nextKey = isIos ? 'pushIosComponentsNextFireMs' : 'pushAndComponentsNextFireMs';
+        const lastHourKey = isIos ? 'pushIosComponentsLastHour' : 'pushAndComponentsLastHour';
+        const label = isIos ? 'iOS' : 'Android';
+
+        logMajorPush(`[${label}] Автообновление компонентов по таймеру...`);
+        try{
+          await runComponentsFetchAndPublish(platform);
+        }catch(err){
+          logMajorPush(`[${label}] Ошибка автообновления: ${err.message || err}`, 'err');
+        }
+
+        const lastHour = Number(appState[lastHourKey]) || 0;
+        const currentHour = new Date().getHours();
+        if(lastHour > 0 && currentHour >= lastHour){
+          appState[timerKey] = 0;
+          appState[nextKey] = 0;
+          logMajorPush(`[${label}] Достигнут последний час (${lastHour}:02). Таймер остановлен.`, 'ok');
+          renderPushWorkflow();
+          return;
+        }
+
+        const nextMs = getNextHourTwoMs();
+        appState[nextKey] = nextMs;
+        appState[timerKey] = setTimeout(() => fireComponentsTimer(platform), nextMs - Date.now());
+        renderPushWorkflow();
+      }
+
+      function startComponentsTimer(platform){
+        const isIos = platform === 'ios';
+        const timerKey = isIos ? 'pushIosComponentsTimerId' : 'pushAndComponentsTimerId';
+        const nextKey = isIos ? 'pushIosComponentsNextFireMs' : 'pushAndComponentsNextFireMs';
+        if(appState[timerKey]){
+          clearTimeout(appState[timerKey]);
+          appState[timerKey] = 0;
+        }
+        const nextMs = getNextHourTwoMs();
+        appState[nextKey] = nextMs;
+        appState[timerKey] = setTimeout(() => fireComponentsTimer(platform), nextMs - Date.now());
+        renderPushWorkflow();
+      }
+
+      function stopComponentsTimer(platform){
+        const isIos = platform === 'ios';
+        const timerKey = isIos ? 'pushIosComponentsTimerId' : 'pushAndComponentsTimerId';
+        const nextKey = isIos ? 'pushIosComponentsNextFireMs' : 'pushAndComponentsNextFireMs';
+        if(appState[timerKey]){
+          clearTimeout(appState[timerKey]);
+          appState[timerKey] = 0;
+        }
+        appState[nextKey] = 0;
+        renderPushWorkflow();
+      }
+
       function logMajorPush(message, kind){
         const el = $('majorPushLogs');
         if(!el) return;
@@ -4007,11 +4351,13 @@
 
       function resetPushWorkflow(platform){
         if(!platform || platform === 'ios'){
+          stopComponentsTimer('ios');
           appState.pushIosCurrentIndex = 0;
           appState.pushIosStatuses = PUSH_IOS_STEPS.map(() => 'pending');
           appState.pushIosRunning = false;
         }
         if(!platform || platform === 'android'){
+          stopComponentsTimer('android');
           appState.pushAndCurrentIndex = 0;
           appState.pushAndStatuses = PUSH_AND_STEPS.map(() => 'pending');
           appState.pushAndRunning = false;
@@ -4057,10 +4403,40 @@
             : isLocked ? 'ring-1 ring-slate-200 bg-slate-100/80 release-launch-workflow-row-locked'
             : 'ring-1 ring-[#ecebff] bg-slate-50/70';
           const actionDis = (running || !isCurrent || status !== 'pending') ? 'disabled' : '';
+          const skipDis = (running || status !== 'pending') ? 'disabled' : '';
           const retryDis = (running || isLocked || status === 'pending' || status === 'running') ? 'disabled' : '';
           const retryBtn = (status === 'done' || status === 'skipped')
             ? `<button type="button" class="btn btn-soft" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="retry" ${retryDis}>Повторить</button>`
             : '';
+          const timerKey = isIos ? 'pushIosComponentsTimerId' : 'pushAndComponentsTimerId';
+          const nextKey = isIos ? 'pushIosComponentsNextFireMs' : 'pushAndComponentsNextFireMs';
+          const lastHourKey = isIos ? 'pushIosComponentsLastHour' : 'pushAndComponentsLastHour';
+          let timerBlock = '';
+          if(step.hasTimer && status === 'done'){
+            const activeTimer = !!appState[timerKey];
+            const nextMs = appState[nextKey];
+            const nextHour = nextMs ? new Date(nextMs).getHours() : 0;
+            const nextTimeStr = nextMs ? `${String(nextHour).padStart(2,'0')}:02` : '';
+            const lastHour = appState[lastHourKey] || 0;
+            if(activeTimer){
+              timerBlock = `<div class="mt-2 flex items-center gap-2 flex-wrap">
+                <span class="text-[11px] text-amber-700">Автообновление активно${nextTimeStr ? ` · следующий запуск в ${nextTimeStr}` : ''} · до ${String(lastHour).padStart(2,'0')}:02</span>
+                <button type="button" class="btn btn-soft text-rose-600 text-xs" data-push-platform="${platform}" data-push-timer="stop">Остановить</button>
+              </div>`;
+            }else{
+              const hourOptions = Array.from({ length: 23 }, (_, i) => i + 1)
+                .map((h) => `<option value="${h}"${h === lastHour ? ' selected' : ''}>${String(h).padStart(2,'0')}:02</option>`)
+                .join('');
+              timerBlock = `<div class="mt-2 flex items-center gap-2 flex-wrap">
+                <span class="text-[11px] text-slate-600">Последний час:</span>
+                <select class="text-xs border border-slate-300 rounded px-1 py-0.5" data-push-platform="${platform}" data-push-last-hour>
+                  <option value="0">—</option>
+                  ${hourOptions}
+                </select>
+                <button type="button" class="btn btn-soft text-xs" data-push-platform="${platform}" data-push-timer="start">Запустить таймер</button>
+              </div>`;
+            }
+          }
           return `
             <div class="rounded-2xl p-3 release-launch-workflow-row ${rowClass}">
               <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -4069,12 +4445,13 @@
                   <div>
                     <div class="text-sm font-semibold text-slate-800">${step.code}. ${escHtml(step.title)}</div>
                     <span class="inline-flex items-center mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ring-1 ${badgeClass}">${text}</span>
+                    ${timerBlock}
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
                   ${retryBtn}
-                  <button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="yes" ${actionDis}>Да</button>
-                  <button type="button" class="btn btn-soft" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="no" ${actionDis}>Нет</button>
+                  ${status === 'pending' ? `<button type="button" class="btn btn-soft text-slate-500" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="no" ${skipDis}>Пропустить</button>` : ''}
+                  <button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="yes" ${actionDis}>Выполнить</button>
                 </div>
               </div>
             </div>`;
@@ -4235,6 +4612,19 @@
         return result;
       }
 
+      async function findReleaseFeedRootPost(platform, release, cfg){
+        const isIos = platform === 'ios';
+        const rootMessage = isIos ? `#IOS #Release ${release}` : `#Android #Release ${release}`;
+        const userId = getMmUserIdFromCookies(cfg.bandCookiesRead) || BAND_POST_USER_ID;
+        const feedPosts = await bandFetchChannelPostsSince(
+          RELEASE_FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, cfg, null
+        );
+        const rootPost = findLatestOwnRootPostByMessage(feedPosts, rootMessage, userId);
+        if(!rootPost) throw new Error(`Тред "${rootMessage}" не найден в ленте релизов — сначала выполни шаг 1.`);
+        logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Тред найден в ленте: ${rootPost.id}`, 'ok');
+        return rootPost;
+      }
+
       async function publishMajorPollToThread(platform, feedPosts, cfg){
         const isIos = platform === 'ios';
         const pollTextarea = $('majorPollText');
@@ -4279,6 +4669,36 @@
         }
         if(action === 'publishAndroid'){
           await publishMajorReleaseFeedPost('android');
+          return;
+        }
+        if(action === 'fillDutyIos'){
+          await fillDutyOfficersInThreadText('ios');
+          showToast('Дежурные iOS добавлены и тред обновлён');
+          return;
+        }
+        if(action === 'fillDutyAnd'){
+          await fillDutyOfficersInThreadText('android');
+          showToast('Дежурные Android добавлены и тред обновлён');
+          return;
+        }
+        if(action === 'fillRunsIos'){
+          await fillRunsInThreadText('ios');
+          showToast('Раны Allure iOS вставлены');
+          return;
+        }
+        if(action === 'fillRunsAnd'){
+          await fillRunsInThreadText('android');
+          showToast('Раны Allure Android вставлены');
+          return;
+        }
+        if(action === 'publishComponentsIos'){
+          await runComponentsFetchAndPublish('ios');
+          showToast('Компоненты iOS опубликованы');
+          return;
+        }
+        if(action === 'publishComponentsAnd'){
+          await runComponentsFetchAndPublish('android');
+          showToast('Компоненты Android опубликованы');
           return;
         }
         if(action === 'publishPollIos'){
@@ -4346,22 +4766,27 @@
           return;
         }
 
-        if(stepIdx !== appState[currentKey]) return;
         if(appState[statusesKey][stepIdx] !== 'pending') return;
 
         const step = steps[stepIdx];
 
         if(decision === 'no'){
           appState[statusesKey][stepIdx] = 'skipped';
-          appState[currentKey] += 1;
           logMajorPush(`[${label}][${step.code}] Пропущено.`, 'warn');
-          renderPushWorkflow();
-          if(appState[currentKey] >= steps.length){
-            showToast(`Все шаги ${label} пройдены`);
+          if(stepIdx === appState[currentKey]){
+            appState[currentKey] += 1;
+            while(appState[currentKey] < steps.length && appState[statusesKey][appState[currentKey]] === 'skipped'){
+              appState[currentKey] += 1;
+            }
+            if(appState[currentKey] >= steps.length){
+              showToast(`Все шаги ${label} пройдены`);
+            }
           }
+          renderPushWorkflow();
           return;
         }
 
+        if(stepIdx !== appState[currentKey]) return;
         if(decision !== 'yes') return;
 
         appState[runningKey] = true;
@@ -4372,6 +4797,9 @@
           await runPushWorkflowStepAction(step.action);
           appState[statusesKey][stepIdx] = 'done';
           appState[currentKey] += 1;
+          while(appState[currentKey] < steps.length && appState[statusesKey][appState[currentKey]] === 'skipped'){
+            appState[currentKey] += 1;
+          }
           logMajorPush(`[${label}][${step.code}] Выполнено.`, 'ok');
           if(appState[currentKey] >= steps.length){
             showToast(`Все шаги ${label} пройдены!`);
@@ -4711,6 +5139,14 @@
         if(ytTokenInput){
           ytTokenInput.value = getYtTokenFromStorage();
         }
+        const deployLabTokenInput = $('deployLabTokenInput');
+        if(deployLabTokenInput){
+          try{
+            deployLabTokenInput.value = String(localStorage.getItem(LS_DEPLOY_LAB_TOKEN_KEY) || '');
+          }catch(_){ }
+          deployLabTokenInput.addEventListener('input', saveDeployLabToken);
+          deployLabTokenInput.addEventListener('change', saveDeployLabToken);
+        }
         if(runReleaseInput){
           try{
             runReleaseInput.value = String(localStorage.getItem(LS_RUN_RELEASE_KEY) || '');
@@ -4899,8 +5335,26 @@
         resultsCopyBtn?.addEventListener('click', copyCurrentDutiesMessage);
         copyPingBtn?.addEventListener('click', copyPingMessage);
 
+        // Push workflow — last hour selector change
+        document.addEventListener('change', (e) => {
+          const sel = e.target.closest('[data-push-last-hour]');
+          if(!sel) return;
+          const tp = String(sel.getAttribute('data-push-platform') || 'ios');
+          const h = Number(sel.value) || 0;
+          if(tp === 'ios') appState.pushIosComponentsLastHour = h;
+          else appState.pushAndComponentsLastHour = h;
+        });
+
         // Push workflow — делегирование кликов по шагам вкладки Релиз
         document.addEventListener('click', (e) => {
+          const timerBtn = e.target.closest('[data-push-timer]');
+          if(timerBtn){
+            const tp = String(timerBtn.getAttribute('data-push-platform') || 'ios');
+            const action = timerBtn.getAttribute('data-push-timer');
+            if(action === 'start') startComponentsTimer(tp);
+            else if(action === 'stop') stopComponentsTimer(tp);
+            return;
+          }
           const btn = e.target.closest('[data-push-step]');
           if(!btn) return;
           const platform = String(btn.getAttribute('data-push-platform') || 'ios');
