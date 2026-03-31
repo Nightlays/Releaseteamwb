@@ -3223,7 +3223,8 @@ document.addEventListener('DOMContentLoaded', () => {
     {
       id: 'youtrack-wiki-v4.html',
       label: 'Wiki Intelligence v4',
-      aliases: ['yt-wiki', 'youtrack-wiki', 'wiki-intelligence']
+      aliases: ['yt-wiki', 'youtrack-wiki', 'wiki-intelligence'],
+      requiresSuperadmin: true
     }
   ];
   const hiddenModulesById = new Map(HIDDEN_MODULES.map(module => [module.id, module]));
@@ -3886,12 +3887,25 @@ document.addEventListener('DOMContentLoaded', () => {
     id,
     label: getButtonLabel(group[0])
   }));
+  let currentModuleId = '';
 
   function resolveModuleRequest(raw) {
     const value = String(raw || '').trim();
     if (!value) return '';
     if (buttonsByModule.has(value) || hiddenModulesById.has(value)) return value;
     return hiddenModuleAliasMap.get(value.toLowerCase()) || '';
+  }
+
+  function isModuleAllowed(moduleId, roleId = (localStorage.getItem(ROLE_KEY) || 'viewer')) {
+    const hiddenModule = hiddenModulesById.get(moduleId);
+    if (!hiddenModule) return true;
+    if (hiddenModule.requiresSuperadmin) return roleId === 'superadmin';
+    return true;
+  }
+
+  function getFirstVisibleModuleId() {
+    const visible = buttons.find(btn => btn.style.display !== 'none');
+    return visible ? visible.getAttribute('data-module') || '' : '';
   }
 
   function syncModuleQuery(moduleId) {
@@ -4106,6 +4120,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return group.some(btn => btn.classList.contains('active'));
     });
     if (!activeVisible) {
+      activateButton(visibleModules[0].id);
+      return;
+    }
+    if (currentModuleId && !isModuleAllowed(currentModuleId, roleId)) {
       activateButton(visibleModules[0].id);
     }
   }
@@ -4380,6 +4398,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function activateButton(target) {
     const moduleId = typeof target === 'string' ? target : target?.getAttribute('data-module');
     if (!moduleId) return;
+    const currentRoleId = localStorage.getItem(ROLE_KEY) || 'viewer';
+    if (!isModuleAllowed(moduleId, currentRoleId)) {
+      showToast('Модуль Wiki Intelligence v4 доступен только суперадмину', 'warning', { title: 'Доступ' });
+      const fallbackModuleId = getFirstVisibleModuleId();
+      if (fallbackModuleId && fallbackModuleId !== moduleId) activateButton(fallbackModuleId);
+      return;
+    }
     const relatedButtons = buttonsByModule.get(moduleId) || [];
     const sourceBtn = relatedButtons.find(btn => btn.closest('.sidebar-tabs')) || relatedButtons[0] || null;
     const hiddenModule = hiddenModulesById.get(moduleId) || null;
@@ -4396,6 +4421,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (finalUrl && frame.src !== finalUrl) {
       frame.src = finalUrl;
     }
+    currentModuleId = moduleId;
     syncModuleQuery(moduleId);
 
     // гарды вкладок на body
