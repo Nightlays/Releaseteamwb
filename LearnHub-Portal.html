@@ -407,9 +407,8 @@ async function hydrateCriticalLearningData(){
   [...baseCourses, ...legacyLocal, ...legacyRemote].forEach(course=>{
     if(course && course.id) mergedMap.set(course.id, course);
   });
-  const mergedCourses = Array.from(mergedMap.values());
-  if(mergedCourses.length && mergedCourses.length !== baseCourses.length){
-    S.s('courses', mergedCourses);
+  if(mergedMap.size){
+    window.LH_MEMORY.coursesMerged = Array.from(mergedMap.values());
   }
 }
 
@@ -433,10 +432,11 @@ const ROLE_MAP={'admin':'Администратор','manager':'Руководи
 // Seed data
 function seedData(){
   const hasUsers = asArray(S.g('users', [])).length > 0;
-  const hasCourses = asArray(S.g('courses', [])).length > 0;
+  const existingCourses = asArray(S.g('courses', []));
+  const hasCourses = existingCourses.length > 0;
   const hasRoles = asArray(S.g('roles', [])).length > 0;
   const hasEnrollments = asArray(S.g('enrollments', [])).length > 0;
-  if(S.g('seeded') && hasUsers && hasCourses && hasRoles && hasEnrollments)return;
+  const enrolledCourseIds = new Set(asArray(S.g('enrollments', [])).map(e=>e?.courseId).filter(Boolean));
   const users=[
     {id:'u1',firstName:'Дмитрий',lastName:'Александров',email:'dmitry@company.com',role:'admin',managerId:null,xp:1240,level:5},
     {id:'u2',firstName:'Анна',lastName:'Иванова',email:'anna@company.com',role:'employee',managerId:'u1',xp:2100,level:7},
@@ -537,8 +537,22 @@ function seedData(){
     {id:'sub2',userId:'u3',courseId:'c1',stepId:'s3',stepTitle:'Тест: Основы',courseTitle:'Основы IT-менеджмента',type:'step_answer',content:'Управлять командой и проектами — это основная задача.',score:null,status:'approved',managerId:'u1',submittedAt:'2026-03-12T14:00:00',reviewedAt:'2026-03-12T16:00:00',reviewNote:'Отличный развёрнутый ответ!'},
     {id:'sub3',userId:'u4',courseId:'c1',stepId:'s5',stepTitle:'Тест по Agile',courseTitle:'Основы IT-менеджмента',type:'step_answer',content:'Люди важнее процессов',score:null,status:'rejected',managerId:'u1',submittedAt:'2026-03-14T09:00:00',reviewedAt:'2026-03-14T11:00:00',reviewNote:'Ответ слишком краткий.'},
   ];
+  const seedCourseIds = courses.map(c=>c.id);
+  const missingReferencedSeedCourses = seedCourseIds.filter(id=>enrolledCourseIds.has(id) && !existingCourses.some(course=>course?.id===id));
+  const shouldRecoverSeedCourses = !hasCourses || missingReferencedSeedCourses.length > 0;
+  if(S.g('seeded') && hasUsers && hasCourses && hasRoles && hasEnrollments && !shouldRecoverSeedCourses)return;
   if(!hasUsers)S.s('users',users);
-  if(!hasCourses)S.s('courses',courses);
+  if(shouldRecoverSeedCourses){
+    const mergedCourses = new Map(existingCourses.filter(Boolean).map(course=>[course.id, course]));
+    courses.forEach(course=>{
+      if(course?.id && !mergedCourses.has(course.id)) mergedCourses.set(course.id, course);
+    });
+    const mergedLegacy = asArray(window.LH_MEMORY.coursesMerged || []);
+    mergedLegacy.forEach(course=>{
+      if(course?.id && !mergedCourses.has(course.id)) mergedCourses.set(course.id, course);
+    });
+    S.s('courses', Array.from(mergedCourses.values()));
+  }
   if(!hasEnrollments)S.s('enrollments',enrollments);
   if(asArray(S.g('stepProgress',[])).length===0)S.s('stepProgress',stepProgress);
   if(asArray(S.g('achievements',[])).length===0)S.s('achievements',achievements);
