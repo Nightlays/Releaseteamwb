@@ -2185,7 +2185,6 @@
       try {
         const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
         const url = new URL(candidate);
-        if (isHostedMode() && isLocalHostname(url.hostname) && String(url.port || "80") === "8787") return fallback;
         return url.toString().replace(/\/+$/, "");
       } catch {
         return fallback;
@@ -2222,11 +2221,33 @@
         const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
         const url = new URL(candidate);
         if (isCoreLlmBase(url.toString())) return getDefaultLlmBase(modelRaw);
-        if (isLocalLlmAdapterBase(url.toString())) return getDefaultLlmBase(modelRaw);
+        if (isLocalLlmAdapterBase(url.toString())) return DEFAULT_LOCAL_LLM_BASE;
         return /\/v1$/i.test(url.toString().replace(/\/+$/, "")) ? url.toString().replace(/\/+$/, "") : `${url.toString().replace(/\/+$/, "")}/v1`;
       } catch {
         return fallback;
       }
+    }
+
+    function buildProxyHealthUrlForBase(proxyBaseRaw) {
+      const proxyBase = normalizeProxyBase(proxyBaseRaw);
+      const url = new URL(proxyBase);
+      if (/\/proxy$/i.test(url.pathname)) {
+        url.pathname = url.pathname.replace(/\/proxy$/i, "/health");
+      } else {
+        url.pathname = url.pathname.replace(/\/+$/, "") + "/health";
+      }
+      return url.toString();
+    }
+
+    function buildLlmHealthUrlForBase(llmBaseRaw, modelRaw = ui?.llmModelInput?.value || "") {
+      const base = normalizeLlmBaseUrl(llmBaseRaw, modelRaw);
+      const url = new URL(base);
+      if (/\/v1$/i.test(url.pathname)) {
+        url.pathname = url.pathname.replace(/\/v1$/i, "/health");
+      } else {
+        url.pathname = url.pathname.replace(/\/+$/, "") + "/health";
+      }
+      return url.toString();
     }
 
     function syncProxyBaseInput({ silent = false } = {}) {
@@ -2438,14 +2459,7 @@
     }
 
     function buildProxyHealthUrl() {
-      const proxyBase = normalizeProxyBase(ui.proxyBaseInput.value);
-      const url = new URL(proxyBase);
-      if (/\/proxy$/i.test(url.pathname)) {
-        url.pathname = url.pathname.replace(/\/proxy$/i, "/health");
-      } else {
-        url.pathname = url.pathname.replace(/\/+$/, "") + "/health";
-      }
-      return url.toString();
+      return buildProxyHealthUrlForBase(ui.proxyBaseInput.value);
     }
 
     function shouldBypassProxy(targetUrl) {
@@ -5075,6 +5089,7 @@
     }
 
     async function checkConnections() {
+      await autoConfigureHostedBackends();
       renderStatus();
       if (!ui.useProxyInput.checked) {
         state.proxyHealth = "disabled";
@@ -5092,6 +5107,79 @@
       }
       renderStatus();
       showToast("Статусы подключений обновлены", state.proxyHealth === "healthy" ? "ok" : "warn");
+    }
+
+    async function probeHealth(url, { timeoutMs = 2200 } = {}) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, {
+          cache: "no-store",
+          signal: controller.signal
+        });
+        if (!response.ok) return { ok: false, status: response.status };
+        const payload = await response.json().catch(() => ({}));
+        return {
+          ok: payload?.ok === true || payload?.status === "ok",
+          status: response.status,
+          payload
+        };
+      } catch (error) {
+        return { ok: false, error: String(error?.message || error) };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function autoConfigureHostedBackends() {
+      if (!isHostedMode()) return;
+      const origin = getBrowserOrigin();
+      if (!origin) return;
+
+      const hostedProxyBase = origin;
+      const localProxyBase = DEFAULT_PROXY;
+      const model = normalizeLlmModel(ui.llmModelInput.value);
+      const hostedLlmBase = `${origin}/llm/v1`;
+      const localLlmBase = DEFAULT_LOCAL_LLM_BASE;
+
+      const currentProxy = normalizeProxyBase(ui.proxyBaseInput.value);
+      const currentLlm = normalizeLlmBaseUrl(ui.llmBaseUrlInput.value, model);
+
+      const proxyLooksHosted = !currentProxy || currentProxy === hostedProxyBase;
+      const llmLooksHosted = shouldUseCoreAdapter(model) && (!currentLlm || currentLlm === hostedLlmBase);
+
+      const [hostedProxyHealth, hostedLlmHealth] = await Promise.all([
+        probeHealth(buildProxyHealthUrlForBase(hostedProxyBase)),
+        llmLooksHosted ? probeHealth(buildLlmHealthUrlForBase(hostedLlmBase, model)) : Promise.resolve({ ok: false })
+      ]);
+
+      let changed = false;
+
+      if (proxyLooksHosted && !hostedProxyHealth.ok) {
+        ui.proxyBaseInput.value = localProxyBase;
+        changed = true;
+      } else if (!currentProxy && hostedProxyHealth.ok) {
+        ui.proxyBaseInput.value = hostedProxyBase;
+        changed = true;
+      }
+
+      if (llmLooksHosted) {
+        if (!hostedLlmHealth.ok) {
+          ui.llmBaseUrlInput.value = localLlmBase;
+          changed = true;
+        } else if (!currentLlm && hostedLlmHealth.ok) {
+          ui.llmBaseUrlInput.value = hostedLlmBase;
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        syncProxyBaseInput({ silent: true });
+        syncLlmBaseUrlInput({ silent: true });
+        saveState();
+        renderAll();
+        showToast("На хосте не найден backend. Переключено на локальные proxy / LLM.", "warn");
+      }
     }
 
     function openSettings() {
@@ -5396,9 +5484,12 @@
     restoreState();
     bindEvents();
     renderAll();
-    if ((ui.tokenInput.value.trim() || ui.wikiTokenInput.value.trim()) && ui.queryInput.value.trim()) {
-      runResearch({ forceLocal: true });
-    }
+    (async () => {
+      await autoConfigureHostedBackends().catch(() => {});
+      if ((ui.tokenInput.value.trim() || ui.wikiTokenInput.value.trim()) && ui.queryInput.value.trim()) {
+        runResearch({ forceLocal: true });
+      }
+    })();
   </script>
 </body>
 </html>
