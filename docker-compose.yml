@@ -1,0 +1,39 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    depends_on:
+      - proxy
+      - llm
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - ./:/usr/share/nginx/html:ro
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+  proxy:
+    build:
+      context: .
+      dockerfile: deploy/node.Dockerfile
+    working_dir: /app
+    command: ["node", "proxy-standalone.js"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+    restart: unless-stopped
+
+  llm:
+    build:
+      context: .
+      dockerfile: deploy/node.Dockerfile
+    working_dir: /app
+    command: ["node", "glm-zai-local-adapter.mjs"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8789
+      GLM_UPSTREAM_BASE: "${GLM_UPSTREAM_BASE:-https://corellm.wb.ru/glm-47/v1}"
+      GLM_MODEL: "${GLM_MODEL:-glm-4.7}"
+      GLM_API_KEY: "${GLM_API_KEY}"
+    restart: unless-stopped
