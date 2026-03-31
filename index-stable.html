@@ -1459,6 +1459,7 @@ table { font-size: 13.5px; }
   body:not(.role-superadmin) #accessToggleBtn{ display:none !important; }
   body:not(.role-superadmin) #roleAccessCard{ display:none !important; }
   body:not(.role-superadmin) #userAccessCard{ display:none !important; }
+  body:not(.role-superadmin) [data-superadmin-only="true"]{ display:none !important; }
   .user-create-card{
     padding:14px;
     border:1px solid var(--line);
@@ -2222,6 +2223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button data-module="Графики.html"data-guard="shell--finalchp">Графики</button>
     <button data-module="SWAT релиз.html"data-guard="shell--finalchp">SWAT релиз</button>
     <button data-module="Копирование данных из YT.html"data-guard="shell--finalchp">Epic / User Story</button>
+    <button data-module="youtrack-wiki-v4.html" data-superadmin-only="true">Wiki Intelligence v4</button>
     <!-- Пример для будущих модулей:
     <button data-module="swat_only.html">SWAT-таблица</button>
     <button data-module="bi_users_calc.html">Статистика BI</button>
