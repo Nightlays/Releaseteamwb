@@ -332,6 +332,46 @@ const S={
   }
 };
 
+window.fbFetchKey = function(key){
+  return new Promise(function(resolve){
+    if(!window.fbReady || !window.fbDB){ resolve(null); return; }
+    window.fbDB.ref('lh/'+key).once('value').then(function(snap){
+      var data = snap.val();
+      resolve(data == null ? null : window.fbToLocal(key, data));
+    }).catch(function(e){
+      console.warn('[LearnHub] FB fetch key error:', key, e);
+      resolve(null);
+    });
+  });
+};
+
+const asArray = (value)=>Array.isArray(value) ? value.filter(Boolean) : (value && typeof value === 'object' ? Object.values(value).filter(Boolean) : []);
+const hasData = (value)=>Array.isArray(value) ? value.length > 0 : !!(value && (typeof value !== 'object' || Object.keys(value).length));
+
+async function hydrateCriticalLearningData(){
+  const criticalKeys = ['courses','enrollments','stepProgress','notifications','achievements','userAchievements','submissions','users','roles'];
+  for(const key of criticalKeys){
+    const localValue = S.g(key, null);
+    if(hasData(localValue)) continue;
+    const remoteValue = await window.fbFetchKey(key);
+    if(hasData(remoteValue)){
+      try{ localStorage.setItem('lh_'+key, JSON.stringify(remoteValue)); }catch(e){}
+    }
+  }
+
+  const baseCourses = asArray(S.g('courses', []));
+  const legacyLocal = asArray(S.g('courses_custom', []));
+  const legacyRemote = asArray(await window.fbFetchKey('courses_custom'));
+  const mergedMap = new Map();
+  [...baseCourses, ...legacyLocal, ...legacyRemote].forEach(course=>{
+    if(course && course.id) mergedMap.set(course.id, course);
+  });
+  const mergedCourses = Array.from(mergedMap.values());
+  if(mergedCourses.length && mergedCourses.length !== baseCourses.length){
+    S.s('courses', mergedCourses);
+  }
+}
+
 // Course cover helpers
 const getCoverStyle=(c)=>c?.coverImage
   ?{backgroundImage:`url(${c.coverImage})`,backgroundSize:'cover',backgroundPosition:'center'}
@@ -351,7 +391,11 @@ const ROLE_MAP={'admin':'Администратор','manager':'Руководи
 
 // Seed data
 function seedData(){
-  if(S.g('seeded'))return;
+  const hasUsers = asArray(S.g('users', [])).length > 0;
+  const hasCourses = asArray(S.g('courses', [])).length > 0;
+  const hasRoles = asArray(S.g('roles', [])).length > 0;
+  const hasEnrollments = asArray(S.g('enrollments', [])).length > 0;
+  if(S.g('seeded') && hasUsers && hasCourses && hasRoles && hasEnrollments)return;
   const users=[
     {id:'u1',firstName:'Дмитрий',lastName:'Александров',email:'dmitry@company.com',role:'admin',managerId:null,xp:1240,level:5},
     {id:'u2',firstName:'Анна',lastName:'Иванова',email:'anna@company.com',role:'employee',managerId:'u1',xp:2100,level:7},
@@ -452,8 +496,16 @@ function seedData(){
     {id:'sub2',userId:'u3',courseId:'c1',stepId:'s3',stepTitle:'Тест: Основы',courseTitle:'Основы IT-менеджмента',type:'step_answer',content:'Управлять командой и проектами — это основная задача.',score:null,status:'approved',managerId:'u1',submittedAt:'2026-03-12T14:00:00',reviewedAt:'2026-03-12T16:00:00',reviewNote:'Отличный развёрнутый ответ!'},
     {id:'sub3',userId:'u4',courseId:'c1',stepId:'s5',stepTitle:'Тест по Agile',courseTitle:'Основы IT-менеджмента',type:'step_answer',content:'Люди важнее процессов',score:null,status:'rejected',managerId:'u1',submittedAt:'2026-03-14T09:00:00',reviewedAt:'2026-03-14T11:00:00',reviewNote:'Ответ слишком краткий.'},
   ];
-  S.s('users',users);S.s('courses',courses);S.s('enrollments',enrollments);S.s('stepProgress',stepProgress);
-  S.s('achievements',achievements);S.s('userAchievements',userAchievements);S.s('notifications',notifications);S.s('roles',roles);S.s('submissions',submissions);S.s('seeded',true);
+  if(!hasUsers)S.s('users',users);
+  if(!hasCourses)S.s('courses',courses);
+  if(!hasEnrollments)S.s('enrollments',enrollments);
+  if(asArray(S.g('stepProgress',[])).length===0)S.s('stepProgress',stepProgress);
+  if(asArray(S.g('achievements',[])).length===0)S.s('achievements',achievements);
+  if(asArray(S.g('userAchievements',[])).length===0)S.s('userAchievements',userAchievements);
+  if(asArray(S.g('notifications',[])).length===0)S.s('notifications',notifications);
+  if(!hasRoles)S.s('roles',roles);
+  if(asArray(S.g('submissions',[])).length===0)S.s('submissions',submissions);
+  S.s('seeded',true);
 }
 // seedData() is called after Firebase sync in the async init block below
 
@@ -634,9 +686,15 @@ function CatalogPage(){
   const{user,go,toast:addToast}=useApp();
   const[cat,setCat]=useState('Все');
   const[q,setQ]=useState('');
-  const courses=S.g('courses',[]).filter(c=>c.status==='published');
+  const[courses,setCourses]=useState(S.g('courses',[]));
   const[enrs,setEnrs]=useState(S.g('enrollments',[]));
-  const filtered=courses.filter(c=>(cat==='Все'||c.category===cat)&&c.title.toLowerCase().includes(q.toLowerCase()));
+  useEffect(()=>{
+    const unsubCourses=window.fbWatch('courses',arr=>{ if(Array.isArray(arr)) setCourses(arr); });
+    const unsubEnrollments=window.fbWatch('enrollments',arr=>{ if(Array.isArray(arr)) setEnrs(arr); });
+    return()=>{ unsubCourses(); unsubEnrollments(); };
+  },[]);
+  const publishedCourses=courses.filter(c=>c.status==='published');
+  const filtered=publishedCourses.filter(c=>(cat==='Все'||c.category===cat)&&c.title.toLowerCase().includes(q.toLowerCase()));
   const enroll=(cid)=>{
     if(enrs.find(e=>e.userId===user.id&&e.courseId===cid)){addToast('info','Вы уже записаны');return}
     const ne={userId:user.id,courseId:cid,progress:0,status:'active',startedAt:new Date().toISOString()};
@@ -1066,6 +1124,15 @@ function ConstructorPage(){
   const[forms,setForms]=useState({cTitle:'',cDesc:'',cCat:CATS[0],cGrad:GRADS[0],mTitle:'',lTitle:'',sTitle:'',sType:'text'});
   const[selModId,setSelModId]=useState(null);
   const[selLesId,setSelLesId]=useState(null);
+
+  useEffect(()=>{
+    const unsubCourses=window.fbWatch('courses',arr=>{
+      if(!Array.isArray(arr)) return;
+      setCourses(arr);
+      setCur(prev=>prev ? (arr.find(c=>c.id===prev.id) || null) : prev);
+    });
+    return()=>unsubCourses();
+  },[]);
 
   const save=(updated)=>{setCourses(updated);S.s('courses',updated);if(cur){const found=updated.find(c=>c.id===cur.id);if(found)setCur(found)}};
   const openM=(k,extra)=>{setModals({...modals,[k]:true});if(extra)setForms(f=>({...f,...extra}))};
@@ -1879,7 +1946,9 @@ function App(){
 // Sync Firebase → localStorage, then seed demo data if needed, then render
 (async function(){
   await window.fbSync();
+  await hydrateCriticalLearningData();
   seedData();
+  await hydrateCriticalLearningData();
   ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 })();
 </script>
