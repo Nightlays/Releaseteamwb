@@ -3219,6 +3219,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!buttonsByModule.has(moduleId)) buttonsByModule.set(moduleId, []);
     buttonsByModule.get(moduleId).push(btn);
   });
+  const HIDDEN_MODULES = [
+    {
+      id: 'youtrack-wiki-v4.html',
+      label: 'Wiki Intelligence v4',
+      aliases: ['yt-wiki', 'youtrack-wiki', 'wiki-intelligence']
+    }
+  ];
+  const hiddenModulesById = new Map(HIDDEN_MODULES.map(module => [module.id, module]));
+  const hiddenModuleAliasMap = new Map();
+  HIDDEN_MODULES.forEach(module => {
+    (module.aliases || []).forEach(alias => {
+      hiddenModuleAliasMap.set(String(alias || '').trim().toLowerCase(), module.id);
+    });
+  });
   const guardClasses = buttons
     .map(b => b.getAttribute('data-guard'))
     .filter(Boolean);
@@ -3873,6 +3887,22 @@ document.addEventListener('DOMContentLoaded', () => {
     label: getButtonLabel(group[0])
   }));
 
+  function resolveModuleRequest(raw) {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    if (buttonsByModule.has(value) || hiddenModulesById.has(value)) return value;
+    return hiddenModuleAliasMap.get(value.toLowerCase()) || '';
+  }
+
+  function syncModuleQuery(moduleId) {
+    if (!moduleId) return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('module', moduleId);
+      window.history.replaceState({}, '', url.toString());
+    } catch (e) {}
+  }
+
   const loadConfig = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
   loadConfig.then((cfg) => {
     const roles = Array.isArray(cfg?.roles) ? cfg.roles : [];
@@ -4351,8 +4381,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const moduleId = typeof target === 'string' ? target : target?.getAttribute('data-module');
     if (!moduleId) return;
     const relatedButtons = buttonsByModule.get(moduleId) || [];
-    const sourceBtn = relatedButtons.find(btn => btn.closest('.sidebar-tabs')) || relatedButtons[0];
-    if (!sourceBtn) return;
+    const sourceBtn = relatedButtons.find(btn => btn.closest('.sidebar-tabs')) || relatedButtons[0] || null;
+    const hiddenModule = hiddenModulesById.get(moduleId) || null;
+    if (!sourceBtn && !hiddenModule) return;
 
     // визульное состояние
     buttons.forEach(b => {
@@ -4365,12 +4396,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (finalUrl && frame.src !== finalUrl) {
       frame.src = finalUrl;
     }
+    syncModuleQuery(moduleId);
 
     // гарды вкладок на body
     if (guardClasses.length) {
       document.body.classList.remove(...guardClasses);
     }
-    const guard = sourceBtn.getAttribute('data-guard');
+    const guard = sourceBtn?.getAttribute('data-guard') || hiddenModule?.guard || '';
     if (guard) {
       document.body.classList.add(guard);
     }
@@ -4387,8 +4419,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Активируем первую кнопку по умолчанию, если она есть
+  const requestedModule = resolveModuleRequest(new URLSearchParams(location.search).get('module'));
   const initiallyActive = buttons.find(b => b.classList.contains('active')) || buttons[0];
-  if (initiallyActive) activateButton(initiallyActive.getAttribute('data-module'));
+  if (requestedModule) {
+    activateButton(requestedModule);
+  } else if (initiallyActive) {
+    activateButton(initiallyActive.getAttribute('data-module'));
+  }
 
   loadRuntimeProxyConfig().then((freshCfg) => {
     const freshBase = normalizeProxyBase(freshCfg?.base || '');

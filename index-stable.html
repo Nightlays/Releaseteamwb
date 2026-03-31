@@ -2374,6 +2374,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!tabBar || !frame) return;
 
   const buttons = Array.from(tabBar.querySelectorAll('[data-module]'));
+  const HIDDEN_MODULES = [
+    {
+      id: 'youtrack-wiki-v4.html',
+      label: 'Wiki Intelligence v4',
+      aliases: ['yt-wiki', 'youtrack-wiki', 'wiki-intelligence']
+    }
+  ];
+  const hiddenModulesById = new Map(HIDDEN_MODULES.map(module => [module.id, module]));
+  const hiddenModuleAliasMap = new Map();
+  HIDDEN_MODULES.forEach(module => {
+    (module.aliases || []).forEach(alias => {
+      hiddenModuleAliasMap.set(String(alias || '').trim().toLowerCase(), module.id);
+    });
+  });
   const guardClasses = buttons
     .map(b => b.getAttribute('data-guard'))
     .filter(Boolean);
@@ -2618,6 +2632,22 @@ document.addEventListener('DOMContentLoaded', () => {
     id: btn.getAttribute('data-module'),
     label: (btn.textContent || '').trim()
   }));
+
+  function resolveModuleRequest(raw) {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    if (buttons.some(btn => btn.getAttribute('data-module') === value) || hiddenModulesById.has(value)) return value;
+    return hiddenModuleAliasMap.get(value.toLowerCase()) || '';
+  }
+
+  function syncModuleQuery(moduleId) {
+    if (!moduleId) return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('module', moduleId);
+      window.history.replaceState({}, '', url.toString());
+    } catch (e) {}
+  }
 
   const loadConfig = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
   loadConfig.then((cfg) => {
@@ -3037,22 +3067,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function activateButton(btn) {
+  function activateButton(btnOrModuleId) {
+    const moduleId = typeof btnOrModuleId === 'string'
+      ? btnOrModuleId
+      : btnOrModuleId?.getAttribute('data-module');
+    if (!moduleId) return;
+    const btn = typeof btnOrModuleId === 'string'
+      ? buttons.find(candidate => candidate.getAttribute('data-module') === moduleId) || null
+      : btnOrModuleId;
+    const hiddenModule = hiddenModulesById.get(moduleId) || null;
+    if (!btn && !hiddenModule) return;
+
     // визульное состояние
     buttons.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    if (btn) btn.classList.add('active');
 
     // загрузка модуля
-    const url = btn.getAttribute('data-module');
+    const url = moduleId;
     if (url && frame.src !== url) {
       frame.src = url;
     }
+    syncModuleQuery(moduleId);
 
     // гарды вкладок на body
     if (guardClasses.length) {
       document.body.classList.remove(...guardClasses);
     }
-    const guard = btn.getAttribute('data-guard');
+    const guard = btn?.getAttribute('data-guard') || hiddenModule?.guard || '';
     if (guard) {
       document.body.classList.add(guard);
     }
@@ -3068,8 +3109,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Активируем первую кнопку по умолчанию, если она есть
+  const requestedModule = resolveModuleRequest(new URLSearchParams(location.search).get('module'));
   const initiallyActive = buttons.find(b => b.classList.contains('active')) || buttons[0];
-  if (initiallyActive) activateButton(initiallyActive);
+  if (requestedModule) {
+    activateButton(requestedModule);
+  } else if (initiallyActive) {
+    activateButton(initiallyActive);
+  }
 
   if (selectAllBtn) {
     selectAllBtn.addEventListener('click', () => {
