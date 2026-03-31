@@ -209,6 +209,36 @@ textarea.fi{resize:vertical;min-height:80px}
   6. В Firebase Console → Build → Realtime Database → Create database → Start in test mode
 -->
 <script>
+window.LH_MEMORY = window.LH_MEMORY || Object.create(null);
+window.LH_VOLATILE_KEYS = new Set(['courses','courses_custom']);
+window.LH_MAX_LOCAL_VALUE_BYTES = 180000;
+window.pruneLearnHubLocalCacheForQuota = function(){
+  const bulkyKeys = ['lh_courses', 'lh_courses_custom'];
+  bulkyKeys.forEach(function(key){
+    try{
+      const value = localStorage.getItem(key);
+      if(value && value.length > 120000){
+        localStorage.removeItem(key);
+      }
+    }catch(e){}
+  });
+};
+window.pruneLearnHubLocalCacheForQuota();
+window.lhCacheWrite = function(key, value){
+  window.LH_MEMORY[key] = value;
+  try{
+    const raw = JSON.stringify(value);
+    const shouldPersist = !window.LH_VOLATILE_KEYS.has(key) && raw.length <= window.LH_MAX_LOCAL_VALUE_BYTES;
+    if(shouldPersist){
+      localStorage.setItem('lh_'+key, raw);
+    }else{
+      localStorage.removeItem('lh_'+key);
+    }
+  }catch(e){
+    try{ localStorage.removeItem('lh_'+key); }catch(err){}
+  }
+};
+
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyB6k8qI7dtj3tTeiVzYcAROHd3gedY97Ys",
   authDomain: "learnhub-portal.firebaseapp.com",
@@ -265,7 +295,7 @@ window.fbSync = function(){
         Object.keys(data).forEach(function(k){
           try{
             const v = window.fbToLocal(k, data[k]);
-            localStorage.setItem('lh_'+k, JSON.stringify(v));
+            window.lhCacheWrite(k, v);
           }catch(e){}
         });
       }
@@ -305,7 +335,7 @@ window.fbWatch = function(key, callback){
   var handler = ref.on('value', function(snap){
     var data = snap.val();
     var arr = data ? window.fbToLocal(key, data) : [];
-    try{ localStorage.setItem('lh_'+key, JSON.stringify(arr)); }catch(e){}
+    window.lhCacheWrite(key, arr);
     if(callback) callback(arr);
   });
   // Return unsubscribe function
@@ -321,9 +351,20 @@ const useApp=()=>useContext(CTX);
 // Storage (localStorage + Firebase Realtime DB sync)
 // users/roles are stored as {id:record} objects in Firebase for per-record efficiency
 const S={
-  g:(k,d)=>{try{const v=localStorage.getItem('lh_'+k);return v?JSON.parse(v):d}catch{return d}},
+  g:(k,d)=>{
+    if(Object.prototype.hasOwnProperty.call(window.LH_MEMORY, k)) return window.LH_MEMORY[k];
+    try{
+      const v=localStorage.getItem('lh_'+k);
+      if(v){
+        const parsed = JSON.parse(v);
+        window.LH_MEMORY[k] = parsed;
+        return parsed;
+      }
+    }catch(e){}
+    return d;
+  },
   s:(k,v)=>{
-    try{localStorage.setItem('lh_'+k,JSON.stringify(v))}catch{}
+    window.lhCacheWrite(k, v);
     if(window.fbReady&&window.fbDB){
       // Convert array→object for collection keys, write as-is for others
       const fbVal=window.fbFromLocal(k,v);
@@ -355,7 +396,7 @@ async function hydrateCriticalLearningData(){
     if(hasData(localValue)) continue;
     const remoteValue = await window.fbFetchKey(key);
     if(hasData(remoteValue)){
-      try{ localStorage.setItem('lh_'+key, JSON.stringify(remoteValue)); }catch(e){}
+      window.lhCacheWrite(key, remoteValue);
     }
   }
 
@@ -1945,11 +1986,16 @@ function App(){
 
 // Sync Firebase → localStorage, then seed demo data if needed, then render
 (async function(){
-  await window.fbSync();
-  await hydrateCriticalLearningData();
-  seedData();
-  await hydrateCriticalLearningData();
-  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  try{ await window.fbSync(); }catch(e){ console.warn('[LearnHub] Initial fbSync failed:', e); }
+  try{ await hydrateCriticalLearningData(); }catch(e){ console.warn('[LearnHub] Initial hydration failed:', e); }
+  try{ seedData(); }catch(e){ console.warn('[LearnHub] Seed failed:', e); }
+  try{ await hydrateCriticalLearningData(); }catch(e){ console.warn('[LearnHub] Post-seed hydration failed:', e); }
+  try{
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  }catch(e){
+    console.error('[LearnHub] Render failed:', e);
+    document.getElementById('root').innerHTML = '<div style="padding:32px;font-family:Inter,sans-serif;color:#1f2937"><h1 style="font-size:24px;margin:0 0 12px">LearnHub</h1><p style="margin:0 0 8px">Портал не смог инициализироваться автоматически.</p><p style="margin:0;color:#6b7280">Очистите локальные ключи <code>lh_*</code> для этого домена и перезагрузите страницу.</p></div>';
+  }
 })();
 </script>
 </body>
