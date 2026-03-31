@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LearnHub — Портал обучения</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--p:#6C5CE7;--ph:#5A4BD1;--pl:#A29BFE;--pbg:#F0EEFF;--s:#00CEC9;--ok:#00B894;--warn:#FDCB6E;--err:#E17055;--info:#74B9FF;--bg:#fff;--bg2:#F8F9FA;--bg3:#E9ECEF;--tx:#2D3436;--tx2:#636E72;--tx3:#B2BEC3;--r:12px;--sh:0 1px 3px rgba(0,0,0,.08);--shm:0 4px 12px rgba(0,0,0,.1);--shl:0 8px 24px rgba(0,0,0,.15)}
+[data-theme=dark]{--p:#A29BFE;--ph:#8B82F8;--pl:#6C5CE7;--pbg:#2D2B55;--bg:#1E1E2E;--bg2:#252536;--bg3:#363650;--tx:#CDD6F4;--tx2:#A6ADC8;--tx3:#585B70;--sh:0 1px 3px rgba(0,0,0,.3);--shm:0 4px 12px rgba(0,0,0,.4)}
+[data-theme=corporate]{--p:#0984E3;--ph:#0773C5;--pl:#74B9FF;--pbg:#E8F4FD;--s:#74B9FF}
+[data-theme=warm]{--p:#E17055;--ph:#D35C43;--pl:#FAB1A0;--pbg:#FFF0EC;--s:#FDCB6E}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg2);color:var(--tx);overflow:hidden;height:100vh}
+#root{height:100vh;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
+.navbar{height:64px;background:var(--bg);border-bottom:1px solid var(--bg3);display:flex;align-items:center;padding:0 20px;gap:16px;z-index:100;flex-shrink:0;box-shadow:var(--sh)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;color:var(--p);cursor:pointer}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--p),var(--s));border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:800}
+.search{flex:1;max-width:360px;position:relative}
+.search input{width:100%;padding:9px 16px 9px 36px;border:1px solid var(--bg3);border-radius:20px;font-size:13px;background:var(--bg2);color:var(--tx);outline:0;transition:.2s;font-family:inherit}
+.search input:focus{border-color:var(--p);background:var(--bg);box-shadow:0 0 0 3px var(--pbg)}
+.search-i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--tx3);font-size:13px}
+.search-dd{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg);border-radius:var(--r);box-shadow:var(--shl);z-index:300;border:1px solid var(--bg3);max-height:360px;overflow-y:auto}
+.search-dd-item{padding:10px 14px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:10px;transition:.1s;border-bottom:1px solid var(--bg3)}
+.search-dd-item:hover{background:var(--pbg);color:var(--p)}
+.search-dd-item:last-child{border-bottom:none}
+.search-dd-sec{padding:6px 14px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);font-weight:700;background:var(--bg2)}
+.nav-r{display:flex;align-items:center;gap:8px;margin-left:auto}
+.nav-btn{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--bg3);cursor:pointer;font-size:16px;transition:.2s;position:relative;color:var(--tx2)}
+.nav-btn:hover{background:var(--pbg);color:var(--p)}
+.badge-c{position:absolute;top:-3px;right:-3px;background:var(--err);color:#fff;font-size:10px;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid var(--bg)}
+.avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--p),var(--pl));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:14px;cursor:pointer;border:2px solid transparent;transition:.2s}
+.avatar:hover{border-color:var(--p)}
+.themes{display:flex;gap:4px;padding:4px;background:var(--bg2);border-radius:20px;border:1px solid var(--bg3)}
+.tdot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.2s}
+.tdot:hover,.tdot.on{border-color:var(--tx);transform:scale(1.15)}
+.app-body{display:flex;flex:1;overflow:hidden}
+.side{width:220px;background:var(--bg);border-right:1px solid var(--bg3);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;transition:width .3s}
+.side.mini{width:60px}
+.side-sec{padding:18px 12px 6px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--tx3);font-weight:700}
+.side.mini .side-sec{text-align:center;padding:14px 4px 4px;font-size:8px}
+.side-item{display:flex;align-items:center;gap:10px;padding:9px 14px;margin:1px 6px;color:var(--tx2);cursor:pointer;font-size:13px;border-radius:6px;transition:.15s;font-weight:500;white-space:nowrap;overflow:hidden}
+.side-item:hover{background:var(--pbg);color:var(--p)}
+.side-item.on{background:var(--pbg);color:var(--p);font-weight:600}
+.side-item i{font-size:16px;flex-shrink:0;width:22px;text-align:center;font-style:normal}
+.side.mini .side-item{padding:9px;justify-content:center;margin:1px 3px}
+.side.mini .side-item span{display:none}
+.side-tog{padding:10px;text-align:center;cursor:pointer;color:var(--tx3);border-top:1px solid var(--bg3);margin-top:auto;font-size:16px;transition:.2s}
+.side-tog:hover{color:var(--p);background:var(--pbg)}
+.main{flex:1;overflow-y:auto;padding:24px 28px}
+.card{background:var(--bg);border-radius:var(--r);box-shadow:var(--sh);transition:.2s;overflow:hidden}
+.card:hover{box-shadow:var(--shm)}
+.card-c{cursor:pointer}.card-c:hover{transform:translateY(-2px)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;border:none;font-family:inherit;white-space:nowrap}
+.btn-p{background:var(--p);color:#fff}.btn-p:hover{background:var(--ph)}
+.btn-s{background:var(--s);color:#fff}.btn-s:hover{opacity:.9}
+.btn-ok{background:var(--ok);color:#fff}
+.btn-o{background:transparent;color:var(--p);border:1.5px solid var(--p)}.btn-o:hover{background:var(--pbg)}
+.btn-g{background:transparent;color:var(--tx2)}.btn-g:hover{background:var(--bg2)}
+.btn-d{background:var(--err);color:#fff}.btn-d:hover{opacity:.9}
+.btn-sm{padding:5px 10px;font-size:11px}
+.pbar{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.pfill{height:100%;border-radius:3px;transition:width .5s ease}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.sec-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sec-t{font-size:17px;font-weight:600}
+.sec-l{font-size:12px;color:var(--p);cursor:pointer;font-weight:500}
+.stat{background:var(--bg);border-radius:var(--r);padding:18px;box-shadow:var(--sh);transition:.2s}
+.stat:hover{box-shadow:var(--shm);transform:translateY(-2px)}
+.stat-i{width:42px;height:42px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:10px}
+.stat-v{font-size:26px;font-weight:700}.stat-l{font-size:12px;color:var(--tx2);margin-top:2px}
+.cov{height:130px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}
+.cov-i{font-size:40px;opacity:.4}
+.cov-upload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0);transition:.2s;cursor:pointer}
+.cov-upload:hover{background:rgba(0,0,0,.45)}
+.cov-upload:hover .cov-upload-lbl{opacity:1}
+.cov-upload-lbl{opacity:0;color:#fff;font-size:12px;font-weight:600;text-align:center;transition:.2s;pointer-events:none}
+.cbdg{position:absolute;top:10px;left:10px;background:rgba(255,255,255,.92);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;color:var(--p)}
+.cbody{padding:14px}
+.ctitle{font-size:14px;font-weight:600;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4}
+.cdesc{font-size:11px;color:var(--tx2);margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cmeta{display:flex;gap:10px;font-size:11px;color:var(--tx2)}
+.fchip{padding:6px 14px;border-radius:20px;font-size:12px;border:1px solid var(--bg3);cursor:pointer;transition:.15s;background:var(--bg);color:var(--tx2);font-weight:500;font-family:inherit}
+.fchip:hover{border-color:var(--p);color:var(--p)}
+.fchip.on{background:var(--p);color:#fff;border-color:var(--p)}
+.modal-ov{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fi .15s}
+.modal{background:var(--bg);border-radius:16px;padding:28px;width:480px;max-width:90vw;box-shadow:var(--shl);animation:si .2s;max-height:90vh;overflow-y:auto}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes si{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.modal h3{font-size:18px;font-weight:700;margin-bottom:18px}
+.modal-ft{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.fg{margin-bottom:14px}
+.fl{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--tx2)}
+.fi{width:100%;padding:9px 14px;border:1.5px solid var(--bg3);border-radius:6px;font-size:13px;background:var(--bg);color:var(--tx);outline:0;transition:.2s;font-family:inherit}
+.fi:focus{border-color:var(--p);box-shadow:0 0 0 3px var(--pbg)}
+.fi::placeholder{color:var(--tx3)}
+select.fi{cursor:pointer}
+textarea.fi{resize:vertical;min-height:80px}
+.toast-c{position:fixed;top:76px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 18px;border-radius:8px;color:#fff;font-size:13px;font-weight:500;box-shadow:var(--shm);display:flex;align-items:center;gap:8px;animation:sli .3s;min-width:260px}
+@keyframes sli{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast-ok{background:var(--ok)}.toast-err{background:var(--err)}.toast-info{background:var(--info)}
+.empty{text-align:center;padding:50px 20px;color:var(--tx2)}
+.empty-i{font-size:56px;margin-bottom:12px;opacity:.5}
+.empty-t{font-size:16px;font-weight:600;margin-bottom:6px;color:var(--tx)}
+.empty-d{font-size:13px;margin-bottom:16px}
+.con-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--bg);border-bottom:1px solid var(--bg3)}
+.con-lay{display:flex;flex:1;overflow:hidden}
+.con-tree{width:260px;background:var(--bg);border-right:1px solid var(--bg3);overflow-y:auto;padding:12px 0;flex-shrink:0}
+.tree-lbl{padding:10px 14px 6px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);font-weight:700}
+.tree-it{display:flex;align-items:center;gap:6px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--tx2);transition:.15s;border-left:3px solid transparent}
+.tree-it:hover{background:var(--pbg);color:var(--p)}
+.tree-it.on{background:var(--pbg);color:var(--p);font-weight:600;border-left-color:var(--p)}
+.tree-it.mod{font-weight:600;color:var(--tx);font-size:13px}
+.tree-it.les{padding-left:26px}.tree-it.stp{padding-left:42px;font-size:11px}
+.tree-add{display:flex;align-items:center;gap:4px;padding:5px 14px;font-size:11px;color:var(--p);cursor:pointer;transition:.15s}
+.tree-add:hover{background:var(--pbg)}
+.tree-add.les{padding-left:26px}.tree-add.stp{padding-left:42px}
+.con-ed{flex:1;overflow-y:auto;padding:20px 28px;background:var(--bg2)}
+.ed-bar{display:flex;gap:2px;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:14px;flex-wrap:wrap;box-shadow:var(--sh)}
+.ed-btn{padding:5px 8px;border-radius:4px;cursor:pointer;font-size:12px;color:var(--tx2);background:none;border:none;transition:.15s;font-family:inherit}
+.ed-btn:hover{background:var(--pbg);color:var(--p)}
+.ed-area{min-height:200px;background:var(--bg);border:1.5px solid var(--bg3);border-radius:6px;padding:18px;font-size:14px;line-height:1.6;outline:0;box-shadow:var(--sh)}
+.ed-area:focus{border-color:var(--p);box-shadow:0 0 0 3px var(--pbg)}
+.stypes{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.stype{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;font-size:12px;border:1.5px solid var(--bg3);cursor:pointer;transition:.15s;background:var(--bg);font-family:inherit;color:var(--tx2)}
+.stype:hover{border-color:var(--p);color:var(--p)}
+.stype.on{background:var(--p);color:#fff;border-color:var(--p)}
+.sset{margin-top:16px;padding:16px;background:var(--bg);border-radius:var(--r);box-shadow:var(--sh)}
+.srow{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px}
+.srow input[type=checkbox]{accent-color:var(--p);width:15px;height:15px;cursor:pointer}
+.cv{display:flex;height:100%}
+.cv-side{width:280px;background:var(--bg);border-right:1px solid var(--bg3);overflow-y:auto;flex-shrink:0}
+.cv-mh{display:flex;align-items:center;gap:6px;padding:10px 14px;font-weight:600;font-size:13px;cursor:pointer;border-bottom:1px solid var(--bg3);background:var(--bg2)}
+.cv-st{display:flex;align-items:center;gap:8px;padding:8px 14px 8px 22px;font-size:12px;cursor:pointer;transition:.15s;color:var(--tx2);border-left:3px solid transparent}
+.cv-st:hover{background:var(--bg2)}.cv-st.on{background:var(--pbg);color:var(--p);font-weight:600;border-left-color:var(--p)}
+.cv-st.done{color:var(--ok)}
+.cv-ck{width:20px;height:20px;border-radius:50%;border:2px solid var(--bg3);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.cv-ck.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.cv-ck.cur{border-color:var(--p);color:var(--p)}
+.cv-main{flex:1;overflow-y:auto}.cv-cnt{max-width:740px;margin:0 auto;padding:28px}
+.quiz-b{background:var(--bg2);border-radius:var(--r);padding:20px;margin:20px 0;border:1px solid var(--bg3)}
+.quiz-q{font-size:15px;font-weight:600;margin-bottom:14px}
+.quiz-o{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--bg);border-radius:6px;margin-bottom:6px;cursor:pointer;border:2px solid transparent;transition:.15s;font-size:13px}
+.quiz-o:hover{border-color:var(--pl)}.quiz-o.sel{border-color:var(--p);background:var(--pbg)}
+.quiz-o.ok{border-color:var(--ok);background:#e6f9f0}.quiz-o.no{border-color:var(--err);background:#fde8e4}
+.quiz-r{width:18px;height:18px;border-radius:50%;border:2px solid var(--bg3);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.quiz-o.sel .quiz-r,.quiz-o.ok .quiz-r{border-color:var(--p)}
+.quiz-o.sel .quiz-r::after,.quiz-o.ok .quiz-r::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--p)}
+.quiz-o.ok .quiz-r{border-color:var(--ok)}.quiz-o.ok .quiz-r::after{background:var(--ok)}
+.quiz-res{margin-top:14px;padding:12px 16px;border-radius:6px;font-size:13px;font-weight:500}
+.quiz-res.ok{background:#e6f9f0;color:#00875a}.quiz-res.no{background:#fde8e4;color:#c0392b}
+.prof-h{background:linear-gradient(135deg,var(--p),var(--pl));border-radius:16px;padding:28px;color:#fff;display:flex;align-items:center;gap:20px;margin-bottom:20px}
+.prof-av{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;border:3px solid rgba(255,255,255,.4);flex-shrink:0}
+.ach{background:var(--bg);border-radius:var(--r);padding:18px;text-align:center;box-shadow:var(--sh);transition:.2s;border:2px solid transparent}
+.ach:hover{box-shadow:var(--shm);transform:translateY(-2px)}
+.ach.got{border-color:var(--warn)}.ach.lock{opacity:.4;filter:grayscale(.4)}
+.team-c{background:var(--bg);border-radius:var(--r);padding:16px;box-shadow:var(--sh);display:flex;align-items:center;gap:14px;transition:.2s;cursor:pointer;border-left:4px solid transparent}
+.team-c:hover{box-shadow:var(--shm)}.team-c.lag{border-left-color:var(--err)}
+.rbdg{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600}
+.tbl{width:100%;border-collapse:collapse;background:var(--bg);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
+.tbl th{background:var(--bg2);padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--tx2);font-weight:600;border-bottom:1px solid var(--bg3)}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--bg3);font-size:13px}
+.tbl tr:last-child td{border-bottom:none}.tbl tr:hover td{background:var(--bg2)}
+.login-pg{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#6C5CE7 0%,#A29BFE 50%,#00CEC9 100%);padding:20px}
+.login-c{background:var(--bg);border-radius:16px;padding:44px 36px;width:400px;max-width:100%;box-shadow:var(--shl)}
+.dd{position:relative}.dd-m{position:absolute;top:calc(100% + 8px);right:0;background:var(--bg);border-radius:var(--r);box-shadow:var(--shl);min-width:220px;z-index:200;border:1px solid var(--bg3);overflow:hidden}
+.dd-i{padding:10px 16px;cursor:pointer;font-size:13px;transition:.1s;color:var(--tx2)}.dd-i:hover{background:var(--pbg);color:var(--p)}
+.dd-sep{height:1px;background:var(--bg3);margin:4px 0}
+.notif-dd{position:absolute;top:calc(100% + 8px);right:0;background:var(--bg);border-radius:var(--r);box-shadow:var(--shl);width:340px;z-index:200;border:1px solid var(--bg3);max-height:400px;overflow-y:auto}
+.notif-it{padding:12px 16px;border-bottom:1px solid var(--bg3);font-size:12px;cursor:pointer;transition:.1s;display:flex;gap:10px;align-items:flex-start}
+.notif-it:hover{background:var(--bg2)}.notif-it.unread{background:var(--pbg)}
+.notif-dot{width:8px;height:8px;border-radius:50%;background:var(--p);flex-shrink:0;margin-top:4px}
+.cert-bg{background:linear-gradient(135deg,#fff8e0,#fff3e0);border:3px solid var(--warn);border-radius:16px;padding:40px;text-align:center;position:relative;overflow:hidden}
+.cert-bg::before{content:'';position:absolute;top:-50px;right:-50px;width:180px;height:180px;background:linear-gradient(135deg,var(--warn),#f9ca24);border-radius:50%;opacity:.15}
+.cert-bg::after{content:'';position:absolute;bottom:-50px;left:-50px;width:160px;height:160px;background:linear-gradient(135deg,var(--p),var(--pl));border-radius:50%;opacity:.1}
+.lb-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bg3);transition:.15s;font-size:13px}
+.lb-row:hover{background:var(--bg2)}
+.lb-row.me{background:var(--pbg);border-radius:6px;border:1px solid var(--pl)}
+.lb-pos{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0}
+.inline-edit{background:transparent;border:1px dashed transparent;padding:2px 6px;border-radius:4px;font-family:inherit;outline:none;transition:.2s;color:inherit;font-size:inherit;font-weight:inherit}
+.inline-edit:hover{border-color:var(--bg3)}.inline-edit:focus{border-color:var(--p);background:var(--bg)}
+.tab-bar{display:flex;gap:0;border-bottom:2px solid var(--bg3);margin-bottom:18px}
+.tab-item{padding:10px 18px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:.15s;color:var(--tx2)}
+.tab-item:hover{color:var(--p)}.tab-item.on{color:var(--p);border-bottom-color:var(--p);font-weight:600}
+@media(max-width:1024px){.grid3{grid-template-columns:repeat(2,1fr)}.grid4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.side{display:none}.main{padding:14px}.grid3,.grid2{grid-template-columns:1fr}.grid4{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ====== FIREBASE CONFIG ======
+  Чтобы получить эти данные:
+  1. Откройте https://console.firebase.google.com
+  2. Нажмите на шестерёнку (Project Settings) рядом с названием проекта
+  3. Прокрутите вниз до раздела "Your apps"
+  4. Нажмите "</>" (Web) → Register app → введите имя "LearnHub"
+  5. Скопируйте объект firebaseConfig и вставьте ниже
+  6. В Firebase Console → Build → Realtime Database → Create database → Start in test mode
+-->
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB6k8qI7dtj3tTeiVzYcAROHd3gedY97Ys",
+  authDomain: "learnhub-portal.firebaseapp.com",
+  databaseURL: "https://learnhub-portal-default-rtdb.firebaseio.com",
+  projectId: "learnhub-portal",
+  storageBucket: "learnhub-portal.firebasestorage.app",
+  messagingSenderId: "253599129852",
+  appId: "1:253599129852:web:cc4c35dd6eebe16f3db779",
+  measurementId: "G-BLQCFBG4E4"
+};
+window.fbDB = null;
+window.fbReady = false;
+
+// Keys stored as {id: record} objects in Firebase (not flat arrays).
+// This allows per-record writes and real-time listeners per user/role.
+window.FB_OBJ_KEYS = ['users', 'roles'];
+
+(function initFirebase(){
+  try {
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    window.fbDB = firebase.database();
+    window.fbReady = true;
+    console.log('[LearnHub] Firebase connected ✅');
+  } catch(e) {
+    console.warn('[LearnHub] Firebase offline, using localStorage only:', e.message);
+  }
+})();
+
+// Convert Firebase value to local format (object→array for collections)
+window.fbToLocal = function(k, v){
+  if(window.FB_OBJ_KEYS.includes(k) && v && typeof v === 'object' && !Array.isArray(v)){
+    return Object.values(v);
+  }
+  return v;
+};
+
+// Convert local array to Firebase format (array→object for collections)
+window.fbFromLocal = function(k, v){
+  if(window.FB_OBJ_KEYS.includes(k) && Array.isArray(v)){
+    const obj = {};
+    v.forEach(function(item){ if(item && item.id) obj[item.id] = item; });
+    return obj;
+  }
+  return v;
+};
+
+// Sync all Firebase data → localStorage, returns promise
+window.fbSync = function(){
+  return new Promise(function(resolve){
+    if(!window.fbReady || !window.fbDB){ resolve(); return; }
+    window.fbDB.ref('lh').once('value').then(function(snap){
+      const data = snap.val();
+      if(data){
+        Object.keys(data).forEach(function(k){
+          try{
+            const v = window.fbToLocal(k, data[k]);
+            localStorage.setItem('lh_'+k, JSON.stringify(v));
+          }catch(e){}
+        });
+      }
+      resolve();
+    }).catch(function(e){ console.warn('[LearnHub] FB sync error:', e); resolve(); });
+  });
+};
+
+// Write a single user record to Firebase (used for targeted saves)
+window.fbSaveUser = function(user){
+  if(!window.fbReady || !window.fbDB || !user || !user.id) return;
+  window.fbDB.ref('lh/users/'+user.id).set(user).catch(function(e){ console.warn('[LearnHub] FB user save error:', e); });
+};
+
+// Write a single role record to Firebase
+window.fbSaveRole = function(role){
+  if(!window.fbReady || !window.fbDB || !role || !role.id) return;
+  window.fbDB.ref('lh/roles/'+role.id).set(role).catch(function(e){ console.warn('[LearnHub] FB role save error:', e); });
+};
+
+// Delete a single user from Firebase
+window.fbDeleteUser = function(userId){
+  if(!window.fbReady || !window.fbDB || !userId) return;
+  window.fbDB.ref('lh/users/'+userId).remove().catch(function(e){ console.warn('[LearnHub] FB user delete error:', e); });
+};
+
+// Delete a single role from Firebase
+window.fbDeleteRole = function(roleId){
+  if(!window.fbReady || !window.fbDB || !roleId) return;
+  window.fbDB.ref('lh/roles/'+roleId).remove().catch(function(e){ console.warn('[LearnHub] FB role delete error:', e); });
+};
+
+// Subscribe to real-time changes on users/roles (calls callback with updated array)
+window.fbWatch = function(key, callback){
+  if(!window.fbReady || !window.fbDB) return function(){};
+  var ref = window.fbDB.ref('lh/'+key);
+  var handler = ref.on('value', function(snap){
+    var data = snap.val();
+    var arr = data ? window.fbToLocal(key, data) : [];
+    try{ localStorage.setItem('lh_'+key, JSON.stringify(arr)); }catch(e){}
+    if(callback) callback(arr);
+  });
+  // Return unsubscribe function
+  return function(){ ref.off('value', handler); };
+};
+</script>
+
+<script type="text/babel">
+const{useState,useEffect,useCallback,createContext,useContext,useRef,useMemo}=React;
+const CTX=createContext();
+const useApp=()=>useContext(CTX);
+
+// Storage (localStorage + Firebase Realtime DB sync)
+// users/roles are stored as {id:record} objects in Firebase for per-record efficiency
+const S={
+  g:(k,d)=>{try{const v=localStorage.getItem('lh_'+k);return v?JSON.parse(v):d}catch{return d}},
+  s:(k,v)=>{
+    try{localStorage.setItem('lh_'+k,JSON.stringify(v))}catch{}
+    if(window.fbReady&&window.fbDB){
+      // Convert array→object for collection keys, write as-is for others
+      const fbVal=window.fbFromLocal(k,v);
+      window.fbDB.ref('lh/'+k).set(fbVal).catch(e=>console.warn('[LearnHub] FB write:',e));
+    }
+  }
+};
+
+// Course cover helpers
+const getCoverStyle=(c)=>c?.coverImage
+  ?{backgroundImage:`url(${c.coverImage})`,backgroundSize:'cover',backgroundPosition:'center'}
+  :{background:c?.coverGradient||'#6C5CE7'};
+
+// Upload image → base64
+const readImageFile=(file)=>new Promise((res,rej)=>{
+  const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);
+});
+
+// Gradients
+const GRADS=['linear-gradient(135deg,#6C5CE7,#A29BFE)','linear-gradient(135deg,#00CEC9,#81ECEC)','linear-gradient(135deg,#E17055,#FDCB6E)','linear-gradient(135deg,#00B894,#55EFC4)','linear-gradient(135deg,#74B9FF,#0984E3)','linear-gradient(135deg,#FDCB6E,#F9CA24)'];
+const CATS=['Менеджмент','Безопасность','Аналитика','Soft Skills','Технологии'];
+const STYPES=[{id:'text',l:'Текст',i:'📝'},{id:'video',l:'Видео',i:'🎥'},{id:'code',l:'Код',i:'💻'},{id:'quiz',l:'Тест',i:'❓'},{id:'survey',l:'Опрос',i:'📋'},{id:'exam',l:'Экзамен',i:'🎓'},{id:'file',l:'Файл',i:'📎'},{id:'ai',l:'ИИ проверка',i:'🤖'}];
+const ICONS={text:'📝',video:'🎥',code:'💻',quiz:'❓',survey:'📋',exam:'🎓',file:'📎',ai:'🤖'};
+const ROLE_MAP={'admin':'Администратор','manager':'Руководитель','instructor':'Инструктор','employee':'Сотрудник'};
+
+// Seed data
+function seedData(){
+  if(S.g('seeded'))return;
+  const users=[
+    {id:'u1',firstName:'Дмитрий',lastName:'Александров',email:'dmitry@company.com',role:'admin',managerId:null,xp:1240,level:5},
+    {id:'u2',firstName:'Анна',lastName:'Иванова',email:'anna@company.com',role:'employee',managerId:'u1',xp:2100,level:7},
+    {id:'u3',firstName:'Пётр',lastName:'Сидоров',email:'petr@company.com',role:'employee',managerId:'u1',xp:1500,level:5},
+    {id:'u4',firstName:'Мария',lastName:'Козлова',email:'maria@company.com',role:'employee',managerId:'u1',xp:800,level:3},
+    {id:'u5',firstName:'Денис',lastName:'Новиков',email:'denis@company.com',role:'employee',managerId:'u1',xp:200,level:1},
+    {id:'u6',firstName:'Елена',lastName:'Волкова',email:'elena@company.com',role:'manager',managerId:'u1',xp:1800,level:6},
+    {id:'u7',firstName:'Игорь',lastName:'Громов',email:'igor@company.com',role:'employee',managerId:'u6',xp:150,level:1},
+    {id:'u8',firstName:'Ольга',lastName:'Смирнова',email:'olga@company.com',role:'instructor',managerId:null,xp:3200,level:10},
+  ];
+  const courses=[
+    {id:'c1',title:'Основы IT-менеджмента',description:'Управление проектами, Agile, Scrum и лидерство',category:'Менеджмент',coverGradient:GRADS[0],icon:'📊',status:'published',authorId:'u8',
+      finalExam:{enabled:true,passingScore:70,timeLimit:20,questions:[
+        {id:'eq1',question:'Что такое Agile?',questionType:'single',options:[{id:'eo1',text:'Водопадная методология',isCorrect:false},{id:'eo2',text:'Гибкая методология разработки',isCorrect:true},{id:'eo3',text:'Язык программирования',isCorrect:false}],points:20},
+        {id:'eq2',question:'Что входит в обязанности IT-менеджера?',questionType:'multi',options:[{id:'eo4',text:'Управление командой',isCorrect:true},{id:'eo5',text:'Планирование проектов',isCorrect:true},{id:'eo6',text:'Написание всего кода',isCorrect:false},{id:'eo7',text:'Коммуникация с бизнесом',isCorrect:true}],points:30},
+        {id:'eq3',question:'Какой артефакт НЕ относится к Scrum?',questionType:'single',options:[{id:'eo8',text:'Product Backlog',isCorrect:false},{id:'eo9',text:'Sprint Backlog',isCorrect:false},{id:'eo10',text:'Диаграмма Ганта',isCorrect:true},{id:'eo11',text:'Increment',isCorrect:false}],points:20},
+        {id:'eq4',question:'Сколько ценностей в Agile-манифесте?',questionType:'single',options:[{id:'eo12',text:'3',isCorrect:false},{id:'eo13',text:'4',isCorrect:true},{id:'eo14',text:'5',isCorrect:false}],points:15},
+        {id:'eq5',question:'MTTR — это...',questionType:'single',options:[{id:'eo16',text:'Mean Time To Recovery',isCorrect:true},{id:'eo17',text:'Maximum Time To Release',isCorrect:false},{id:'eo18',text:'Minimum Test To Run',isCorrect:false}],points:15},
+      ]},
+      modules:[
+        {id:'m1',title:'Введение в менеджмент',order:0,lessons:[
+          {id:'l1',title:'Что такое IT-менеджмент',order:0,steps:[
+            {id:'s1',title:'Введение',type:'text',content:'<h2>Что такое IT-менеджмент?</h2><p>IT-менеджмент — это дисциплина, которая объединяет <strong>управленческие навыки</strong> с глубоким пониманием информационных технологий.</p><p>Современный IT-менеджер должен:</p><ul><li>Понимать технологии и архитектуру</li><li>Управлять командой разработчиков</li><li>Планировать и контролировать проекты</li><li>Коммуницировать с бизнесом</li></ul>',points:10,required:true,order:0},
+            {id:'s2',title:'Видео: Обзор профессии',type:'video',content:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',points:10,required:true,order:1},
+            {id:'s3',title:'Тест: Основы',type:'quiz',content:JSON.stringify({question:'Что является главной задачей IT-менеджера?',questionType:'single',options:[{id:'o1',text:'Писать код',isCorrect:false},{id:'o2',text:'Управлять командой и проектами',isCorrect:true},{id:'o3',text:'Тестировать ПО',isCorrect:false},{id:'o4',text:'Настраивать серверы',isCorrect:false}],points:10,attempts:3,explanation:'IT-менеджер фокусируется на управлении командой, проектами и процессами, а не на технических задачах напрямую.'}),points:10,required:true,order:2},
+          ]},
+        ]},
+        {id:'m2',title:'Agile-методологии',order:1,lessons:[
+          {id:'l2',title:'Принципы Agile',order:0,steps:[
+            {id:'s4',title:'Agile-манифест',type:'text',content:'<h2>Agile-манифест</h2><p>Agile-манифест был создан в 2001 году. Его 4 ценности:</p><ol><li><strong>Люди и взаимодействие</strong> важнее процессов и инструментов</li><li><strong>Работающий продукт</strong> важнее документации</li><li><strong>Сотрудничество с заказчиком</strong> важнее контракта</li><li><strong>Готовность к изменениям</strong> важнее следования плану</li></ol>',points:10,required:true,order:0},
+            {id:'s5',title:'Тест по Agile',type:'quiz',content:JSON.stringify({question:'Какая ценность Agile-манифеста первая?',questionType:'single',options:[{id:'o1',text:'Работающий продукт важнее документации',isCorrect:false},{id:'o2',text:'Люди и взаимодействие важнее процессов',isCorrect:true},{id:'o3',text:'Готовность к изменениям важнее плана',isCorrect:false}],points:10,attempts:2,explanation:'Первая ценность — люди и взаимодействие важнее процессов и инструментов.'}),points:10,required:true,order:1},
+          ]},
+        ]},
+      ]},
+    {id:'c2',title:'Информационная безопасность',description:'Кибербезопасность для менеджеров: защита данных, угрозы и compliance',category:'Безопасность',coverGradient:GRADS[2],icon:'🔒',status:'published',authorId:'u8',
+      modules:[{id:'m3',title:'Основы ИБ',order:0,lessons:[{id:'l3',title:'Введение в ИБ',order:0,steps:[
+        {id:'s6',title:'Что такое ИБ',type:'text',content:'<h2>Информационная безопасность</h2><p>Защита информации от несанкционированного доступа, использования, раскрытия, нарушения, модификации или уничтожения.</p><h3>Три столпа ИБ:</h3><ul><li><strong>Конфиденциальность</strong> — доступ только для авторизованных</li><li><strong>Целостность</strong> — данные не изменены без разрешения</li><li><strong>Доступность</strong> — информация доступна когда нужна</li></ul>',points:10,required:true,order:0},
+        {id:'s6b',title:'Тест по ИБ',type:'quiz',content:JSON.stringify({question:'Какие три столпа информационной безопасности?',questionType:'single',options:[{id:'o1',text:'Скорость, качество, безопасность',isCorrect:false},{id:'o2',text:'Конфиденциальность, целостность, доступность',isCorrect:true},{id:'o3',text:'Шифрование, аутентификация, авторизация',isCorrect:false}],points:10,attempts:2,explanation:'CIA Triad: Confidentiality, Integrity, Availability.'}),points:10,required:true,order:1}
+      ]}]}]},
+    {id:'c3',title:'Data-Driven Decision Making',description:'Принятие решений на основе данных: метрики, аналитика, A/B тесты',category:'Аналитика',coverGradient:GRADS[1],icon:'📈',status:'published',authorId:'u8',
+      modules:[{id:'m4',title:'Метрики и KPI',order:0,lessons:[{id:'l4',title:'Основы метрик',order:0,steps:[
+        {id:'s7',title:'Что такое KPI',type:'text',content:'<h2>KPI — Key Performance Indicators</h2><p>Ключевые показатели эффективности помогают измерить успех проекта или команды.</p><h3>Примеры KPI в IT:</h3><ul><li>Lead Time — время от задачи до деплоя</li><li>Deployment Frequency — частота релизов</li><li>MTTR — среднее время восстановления</li><li>Change Failure Rate — процент сбойных релизов</li></ul>',points:10,required:true,order:0}
+      ]}]}]},
+    {id:'c4',title:'Эффективная коммуникация',description:'Soft skills для руководителей: переговоры, обратная связь, конфликты',category:'Soft Skills',coverGradient:GRADS[3],icon:'💬',status:'published',authorId:'u8',
+      modules:[{id:'m5',title:'Основы коммуникации',order:0,lessons:[{id:'l5',title:'Активное слушание',order:0,steps:[
+        {id:'s8',title:'Что такое активное слушание',type:'text',content:'<h2>Активное слушание</h2><p>Техника коммуникации, при которой слушатель полностью сосредоточен на собеседнике.</p><p>Ключевые элементы:</p><ul><li>Зрительный контакт</li><li>Перефразирование</li><li>Уточняющие вопросы</li><li>Невербальная обратная связь</li></ul>',points:10,required:true,order:0}
+      ]}]}]},
+  ];
+  const enrollments=[
+    {userId:'u1',courseId:'c1',progress:60,status:'active',startedAt:'2026-03-01'},
+    {userId:'u1',courseId:'c3',progress:100,status:'completed',startedAt:'2026-02-01',completedAt:'2026-02-20'},
+    {userId:'u2',courseId:'c1',progress:100,status:'completed',startedAt:'2026-02-10',completedAt:'2026-03-01'},
+    {userId:'u2',courseId:'c2',progress:45,status:'active',startedAt:'2026-03-05'},
+    {userId:'u3',courseId:'c1',progress:80,status:'active',startedAt:'2026-02-15'},
+    {userId:'u4',courseId:'c1',progress:30,status:'active',startedAt:'2026-03-01'},
+    {userId:'u5',courseId:'c1',progress:10,status:'active',startedAt:'2026-03-10'},
+    {userId:'u6',courseId:'c2',progress:100,status:'completed',startedAt:'2026-01-15',completedAt:'2026-02-10'},
+    {userId:'u7',courseId:'c1',progress:15,status:'active',startedAt:'2026-03-12'},
+  ];
+  const stepProgress=[
+    {userId:'u1',stepId:'s1',courseId:'c1',status:'completed',score:100},
+    {userId:'u1',stepId:'s2',courseId:'c1',status:'completed',score:100},
+    {userId:'u1',stepId:'s3',courseId:'c1',status:'completed',score:100},
+    {userId:'u1',stepId:'s7',courseId:'c3',status:'completed',score:100},
+  ];
+  const achievements=[
+    {id:'a1',title:'Быстрый старт',desc:'Завершить первый курс',icon:'🚀',rank:'gold',xp:50,condition:{type:'courses_completed',value:1}},
+    {id:'a2',title:'Книжный червь',desc:'Завершить 10 курсов',icon:'📚',rank:'gold',xp:200,condition:{type:'courses_completed',value:10}},
+    {id:'a3',title:'Снайпер',desc:'5 тестов без ошибок',icon:'🎯',rank:'silver',xp:100,condition:{type:'quizzes_perfect',value:5}},
+    {id:'a4',title:'Марафонец',desc:'Учиться 30 дней подряд',icon:'🏋️',rank:'silver',xp:150,condition:{type:'streak',value:30}},
+    {id:'a5',title:'Лидер',desc:'Стать #1 в команде',icon:'👑',rank:'gold',xp:300,condition:{type:'rank',value:1}},
+    {id:'a6',title:'AI-мастер',desc:'Пройти 5 ИИ-проверок',icon:'🤖',rank:'silver',xp:100,condition:{type:'ai_reviews',value:5}},
+    {id:'a7',title:'Мудрец',desc:'Завершить все курсы',icon:'🔮',rank:'gold',xp:500,condition:{type:'all_courses',value:1}},
+    {id:'a8',title:'Бриллиант',desc:'Набрать 5000 XP',icon:'💎',rank:'gold',xp:500,condition:{type:'xp',value:5000}},
+  ];
+  const userAchievements=[
+    {userId:'u1',achievementId:'a1',progress:100,earnedAt:'2026-02-20'},
+    {userId:'u1',achievementId:'a2',progress:10},
+    {userId:'u1',achievementId:'a3',progress:60,progressText:'3 / 5'},
+    {userId:'u1',achievementId:'a4',progress:70,progressText:'21 / 30 дней'},
+    {userId:'u2',achievementId:'a1',progress:100,earnedAt:'2026-03-01'},
+    {userId:'u6',achievementId:'a1',progress:100,earnedAt:'2026-02-10'},
+  ];
+  const notifications=[
+    {id:'n1',text:'Вам назначен курс "Основы IT-менеджмента"',icon:'📚',time:'2 часа назад',read:false},
+    {id:'n2',text:'Достижение "Быстрый старт" получено!',icon:'🏆',time:'1 день назад',read:false},
+    {id:'n3',text:'Курс "Data-Driven" завершён на 100%',icon:'✅',time:'2 дня назад',read:true},
+    {id:'n4',text:'Новый курс: "Эффективная коммуникация"',icon:'🆕',time:'3 дня назад',read:true},
+  ];
+  const roles=[
+    {id:'r1',name:'Администратор',permissions:['all'],system:true,color:'#E17055',bg:'#fde8e4'},
+    {id:'r2',name:'Руководитель',permissions:['view_courses','manage_team','view_stats'],system:true,color:'#6C5CE7',bg:'#F0EEFF'},
+    {id:'r3',name:'Инструктор',permissions:['view_courses','create_courses','view_students'],system:true,color:'#F9CA24',bg:'#fff8e0'},
+    {id:'r4',name:'Сотрудник',permissions:['view_courses','complete_courses'],system:true,color:'#00B894',bg:'#e6f9f0'},
+  ];
+  const submissions=[
+    {id:'sub1',userId:'u2',courseId:'c1',stepId:null,stepTitle:'Финальный экзамен',courseTitle:'Основы IT-менеджмента',type:'exam_result',content:'Результат: 85%',score:85,status:'pending',managerId:'u1',submittedAt:'2026-03-15T10:30:00',reviewedAt:null,reviewNote:''},
+    {id:'sub2',userId:'u3',courseId:'c1',stepId:'s3',stepTitle:'Тест: Основы',courseTitle:'Основы IT-менеджмента',type:'step_answer',content:'Управлять командой и проектами — это основная задача.',score:null,status:'approved',managerId:'u1',submittedAt:'2026-03-12T14:00:00',reviewedAt:'2026-03-12T16:00:00',reviewNote:'Отличный развёрнутый ответ!'},
+    {id:'sub3',userId:'u4',courseId:'c1',stepId:'s5',stepTitle:'Тест по Agile',courseTitle:'Основы IT-менеджмента',type:'step_answer',content:'Люди важнее процессов',score:null,status:'rejected',managerId:'u1',submittedAt:'2026-03-14T09:00:00',reviewedAt:'2026-03-14T11:00:00',reviewNote:'Ответ слишком краткий.'},
+  ];
+  S.s('users',users);S.s('courses',courses);S.s('enrollments',enrollments);S.s('stepProgress',stepProgress);
+  S.s('achievements',achievements);S.s('userAchievements',userAchievements);S.s('notifications',notifications);S.s('roles',roles);S.s('submissions',submissions);S.s('seeded',true);
+}
+// seedData() is called after Firebase sync in the async init block below
+
+// ---- REUSABLE COMPONENTS ----
+function Modal({open,title,children,onClose,footer,wide}){
+  if(!open)return null;
+  return(<div className="modal-ov" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()} style={wide?{width:640}:{}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+      <h3 style={{margin:0}}>{title}</h3>
+      <span style={{cursor:'pointer',fontSize:20,color:'var(--tx3)'}} onClick={onClose}>✕</span>
+    </div>
+    {children}
+    {footer&&<div className="modal-ft">{footer}</div>}
+  </div></div>);
+}
+function PBar({v,c}){return<div className="pbar"><div className="pfill" style={{width:`${v}%`,background:c||'var(--p)'}}/></div>}
+function Tabs({tabs,active,onChange}){return<div className="tab-bar">{tabs.map(t=><div key={t.id} className={`tab-item ${active===t.id?'on':''}`} onClick={()=>onChange(t.id)}>{t.icon&&<span>{t.icon} </span>}{t.label}</div>)}</div>}
+
+// ---- NAVBAR with working search ----
+function Navbar(){
+  const{theme,setTheme,user,go,toast:addToast,logout}=useApp();
+  const[showNotif,setShowNotif]=useState(false);
+  const[showDD,setShowDD]=useState(false);
+  const[notifs,setNotifs]=useState(S.g('notifications',[]));
+  const[searchQ,setSearchQ]=useState('');
+  const[searchFocus,setSearchFocus]=useState(false);
+  const unread=notifs.filter(n=>!n.read).length;
+  const markRead=()=>{const u=notifs.map(n=>({...n,read:true}));setNotifs(u);S.s('notifications',u)};
+  const ini=user.firstName[0]+user.lastName[0];
+  const ts=[{id:'',c:'#6C5CE7',l:'Яркая'},{id:'dark',c:'#1E1E2E',l:'Тёмная'},{id:'corporate',c:'#0984E3',l:'Корпоратив'},{id:'warm',c:'#E17055',l:'Тёплая'}];
+
+  // Global search
+  const searchResults=useMemo(()=>{
+    if(!searchQ.trim()||searchQ.length<2)return{courses:[],users:[]};
+    const q=searchQ.toLowerCase();
+    const courses=S.g('courses',[]).filter(c=>c.title.toLowerCase().includes(q)||c.description.toLowerCase().includes(q)||c.category.toLowerCase().includes(q));
+    const users=S.g('users',[]).filter(u=>`${u.firstName} ${u.lastName}`.toLowerCase().includes(q)||u.email.toLowerCase().includes(q));
+    return{courses:courses.slice(0,5),users:users.slice(0,5)};
+  },[searchQ]);
+  const hasResults=searchResults.courses.length>0||searchResults.users.length>0;
+
+  return(<nav className="navbar">
+    <div className="logo" onClick={()=>go('dash')}><div className="logo-icon">L</div><span>LearnHub</span></div>
+    <div className="search">
+      <span className="search-i">🔍</span>
+      <input placeholder="Поиск курсов, людей..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} onFocus={()=>setSearchFocus(true)} onBlur={()=>setTimeout(()=>setSearchFocus(false),200)}/>
+      {searchFocus&&searchQ.length>=2&&<div className="search-dd">
+        {!hasResults&&<div style={{padding:16,textAlign:'center',color:'var(--tx2)',fontSize:13}}>Ничего не найдено</div>}
+        {searchResults.courses.length>0&&<><div className="search-dd-sec">Курсы</div>
+          {searchResults.courses.map(c=><div key={c.id} className="search-dd-item" onMouseDown={()=>{go('cv_'+c.id);setSearchQ('')}}>
+            <span style={{fontSize:20}}>{c.icon||'📚'}</span><div><div style={{fontWeight:500}}>{c.title}</div><div style={{fontSize:11,color:'var(--tx2)'}}>{c.category}</div></div>
+          </div>)}</>}
+        {searchResults.users.length>0&&<><div className="search-dd-sec">Пользователи</div>
+          {searchResults.users.map(u=><div key={u.id} className="search-dd-item" onMouseDown={()=>{setSearchQ('')}}>
+            <div style={{width:28,height:28,borderRadius:'50%',background:'var(--pbg)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--p)',fontSize:10,fontWeight:600}}>{u.firstName[0]}{u.lastName[0]}</div>
+            <div><div style={{fontWeight:500}}>{u.firstName} {u.lastName}</div><div style={{fontSize:11,color:'var(--tx2)'}}>{u.email}</div></div>
+          </div>)}</>}
+      </div>}
+    </div>
+    <div className="nav-r">
+      <div className="themes">{ts.map(t=><div key={t.id} className={`tdot ${theme===t.id?'on':''}`} style={{background:t.c}} onClick={()=>setTheme(t.id)} title={t.l}/>)}</div>
+      <div style={{position:'relative'}}>
+        <div className="nav-btn" onClick={()=>{setShowNotif(!showNotif);setShowDD(false)}}>🔔{unread>0&&<span className="badge-c">{unread}</span>}</div>
+        {showNotif&&<div className="notif-dd">
+          <div style={{padding:'10px 14px',fontWeight:600,fontSize:13,borderBottom:'1px solid var(--bg3)',display:'flex',justifyContent:'space-between'}}>
+            <span>Уведомления</span>{unread>0&&<span style={{color:'var(--p)',cursor:'pointer',fontSize:11}} onClick={markRead}>Прочитать все</span>}
+          </div>
+          {notifs.length===0?<div style={{padding:20,textAlign:'center',color:'var(--tx2)',fontSize:13}}>Нет уведомлений</div>:
+          notifs.map(n=><div key={n.id} className={`notif-it ${!n.read?'unread':''}`}>
+            {!n.read&&<div className="notif-dot"/>}
+            <div><div style={{fontSize:12}}>{n.icon} {n.text}</div><div style={{fontSize:10,color:'var(--tx3)',marginTop:3}}>{n.time}</div></div>
+          </div>)}
+        </div>}
+      </div>
+      <div className="dd">
+        <div className="avatar" onClick={()=>{setShowDD(!showDD);setShowNotif(false)}}>{ini}</div>
+        {showDD&&<div className="dd-m">
+          <div className="dd-i" style={{fontWeight:600,color:'var(--tx)'}}>{user.firstName} {user.lastName}</div>
+          <div style={{padding:'0 16px 8px',fontSize:11,color:'var(--tx2)'}}>⭐ {user.xp} XP · Ур. {user.level}</div>
+          <div className="dd-sep"/>
+          <div className="dd-i" onClick={()=>{go('profile');setShowDD(false)}}>👤 Профиль</div>
+          <div className="dd-i" onClick={()=>{go('settings');setShowDD(false)}}>⚙️ Настройки</div>
+          <div className="dd-sep"/>
+          <div className="dd-i" style={{color:'var(--err)'}} onClick={()=>{logout();setShowDD(false)}}>🚪 Выйти</div>
+        </div>}
+      </div>
+    </div>
+  </nav>);
+}
+
+// ---- SIDEBAR ----
+function Sidebar(){
+  const{page,go,mini,setMini,user}=useApp();
+  const isA=user.role==='admin',isM=isA||user.role==='manager',isI=isA||user.role==='instructor';
+  const pendingReviews=S.g('submissions',[]).filter(s=>s.status==='pending'&&s.managerId===user.id).length;
+  const items=[
+    {s:'Обучение'},{id:'dash',i:'📊',l:'Dashboard'},{id:'catalog',i:'📚',l:'Каталог'},{id:'mycourses',i:'📖',l:'Мои курсы'},{id:'achievements',i:'🏆',l:'Достижения'},
+  ];
+  if(isM)items.push({s:'Управление'},{id:'team',i:'👥',l:'Команда'},{id:'analytics',i:'📈',l:'Аналитика'},{id:'reviews',i:'📋',l:'Проверки',badge:pendingReviews});
+  if(isI)items.push({s:'Создание'},{id:'constructor',i:'🛠️',l:'Конструктор'});
+  if(isA)items.push({s:'Админ'},{id:'admin-users',i:'👤',l:'Пользователи'},{id:'admin-roles',i:'🔑',l:'Роли'});
+  items.push({id:'settings',i:'⚙️',l:'Настройки'});
+  return(<aside className={`side ${mini?'mini':''}`}>
+    {items.map((it,i)=>it.s?<div key={i} className="side-sec">{mini?'•••':it.s}</div>:
+      <div key={it.id} className={`side-item ${page===it.id?'on':''}`} onClick={()=>go(it.id)} title={it.l}>
+        <i>{it.i}</i><span>{it.l}</span>
+        {it.badge>0&&<span style={{marginLeft:'auto',background:'var(--err)',color:'#fff',fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:10,flexShrink:0}}>{it.badge}</span>}
+      </div>
+    )}
+    <div className="side-tog" onClick={()=>setMini(!mini)}>{mini?'▶':'◀'}</div>
+  </aside>);
+}
+
+// ---- LEADERBOARD ----
+function Leaderboard({compact}){
+  const{user}=useApp();
+  const users=S.g('users',[]).sort((a,b)=>b.xp-a.xp);
+  const list=compact?users.slice(0,5):users;
+  const medals=['🥇','🥈','🥉'];
+  return(<div className="card" style={{overflow:'hidden'}}>
+    {list.map((u,i)=><div key={u.id} className={`lb-row ${u.id===user.id?'me':''}`}>
+      <div className="lb-pos" style={{background:i<3?['#fff8e0','#f0f0f0','#fff0ec'][i]:'var(--bg2)',color:i<3?['#f39c12','#7f8c8d','#d35400'][i]:'var(--tx2)'}}>{i<3?medals[i]:i+1}</div>
+      <div style={{width:32,height:32,borderRadius:'50%',background:GRADS[i%GRADS.length],display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:11,fontWeight:600}}>{u.firstName[0]}{u.lastName[0]}</div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontWeight:u.id===user.id?700:500,fontSize:13}}>{u.firstName} {u.lastName} {u.id===user.id?'(вы)':''}</div>
+        <div style={{fontSize:11,color:'var(--tx2)'}}>Ур. {u.level}</div>
+      </div>
+      <div style={{fontWeight:700,color:'var(--warn)',fontSize:14}}>⭐ {u.xp}</div>
+    </div>)}
+  </div>);
+}
+
+// ---- DASHBOARD ----
+function DashPage(){
+  const{user,go}=useApp();
+  const enrs=S.g('enrollments',[]).filter(e=>e.userId===user.id);
+  const courses=S.g('courses',[]);
+  const active=enrs.filter(e=>e.status==='active').length;
+  const done=enrs.filter(e=>e.status==='completed').length;
+  const ua=S.g('userAchievements',[]).filter(a=>a.userId===user.id&&a.earnedAt);
+  const allUsers=S.g('users',[]).sort((a,b)=>b.xp-a.xp);
+  const rank=allUsers.findIndex(u=>u.id===user.id)+1;
+  return(<div>
+    <h1 style={{fontSize:24,fontWeight:700,marginBottom:4}}>Привет, <span style={{color:'var(--p)'}}>{user.firstName}!</span> 👋</h1>
+    <p style={{color:'var(--tx2)',fontSize:13,marginBottom:20}}>У вас {active} курсов в процессе · Вы #{rank} в рейтинге</p>
+    <div className="grid4" style={{marginBottom:20}}>
+      <div className="stat"><div className="stat-i" style={{background:'var(--pbg)',color:'var(--p)'}}>📚</div><div className="stat-v">{active}</div><div className="stat-l">В процессе</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#e6f9f0',color:'var(--ok)'}}>✅</div><div className="stat-v">{done}</div><div className="stat-l">Завершено</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#fff3e0',color:'var(--warn)'}}>🏆</div><div className="stat-v">{ua.length}</div><div className="stat-l">Достижений</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#e8f4fd',color:'var(--info)'}}>⭐</div><div className="stat-v" style={{color:'var(--p)'}}>{user.xp}</div><div className="stat-l">Очков XP</div></div>
+    </div>
+    <div className="grid2" style={{gridTemplateColumns:'2fr 1fr'}}>
+      <div>
+        <div className="sec-h"><h2 className="sec-t">Мои курсы</h2><span className="sec-l" onClick={()=>go('mycourses')}>Все →</span></div>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {enrs.filter(e=>e.status==='active').slice(0,4).map(e=>{const c=courses.find(x=>x.id===e.courseId);if(!c)return null;
+            return<div key={e.courseId} className="card" style={{display:'flex',alignItems:'center',gap:14,padding:14,cursor:'pointer'}} onClick={()=>go('cv_'+e.courseId)}>
+              <div style={{width:50,height:50,borderRadius:10,background:c.coverGradient,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,flexShrink:0}}>{c.icon||'📚'}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{c.title}</div>
+                <PBar v={e.progress}/>
+                <div style={{fontSize:11,color:'var(--tx2)',marginTop:3}}>{e.progress}% завершено</div>
+              </div>
+            </div>})}
+          {enrs.filter(e=>e.status==='active').length===0&&<div className="card" style={{padding:20,textAlign:'center',color:'var(--tx2)',fontSize:13}}>Нет активных курсов. <span style={{color:'var(--p)',cursor:'pointer'}} onClick={()=>go('catalog')}>Перейти в каталог →</span></div>}
+        </div>
+      </div>
+      <div>
+        <div className="sec-h"><h2 className="sec-t">Рейтинг</h2></div>
+        <Leaderboard compact/>
+      </div>
+    </div>
+  </div>);
+}
+
+// ---- CATALOG ----
+function CatalogPage(){
+  const{user,go,toast:addToast}=useApp();
+  const[cat,setCat]=useState('Все');
+  const[q,setQ]=useState('');
+  const courses=S.g('courses',[]).filter(c=>c.status==='published');
+  const[enrs,setEnrs]=useState(S.g('enrollments',[]));
+  const filtered=courses.filter(c=>(cat==='Все'||c.category===cat)&&c.title.toLowerCase().includes(q.toLowerCase()));
+  const enroll=(cid)=>{
+    if(enrs.find(e=>e.userId===user.id&&e.courseId===cid)){addToast('info','Вы уже записаны');return}
+    const ne={userId:user.id,courseId:cid,progress:0,status:'active',startedAt:new Date().toISOString()};
+    const u=[...enrs,ne];setEnrs(u);S.s('enrollments',u);
+    const notifs=S.g('notifications',[]);notifs.unshift({id:'n'+Date.now(),text:'Вы записались на курс!',icon:'📚',time:'только что',read:false});S.s('notifications',notifs);
+    addToast('ok','Записались на курс!');
+  };
+  return(<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+      <div><h1 style={{fontSize:22,fontWeight:700}}>Каталог курсов</h1><p style={{fontSize:12,color:'var(--tx2)',marginTop:3}}>{filtered.length} курсов</p></div>
+      <div className="search" style={{maxWidth:260}}><span className="search-i">🔍</span><input placeholder="Поиск..." value={q} onChange={e=>setQ(e.target.value)}/></div>
+    </div>
+    <div style={{display:'flex',gap:6,marginBottom:18,flexWrap:'wrap'}}>
+      {['Все',...CATS].map(c=><button key={c} className={`fchip ${cat===c?'on':''}`} onClick={()=>setCat(c)}>{c}</button>)}
+    </div>
+    {filtered.length===0?<div className="empty"><div className="empty-i">🔍</div><div className="empty-t">Курсы не найдены</div></div>:
+    <div className="grid3">{filtered.map(c=>{const enr=enrs.find(e=>e.userId===user.id&&e.courseId===c.id);const totalSteps=(()=>{let n=0;c.modules?.forEach(m=>m.lessons?.forEach(l=>n+=(l.steps?.length||0)));return n})();
+      return<div key={c.id} className="card">
+        <div className="cov" style={{...getCoverStyle(c),height:150}}>{!c.coverImage&&<span className="cov-i">{c.icon||'📚'}</span>}<span className="cbdg">{c.category}</span></div>
+        <div className="cbody">
+          <div className="ctitle">{c.title}</div><div className="cdesc">{c.description}</div>
+          <div className="cmeta" style={{marginBottom:10}}><span>📝 {c.modules?.length||0} мод.</span><span>📄 {totalSteps} шагов</span></div>
+          {enr?<button className="btn btn-s btn-sm" onClick={()=>go('cv_'+c.id)}>{enr.progress===100?'✓ Пройден':`Продолжить (${enr.progress}%)`}</button>
+          :<button className="btn btn-p btn-sm" onClick={()=>enroll(c.id)}>Записаться</button>}
+        </div>
+      </div>})}</div>}
+  </div>);
+}
+
+// ---- MY COURSES ----
+function MyCoursesPage(){
+  const{user,go}=useApp();
+  const[tab,setTab]=useState('active');
+  const enrs=S.g('enrollments',[]).filter(e=>e.userId===user.id);
+  const courses=S.g('courses',[]);
+  const filtered=tab==='all'?enrs:enrs.filter(e=>e.status===tab);
+  if(enrs.length===0)return<div className="empty"><div className="empty-i">📚</div><div className="empty-t">Нет записанных курсов</div><div className="empty-d">Перейдите в каталог</div><button className="btn btn-p" onClick={()=>go('catalog')}>Каталог</button></div>;
+  return(<div><h1 style={{fontSize:22,fontWeight:700,marginBottom:12}}>Мои курсы</h1>
+    <Tabs tabs={[{id:'active',label:'В процессе',icon:'📖'},{id:'completed',label:'Завершённые',icon:'✅'},{id:'all',label:'Все'}]} active={tab} onChange={setTab}/>
+    <div className="grid3">{filtered.map(e=>{const c=courses.find(x=>x.id===e.courseId);if(!c)return null;
+      return<div key={e.courseId} className="card card-c" onClick={()=>go(e.status==='completed'?'cert_'+e.courseId:'cv_'+e.courseId)}>
+        <div className="cov" style={getCoverStyle(c)}>{!c.coverImage&&<span className="cov-i">{c.icon||'📚'}</span>}
+          {e.status==='completed'&&<span style={{position:'absolute',top:10,right:10,background:'#e6f9f0',color:'#00875a',padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:600}}>✓ Пройден</span>}
+        </div>
+        <div className="cbody"><div className="ctitle">{c.title}</div><PBar v={e.progress} c={e.status==='completed'?'var(--ok)':'var(--p)'}/><div className="cmeta"><span style={{fontWeight:600}}>{e.progress}%</span>{e.status==='completed'&&<span>🎓 Сертификат</span>}</div></div>
+      </div>})}</div>
+    {filtered.length===0&&<div className="empty" style={{padding:30}}><div className="empty-t">{tab==='active'?'Нет активных курсов':'Нет завершённых курсов'}</div></div>}
+  </div>);
+}
+
+// ---- CERTIFICATE VIEW ----
+function CertificatePage({courseId}){
+  const{user,go}=useApp();
+  const course=S.g('courses',[]).find(c=>c.id===courseId);
+  const enr=S.g('enrollments',[]).find(e=>e.userId===user.id&&e.courseId===courseId);
+  if(!course||!enr||enr.status!=='completed')return<div className="empty"><div className="empty-i">❌</div><div className="empty-t">Сертификат недоступен</div><button className="btn btn-g" onClick={()=>go('mycourses')}>← Назад</button></div>;
+  return(<div style={{maxWidth:700,margin:'0 auto'}}>
+    <button className="btn btn-g" onClick={()=>go('mycourses')} style={{marginBottom:16}}>← Мои курсы</button>
+    <div className="cert-bg">
+      <div style={{fontSize:48,marginBottom:12}}>🎓</div>
+      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:2,color:'var(--tx2)',fontWeight:700,marginBottom:8}}>Сертификат об окончании</div>
+      <div style={{fontSize:28,fontWeight:800,color:'var(--tx)',marginBottom:6}}>{course.title}</div>
+      <div style={{fontSize:14,color:'var(--tx2)',marginBottom:24}}>Настоящим подтверждается, что</div>
+      <div style={{fontSize:22,fontWeight:700,color:'var(--p)',marginBottom:6}}>{user.firstName} {user.lastName}</div>
+      <div style={{fontSize:13,color:'var(--tx2)',marginBottom:24}}>успешно завершил(а) курс «{course.title}»</div>
+      <div style={{display:'flex',justifyContent:'center',gap:40,marginBottom:20}}>
+        <div><div style={{fontSize:10,color:'var(--tx3)',textTransform:'uppercase'}}>Дата</div><div style={{fontWeight:600,fontSize:14}}>{enr.completedAt?new Date(enr.completedAt).toLocaleDateString('ru'):'-'}</div></div>
+        <div><div style={{fontSize:10,color:'var(--tx3)',textTransform:'uppercase'}}>Прогресс</div><div style={{fontWeight:600,fontSize:14,color:'var(--ok)'}}>100%</div></div>
+        <div><div style={{fontSize:10,color:'var(--tx3)',textTransform:'uppercase'}}>ID</div><div style={{fontWeight:600,fontSize:14}}>{courseId.toUpperCase()}-{user.id.toUpperCase()}</div></div>
+      </div>
+      <div style={{borderTop:'1px dashed var(--bg3)',paddingTop:16,fontSize:12,color:'var(--tx3)'}}>LearnHub — Портал обучения IT-менеджеров</div>
+    </div>
+    <div style={{display:'flex',gap:8,justifyContent:'center',marginTop:16}}>
+      <button className="btn btn-p" onClick={()=>go('cv_'+courseId)}>Пройти ещё раз</button>
+      <button className="btn btn-o" onClick={()=>window.print()}>🖨️ Печать</button>
+    </div>
+  </div>);
+}
+
+// ---- COURSE VIEWER ----
+function CourseViewer({courseId}){
+  const{user,go,toast:addToast}=useApp();
+  const courses=S.g('courses',[]);const course=courses.find(c=>c.id===courseId);
+  const[stepIdx,setStepIdx]=useState(0);
+  const[sel,setSel]=useState({});
+  const[submitted,setSubmitted]=useState(false);
+  const[sp,setSp]=useState(S.g('stepProgress',[]));
+  // Send to manager
+  const[sendModal,setSendModal]=useState(false);
+  const[sendComment,setSendComment]=useState('');
+  // AI review
+  const[aiAnswer,setAiAnswer]=useState('');
+  const[aiSent,setAiSent]=useState(false);
+  // File upload
+  const[uploadedFile,setUploadedFile]=useState(null);
+  // Final exam
+  const[showExam,setShowExam]=useState(false);
+  const[examAnswers,setExamAnswers]=useState({});
+  const[examDone,setExamDone]=useState(false);
+  const[examScore,setExamScore]=useState(null);
+
+  if(!course)return<div className="empty"><div className="empty-i">❌</div><div className="empty-t">Курс не найден</div></div>;
+  const allSteps=[];course.modules?.forEach(m=>m.lessons?.forEach(l=>l.steps?.forEach(s=>allSteps.push({...s,modTitle:m.title,lesTitle:l.title}))));
+  if(allSteps.length===0)return<div className="empty"><div className="empty-i">📝</div><div className="empty-t">В курсе пока нет шагов</div><button className="btn btn-g" onClick={()=>go('mycourses')}>← Назад</button></div>;
+  const step=allSteps[stepIdx];
+  const isDone=(sid)=>sp.some(p=>p.userId===user.id&&p.stepId===sid&&p.courseId===courseId);
+  const completedCount=allSteps.filter(s=>isDone(s.id)).length;
+  const allStepsDone=completedCount>=allSteps.length;
+  const hasFinalExam=course.finalExam?.enabled&&course.finalExam?.questions?.length>0;
+  const progress=Math.round((completedCount/allSteps.length)*100);
+
+  const addXP=(pts)=>{const us=S.g('users',[]).map(u2=>u2.id===user.id?{...u2,xp:(u2.xp||0)+pts}:u2);S.s('users',us)};
+
+  const markDone=()=>{
+    if(!isDone(step.id)){
+      const u=[...sp,{userId:user.id,stepId:step.id,courseId,status:'completed',score:100}];setSp(u);S.s('stepProgress',u);
+      const newCount=completedCount+1;
+      const newProg=Math.round((newCount/allSteps.length)*100);
+      const courseCompleted=newProg>=100&&!hasFinalExam;
+      const enrs=S.g('enrollments',[]).map(e=>e.userId===user.id&&e.courseId===courseId?{...e,progress:newProg,status:courseCompleted?'completed':'active',completedAt:courseCompleted?new Date().toISOString():undefined}:e);
+      S.s('enrollments',enrs);
+      addXP(step.points||10);
+      if(courseCompleted){
+        addToast('ok','🎉 Курс пройден! +50 XP');addXP(50);
+        const notifs=S.g('notifications',[]);notifs.unshift({id:'n'+Date.now(),text:`Курс "${course.title}" завершён!`,icon:'🎓',time:'только что',read:false});S.s('notifications',notifs);
+      }
+      // Go to exam after last step
+      if(newCount>=allSteps.length&&hasFinalExam){setShowExam(true);return}
+      if(courseCompleted){go('cert_'+courseId);return}
+    }
+    if(stepIdx<allSteps.length-1){setStepIdx(stepIdx+1);setSel({});setSubmitted(false);setAiAnswer('');setAiSent(false);setUploadedFile(null);}
+    else if(hasFinalExam&&allStepsDone){setShowExam(true)}
+    else{go('cert_'+courseId)}
+  };
+
+  const submitQuiz=()=>{if(Object.keys(sel).filter(k=>sel[k]).length===0){addToast('err','Выберите ответ');return}setSubmitted(true)};
+  const getYT=(url)=>{const m=(url||'').match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);return m?`https://www.youtube-nocookie.com/embed/${m[1]}?rel=0&modestbranding=1&playsinline=1`:null};
+  let quizData=null;if(step.type==='quiz'||step.type==='exam'){try{quizData=JSON.parse(step.content)}catch{}}
+
+  const isQuizCorrect=()=>{
+    if(!quizData)return false;
+    const correctIds=new Set(quizData.options.map((_,i)=>i).filter(i=>quizData.options[i].isCorrect));
+    const selectedIds=new Set(Object.keys(sel).filter(k=>sel[k]).map(Number));
+    if(correctIds.size!==selectedIds.size)return false;
+    for(const id of correctIds)if(!selectedIds.has(id))return false;
+    return true;
+  };
+
+  // Send to manager
+  const sendToManager=()=>{
+    if(!user.managerId){addToast('err','Руководитель не назначен');setSendModal(false);return}
+    const subs=S.g('submissions',[]);
+    subs.push({id:'sub'+Date.now(),userId:user.id,courseId,stepId:step.id,stepTitle:step.title,courseTitle:course.title,type:'step_answer',content:sendComment||'Ответ отправлен на проверку',score:null,status:'pending',managerId:user.managerId,submittedAt:new Date().toISOString(),reviewedAt:null,reviewNote:''});
+    S.s('submissions',subs);
+    addToast('ok','✅ Отправлено руководителю');setSendModal(false);setSendComment('');
+  };
+
+  // AI submit
+  const submitAI=()=>{
+    if(!aiAnswer.trim()){addToast('err','Введите ответ');return}
+    const subs=S.g('submissions',[]);
+    subs.push({id:'sub'+Date.now(),userId:user.id,courseId,stepId:step.id,stepTitle:step.title,courseTitle:course.title,type:'step_answer',content:aiAnswer,score:null,status:'pending',managerId:user.managerId||null,submittedAt:new Date().toISOString(),reviewedAt:null,reviewNote:''});
+    S.s('submissions',subs);
+    setAiSent(true);addToast('ok','🤖 Ответ отправлен на проверку');
+  };
+
+  // Final Exam submit
+  const submitExam=()=>{
+    const qs=course.finalExam.questions;let total=0,earned=0;
+    qs.forEach(q=>{
+      total+=q.points||10;const ans=examAnswers[q.id];
+      if(q.questionType==='single'){if(q.options.find(o=>o.isCorrect)?.id===ans)earned+=q.points||10}
+      else{const cor=new Set(q.options.filter(o=>o.isCorrect).map(o=>o.id));const sel2=new Set(Array.isArray(ans)?ans:[]);let ok=cor.size===sel2.size;for(const c of cor)if(!sel2.has(c)){ok=false;break}if(ok)earned+=q.points||10}
+    });
+    const pct=total>0?Math.round((earned/total)*100):0;
+    setExamScore(pct);setExamDone(true);
+    // Send to manager
+    const subs=S.g('submissions',[]);
+    subs.push({id:'sub'+Date.now(),userId:user.id,courseId,stepId:null,stepTitle:'Финальный экзамен',courseTitle:course.title,type:'exam_result',content:`Результат: ${pct}%`,score:pct,status:'pending',managerId:user.managerId||null,submittedAt:new Date().toISOString(),reviewedAt:null,reviewNote:''});
+    S.s('submissions',subs);
+    if(pct>=course.finalExam.passingScore){
+      const enrs=S.g('enrollments',[]).map(e=>e.userId===user.id&&e.courseId===courseId?{...e,progress:100,status:'completed',completedAt:new Date().toISOString()}:e);S.s('enrollments',enrs);
+      addXP(50);addToast('ok','🎉 Экзамен сдан! Результат отправлен руководителю');
+    }else{addToast('info','📋 Экзамен не сдан. Результат отправлен руководителю')}
+  };
+
+  // ---- EXAM SCREEN ----
+  if(showExam){
+    const qs=course.finalExam.questions;
+    return(<div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 64px)',margin:'-24px -28px'}}>
+      <div className="con-bar">
+        <button className="btn btn-g btn-sm" onClick={()=>setShowExam(false)}>← Назад к шагам</button>
+        <span style={{fontWeight:600,fontSize:14}}>Финальный экзамен — {course.title}</span>
+        <span style={{fontSize:12,color:'var(--tx2)'}}>Проходной балл: {course.finalExam.passingScore}%</span>
+      </div>
+      <div style={{flex:1,overflowY:'auto'}}><div style={{maxWidth:720,margin:'0 auto',padding:28}}>
+        {!examDone?<>
+          <div style={{background:'linear-gradient(135deg,var(--p),var(--s,#00CEC9))',color:'#fff',borderRadius:12,padding:'24px 28px',marginBottom:24,position:'relative',overflow:'hidden'}}>
+            <div style={{fontSize:22,fontWeight:700,marginBottom:4}}>🎓 Финальный экзамен</div>
+            <div style={{fontSize:13,opacity:.9}}>{qs.length} вопросов · Проходной балл {course.finalExam.passingScore}%{course.finalExam.timeLimit?` · ${course.finalExam.timeLimit} мин`:''}</div>
+          </div>
+          {qs.map((q,qi)=><div key={q.id} className="quiz-b" style={{marginBottom:16}}>
+            <div className="quiz-q">{qi+1}. {q.question}</div>
+            {q.questionType==='multi'&&<div style={{fontSize:11,color:'var(--tx2)',marginBottom:8}}>Выберите все правильные ответы</div>}
+            {q.options.map(o=>{
+              const isSel=q.questionType==='single'?examAnswers[q.id]===o.id:(Array.isArray(examAnswers[q.id])&&examAnswers[q.id].includes(o.id));
+              return<div key={o.id} className={`quiz-o ${isSel?'sel':''}`} onClick={()=>{
+                if(q.questionType==='single')setExamAnswers({...examAnswers,[q.id]:o.id});
+                else{const cur=examAnswers[q.id]||[];setExamAnswers({...examAnswers,[q.id]:isSel?cur.filter(x=>x!==o.id):[...cur,o.id]})}
+              }}><div className="quiz-r"/>{o.text}</div>})}
+          </div>)}
+          <button className="btn btn-p" style={{width:'100%',padding:12,fontSize:15}} onClick={submitExam}>Завершить экзамен</button>
+        </>:<div style={{textAlign:'center',padding:'40px 0'}}>
+          <div style={{fontSize:64,marginBottom:16}}>{examScore>=course.finalExam.passingScore?'🎉':'😔'}</div>
+          <div style={{fontSize:52,fontWeight:800,color:examScore>=course.finalExam.passingScore?'var(--ok)':'var(--err)',marginBottom:8}}>{examScore}%</div>
+          <div style={{fontSize:18,fontWeight:700,marginBottom:6}}>{examScore>=course.finalExam.passingScore?'Экзамен сдан!':'Экзамен не сдан'}</div>
+          <div style={{fontSize:13,color:'var(--tx2)',marginBottom:24}}>Проходной балл: {course.finalExam.passingScore}% · Результат отправлен руководителю</div>
+          <div style={{display:'flex',gap:12,justifyContent:'center'}}>
+            {examScore>=course.finalExam.passingScore&&<button className="btn btn-p" onClick={()=>go('cert_'+courseId)}>🎓 Получить сертификат</button>}
+            <button className="btn btn-o" onClick={()=>{setExamDone(false);setExamAnswers({})}}>Попробовать снова</button>
+          </div>
+        </div>}
+      </div></div>
+    </div>);
+  }
+
+  return(<div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 64px)',margin:'-24px -28px'}}>
+    <div className="con-bar">
+      <button className="btn btn-g btn-sm" onClick={()=>go('mycourses')}>← Мои курсы</button>
+      <span style={{fontWeight:600,fontSize:14}}>{course.title}</span>
+      <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:12,color:'var(--tx2)'}}>{completedCount}/{allSteps.length}</span><div style={{width:100}}><PBar v={progress}/></div></div>
+    </div>
+    <div className="cv" style={{flex:1}}>
+      <div className="cv-side">
+        {course.modules?.map(m=><div key={m.id}>
+          <div className="cv-mh">📁 {m.title}</div>
+          {m.lessons?.map(l=>l.steps?.map(s=>{
+            const idx=allSteps.findIndex(x=>x.id===s.id);const isCur=stepIdx===idx;const isOk=isDone(s.id);
+            return<div key={s.id} className={`cv-st ${isCur?'on':''} ${isOk?'done':''}`} onClick={()=>{setStepIdx(idx);setSel({});setSubmitted(false);setAiAnswer('');setAiSent(false);setUploadedFile(null)}}>
+              <div className={`cv-ck ${isOk?'ok':''} ${isCur?'cur':''}`}>{isOk?'✓':isCur?'●':''}</div>
+              <span>{ICONS[s.type]||'📝'} {s.title}</span>
+            </div>}))}
+        </div>)}
+        {hasFinalExam&&<div className={`cv-st ${allStepsDone?'':'lock'}`} style={{borderTop:'1px solid var(--bg3)',fontWeight:600,color:allStepsDone?'var(--p)':'var(--tx3)',cursor:allStepsDone?'pointer':'not-allowed'}} onClick={()=>allStepsDone&&setShowExam(true)}>
+          <div className="cv-ck" style={{borderColor:allStepsDone?'var(--p)':'var(--bg3)'}}>{allStepsDone?'🎓':'🔒'}</div>
+          <span>Финальный экзамен{!allStepsDone?' (недоступен)':''}</span>
+        </div>}
+      </div>
+      <div className="cv-main"><div className="cv-cnt">
+        <div style={{fontSize:11,color:'var(--tx2)',marginBottom:4}}>{step.modTitle} · {step.lesTitle} · Шаг {stepIdx+1} из {allSteps.length}</div>
+        <h1 style={{fontSize:22,fontWeight:700,marginBottom:18}}>{step.title}</h1>
+
+        {step.type==='text'&&<div style={{fontSize:14,lineHeight:1.7}} dangerouslySetInnerHTML={{__html:step.content||'<p>Контент не добавлен</p>'}}/>}
+
+        {step.type==='video'&&(getYT(step.content)
+          ?<div style={{borderRadius:12,overflow:'hidden',marginBottom:8}}><iframe width="100%" height="400" src={getYT(step.content)} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/></div>
+          :<div style={{background:'var(--bg3)',borderRadius:12,padding:32,textAlign:'center',color:'var(--tx2)'}}><div style={{fontSize:40,marginBottom:8}}>🎬</div><p style={{fontSize:14}}>Вставьте YouTube URL в конструкторе</p><p style={{fontSize:12,marginTop:4,opacity:.6}}>{step.content||'URL не задан'}</p></div>)}
+
+        {step.type==='code'&&<pre style={{background:'#1e1e2e',color:'#cdd6f4',padding:20,borderRadius:8,fontSize:13,lineHeight:1.6,overflowX:'auto',fontFamily:'monospace'}}>{step.content||'// Код не добавлен'}</pre>}
+
+        {(step.type==='quiz'||step.type==='exam')&&quizData&&<div className="quiz-b">
+          <div className="quiz-q">❓ {quizData.question}</div>
+          {quizData.questionType==='multi'&&<div style={{fontSize:11,color:'var(--tx2)',marginBottom:8}}>Выберите все правильные ответы</div>}
+          {quizData.options?.map((o,i)=>{
+            let cls='quiz-o';
+            if(submitted&&o.isCorrect)cls+=' ok';
+            else if(submitted&&sel[i]&&!o.isCorrect)cls+=' no';
+            else if(!submitted&&sel[i])cls+=' sel';
+            return<div key={o.id||i} className={cls} onClick={()=>{if(submitted)return;if(quizData.questionType==='single'){setSel({[i]:true})}else{setSel({...sel,[i]:!sel[i]})}}}>
+              <div className="quiz-r"/>{o.text}</div>})}
+          {!submitted&&<button className="btn btn-p" style={{marginTop:14}} onClick={submitQuiz}>Проверить</button>}
+          {submitted&&<div className={`quiz-res ${isQuizCorrect()?'ok':'no'}`}>
+            {isQuizCorrect()?'✅ Правильно! +'+(quizData.points||10)+' XP':'❌ Неправильно. Попробуйте ещё раз'}
+            {quizData.explanation&&<div style={{marginTop:6,fontSize:12,opacity:.8}}>💡 {quizData.explanation}</div>}
+          </div>}
+        </div>}
+
+        {step.type==='survey'&&<div className="quiz-b"><div className="quiz-q">📋 Опрос</div><textarea className="fi" placeholder="Введите ваш ответ..." style={{minHeight:120}}/></div>}
+
+        {step.type==='file'&&<div className="card" style={{padding:24,textAlign:'center'}}>
+          {step.content&&<p style={{fontSize:13,color:'var(--tx2)',marginBottom:16}}>📎 {step.content}</p>}
+          <input type="file" id={`fu_${step.id}`} style={{display:'none'}} onChange={e=>setUploadedFile(e.target.files[0])}/>
+          <label htmlFor={`fu_${step.id}`} style={{cursor:'pointer',display:'block',padding:'24px 20px',border:'2px dashed var(--bg3)',borderRadius:8,color:'var(--tx2)',fontSize:13,transition:'.2s'}} onMouseOver={e=>e.currentTarget.style.borderColor='var(--p)'} onMouseOut={e=>e.currentTarget.style.borderColor='var(--bg3)'}>
+            {uploadedFile?<><div style={{fontSize:32,marginBottom:8}}>📄</div><div style={{fontWeight:600,color:'var(--ok)'}}>{uploadedFile.name}</div><div style={{fontSize:11,marginTop:4,opacity:.7}}>{(uploadedFile.size/1024).toFixed(1)} KB</div></>:<><div style={{fontSize:32,marginBottom:8}}>📁</div><div>Нажмите для выбора файла</div><div style={{fontSize:11,marginTop:4,opacity:.6}}>Поддерживаются любые форматы</div></>}
+          </label>
+        </div>}
+
+        {step.type==='ai'&&<div className="card" style={{padding:20}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><span style={{fontSize:20}}>🤖</span><span style={{fontWeight:600,fontSize:15}}>ИИ-проверка ответа</span></div>
+          {step.content&&<p style={{fontSize:13,color:'var(--tx2)',marginBottom:12,lineHeight:1.6}}>{step.content}</p>}
+          {!aiSent?<>
+            <textarea className="fi" value={aiAnswer} onChange={e=>setAiAnswer(e.target.value)} placeholder="Напишите развёрнутый ответ..." style={{minHeight:150}}/>
+            <div style={{display:'flex',gap:8,marginTop:10}}>
+              <button className="btn btn-p" onClick={submitAI}>🚀 Отправить на проверку</button>
+            </div>
+          </>:<div style={{background:'var(--pbg)',borderRadius:8,padding:16,color:'var(--p)',textAlign:'center'}}>
+            <div style={{fontSize:24,marginBottom:8}}>✅</div>
+            <div style={{fontWeight:600}}>Ответ отправлен на проверку</div>
+            <div style={{fontSize:12,marginTop:4,opacity:.8}}>Руководитель проверит и даст обратную связь</div>
+          </div>}
+        </div>}
+
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:28,paddingTop:18,borderTop:'1px solid var(--bg3)'}}>
+          <button className="btn btn-g" disabled={stepIdx===0} onClick={()=>{if(stepIdx>0){setStepIdx(stepIdx-1);setSel({});setSubmitted(false);setAiAnswer('');setAiSent(false);setUploadedFile(null)}}}>← Назад</button>
+          <div style={{display:'flex',gap:8}}>
+            {user.managerId&&<button className="btn btn-o btn-sm" onClick={()=>setSendModal(true)}>📤 Отправить руководителю</button>}
+            {(step.type==='quiz'||step.type==='exam')
+              ?(submitted?<button className="btn btn-p" onClick={markDone}>{stepIdx===allSteps.length-1?(hasFinalExam?'К экзамену →':'🎓 Завершить'):'Далее →'}</button>:null)
+              :<button className="btn btn-p" onClick={markDone}>{stepIdx===allSteps.length-1?(hasFinalExam?'К экзамену →':'🎓 Завершить'):'Далее →'}</button>}
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    {/* Send to manager modal */}
+    {sendModal&&<div className="modal-ov" onClick={()=>setSendModal(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <h3>📤 Отправить руководителю</h3>
+          <button className="btn btn-g btn-sm" onClick={()=>setSendModal(false)}>✕</button>
+        </div>
+        <p style={{fontSize:13,color:'var(--tx2)',marginBottom:14}}>Шаг: <strong>{step.title}</strong></p>
+        <div className="fg"><label className="fl">Ваш ответ / комментарий</label>
+          <textarea className="fi" value={sendComment} onChange={e=>setSendComment(e.target.value)} placeholder="Опишите ваш ответ или добавьте комментарий к этому шагу..." style={{minHeight:120}}/>
+        </div>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
+          <button className="btn btn-g" onClick={()=>setSendModal(false)}>Отмена</button>
+          <button className="btn btn-p" onClick={sendToManager}>📤 Отправить</button>
+        </div>
+      </div>
+    </div>}
+  </div>);
+}
+
+// ---- REVIEWS PAGE ----
+function ReviewsPage(){
+  const{user,toast:addToast}=useApp();
+  const[tab,setTab]=useState('pending');
+  const[subs,setSubs]=useState(S.g('submissions',[]));
+  const[reviewModal,setReviewModal]=useState(null);
+  const[note,setNote]=useState('');
+
+  const mine=subs.filter(s=>s.managerId===user.id);
+  const filtered=mine.filter(s=>s.status===tab);
+  const users=S.g('users',[]);
+  const getUser=(id)=>users.find(u=>u.id===id);
+  const pendingCount=mine.filter(s=>s.status==='pending').length;
+
+  const decide=(sub,status)=>{
+    const updated=subs.map(s=>s.id===sub.id?{...s,status,reviewNote:note,reviewedAt:new Date().toISOString()}:s);
+    setSubs(updated);S.s('submissions',updated);
+    setReviewModal(null);setNote('');
+    addToast('ok',status==='approved'?'✅ Принято':'❌ Отклонено');
+    // Notify employee
+    const notifs=S.g('notifications',[]);
+    notifs.unshift({id:'n'+Date.now(),text:`Ваш ответ по "${sub.stepTitle}" ${status==='approved'?'принят':'отклонён'}.${note?` Комментарий: ${note}`:''}`,icon:status==='approved'?'✅':'❌',time:'только что',read:false});
+    S.s('notifications',notifs);
+  };
+
+  const tabs=[{id:'pending',l:`⏳ На проверке (${pendingCount})`},{id:'approved',l:'✅ Принято'},{id:'rejected',l:'❌ Отклонено'}];
+
+  return(<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+      <div><h1 style={{fontSize:22,fontWeight:700}}>📋 Проверки</h1><p style={{fontSize:13,color:'var(--tx2)',marginTop:2}}>Ответы сотрудников на проверку</p></div>
+    </div>
+    <div className="tab-bar">{tabs.map(t=><div key={t.id} className={`tab-item ${tab===t.id?'on':''}`} onClick={()=>setTab(t.id)}>{t.l}</div>)}</div>
+    {filtered.length===0?<div className="empty"><div className="empty-i">📋</div><div className="empty-t">{tab==='pending'?'Нет ожидающих проверок':tab==='approved'?'Нет принятых':'Нет отклонённых'}</div></div>:
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      {filtered.map(sub=>{
+        const emp=getUser(sub.userId);
+        return(<div key={sub.id} className="card" style={{padding:20,borderLeft:`3px solid ${sub.status==='pending'?'var(--warn)':sub.status==='approved'?'var(--ok)':'var(--err)'}`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <div style={{width:36,height:36,borderRadius:'50%',background:GRADS[0],display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:13,fontWeight:700,flexShrink:0}}>{emp?emp.firstName[0]+emp.lastName[0]:'?'}</div>
+              <div>
+                <div style={{fontWeight:700,fontSize:14}}>{emp?`${emp.firstName} ${emp.lastName}`:'Неизвестный'}</div>
+                <div style={{fontSize:11,color:'var(--tx3)'}}>{new Date(sub.submittedAt).toLocaleString('ru')}</div>
+              </div>
+            </div>
+            <span style={{padding:'3px 10px',borderRadius:20,fontSize:10,fontWeight:700,background:sub.status==='pending'?'var(--warn)':sub.status==='approved'?'var(--ok)':'var(--err)',color:'#fff',flexShrink:0}}>
+              {sub.status==='pending'?'На проверке':sub.status==='approved'?'Принято':'Отклонено'}
+            </span>
+          </div>
+          <div style={{fontSize:12,color:'var(--tx3)',marginBottom:6}}>
+            <strong style={{color:'var(--tx2)'}}>{sub.type==='exam_result'?'🎓 Экзамен':'📝 Ответ на шаг'}:</strong> {sub.courseTitle} → {sub.stepTitle}
+          </div>
+          <div style={{background:'var(--bg2)',borderRadius:8,padding:'10px 14px',fontSize:13,color:'var(--tx)',lineHeight:1.6,marginBottom:sub.status!=='pending'?12:0}}>
+            {sub.content||'—'}
+            {sub.type==='exam_result'&&sub.score!=null&&<div style={{marginTop:6,fontWeight:700,fontSize:16,color:sub.score>=70?'var(--ok)':'var(--err)'}}>{sub.score}%</div>}
+          </div>
+          {sub.reviewNote&&<div style={{background:'var(--pbg)',borderRadius:8,padding:'8px 12px',fontSize:12,color:'var(--p)',marginBottom:sub.status==='pending'?12:0}}>💬 {sub.reviewNote}</div>}
+          {sub.status==='pending'&&<div style={{display:'flex',gap:8,marginTop:12}}>
+            <button className="btn btn-ok btn-sm" onClick={()=>{setReviewModal(sub);setNote('')}}>✅ Принять</button>
+            <button className="btn btn-d btn-sm" onClick={()=>{setReviewModal(sub);setNote('')}}>❌ Отклонить</button>
+          </div>}
+        </div>)})}
+    </div>}
+
+    {reviewModal&&<div className="modal-ov" onClick={()=>setReviewModal(null)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <h3>Проверка ответа</h3>
+          <button className="btn btn-g btn-sm" onClick={()=>setReviewModal(null)}>✕</button>
+        </div>
+        <p style={{fontSize:13,color:'var(--tx2)',marginBottom:14}}>Сотрудник: <strong>{getUser(reviewModal.userId)?.firstName} {getUser(reviewModal.userId)?.lastName}</strong></p>
+        <p style={{fontSize:13,color:'var(--tx2)',marginBottom:14}}>Ответ: <em>{reviewModal.content}</em></p>
+        <div className="fg"><label className="fl">Комментарий к ответу (необязательно)</label>
+          <textarea className="fi" value={note} onChange={e=>setNote(e.target.value)} placeholder="Напишите обратную связь сотруднику..." style={{minHeight:90}}/>
+        </div>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
+          <button className="btn btn-g" onClick={()=>setReviewModal(null)}>Отмена</button>
+          <button className="btn btn-d btn-sm" onClick={()=>decide(reviewModal,'rejected')}>❌ Отклонить</button>
+          <button className="btn btn-ok" onClick={()=>decide(reviewModal,'approved')}>✅ Принять</button>
+        </div>
+      </div>
+    </div>}
+  </div>);
+}
+
+// ---- CONSTRUCTOR ----
+function ConstructorPage(){
+  const{user,toast:addToast}=useApp();
+  const[courses,setCourses]=useState(S.g('courses',[]));
+  const[cur,setCur]=useState(null);
+  const[selStep,setSelStep]=useState(null);
+  const[modals,setModals]=useState({course:false,module:false,lesson:false,step:false,editCourse:false});
+  const[forms,setForms]=useState({cTitle:'',cDesc:'',cCat:CATS[0],cGrad:GRADS[0],mTitle:'',lTitle:'',sTitle:'',sType:'text'});
+  const[selModId,setSelModId]=useState(null);
+  const[selLesId,setSelLesId]=useState(null);
+
+  const save=(updated)=>{setCourses(updated);S.s('courses',updated);if(cur){const found=updated.find(c=>c.id===cur.id);if(found)setCur(found)}};
+  const openM=(k,extra)=>{setModals({...modals,[k]:true});if(extra)setForms(f=>({...f,...extra}))};
+  const closeM=(k)=>setModals({...modals,[k]:false});
+
+  // Create course
+  const createCourse=()=>{
+    if(!forms.cTitle.trim()){addToast('err','Введите название');return}
+    const nc={id:'c'+Date.now(),title:forms.cTitle,description:forms.cDesc,category:forms.cCat,coverGradient:forms.cGrad,coverImage:forms.cImage||null,icon:'📚',status:'draft',authorId:user.id,modules:[]};
+    const u=[...courses,nc];save(u);setCur(nc);closeM('course');setForms(f=>({...f,cTitle:'',cDesc:'',cImage:null}));addToast('ok','Курс создан!');
+  };
+  // Edit course metadata
+  const editCourse=()=>{
+    if(!forms.cTitle.trim())return;
+    const u=courses.map(c=>c.id===cur.id?{...c,title:forms.cTitle,description:forms.cDesc,category:forms.cCat,coverGradient:forms.cGrad,coverImage:forms.cImage!==undefined?forms.cImage:c.coverImage}:c);
+    save(u);closeM('editCourse');addToast('ok','Курс обновлён');
+  };
+  // Handle cover image upload
+  const handleCoverUpload=async(file)=>{
+    if(!file)return;
+    if(file.size>2*1024*1024){addToast('err','Файл слишком большой. Максимум 2MB');return}
+    try{const b64=await readImageFile(file);setForms(f=>({...f,cImage:b64}))}catch{addToast('err','Ошибка загрузки изображения')}
+  };
+  // Delete course
+  const delCourse=(id)=>{
+    if(!confirm('Удалить курс и все его содержимое?'))return;
+    const u=courses.filter(c=>c.id!==id);save(u);if(cur?.id===id){setCur(null);setSelStep(null)}
+    // Clean up enrollments
+    const enrs=S.g('enrollments',[]).filter(e=>e.courseId!==id);S.s('enrollments',enrs);
+    addToast('ok','Курс удалён');
+  };
+  // Duplicate course
+  const dupCourse=(c)=>{
+    const nc=JSON.parse(JSON.stringify(c));nc.id='c'+Date.now();nc.title=c.title+' (копия)';nc.status='draft';nc.authorId=user.id;
+    // Regenerate IDs
+    nc.modules.forEach(m=>{m.id='m'+Date.now()+Math.random().toString(36).slice(2,6);m.lessons.forEach(l=>{l.id='l'+Date.now()+Math.random().toString(36).slice(2,6);l.steps.forEach(s=>{s.id='s'+Date.now()+Math.random().toString(36).slice(2,6)})})});
+    const u=[...courses,nc];save(u);addToast('ok','Курс скопирован');
+  };
+  // Add module
+  const addModule=()=>{
+    if(!forms.mTitle.trim()||!cur)return;
+    const nm={id:'m'+Date.now(),title:forms.mTitle,order:cur.modules.length,lessons:[]};
+    const u=courses.map(c=>c.id===cur.id?{...c,modules:[...c.modules,nm]}:c);save(u);closeM('module');setForms(f=>({...f,mTitle:''}));addToast('ok','Модуль добавлен');
+  };
+  // Rename module inline
+  const renameModule=(mid,newTitle)=>{
+    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===mid?{...m,title:newTitle}:m)}:c);save(u);
+  };
+  // Add lesson
+  const addLesson=()=>{
+    if(!forms.lTitle.trim()||!cur||!selModId)return;
+    const nl={id:'l'+Date.now(),title:forms.lTitle,order:0,steps:[]};
+    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===selModId?{...m,lessons:[...m.lessons,nl]}:m)}:c);
+    save(u);closeM('lesson');setForms(f=>({...f,lTitle:''}));addToast('ok','Урок добавлен');
+  };
+  // Rename lesson inline
+  const renameLesson=(mid,lid,newTitle)=>{
+    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===mid?{...m,lessons:m.lessons.map(l=>l.id===lid?{...l,title:newTitle}:l)}:m)}:c);save(u);
+  };
+  // Add step
+  const addStep=()=>{
+    if(!forms.sTitle.trim()||!cur||!selModId||!selLesId)return;
+    const defContent=forms.sType==='quiz'||forms.sType==='exam'?JSON.stringify({question:'',questionType:'single',options:[{id:'o1',text:'Вариант 1',isCorrect:true},{id:'o2',text:'Вариант 2',isCorrect:false}],points:10,attempts:3,explanation:''}):'';
+    const ns={id:'s'+Date.now(),title:forms.sTitle,type:forms.sType,content:defContent,points:10,required:true,order:0};
+    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===selModId?{...m,lessons:m.lessons.map(l=>l.id===selLesId?{...l,steps:[...l.steps,ns]}:l)}:m)}:c);
+    save(u);setSelStep(ns);closeM('step');setForms(f=>({...f,sTitle:''}));addToast('ok','Шаг добавлен');
+  };
+  // Delete
+  const delModule=(mid)=>{if(!confirm('Удалить модуль?'))return;const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.filter(m=>m.id!==mid)}:c);save(u);addToast('ok','Модуль удалён')};
+  const delLesson=(mid,lid)=>{if(!confirm('Удалить урок?'))return;const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===mid?{...m,lessons:m.lessons.filter(l=>l.id!==lid)}:m)}:c);save(u);addToast('ok','Урок удалён')};
+  const delStep=(mid,lid,sid)=>{if(!confirm('Удалить шаг?'))return;const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===mid?{...m,lessons:m.lessons.map(l=>l.id===lid?{...l,steps:l.steps.filter(s=>s.id!==sid)}:l)}:m)}:c);save(u);if(selStep?.id===sid)setSelStep(null);addToast('ok','Шаг удалён')};
+  // Move step
+  const moveStep=(mid,lid,sid,dir)=>{
+    const u=courses.map(c=>{if(c.id!==cur.id)return c;return{...c,modules:c.modules.map(m=>{if(m.id!==mid)return m;return{...m,lessons:m.lessons.map(l=>{
+      if(l.id!==lid)return l;const steps=[...l.steps];const idx=steps.findIndex(s=>s.id===sid);
+      if(idx<0||(dir===-1&&idx===0)||(dir===1&&idx===steps.length-1))return l;
+      [steps[idx],steps[idx+dir]]=[steps[idx+dir],steps[idx]];return{...l,steps}})}})}});save(u);
+  };
+  // Move module
+  const moveModule=(mid,dir)=>{
+    const u=courses.map(c=>{if(c.id!==cur.id)return c;const mods=[...c.modules];const idx=mods.findIndex(m=>m.id===mid);
+      if(idx<0||(dir===-1&&idx===0)||(dir===1&&idx===mods.length-1))return c;
+      [mods[idx],mods[idx+dir]]=[mods[idx+dir],mods[idx]];return{...c,modules:mods}});save(u);
+  };
+  // Update step content
+  const updateStep=(field,value)=>{
+    if(!selStep||!cur)return;
+    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>({...m,lessons:m.lessons.map(l=>({...l,steps:l.steps.map(s=>s.id===selStep.id?{...s,[field]:value}:s)}))}))}:c);
+    save(u);setSelStep(prev=>({...prev,[field]:value}));
+  };
+  // Publish
+  const publish=()=>{const u=courses.map(c=>c.id===cur.id?{...c,status:c.status==='published'?'draft':'published'}:c);save(u);addToast('ok',cur.status==='published'?'Курс снят с публикации':'Курс опубликован!')};
+  // Count steps
+  const countSteps=(c)=>{let n=0;c.modules?.forEach(m=>m.lessons?.forEach(l=>n+=(l.steps?.length||0)));return n};
+
+  // Course list view
+  if(!cur)return(<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+      <h1 style={{fontSize:22,fontWeight:700}}>Конструктор курсов</h1>
+      <button className="btn btn-p" onClick={()=>openM('course')}>+ Создать курс</button>
+    </div>
+    {courses.filter(c=>c.authorId===user.id||user.role==='admin').length===0?
+      <div className="empty"><div className="empty-i">🛠️</div><div className="empty-t">Нет курсов</div><div className="empty-d">Создайте свой первый курс</div><button className="btn btn-p" onClick={()=>openM('course')}>Создать</button></div>:
+      <div className="grid3">{courses.filter(c=>c.authorId===user.id||user.role==='admin').map(c=>
+        <div key={c.id} className="card">
+          <div className="cov" style={{...getCoverStyle(c),cursor:'pointer'}} onClick={()=>setCur(c)}>{!c.coverImage&&<span className="cov-i">{c.icon||'📚'}</span>}
+            <div style={{position:'absolute',bottom:6,right:6,zIndex:2}}>
+              <input type="file" accept="image/*" id={`qi_${c.id}`} style={{display:'none'}} onChange={async e=>{if(!e.target.files[0])return;const b=await readImageFile(e.target.files[0]);const u=courses.map(x=>x.id===c.id?{...x,coverImage:b}:x);save(u);addToast('ok','Обложка обновлена')}}/>
+              <label htmlFor={`qi_${c.id}`} style={{background:'rgba(0,0,0,.55)',color:'#fff',fontSize:10,padding:'3px 8px',borderRadius:6,cursor:'pointer',fontWeight:600}} onClick={e=>e.stopPropagation()}>🖼️ Фото</label>
+            </div>
+            <span style={{position:'absolute',top:10,right:10,background:c.status==='published'?'#e6f9f0':'#fff3e0',color:c.status==='published'?'#00875a':'#E67E22',padding:'3px 10px',borderRadius:20,fontSize:10,fontWeight:600}}>{c.status==='published'?'Опубликован':'Черновик'}</span>
+          </div>
+          <div className="cbody">
+            <div className="ctitle">{c.title}</div>
+            <div className="cmeta" style={{marginBottom:8}}><span>{c.modules?.length||0} мод.</span><span>{countSteps(c)} шагов</span></div>
+            <div style={{display:'flex',gap:4}}>
+              <button className="btn btn-p btn-sm" onClick={()=>setCur(c)}>Редактировать</button>
+              <button className="btn btn-o btn-sm" onClick={()=>dupCourse(c)}>📋</button>
+              <button className="btn btn-d btn-sm" onClick={()=>delCourse(c.id)}>🗑️</button>
+            </div>
+          </div>
+        </div>)}</div>}
+    <Modal open={modals.course} title="Создать курс" onClose={()=>closeM('course')} footer={<><button className="btn btn-g" onClick={()=>closeM('course')}>Отмена</button><button className="btn btn-p" onClick={createCourse}>Создать</button></>}>
+      <div className="fg"><label className="fl">Название курса</label><input className="fi" value={forms.cTitle} onChange={e=>setForms({...forms,cTitle:e.target.value})} placeholder="Введите название"/></div>
+      <div className="fg"><label className="fl">Описание</label><textarea className="fi" value={forms.cDesc} onChange={e=>setForms({...forms,cDesc:e.target.value})} placeholder="Краткое описание курса"/></div>
+      <div className="fg"><label className="fl">Категория</label><select className="fi" value={forms.cCat} onChange={e=>setForms({...forms,cCat:e.target.value})}>{CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+      <div className="fg">
+        <label className="fl">Обложка курса</label>
+        <input type="file" accept="image/*" id="coverUpNew" style={{display:'none'}} onChange={e=>handleCoverUpload(e.target.files[0])}/>
+        {forms.cImage
+          ?<div style={{position:'relative',borderRadius:10,overflow:'hidden',height:120,marginBottom:8}}>
+              <div style={{width:'100%',height:'100%',backgroundImage:`url(${forms.cImage})`,backgroundSize:'cover',backgroundPosition:'center'}}/>
+              <button className="btn btn-d btn-sm" style={{position:'absolute',top:6,right:6}} onClick={()=>setForms(f=>({...f,cImage:null}))}>✕ Удалить</button>
+            </div>
+          :<label htmlFor="coverUpNew" style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',border:'2px dashed var(--bg3)',borderRadius:8,cursor:'pointer',fontSize:13,color:'var(--tx2)',marginBottom:8,transition:'.2s'}} onMouseOver={e=>e.currentTarget.style.borderColor='var(--p)'} onMouseOut={e=>e.currentTarget.style.borderColor='var(--bg3)'}>
+              <span style={{fontSize:24}}>🖼️</span>
+              <div><div style={{fontWeight:600,color:'var(--tx)'}}>Загрузить изображение</div><div style={{fontSize:11,marginTop:2}}>PNG, JPG, WebP · макс. 2MB</div></div>
+            </label>}
+        <div style={{fontSize:11,color:'var(--tx3)',marginBottom:6}}>Или выбери цвет:</div>
+        <div style={{display:'flex',gap:8}}>{GRADS.map((g,i)=><div key={i} style={{width:36,height:36,borderRadius:8,background:g,cursor:'pointer',border:forms.cGrad===g&&!forms.cImage?'3px solid var(--tx)':'3px solid transparent'}} onClick={()=>setForms({...forms,cGrad:g,cImage:null})}/>)}</div>
+      </div>
+    </Modal>
+  </div>);
+
+  // Course editor view
+  return(<div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 64px)',margin:'-24px -28px'}}>
+    <div className="con-bar">
+      <button className="btn btn-g btn-sm" onClick={()=>{setCur(null);setSelStep(null)}}>← Назад</button>
+      <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <span style={{fontWeight:600,fontSize:14}}>{cur.title}</span>
+        <button className="btn btn-g btn-sm" onClick={()=>{setForms(f=>({...f,cTitle:cur.title,cDesc:cur.description||'',cCat:cur.category||CATS[0],cGrad:cur.coverGradient||GRADS[0],cImage:cur.coverImage||null}));openM('editCourse')}}>✏️</button>
+      </div>
+      <div style={{display:'flex',gap:6}}>
+        <span style={{fontSize:11,color:'var(--tx2)',alignSelf:'center'}}>{countSteps(cur)} шагов</span>
+        <button className="btn btn-o btn-sm" onClick={publish}>{cur.status==='published'?'Снять публикацию':'📢 Опубликовать'}</button>
+        <button className="btn btn-p btn-sm" onClick={()=>addToast('ok','Авто-сохранение включено')}>💾</button>
+      </div>
+    </div>
+    <div className="con-lay">
+      <div className="con-tree">
+        <div className="tree-lbl">Структура курса</div>
+        {cur.modules?.map((m,mi)=><div key={m.id}>
+          <div className="tree-it mod" style={{justifyContent:'space-between'}}>
+            <input className="inline-edit" style={{fontWeight:600,fontSize:13,flex:1}} defaultValue={m.title} onBlur={e=>renameModule(m.id,e.target.value)}/>
+            <span style={{display:'flex',gap:2,flexShrink:0}}>
+              <span style={{cursor:'pointer',fontSize:10}} onClick={()=>moveModule(m.id,-1)} title="Вверх">⬆️</span>
+              <span style={{cursor:'pointer',fontSize:10}} onClick={()=>moveModule(m.id,1)} title="Вниз">⬇️</span>
+              <span style={{cursor:'pointer',fontSize:11,color:'var(--err)'}} onClick={()=>delModule(m.id)}>🗑️</span>
+            </span>
+          </div>
+          {m.lessons?.map(l=><div key={l.id}>
+            <div className="tree-it les" style={{justifyContent:'space-between'}}>
+              <input className="inline-edit" style={{fontSize:12,flex:1}} defaultValue={l.title} onBlur={e=>renameLesson(m.id,l.id,e.target.value)}/>
+              <span style={{cursor:'pointer',fontSize:11,color:'var(--err)',flexShrink:0}} onClick={()=>delLesson(m.id,l.id)}>🗑️</span>
+            </div>
+            {l.steps?.map(s=><div key={s.id} className={`tree-it stp ${selStep?.id===s.id?'on':''}`} style={{justifyContent:'space-between'}}>
+              <span onClick={()=>setSelStep(s)} style={{flex:1,cursor:'pointer'}}>{ICONS[s.type]||'📝'} {s.title}</span>
+              <span style={{display:'flex',gap:2,flexShrink:0}}>
+                <span style={{cursor:'pointer',fontSize:10}} onClick={()=>moveStep(m.id,l.id,s.id,-1)}>⬆️</span>
+                <span style={{cursor:'pointer',fontSize:10}} onClick={()=>moveStep(m.id,l.id,s.id,1)}>⬇️</span>
+                <span style={{cursor:'pointer',fontSize:10,color:'var(--err)'}} onClick={()=>delStep(m.id,l.id,s.id)}>🗑️</span>
+              </span>
+            </div>)}
+            <div className="tree-add stp" onClick={()=>{setSelModId(m.id);setSelLesId(l.id);openM('step')}}>+ Шаг</div>
+          </div>)}
+          <div className="tree-add les" onClick={()=>{setSelModId(m.id);openM('lesson')}}>+ Урок</div>
+        </div>)}
+        <div className="tree-add" onClick={()=>openM('module')}>+ Модуль</div>
+      </div>
+      <div className="con-ed">
+        {!selStep?<div className="empty"><div className="empty-i">👈</div><div className="empty-t">Выберите шаг</div><div className="empty-d">Или добавьте новый шаг в дерево слева</div></div>:
+        <StepEditor step={selStep} onUpdate={updateStep}/>}
+      </div>
+    </div>
+    {/* Modals */}
+    <Modal open={modals.editCourse} title="Редактировать курс" onClose={()=>closeM('editCourse')} footer={<><button className="btn btn-g" onClick={()=>closeM('editCourse')}>Отмена</button><button className="btn btn-p" onClick={editCourse}>Сохранить</button></>}>
+      <div className="fg"><label className="fl">Название</label><input className="fi" value={forms.cTitle} onChange={e=>setForms({...forms,cTitle:e.target.value})}/></div>
+      <div className="fg"><label className="fl">Описание</label><textarea className="fi" value={forms.cDesc} onChange={e=>setForms({...forms,cDesc:e.target.value})}/></div>
+      <div className="fg"><label className="fl">Категория</label><select className="fi" value={forms.cCat} onChange={e=>setForms({...forms,cCat:e.target.value})}>{CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+      <div className="fg">
+        <label className="fl">Обложка курса</label>
+        <input type="file" accept="image/*" id="coverUpEdit" style={{display:'none'}} onChange={e=>handleCoverUpload(e.target.files[0])}/>
+        {forms.cImage
+          ?<div style={{position:'relative',borderRadius:10,overflow:'hidden',height:120,marginBottom:8}}>
+              <div style={{width:'100%',height:'100%',backgroundImage:`url(${forms.cImage})`,backgroundSize:'cover',backgroundPosition:'center'}}/>
+              <button className="btn btn-d btn-sm" style={{position:'absolute',top:6,right:6}} onClick={()=>setForms(f=>({...f,cImage:null}))}>✕ Удалить</button>
+            </div>
+          :<label htmlFor="coverUpEdit" style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',border:'2px dashed var(--bg3)',borderRadius:8,cursor:'pointer',fontSize:13,color:'var(--tx2)',marginBottom:8,transition:'.2s'}} onMouseOver={e=>e.currentTarget.style.borderColor='var(--p)'} onMouseOut={e=>e.currentTarget.style.borderColor='var(--bg3)'}>
+              <span style={{fontSize:24}}>🖼️</span>
+              <div><div style={{fontWeight:600,color:'var(--tx)'}}>Загрузить изображение</div><div style={{fontSize:11,marginTop:2}}>PNG, JPG, WebP · макс. 2MB</div></div>
+            </label>}
+        <div style={{fontSize:11,color:'var(--tx3)',marginBottom:6}}>Или выбери цвет фона:</div>
+        <div style={{display:'flex',gap:8}}>{GRADS.map((g,i)=><div key={i} style={{width:36,height:36,borderRadius:8,background:g,cursor:'pointer',border:forms.cGrad===g&&!forms.cImage?'3px solid var(--tx)':'3px solid transparent'}} onClick={()=>setForms({...forms,cGrad:g,cImage:null})}/>)}</div>
+      </div>
+    </Modal>
+    <Modal open={modals.module} title="Добавить модуль" onClose={()=>closeM('module')} footer={<><button className="btn btn-g" onClick={()=>closeM('module')}>Отмена</button><button className="btn btn-p" onClick={addModule}>Добавить</button></>}>
+      <div className="fg"><label className="fl">Название модуля</label><input className="fi" value={forms.mTitle} onChange={e=>setForms({...forms,mTitle:e.target.value})} placeholder="Например: Введение" onKeyDown={e=>e.key==='Enter'&&addModule()}/></div>
+    </Modal>
+    <Modal open={modals.lesson} title="Добавить урок" onClose={()=>closeM('lesson')} footer={<><button className="btn btn-g" onClick={()=>closeM('lesson')}>Отмена</button><button className="btn btn-p" onClick={addLesson}>Добавить</button></>}>
+      <div className="fg"><label className="fl">Название урока</label><input className="fi" value={forms.lTitle} onChange={e=>setForms({...forms,lTitle:e.target.value})} placeholder="Например: Основы" onKeyDown={e=>e.key==='Enter'&&addLesson()}/></div>
+    </Modal>
+    <Modal open={modals.step} title="Добавить шаг" onClose={()=>closeM('step')} footer={<><button className="btn btn-g" onClick={()=>closeM('step')}>Отмена</button><button className="btn btn-p" onClick={addStep}>Добавить</button></>}>
+      <div className="fg"><label className="fl">Название шага</label><input className="fi" value={forms.sTitle} onChange={e=>setForms({...forms,sTitle:e.target.value})} placeholder="Например: Введение в тему"/></div>
+      <div className="fg"><label className="fl">Тип шага</label>
+        <div className="stypes">{STYPES.map(t=><button key={t.id} className={`stype ${forms.sType===t.id?'on':''}`} onClick={()=>setForms({...forms,sType:t.id})}>{t.i} {t.l}</button>)}</div>
+      </div>
+    </Modal>
+  </div>);
+}
+
+// ---- STEP EDITOR ----
+function StepEditor({step,onUpdate}){
+  const edRef=useRef(null);
+  const[quizData,setQuizData]=useState(null);
+  useEffect(()=>{
+    if(step.type==='quiz'||step.type==='exam'||step.type==='survey'){
+      try{setQuizData(JSON.parse(step.content))}catch{setQuizData({question:'',questionType:'single',options:[{id:'o1',text:'',isCorrect:false}],points:10,attempts:3,explanation:''})}
+    }
+  },[step.id,step.type]);
+  const updateQuiz=(field,val)=>{const nq={...quizData,[field]:val};setQuizData(nq);onUpdate('content',JSON.stringify(nq))};
+  const updateOption=(idx,field,val)=>{const opts=[...quizData.options];opts[idx]={...opts[idx],[field]:val};updateQuiz('options',opts)};
+  const addOption=()=>{updateQuiz('options',[...quizData.options,{id:'o'+Date.now(),text:'',isCorrect:false}])};
+  const delOption=(idx)=>{if(quizData.options.length<=1)return;updateQuiz('options',quizData.options.filter((_,i)=>i!==idx))};
+  const applyFmt=(cmd,val)=>{document.execCommand(cmd,false,val)};
+
+  return(<div>
+    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+      <input className="inline-edit" style={{fontSize:17,fontWeight:600,flex:1}} defaultValue={step.title} key={step.id+'title'} onBlur={e=>onUpdate('title',e.target.value)}/>
+      <span style={{fontSize:12,color:'var(--tx2)',background:'var(--bg2)',padding:'3px 10px',borderRadius:20}}>{ICONS[step.type]} {STYPES.find(t=>t.id===step.type)?.l||step.type}</span>
+    </div>
+    <div className="stypes" style={{marginBottom:14}}>
+      {STYPES.map(t=><div key={t.id} className={`stype ${step.type===t.id?'on':''}`} onClick={()=>onUpdate('type',t.id)}>{t.i} {t.l}</div>)}
+    </div>
+
+    {step.type==='text'&&<div>
+      <div className="ed-bar">
+        <button className="ed-btn" style={{fontWeight:700}} onClick={()=>applyFmt('bold')}>B</button>
+        <button className="ed-btn" style={{fontStyle:'italic'}} onClick={()=>applyFmt('italic')}>I</button>
+        <button className="ed-btn" style={{textDecoration:'underline'}} onClick={()=>applyFmt('underline')}>U</button>
+        <button className="ed-btn" onClick={()=>applyFmt('formatBlock','h1')}>H1</button>
+        <button className="ed-btn" onClick={()=>applyFmt('formatBlock','h2')}>H2</button>
+        <button className="ed-btn" onClick={()=>applyFmt('formatBlock','h3')}>H3</button>
+        <button className="ed-btn" onClick={()=>applyFmt('insertUnorderedList')}>• Список</button>
+        <button className="ed-btn" onClick={()=>applyFmt('insertOrderedList')}>1. Нумер.</button>
+        <button className="ed-btn" onClick={()=>applyFmt('formatBlock','blockquote')}>❝ Цитата</button>
+        <button className="ed-btn" onClick={()=>{const u=prompt('URL ссылки:');if(u)applyFmt('createLink',u)}}>🔗</button>
+        <button className="ed-btn" onClick={()=>{const u=prompt('URL изображения:');if(u)applyFmt('insertImage',u)}}>🖼️</button>
+        <button className="ed-btn" onClick={()=>applyFmt('removeFormat')}>✕ Сброс</button>
+      </div>
+      <div ref={edRef} className="ed-area" contentEditable suppressContentEditableWarning onBlur={e=>onUpdate('content',e.currentTarget.innerHTML)} dangerouslySetInnerHTML={{__html:step.content||''}} key={step.id}/>
+    </div>}
+
+    {step.type==='video'&&<div>
+      <div className="fg"><label className="fl">YouTube URL</label><input className="fi" value={step.content||''} onChange={e=>onUpdate('content',e.target.value)} placeholder="https://youtube.com/watch?v=..."/></div>
+      {step.content&&(()=>{const m=(step.content||'').match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+        return m?<iframe width="100%" height="360" src={`https://www.youtube-nocookie.com/embed/${m[1]}?rel=0&modestbranding=1`} frameBorder="0" style={{borderRadius:8,marginTop:8}} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/>:<p style={{color:'var(--err)',fontSize:13}}>Некорректный URL</p>})()}
+    </div>}
+
+    {step.type==='code'&&<div>
+      <div className="fg"><label className="fl">Язык</label><select className="fi" style={{width:200}}><option>JavaScript</option><option>Python</option><option>Java</option><option>Go</option><option>SQL</option><option>TypeScript</option><option>C#</option></select></div>
+      <textarea className="fi" style={{minHeight:250,fontFamily:'monospace',fontSize:13,lineHeight:1.5}} value={step.content||''} onChange={e=>onUpdate('content',e.target.value)} placeholder="// Введите код..."/>
+    </div>}
+
+    {(step.type==='quiz'||step.type==='exam'||step.type==='survey')&&quizData&&<div>
+      <div className="fg"><label className="fl">Текст вопроса</label><textarea className="fi" value={quizData.question} onChange={e=>updateQuiz('question',e.target.value)} placeholder="Введите вопрос..."/></div>
+      {step.type!=='survey'&&<div className="fg"><label className="fl">Тип ответа</label>
+        <div style={{display:'flex',gap:8}}>
+          <button className={`fchip ${quizData.questionType==='single'?'on':''}`} onClick={()=>updateQuiz('questionType','single')}>Один ответ</button>
+          <button className={`fchip ${quizData.questionType==='multi'?'on':''}`} onClick={()=>updateQuiz('questionType','multi')}>Несколько</button>
+        </div>
+      </div>}
+      <div className="fg"><label className="fl">Варианты ответов</label>
+        {quizData.options.map((o,i)=><div key={o.id||i} style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
+          <input className="fi" style={{flex:1}} value={o.text} onChange={e=>updateOption(i,'text',e.target.value)} placeholder={`Вариант ${i+1}`}/>
+          {step.type!=='survey'&&<label style={{display:'flex',alignItems:'center',gap:4,fontSize:11,whiteSpace:'nowrap',cursor:'pointer'}}>
+            <input type="checkbox" checked={o.isCorrect} onChange={e=>updateOption(i,'isCorrect',e.target.checked)} style={{accentColor:'var(--ok)'}}/>Верный
+          </label>}
+          <button className="btn btn-d btn-sm" onClick={()=>delOption(i)}>✕</button>
+        </div>)}
+        <button className="btn btn-o btn-sm" onClick={addOption}>+ Добавить вариант</button>
+      </div>
+      {step.type!=='survey'&&<>
+        <div style={{display:'flex',gap:16}}>
+          <div className="fg" style={{flex:1}}><label className="fl">Баллы</label><input className="fi" type="number" value={quizData.points||10} onChange={e=>updateQuiz('points',+e.target.value)}/></div>
+          <div className="fg" style={{flex:1}}><label className="fl">Попытки</label><input className="fi" type="number" value={quizData.attempts||3} onChange={e=>updateQuiz('attempts',+e.target.value)}/></div>
+        </div>
+        <div className="fg"><label className="fl">Объяснение правильного ответа</label><textarea className="fi" value={quizData.explanation||''} onChange={e=>updateQuiz('explanation',e.target.value)} placeholder="Будет показано после ответа"/></div>
+      </>}
+      {step.type==='exam'&&<div style={{display:'flex',gap:16}}>
+        <div className="fg" style={{flex:1}}><label className="fl">Таймер (мин.)</label><input className="fi" type="number" defaultValue={30}/></div>
+        <div className="fg" style={{flex:1}}><label className="fl">Проходной балл (%)</label><input className="fi" type="number" defaultValue={70}/></div>
+      </div>}
+    </div>}
+
+    {step.type==='file'&&<div className="fg"><label className="fl">Описание задания</label><textarea className="fi" value={step.content||''} onChange={e=>onUpdate('content',e.target.value)} placeholder="Опишите, какой файл нужно загрузить..."/></div>}
+    {step.type==='ai'&&<div>
+      <div className="fg"><label className="fl">Промпт для ИИ-проверки</label><textarea className="fi" style={{minHeight:120}} value={step.content||''} onChange={e=>onUpdate('content',e.target.value)} placeholder="Инструкция для ИИ: как оценивать ответ студента..."/></div>
+      <div className="fg"><label className="fl">Максимальный балл</label><input className="fi" type="number" defaultValue={100} style={{width:120}}/></div>
+    </div>}
+
+    <div className="sset">
+      <h4 style={{fontSize:13,fontWeight:600,marginBottom:10}}>⚙️ Настройки шага</h4>
+      <div className="srow"><input type="checkbox" checked={step.required!==false} onChange={e=>onUpdate('required',e.target.checked)}/> Обязательный шаг</div>
+      <div className="srow">Баллы за прохождение: <input className="fi" type="number" value={step.points||10} onChange={e=>onUpdate('points',+e.target.value)} style={{width:70,marginLeft:6}}/></div>
+    </div>
+  </div>);
+}
+
+// ---- PROFILE + ACHIEVEMENTS ----
+function ProfilePage(){
+  const{user}=useApp();
+  const achs=S.g('achievements',[]);const ua=S.g('userAchievements',[]).filter(a=>a.userId===user.id);
+  const enrs=S.g('enrollments',[]).filter(e=>e.userId===user.id);
+  const done=enrs.filter(e=>e.status==='completed').length;
+  const active=enrs.filter(e=>e.status==='active').length;
+  const nextLevelXp=(user.level+1)*300;const xpPct=Math.min(100,Math.round((user.xp/nextLevelXp)*100));
+  const earnedIds=ua.filter(a=>a.earnedAt).map(a=>a.achievementId);
+  return(<div>
+    <div className="prof-h">
+      <div className="prof-av">{user.firstName[0]}{user.lastName[0]}</div>
+      <div>
+        <div style={{fontSize:22,fontWeight:700}}>{user.firstName} {user.lastName}</div>
+        <div style={{fontSize:13,opacity:.85,marginTop:3}}>{ROLE_MAP[user.role]||user.role}</div>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:8}}>
+          <span style={{background:'rgba(255,255,255,.2)',padding:'3px 12px',borderRadius:20,fontWeight:600,fontSize:12}}>⭐ Уровень {user.level}</span>
+          <span style={{fontSize:12,opacity:.85}}>{user.xp} / {nextLevelXp} XP</span>
+        </div>
+        <div style={{marginTop:8,height:7,background:'rgba(255,255,255,.2)',borderRadius:4,width:280}}><div style={{height:'100%',width:`${xpPct}%`,background:'#fff',borderRadius:4,transition:'width .5s'}}/></div>
+      </div>
+    </div>
+    <div className="grid4" style={{marginBottom:20}}>
+      <div className="stat"><div className="stat-i" style={{background:'var(--pbg)',color:'var(--p)'}}>📚</div><div className="stat-v">{done}</div><div className="stat-l">Завершено</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#e8f4fd',color:'var(--info)'}}>📖</div><div className="stat-v" style={{color:'var(--s)'}}>{active}</div><div className="stat-l">В процессе</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#fff3e0',color:'var(--warn)'}}>🏆</div><div className="stat-v" style={{color:'var(--warn)'}}>{earnedIds.length}</div><div className="stat-l">Достижений</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#e6f9f0',color:'var(--ok)'}}>📊</div><div className="stat-v" style={{color:'var(--ok)'}}>94%</div><div className="stat-l">Средний балл</div></div>
+    </div>
+    <div className="sec-h"><h2 className="sec-t">🏆 Достижения ({earnedIds.length} / {achs.length})</h2></div>
+    <div className="grid4">
+      {achs.map(a=>{const ua1=ua.find(x=>x.achievementId===a.id);const earned=earnedIds.includes(a.id);const prog=ua1?.progress||0;const locked=!ua1;
+        return<div key={a.id} className={`ach ${earned?'got':''} ${locked?'lock':''}`}>
+          <div style={{fontSize:36,marginBottom:6}}>{a.icon}</div>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:3}}>{a.title}</div>
+          <div style={{fontSize:11,color:'var(--tx2)',marginBottom:8}}>{a.desc}</div>
+          <PBar v={prog} c={earned?'var(--ok)':locked?'var(--bg3)':'var(--p)'}/>
+          {earned&&<div style={{fontSize:10,color:'var(--warn)',fontWeight:700,marginTop:6}}>+{a.xp} XP {a.rank==='gold'?'🥇':'🥈'}</div>}
+          {!earned&&!locked&&<div style={{fontSize:10,color:'var(--tx2)',marginTop:6}}>{ua1?.progressText||`${prog}%`}</div>}
+          {locked&&<div style={{fontSize:10,color:'var(--tx3)',marginTop:6}}>🔒 Заблокировано</div>}
+        </div>})}
+    </div>
+    <div style={{marginTop:24}}><div className="sec-h"><h2 className="sec-t">🏅 Таблица лидеров</h2></div><Leaderboard/></div>
+  </div>);
+}
+
+// ---- TEAM ----
+function TeamPage(){
+  const{user,go,toast:addToast}=useApp();
+  const allUsers=S.g('users',[]);
+  const users=allUsers.filter(u=>u.id!==user.id);
+  const courses=S.g('courses',[]).filter(c=>c.status==='published');
+  const allEnrs=S.g('enrollments',[]);
+  const[showAssign,setShowAssign]=useState(false);
+  const[assignUser,setAssignUser]=useState('');
+  const[assignCourse,setAssignCourse]=useState('');
+  const[tab,setTab]=useState('overview');
+
+  const getTeamStats=(uid)=>{
+    const enrs=allEnrs.filter(e=>e.userId===uid);
+    const done=enrs.filter(e=>e.status==='completed').length;
+    const total=enrs.length;
+    const avg=total>0?Math.round(enrs.reduce((s,e)=>s+e.progress,0)/total):0;
+    return{done,total,avg,enrs};
+  };
+
+  const team=users.map(u=>({...u,...getTeamStats(u.id)}));
+  const avgAll=team.length?Math.round(team.reduce((s,t)=>s+t.avg,0)/team.length):0;
+  const lag=team.filter(t=>t.avg<30&&t.total>0).length;
+  const totalDone=team.reduce((s,t)=>s+t.done,0);
+
+  const doAssign=()=>{
+    if(!assignUser||!assignCourse){addToast('err','Выберите сотрудника и курс');return}
+    const enrs=S.g('enrollments',[]);
+    if(enrs.find(e=>e.userId===assignUser&&e.courseId===assignCourse)){addToast('info','Уже назначен');setShowAssign(false);return}
+    enrs.push({userId:assignUser,courseId:assignCourse,progress:0,status:'active',startedAt:new Date().toISOString()});
+    S.s('enrollments',enrs);
+    const u=allUsers.find(x=>x.id===assignUser);const c=courses.find(x=>x.id===assignCourse);
+    const notifs=S.g('notifications',[]);notifs.unshift({id:'n'+Date.now(),text:`Курс "${c?.title}" назначен ${u?.firstName} ${u?.lastName}`,icon:'📋',time:'только что',read:false});S.s('notifications',notifs);
+    addToast('ok','Курс назначен!');setShowAssign(false);
+  };
+
+  return(<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+      <div><h1 style={{fontSize:22,fontWeight:700}}>Моя команда</h1><p style={{fontSize:12,color:'var(--tx2)',marginTop:3}}>{team.length} сотрудников</p></div>
+      <button className="btn btn-p" onClick={()=>setShowAssign(true)}>+ Назначить курс</button>
+    </div>
+    <div className="grid4" style={{marginBottom:16}}>
+      <div className="stat"><div className="stat-i" style={{background:'var(--pbg)',color:'var(--p)'}}>👥</div><div className="stat-v">{team.length}</div><div className="stat-l">Сотрудников</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#e6f9f0',color:'var(--ok)'}}>📊</div><div className="stat-v" style={{color:'var(--ok)'}}>{avgAll}%</div><div className="stat-l">Ср. прогресс</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#e8f4fd',color:'var(--info)'}}>✅</div><div className="stat-v">{totalDone}</div><div className="stat-l">Курсов завершено</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#fde8e4',color:'var(--err)'}}>⚠️</div><div className="stat-v" style={{color:'var(--err)'}}>{lag}</div><div className="stat-l">Отстающих</div></div>
+    </div>
+    <Tabs tabs={[{id:'overview',label:'Обзор',icon:'👥'},{id:'leaderboard',label:'Рейтинг',icon:'🏅'}]} active={tab} onChange={setTab}/>
+    {tab==='overview'&&<div className="grid2">{team.map(m=>{const isLag=m.avg<30&&m.total>0;
+      return<div key={m.id} className={`team-c ${isLag?'lag':''}`}>
+        <div style={{width:44,height:44,borderRadius:'50%',background:GRADS[parseInt(m.id.replace('u',''))%GRADS.length],display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:600,fontSize:14,flexShrink:0}}>{m.firstName[0]}{m.lastName[0]}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:600,fontSize:14}}>{m.firstName} {m.lastName}</div>
+          <span className="rbdg" style={{background:m.role==='manager'?'#F0EEFF':'#e6f9f0',color:m.role==='manager'?'#6C5CE7':'#00B894'}}>{ROLE_MAP[m.role]||m.role}</span>
+          <div style={{fontSize:11,color:'var(--tx2)',marginTop:4}}>{m.total} курсов · {m.done} завершено</div>
+        </div>
+        <div style={{display:'flex',gap:16,alignItems:'center'}}>
+          <div style={{textAlign:'center'}}><div style={{fontSize:18,fontWeight:700,color:isLag?'var(--err)':m.avg>80?'var(--ok)':'var(--p)'}}>{m.avg}%</div><div style={{fontSize:10,color:'var(--tx2)'}}>Прогресс</div></div>
+          <div style={{textAlign:'center'}}><div style={{fontSize:18,fontWeight:700,color:'var(--warn)'}}>⭐ {m.xp}</div><div style={{fontSize:10,color:'var(--tx2)'}}>XP</div></div>
+        </div>
+      </div>})}</div>}
+    {tab==='leaderboard'&&<Leaderboard/>}
+    <Modal open={showAssign} title="Назначить курс" onClose={()=>setShowAssign(false)} footer={<><button className="btn btn-g" onClick={()=>setShowAssign(false)}>Отмена</button><button className="btn btn-p" onClick={doAssign}>Назначить</button></>}>
+      <div className="fg"><label className="fl">Сотрудник</label><select className="fi" value={assignUser} onChange={e=>setAssignUser(e.target.value)}><option value="">Выберите...</option>{users.map(u=><option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.email})</option>)}</select></div>
+      <div className="fg"><label className="fl">Курс</label><select className="fi" value={assignCourse} onChange={e=>setAssignCourse(e.target.value)}><option value="">Выберите...</option>{courses.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select></div>
+    </Modal>
+  </div>);
+}
+
+// ---- ANALYTICS ----
+function AnalyticsPage(){
+  const{user}=useApp();
+  const users=S.g('users',[]);
+  const courses=S.g('courses',[]);
+  const enrs=S.g('enrollments',[]);
+  const totalEnrs=enrs.length;
+  const completedEnrs=enrs.filter(e=>e.status==='completed').length;
+  const completionRate=totalEnrs>0?Math.round((completedEnrs/totalEnrs)*100):0;
+  const avgProgress=totalEnrs>0?Math.round(enrs.reduce((s,e)=>s+e.progress,0)/totalEnrs):0;
+
+  // Course stats
+  const courseStats=courses.filter(c=>c.status==='published').map(c=>{
+    const ce=enrs.filter(e=>e.courseId===c.id);
+    const done=ce.filter(e=>e.status==='completed').length;
+    const avg=ce.length>0?Math.round(ce.reduce((s,e)=>s+e.progress,0)/ce.length):0;
+    return{...c,enrolled:ce.length,done,avg};
+  }).sort((a,b)=>b.enrolled-a.enrolled);
+
+  // Activity by role
+  const roleStats=Object.entries(ROLE_MAP).map(([key,label])=>{
+    const roleUsers=users.filter(u=>u.role===key);
+    const roleEnrs=enrs.filter(e=>roleUsers.some(u=>u.id===e.userId));
+    const avg=roleEnrs.length>0?Math.round(roleEnrs.reduce((s,e)=>s+e.progress,0)/roleEnrs.length):0;
+    return{role:label,count:roleUsers.length,avg,enrs:roleEnrs.length};
+  });
+
+  return(<div>
+    <h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Аналитика</h1>
+    <p style={{fontSize:12,color:'var(--tx2)',marginBottom:18}}>Статистика платформы обучения</p>
+    <div className="grid4" style={{marginBottom:20}}>
+      <div className="stat"><div className="stat-i" style={{background:'var(--pbg)',color:'var(--p)'}}>👥</div><div className="stat-v">{users.length}</div><div className="stat-l">Пользователей</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#e6f9f0',color:'var(--ok)'}}>📊</div><div className="stat-v" style={{color:'var(--ok)'}}>{completionRate}%</div><div className="stat-l">Завершаемость</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#e8f4fd',color:'var(--info)'}}>📈</div><div className="stat-v">{avgProgress}%</div><div className="stat-l">Ср. прогресс</div></div>
+      <div className="stat"><div className="stat-i" style={{background:'#fff3e0',color:'var(--warn)'}}>📚</div><div className="stat-v">{totalEnrs}</div><div className="stat-l">Записей на курсы</div></div>
+    </div>
+
+    <div className="grid2" style={{marginBottom:20}}>
+      <div>
+        <div className="sec-h"><h2 className="sec-t">Популярные курсы</h2></div>
+        <div className="card" style={{overflow:'hidden'}}>
+          {courseStats.map((c,i)=><div key={c.id} style={{padding:'12px 16px',borderBottom:'1px solid var(--bg3)',display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:36,height:36,borderRadius:8,background:c.coverGradient,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{c.icon||'📚'}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:500,fontSize:13}}>{c.title}</div>
+              <div style={{display:'flex',gap:12,fontSize:11,color:'var(--tx2)',marginTop:2}}>
+                <span>👥 {c.enrolled}</span><span>✅ {c.done}</span><span>📊 {c.avg}%</span>
+              </div>
+            </div>
+            <div style={{width:80}}><PBar v={c.avg} c={c.avg>70?'var(--ok)':c.avg>40?'var(--warn)':'var(--err)'}/></div>
+          </div>)}
+        </div>
+      </div>
+      <div>
+        <div className="sec-h"><h2 className="sec-t">Активность по ролям</h2></div>
+        <div className="card" style={{overflow:'hidden'}}>
+          {roleStats.map(r=><div key={r.role} style={{padding:'14px 16px',borderBottom:'1px solid var(--bg3)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+              <span style={{fontWeight:500,fontSize:13}}>{r.role}</span>
+              <span style={{fontSize:12,color:'var(--tx2)'}}>{r.count} чел. · {r.enrs} записей</span>
+            </div>
+            <PBar v={r.avg} c="var(--p)"/><div style={{fontSize:11,color:'var(--tx2)',marginTop:3}}>Ср. прогресс: {r.avg}%</div>
+          </div>)}
+        </div>
+        <div style={{marginTop:16}}>
+          <div className="sec-h"><h2 className="sec-t">Топ по XP</h2></div>
+          <Leaderboard compact/>
+        </div>
+      </div>
+    </div>
+  </div>);
+}
+
+// ---- ADMIN USERS (with edit) ----
+function AdminUsersPage(){
+  const{toast:addToast}=useApp();
+  const[users,setUsers]=useState(S.g('users',[]));
+  const[roles,setRoles]=useState(S.g('roles',[]));
+  const[show,setShow]=useState(false);
+  const[editUser,setEditUser]=useState(null);
+  const[f,setF]=useState({fn:'',ln:'',em:'',pw:'',role:'employee',mid:''});
+
+  // Real-time Firebase listeners: keep users+roles in sync across all tabs/devices
+  useEffect(()=>{
+    const unsubUsers=window.fbWatch('users',arr=>{ if(arr)setUsers(arr); });
+    const unsubRoles=window.fbWatch('roles',arr=>{ if(arr)setRoles(arr); });
+    return()=>{ unsubUsers(); unsubRoles(); };
+  },[]);
+
+  const openAdd=()=>{setEditUser(null);setF({fn:'',ln:'',em:'',pw:'',role:'employee',mid:''});setShow(true)};
+  const openEdit=(u)=>{setEditUser(u);setF({fn:u.firstName,ln:u.lastName,em:u.email,pw:'',role:u.role,mid:u.managerId||''});setShow(true)};
+
+  const submit=()=>{
+    if(!f.fn||!f.em){addToast('err','Заполните имя и email');return}
+    if(editUser){
+      // Update in place + targeted Firebase write
+      const updated={...editUser,firstName:f.fn,lastName:f.ln,email:f.em,role:f.role,managerId:f.mid||null};
+      const newList=users.map(x=>x.id===editUser.id?updated:x);
+      setUsers(newList);
+      localStorage.setItem('lh_users',JSON.stringify(newList));
+      window.fbSaveUser(updated); // Targeted single-record write
+      addToast('ok','Пользователь обновлён');
+    }else{
+      if(!f.pw){addToast('err','Задайте пароль для нового пользователя');return}
+      const nu={id:'u'+Date.now(),firstName:f.fn,lastName:f.ln,email:f.em,password:f.pw,role:f.role,managerId:f.mid||null,xp:0,level:1,createdAt:new Date().toISOString()};
+      const newList=[...users,nu];
+      setUsers(newList);
+      localStorage.setItem('lh_users',JSON.stringify(newList));
+      window.fbSaveUser(nu); // Targeted single-record write
+      addToast('ok','Пользователь добавлен');
+    }
+    setShow(false);
+  };
+
+  const del=(id)=>{
+    if(!confirm('Удалить пользователя?'))return;
+    const newList=users.filter(x=>x.id!==id);
+    setUsers(newList);
+    localStorage.setItem('lh_users',JSON.stringify(newList));
+    window.fbDeleteUser(id); // Targeted single-record delete
+    // Also unlink any subordinates
+    const unlinked=newList.map(x=>x.managerId===id?{...x,managerId:null}:x);
+    if(unlinked.some((x,i)=>x!==newList[i])){
+      setUsers(unlinked);
+      localStorage.setItem('lh_users',JSON.stringify(unlinked));
+      unlinked.forEach(x=>{ if(users.find(u=>u.id===x.id)?.managerId===id) window.fbSaveUser(x); });
+    }
+    addToast('ok','Пользователь удалён');
+  };
+
+  const managers=users.filter(u=>u.role==='admin'||u.role==='manager');
+  return(<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+      <div><h1 style={{fontSize:22,fontWeight:700}}>Пользователи</h1><p style={{fontSize:12,color:'var(--tx2)',marginTop:3}}>{users.length} чел. · синхронизировано с Firebase</p></div>
+      <button className="btn btn-p" onClick={openAdd}>+ Пригласить</button>
+    </div>
+    <table className="tbl"><thead><tr><th>Пользователь</th><th>Email</th><th>Роль</th><th>Руководитель</th><th>XP</th><th>Подчинённые</th><th></th></tr></thead>
+    <tbody>{users.map(u=>{
+      const mgr=users.find(x=>x.id===u.managerId);
+      const r=roles.find(x=>x.name===(ROLE_MAP[u.role]||u.role));
+      const subs=users.filter(x=>x.managerId===u.id);
+      return<tr key={u.id}><td style={{display:'flex',alignItems:'center',gap:8}}>
+        <div style={{width:32,height:32,borderRadius:'50%',background:'var(--pbg)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--p)',fontSize:11,fontWeight:700,flexShrink:0}}>{u.firstName[0]}{u.lastName?.[0]||''}</div>
+        <div><div style={{fontWeight:500}}>{u.firstName} {u.lastName}</div>{u.createdAt&&<div style={{fontSize:10,color:'var(--tx3)'}}>с {u.createdAt.slice(0,10)}</div>}</div></td>
+        <td style={{color:'var(--tx2)'}}>{u.email}</td>
+        <td><span className="rbdg" style={{background:r?.bg||'#eee',color:r?.color||'#666'}}>{ROLE_MAP[u.role]||u.role}</span></td>
+        <td style={{color:'var(--tx2)'}}>{mgr?`${mgr.firstName} ${mgr.lastName?.[0]||''}.`:'—'}</td>
+        <td><span style={{fontWeight:600,color:'var(--warn)'}}>⭐ {u.xp}</span></td>
+        <td style={{color:'var(--tx2)',fontSize:12}}>{subs.length>0?subs.map(s=>s.firstName).join(', '):'—'}</td>
+        <td><div style={{display:'flex',gap:4}}><button className="btn btn-o btn-sm" onClick={()=>openEdit(u)}>✏️</button><button className="btn btn-d btn-sm" onClick={()=>del(u.id)}>🗑️</button></div></td>
+      </tr>;
+    })}</tbody></table>
+    <Modal open={show} title={editUser?'Редактировать пользователя':'Пригласить пользователя'} onClose={()=>setShow(false)} footer={<><button className="btn btn-g" onClick={()=>setShow(false)}>Отмена</button><button className="btn btn-p" onClick={submit}>{editUser?'Сохранить':'Добавить'}</button></>}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div className="fg"><label className="fl">Имя *</label><input className="fi" value={f.fn} onChange={e=>setF({...f,fn:e.target.value})} placeholder="Иван"/></div>
+        <div className="fg"><label className="fl">Фамилия</label><input className="fi" value={f.ln} onChange={e=>setF({...f,ln:e.target.value})} placeholder="Петров"/></div>
+      </div>
+      <div className="fg"><label className="fl">Email *</label><input className="fi" type="email" value={f.em} onChange={e=>setF({...f,em:e.target.value})} disabled={!!editUser} placeholder="ivan@company.com"/></div>
+      {!editUser&&<div className="fg"><label className="fl">Пароль *</label><input className="fi" type="text" value={f.pw} onChange={e=>setF({...f,pw:e.target.value})} placeholder="Временный пароль"/></div>}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div className="fg"><label className="fl">Роль</label><select className="fi" value={f.role} onChange={e=>setF({...f,role:e.target.value})}>
+          <option value="employee">Сотрудник</option><option value="manager">Руководитель</option><option value="instructor">Инструктор</option><option value="admin">Администратор</option>
+        </select></div>
+        <div className="fg"><label className="fl">Руководитель</label><select className="fi" value={f.mid} onChange={e=>setF({...f,mid:e.target.value})}>
+          <option value="">Без руководителя</option>{managers.filter(u=>u.id!==editUser?.id).map(u=><option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+        </select></div>
+      </div>
+      {f.mid&&<div style={{padding:'8px 12px',background:'var(--pbg)',borderRadius:8,fontSize:12,color:'var(--p)'}}>
+        👤 Будет подчинён: <strong>{managers.find(u=>u.id===f.mid)?.firstName} {managers.find(u=>u.id===f.mid)?.lastName}</strong>
+      </div>}
+    </Modal>
+  </div>);
+}
+
+// ---- ADMIN ROLES ----
+function AdminRolesPage(){
+  const{toast:addToast}=useApp();
+  const[roles,setRoles]=useState(S.g('roles',[]));
+  const[show,setShow]=useState(false);
+  const[editRole,setEditRole]=useState(null);
+  const[f,setF]=useState({name:'',color:'#636E72',bg:'#eeeeee',perms:[]});
+  const allPerms=['view_courses','complete_courses','create_courses','manage_team','manage_users','view_stats','manage_roles','settings'];
+  const permLabels={view_courses:'Просмотр курсов',complete_courses:'Прохождение курсов',create_courses:'Создание курсов',manage_team:'Управление командой',manage_users:'Управление пользователями',view_stats:'Статистика',manage_roles:'Управление ролями',settings:'Настройки'};
+  const COLORS=[{color:'#6C5CE7',bg:'#F0EEFF'},{color:'#0984E3',bg:'#E8F4FD'},{color:'#00B894',bg:'#e6f9f0'},{color:'#E17055',bg:'#fde8e4'},{color:'#F9CA24',bg:'#fff8e0'},{color:'#636E72',bg:'#eeeeee'}];
+
+  // Real-time Firebase listener for roles
+  useEffect(()=>{
+    const unsub=window.fbWatch('roles',arr=>{ if(arr)setRoles(arr); });
+    return()=>unsub();
+  },[]);
+
+  const openAdd=()=>{setEditRole(null);setF({name:'',color:'#636E72',bg:'#eeeeee',perms:[]});setShow(true)};
+  const openEdit=(r)=>{setEditRole(r);setF({name:r.name,color:r.color,bg:r.bg,perms:[...r.permissions]});setShow(true)};
+
+  const submit=()=>{
+    if(!f.name){addToast('err','Введите название роли');return}
+    if(editRole){
+      const updated={...editRole,name:f.name,color:f.color,bg:f.bg,permissions:f.perms};
+      const newList=roles.map(x=>x.id===editRole.id?updated:x);
+      setRoles(newList);
+      localStorage.setItem('lh_roles',JSON.stringify(newList));
+      window.fbSaveRole(updated);
+      addToast('ok','Роль обновлена');
+    }else{
+      const nr={id:'r'+Date.now(),name:f.name,permissions:f.perms,system:false,color:f.color,bg:f.bg,createdAt:new Date().toISOString()};
+      const newList=[...roles,nr];
+      setRoles(newList);
+      localStorage.setItem('lh_roles',JSON.stringify(newList));
+      window.fbSaveRole(nr);
+      addToast('ok','Роль создана');
+    }
+    setShow(false);
+  };
+
+  const del=(id)=>{
+    const r=roles.find(x=>x.id===id);
+    if(r?.system){addToast('err','Нельзя удалить системную роль');return}
+    if(!confirm('Удалить роль?'))return;
+    const newList=roles.filter(x=>x.id!==id);
+    setRoles(newList);
+    localStorage.setItem('lh_roles',JSON.stringify(newList));
+    window.fbDeleteRole(id);
+    addToast('ok','Роль удалена');
+  };
+
+  return(<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+      <div><h1 style={{fontSize:22,fontWeight:700}}>Роли</h1><p style={{fontSize:12,color:'var(--tx2)',marginTop:3}}>{roles.length} ролей</p></div>
+      <button className="btn btn-p" onClick={openAdd}>+ Создать роль</button>
+    </div>
+    <div className="grid2">{roles.map(r=><div key={r.id} className="card" style={{padding:20}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <span className="rbdg" style={{background:r.bg,color:r.color,fontSize:12,padding:'4px 12px'}}>{r.name}</span>
+        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          {r.system&&<span style={{fontSize:10,color:'var(--tx3)'}}>Системная</span>}
+          {!r.system&&<button className="btn btn-o btn-sm" onClick={()=>openEdit(r)}>✏️</button>}
+          {!r.system&&<button className="btn btn-d btn-sm" onClick={()=>del(r.id)}>🗑️</button>}
+        </div>
+      </div>
+      <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{(r.permissions||[]).map(p=><span key={p} style={{fontSize:10,background:'var(--bg2)',padding:'2px 8px',borderRadius:10,color:'var(--tx2)'}}>{permLabels[p]||p}</span>)}</div>
+    </div>)}</div>
+    <Modal open={show} title={editRole?'Редактировать роль':'Создать роль'} onClose={()=>setShow(false)} footer={<><button className="btn btn-g" onClick={()=>setShow(false)}>Отмена</button><button className="btn btn-p" onClick={submit}>{editRole?'Сохранить':'Создать'}</button></>}>
+      <div className="fg"><label className="fl">Название роли</label><input className="fi" value={f.name} onChange={e=>setF({...f,name:e.target.value})} placeholder="Например: Куратор" disabled={editRole?.system}/></div>
+      <div className="fg"><label className="fl">Цвет метки</label>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:4}}>
+          {COLORS.map(c=><div key={c.color} onClick={()=>setF({...f,color:c.color,bg:c.bg})} style={{width:28,height:28,borderRadius:'50%',background:c.color,cursor:'pointer',border:f.color===c.color?'3px solid var(--tx)':'3px solid transparent',transition:'.15s'}}/>)}
+        </div>
+      </div>
+      <div style={{padding:'8px 12px',background:f.bg,borderRadius:8,marginBottom:12}}>
+        <span style={{fontSize:12,color:f.color,fontWeight:600}}>{f.name||'Предпросмотр роли'}</span>
+      </div>
+      <div className="fg"><label className="fl">Разрешения</label>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4}}>
+          {allPerms.map(p=><label key={p} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer',padding:'4px 0'}}>
+            <input type="checkbox" checked={f.perms.includes(p)} onChange={e=>{if(e.target.checked)setF({...f,perms:[...f.perms,p]});else setF({...f,perms:f.perms.filter(x=>x!==p)})}} style={{accentColor:'var(--p)'}}/>{permLabels[p]}
+          </label>)}
+        </div>
+      </div>
+    </Modal>
+  </div>);
+}
+
+// ---- SETTINGS ----
+function SettingsPage(){
+  const{theme,setTheme,user,setUser,toast:addToast}=useApp();
+  const ts=[{id:'',l:'🌈 Яркая',c:'#6C5CE7'},{id:'dark',l:'🌙 Тёмная',c:'#1E1E2E'},{id:'corporate',l:'💼 Корпоратив',c:'#0984E3'},{id:'warm',l:'🔥 Тёплая',c:'#E17055'}];
+  const resetData=()=>{if(!confirm('Сбросить все данные? Это действие необратимо.'))return;localStorage.clear();location.reload()};
+  return(<div>
+    <h1 style={{fontSize:22,fontWeight:700,marginBottom:18}}>Настройки</h1>
+    <div className="card" style={{padding:20,marginBottom:16}}>
+      <h3 style={{fontSize:15,fontWeight:600,marginBottom:14}}>🎨 Тема оформления</h3>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+        {ts.map(t=><button key={t.id} className={`btn ${theme===t.id?'btn-p':'btn-o'}`} style={{justifyContent:'center'}} onClick={()=>setTheme(t.id)}>{t.l}</button>)}
+      </div>
+    </div>
+    <div className="card" style={{padding:20,marginBottom:16}}>
+      <h3 style={{fontSize:15,fontWeight:600,marginBottom:14}}>👤 Профиль</h3>
+      <div className="fg"><label className="fl">Имя</label><input className="fi" value={user.firstName} onChange={e=>{const u={...user,firstName:e.target.value};setUser(u);S.s('currentUser',u);const users=S.g('users',[]).map(x=>x.id===u.id?{...x,firstName:u.firstName}:x);S.s('users',users)}}/></div>
+      <div className="fg"><label className="fl">Фамилия</label><input className="fi" value={user.lastName} onChange={e=>{const u={...user,lastName:e.target.value};setUser(u);S.s('currentUser',u);const users=S.g('users',[]).map(x=>x.id===u.id?{...x,lastName:u.lastName}:x);S.s('users',users)}}/></div>
+      <div className="fg"><label className="fl">Email</label><input className="fi" value={user.email} disabled style={{opacity:.6}}/></div>
+    </div>
+    <div className="card" style={{padding:20,borderLeft:'3px solid var(--err)'}}>
+      <h3 style={{fontSize:15,fontWeight:600,marginBottom:8,color:'var(--err)'}}>⚠️ Опасная зона</h3>
+      <p style={{fontSize:12,color:'var(--tx2)',marginBottom:12}}>Сброс удалит все данные и вернёт систему к начальному состоянию</p>
+      <button className="btn btn-d" onClick={resetData}>Сбросить все данные</button>
+    </div>
+  </div>);
+}
+
+// ---- LOGIN ----
+function LoginPage({onLogin}){
+  const[email,setEmail]=useState('');
+  const[pw,setPw]=useState('');
+  const[err,setErr]=useState('');
+  const go=()=>{if(onLogin(email,pw)){setErr('')}else{setErr('Пользователь с таким email не найден')}};
+  return(<div className="login-pg">
+    <div className="login-c">
+      <div style={{display:'flex',alignItems:'center',gap:10,justifyContent:'center',marginBottom:28}}>
+        <div className="logo-icon" style={{width:48,height:48,fontSize:22,borderRadius:14}}>L</div>
+        <span style={{fontSize:24,fontWeight:700,color:'var(--p)'}}>LearnHub</span>
+      </div>
+      <div style={{textAlign:'center',fontSize:20,fontWeight:700,marginBottom:6}}>Вход в систему</div>
+      <div style={{textAlign:'center',fontSize:13,color:'var(--tx2)',marginBottom:28}}>Портал обучения IT-менеджеров</div>
+      <div className="fg"><label className="fl">Email</label><input className="fi" type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&go()} placeholder="dmitry@company.com"/></div>
+      <div className="fg"><label className="fl">Пароль</label><input className="fi" type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==='Enter'&&go()} placeholder="Любой пароль"/></div>
+      {err&&<p style={{color:'var(--err)',fontSize:13,marginBottom:12}}>{err}</p>}
+      <button className="btn btn-p" style={{width:'100%',padding:11,marginTop:4}} onClick={go}>Войти</button>
+      <button className="btn btn-o" style={{width:'100%',padding:11,marginTop:8}} onClick={()=>{setEmail('dmitry@company.com');setPw('demo')}}>Заполнить демо-данные</button>
+      <p style={{textAlign:'center',marginTop:18,fontSize:12,color:'var(--tx2)'}}>Демо: dmitry@company.com / любой пароль</p>
+    </div>
+  </div>);
+}
+
+// ---- MAIN APP ----
+function App(){
+  const[loggedIn,setLoggedIn]=useState(!!S.g('currentUser'));
+  const[user,setUser]=useState(S.g('currentUser',null));
+  const[page,setPage]=useState('dash');
+  const[theme,setThemeState]=useState(S.g('theme',''));
+  const[mini,setMini]=useState(false);
+  const[toasts,setToasts]=useState([]);
+
+  useEffect(()=>{document.documentElement.setAttribute('data-theme',theme);S.s('theme',theme)},[theme]);
+
+  const toast=(type,msg)=>{const id=Date.now();setToasts(p=>[...p,{id,type,msg}]);setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3500)};
+  const go=(p)=>setPage(p);
+  const setTheme=(t)=>setThemeState(t);
+  const login=(email,pw)=>{
+    const users=S.g('users',[]);
+    const u=users.find(x=>x.email===email);
+    if(!u) return false;
+    // If user has a password set, check it; seed users (no password field) always pass
+    if(u.password && u.password!==pw) return false;
+    setUser(u);S.s('currentUser',u);setLoggedIn(true);toast('ok','Добро пожаловать, '+u.firstName+'!');return true;
+  };
+  const logout=()=>{S.s('currentUser',null);setUser(null);setLoggedIn(false);setPage('dash')};
+
+  const ctx=useMemo(()=>({user,setUser,page,go,theme,setTheme,mini,setMini,toasts,toast,logout}),[user,page,theme,mini,toasts]);
+
+  if(!loggedIn)return<CTX.Provider value={ctx}><LoginPage onLogin={login}/><div className="toast-c">{toasts.map(t=><div key={t.id} className={`toast toast-${t.type}`}>{t.type==='ok'?'✅':t.type==='err'?'❌':'ℹ️'} {t.msg}</div>)}</div></CTX.Provider>;
+
+  // Route
+  let content;
+  if(page==='dash')content=<DashPage/>;
+  else if(page==='catalog')content=<CatalogPage/>;
+  else if(page==='mycourses')content=<MyCoursesPage/>;
+  else if(page==='achievements'||page==='profile')content=<ProfilePage/>;
+  else if(page==='constructor')content=<ConstructorPage/>;
+  else if(page==='team')content=<TeamPage/>;
+  else if(page==='analytics')content=<AnalyticsPage/>;
+  else if(page==='reviews')content=<ReviewsPage/>;
+  else if(page==='admin-users')content=<AdminUsersPage/>;
+  else if(page==='admin-roles')content=<AdminRolesPage/>;
+  else if(page==='settings')content=<SettingsPage/>;
+  else if(page.startsWith('cv_'))content=<CourseViewer courseId={page.replace('cv_','')}/>;
+  else if(page.startsWith('cert_'))content=<CertificatePage courseId={page.replace('cert_','')}/>;
+  else content=<DashPage/>;
+
+  return(<CTX.Provider value={ctx}>
+    <Navbar/>
+    <div className="app-body">
+      <Sidebar/>
+      <main className="main">{content}</main>
+    </div>
+    <div className="toast-c">{toasts.map(t=><div key={t.id} className={`toast toast-${t.type}`}>{t.type==='ok'?'✅':t.type==='err'?'❌':'ℹ️'} {t.msg}</div>)}</div>
+  </CTX.Provider>);
+}
+
+// Sync Firebase → localStorage, then seed demo data if needed, then render
+(async function(){
+  await window.fbSync();
+  seedData();
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+})();
+</script>
+</body>
+</html>
