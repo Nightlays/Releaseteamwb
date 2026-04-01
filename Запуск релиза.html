@@ -401,6 +401,8 @@
       const LS_MAJOR_PUSH_ANDROID_RELEASE_KEY = 'wb_release_launch_major_push_android_release_v1';
       const LS_MAJOR_PUSH_IOS_ROOT_ANCHOR_KEY = 'wb_release_launch_major_push_ios_root_anchor_v1';
       const LS_MAJOR_PUSH_ANDROID_ROOT_ANCHOR_KEY = 'wb_release_launch_major_push_android_root_anchor_v1';
+      const LS_AUTOMATION_PLAN_KEY = 'wb_release_launch_automation_plan_v1';
+      const LS_STEP_SCHEDULES_KEY = 'wb_release_launch_step_schedules_v1';
       const DEPLOY_LAB_BASE_URL = 'https://deploy-lab-api.wb.ru';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
       const PROXY_BASE = 'http://localhost:8787';
@@ -531,6 +533,17 @@
       const swatScheduleTimeInput = $('swatScheduleTimeInput');
       const swatScheduleSubmitBtn = $('swatScheduleSubmitBtn');
       const swatScheduleModalError = $('swatScheduleModalError');
+      const automationCard = $('automationCard');
+      const automationTriggerModeSelect = $('automationTriggerModeSelect');
+      const automationDelayField = $('automationDelayField');
+      const automationDelayMinutesInput = $('automationDelayMinutesInput');
+      const automationScheduleFields = $('automationScheduleFields');
+      const automationDateInput = $('automationDateInput');
+      const automationTimeInput = $('automationTimeInput');
+      const automationScenarioHint = $('automationScenarioHint');
+      const automationStatus = $('automationStatus');
+      const automationScheduleBtn = $('automationScheduleBtn');
+      const automationCancelBtn = $('automationCancelBtn');
       const ytTokenInput = $('ytTokenInput');
 
       const resultsEmpty = $('resultsEmpty');
@@ -579,7 +592,16 @@
         pushIosSyncSeq: 0,
         pushAndSyncSeq: 0,
         pushIosSyncTimerId: 0,
-        pushAndSyncTimerId: 0
+        pushAndSyncTimerId: 0,
+        stepSchedules: {},
+        stepScheduleTimers: {},
+        stepScheduleTickTimerId: 0,
+        stepScheduleDrafts: {},
+        automationPlan: null,
+        automationTimerId: 0,
+        automationTickTimerId: 0,
+        automationRunning: false,
+        automationLastMessage: ''
       };
 
       const WORKFLOW_STEPS = [
@@ -1492,6 +1514,653 @@
         document.body.classList.add('release-launch-modal-open');
       }
 
+      function isAutomationSupportedMode(mode){
+        return mode === RUN_MODE_MAJOR
+          || mode === '1'
+          || mode === '2'
+          || mode === '3'
+          || mode === '4'
+          || mode === '5'
+          || mode === '6';
+      }
+
+      function isAutomationReleaseFeedBlockedMode(mode){
+        return mode === '3' || mode === '4';
+      }
+
+      function getAutomationModeLabel(mode){
+        if(mode === RUN_MODE_MAJOR) return 'мажорный релиз';
+        if(mode === '1') return 'ХФ Android';
+        if(mode === '2') return 'ХФ iOS';
+        if(mode === '3') return 'NAPI';
+        if(mode === '4') return 'воскресные раны устройств';
+        if(mode === '5') return 'RuStore / AppGallery (Крит-путь)';
+        if(mode === '6') return 'RuStore / AppGallery (Smoke)';
+        return 'сценарий';
+      }
+
+      function buildAutomationScenarioText(mode){
+        if(mode === RUN_MODE_MAJOR){
+          return 'Сценарий: выполнит сбор дежурных и затем автоматически пройдёт шаги 1–5 с ответом «Да».';
+        }
+        if(!isAutomationSupportedMode(mode)){
+          return 'Выбери тип запуска, чтобы подготовить автосценарий.';
+        }
+        const parts = ['Сценарий: создаст ран'];
+        parts.push('опубликует SWAT Team Only');
+        if(!isAutomationReleaseFeedBlockedMode(mode)){
+          parts.push('обновит ленту релизов');
+        }
+        return `${parts.join(', ')}.`;
+      }
+
+      function buildDefaultAutomationScheduleMs(nowMs){
+        const baseMs = Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now();
+        const target = baseMs + 15 * 60 * 1000;
+        const parts = getMskParts(target);
+        return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hours, parts.minutes, 0, 0) - MSK_OFFSET_MS;
+      }
+
+      function formatAutomationCountdown(targetMs){
+        const delta = Math.max(0, Number(targetMs) - Date.now());
+        const totalMinutes = Math.ceil(delta / 60000);
+        if(totalMinutes <= 1) return 'меньше минуты';
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        if(hours && minutes) return `${hours} ч ${minutes} мин`;
+        if(hours) return `${hours} ч`;
+        return `${minutes} мин`;
+      }
+
+      function collectAutomationSnapshot(){
+        return {
+          runMode: String(appState.currentMode || ''),
+          runRelease: runReleaseInput ? String(runReleaseInput.value || '').trim() : '',
+          runBuild: runBuildInput ? String(runBuildInput.value || '').trim() : '',
+          swatLead: swatLeadViktor && swatLeadViktor.checked
+            ? 'viktor'
+            : (swatLeadRoman && swatLeadRoman.checked ? 'roman' : '')
+        };
+      }
+
+      function applyAutomationSnapshot(snapshot){
+        if(!snapshot || typeof snapshot !== 'object') return;
+        const mode = isRunModeSupported(snapshot.runMode) ? String(snapshot.runMode || '') : '';
+        if(mode) setRunMode(mode);
+        if(runReleaseInput && typeof snapshot.runRelease === 'string'){
+          runReleaseInput.value = snapshot.runRelease;
+          try{
+            localStorage.setItem(LS_RUN_RELEASE_KEY, String(snapshot.runRelease || '').trim());
+          }catch(_){ }
+        }
+        if(runBuildInput && typeof snapshot.runBuild === 'string'){
+          runBuildInput.value = snapshot.runBuild;
+          try{
+            localStorage.setItem(LS_RUN_BUILD_KEY, String(snapshot.runBuild || '').trim());
+          }catch(_){ }
+        }
+        if(swatLeadViktor) swatLeadViktor.checked = snapshot.swatLead === 'viktor';
+        if(swatLeadRoman) swatLeadRoman.checked = snapshot.swatLead === 'roman';
+        schedulePreviewRefresh();
+      }
+
+      function loadAutomationPlan(){
+        try{
+          const raw = JSON.parse(localStorage.getItem(LS_AUTOMATION_PLAN_KEY) || 'null');
+          if(!raw || typeof raw !== 'object') return null;
+          const triggerMode = raw.triggerMode === 'schedule' ? 'schedule' : 'delay';
+          const targetMs = Number(raw.targetMs);
+          const snapshot = raw.snapshot && typeof raw.snapshot === 'object' ? raw.snapshot : null;
+          if(!Number.isFinite(targetMs) || !snapshot || !isAutomationSupportedMode(String(snapshot.runMode || ''))){
+            return null;
+          }
+          return {
+            triggerMode,
+            targetMs,
+            createdAt: Number(raw.createdAt) || Date.now(),
+            snapshot
+          };
+        }catch(_){
+          return null;
+        }
+      }
+
+      function saveAutomationPlan(plan){
+        try{
+          if(!plan){
+            localStorage.removeItem(LS_AUTOMATION_PLAN_KEY);
+            return;
+          }
+          localStorage.setItem(LS_AUTOMATION_PLAN_KEY, JSON.stringify(plan));
+        }catch(_){ }
+      }
+
+      function clearAutomationTimer(){
+        if(appState.automationTimerId){
+          clearTimeout(appState.automationTimerId);
+          appState.automationTimerId = 0;
+        }
+      }
+
+      function clearAutomationTicker(){
+        if(appState.automationTickTimerId){
+          clearInterval(appState.automationTickTimerId);
+          appState.automationTickTimerId = 0;
+        }
+      }
+
+      function ensureAutomationTicker(){
+        clearAutomationTicker();
+        if(!appState.automationPlan || appState.automationRunning) return;
+        appState.automationTickTimerId = window.setInterval(() => {
+          if(!appState.automationPlan || appState.automationRunning){
+            clearAutomationTicker();
+            return;
+          }
+          renderAutomationControls();
+        }, 1000);
+      }
+
+      function clearAutomationPlan(options){
+        clearAutomationTimer();
+        clearAutomationTicker();
+        appState.automationPlan = null;
+        saveAutomationPlan(null);
+        if(options && options.message){
+          appState.automationLastMessage = String(options.message || '').trim();
+        }
+        renderAutomationControls();
+      }
+
+      function buildAutomationPlanFromInputs(){
+        const snapshot = collectAutomationSnapshot();
+        if(!isAutomationSupportedMode(snapshot.runMode)){
+          throw new Error('Сначала выбери тип запуска.');
+        }
+
+        const triggerMode = automationTriggerModeSelect && automationTriggerModeSelect.value === 'schedule'
+          ? 'schedule'
+          : 'delay';
+        let targetMs = NaN;
+
+        if(triggerMode === 'schedule'){
+          targetMs = parseMskDateTimeToMs(
+            automationDateInput ? automationDateInput.value : '',
+            automationTimeInput ? automationTimeInput.value : ''
+          );
+        }else{
+          const delayMinutes = Math.max(1, Number(automationDelayMinutesInput ? automationDelayMinutesInput.value : 0) || 0);
+          targetMs = Date.now() + delayMinutes * 60 * 1000;
+        }
+
+        if(!Number.isFinite(targetMs)){
+          throw new Error('Заполни дату и время автозапуска.');
+        }
+        if(targetMs <= Date.now()){
+          throw new Error('Время автозапуска должно быть позже текущего момента.');
+        }
+
+        return {
+          triggerMode,
+          targetMs,
+          createdAt: Date.now(),
+          snapshot
+        };
+      }
+
+      function renderAutomationControls(){
+        if(!automationCard) return;
+
+        const currentMode = String(appState.currentMode || '');
+        const pendingPlan = appState.automationPlan;
+        const plannedMode = pendingPlan && pendingPlan.snapshot ? String(pendingPlan.snapshot.runMode || '') : '';
+        const visible = isAutomationSupportedMode(currentMode) || !!pendingPlan || !!appState.automationRunning;
+        automationCard.style.display = visible ? '' : 'none';
+        if(!visible) return;
+
+        const triggerMode = automationTriggerModeSelect && automationTriggerModeSelect.value === 'schedule'
+          ? 'schedule'
+          : 'delay';
+        if(automationDelayField) automationDelayField.style.display = triggerMode === 'delay' ? '' : 'none';
+        if(automationScheduleFields) automationScheduleFields.style.display = triggerMode === 'schedule' ? '' : 'none';
+
+        if(automationScenarioHint){
+          automationScenarioHint.textContent = buildAutomationScenarioText(plannedMode || currentMode);
+        }
+
+        const busy = appState.running || appState.workflowRunning || appState.runCreateRunning || appState.startButtonBusy || appState.automationRunning;
+        if(automationTriggerModeSelect) automationTriggerModeSelect.disabled = busy;
+        if(automationDelayMinutesInput) automationDelayMinutesInput.disabled = busy || triggerMode !== 'delay';
+        if(automationDateInput) automationDateInput.disabled = busy || triggerMode !== 'schedule';
+        if(automationTimeInput) automationTimeInput.disabled = busy || triggerMode !== 'schedule';
+        if(automationScheduleBtn) automationScheduleBtn.disabled = busy || !isAutomationSupportedMode(currentMode);
+        if(automationCancelBtn) automationCancelBtn.disabled = appState.automationRunning || !pendingPlan;
+
+        if(automationStatus){
+          if(appState.automationRunning){
+            automationStatus.textContent = appState.automationLastMessage || 'Автовыполнение запущено.';
+            automationStatus.className = 'release-launch-status release-launch-status-progress';
+          }else if(pendingPlan){
+            const when = formatMskDateTimeHuman(pendingPlan.targetMs);
+            const countdown = formatAutomationCountdown(pendingPlan.targetMs);
+            automationStatus.textContent = `Запланировано: ${getAutomationModeLabel(plannedMode)} · ${when} · через ${countdown}`;
+            automationStatus.className = 'release-launch-status release-launch-status-ok';
+          }else{
+            automationStatus.textContent = appState.automationLastMessage || 'Автовыполнение не запланировано.';
+            automationStatus.className = 'release-launch-status release-launch-status-muted';
+          }
+        }
+      }
+
+      async function runWorkflowAutomatically(){
+        let guard = 0;
+        while(appState.workflowCurrentIndex < WORKFLOW_STEPS.length){
+          if(guard > WORKFLOW_STEPS.length + 2){
+            throw new Error('Автосценарий зациклился на шагах workflow.');
+          }
+          const idx = Number(appState.workflowCurrentIndex);
+          const status = String(appState.workflowStatuses[idx] || 'pending');
+          if(status !== 'pending'){
+            appState.workflowCurrentIndex += 1;
+            renderWorkflow();
+            guard += 1;
+            continue;
+          }
+          const beforeIdx = appState.workflowCurrentIndex;
+          await applyWorkflowDecision(idx, 'yes');
+          if(appState.workflowCurrentIndex === beforeIdx && appState.workflowStatuses[idx] === 'pending'){
+            throw new Error(`Не удалось продвинуть шаг ${WORKFLOW_STEPS[idx].code}.`);
+          }
+          guard += 1;
+          await sleep(180);
+        }
+      }
+
+      async function executeAutomationPlan(plan){
+        if(!plan || !plan.snapshot) return;
+        if(appState.running || appState.workflowRunning || appState.runCreateRunning || appState.startButtonBusy){
+          const postponedPlan = Object.assign({}, plan, { targetMs: Date.now() + 60 * 1000 });
+          appState.automationLastMessage = 'Интерфейс был занят. Автовыполнение перенесено на 1 минуту.';
+          armAutomationPlan(postponedPlan);
+          return;
+        }
+        clearAutomationTimer();
+        clearAutomationTicker();
+        appState.automationPlan = null;
+        saveAutomationPlan(null);
+        appState.automationRunning = true;
+        appState.automationLastMessage = `Выполняется: ${getAutomationModeLabel(String(plan.snapshot.runMode || ''))}`;
+        renderAutomationControls();
+        refreshModeControls();
+
+        try{
+          applyAutomationSnapshot(plan.snapshot);
+          const mode = String(plan.snapshot.runMode || '');
+
+          if(mode === RUN_MODE_MAJOR){
+            const collected = await runCollection();
+            if(!collected || !appState.lastRun){
+              throw new Error('Сбор дежурных не завершён. Автовыполнение остановлено.');
+            }
+            await runWorkflowAutomatically();
+          }else{
+            await runCreateLaunch();
+            if(hasRunCreatorPublishData()){
+              await publishSwatTeamOnlyPost();
+              if(!isAutomationReleaseFeedBlockedMode(mode)){
+                await publishReleaseFeedPosts();
+              }
+            }else{
+              runCreatorInfo('Автовыполнение: после создания рана не найдено данных для публикации.', { kind: 'warn', skipPreviewRefresh: true });
+            }
+          }
+
+          appState.automationLastMessage = `Автовыполнение завершено: ${getAutomationModeLabel(mode)}.`;
+          showToast('Автовыполнение завершено');
+        }catch(error){
+          const message = error && error.message ? error.message : String(error || 'Неизвестная ошибка');
+          appState.automationLastMessage = `Ошибка автосценария: ${message}`;
+          if(String(plan.snapshot.runMode || '') === RUN_MODE_MAJOR){
+            log(`Автовыполнение: ${message}`, 'err');
+          }else{
+            runCreatorInfo(`Автовыполнение: ${escHtml(message)}`, { html: true, kind: 'err', skipPreviewRefresh: true });
+          }
+          showToast(message, false);
+        }finally{
+          appState.automationRunning = false;
+          renderAutomationControls();
+          refreshModeControls();
+        }
+      }
+
+      function armAutomationPlan(plan){
+        clearAutomationTimer();
+        clearAutomationTicker();
+
+        const targetMs = Number(plan && plan.targetMs);
+        if(!Number.isFinite(targetMs)){
+          throw new Error('Некорректное время автозапуска.');
+        }
+
+        const latenessMs = Date.now() - targetMs;
+        if(latenessMs > 15 * 60 * 1000){
+          clearAutomationPlan({ message: 'Предыдущее автовыполнение просрочено и снято.' });
+          return;
+        }
+
+        appState.automationPlan = plan;
+        saveAutomationPlan(plan);
+        const delayMs = Math.max(0, targetMs - Date.now());
+        appState.automationTimerId = window.setTimeout(() => {
+          executeAutomationPlan(plan).catch(() => { });
+        }, delayMs);
+        ensureAutomationTicker();
+        renderAutomationControls();
+      }
+
+      function getStepScheduleKey(scope, platform, stepIdx){
+        return `${String(scope || 'major')}::${String(platform || 'main')}::${Number(stepIdx)}`;
+      }
+
+      function getStepScheduleIds(scope, platform, stepIdx){
+        const safeScope = String(scope || 'major').replace(/[^a-z0-9_-]+/ig, '-');
+        const safePlatform = String(platform || 'main').replace(/[^a-z0-9_-]+/ig, '-');
+        const safeIdx = String(Number(stepIdx));
+        const suffix = `${safeScope}-${safePlatform}-${safeIdx}`;
+        return {
+          delay: `stepScheduleDelay-${suffix}`,
+          date: `stepScheduleDate-${suffix}`,
+          time: `stepScheduleTime-${suffix}`
+        };
+      }
+
+      function makeDefaultStepScheduleDraft(){
+        const targetMs = Date.now() + 10 * 60 * 1000;
+        return {
+          delayMinutes: '10',
+          date: formatMskDateInputValue(targetMs),
+          time: formatMskTimeInputValue(targetMs)
+        };
+      }
+
+      function getStepScheduleDraft(key){
+        if(!appState.stepScheduleDrafts[key]){
+          appState.stepScheduleDrafts[key] = makeDefaultStepScheduleDraft();
+        }
+        return appState.stepScheduleDrafts[key];
+      }
+
+      function saveStepSchedules(){
+        try{
+          localStorage.setItem(LS_STEP_SCHEDULES_KEY, JSON.stringify(appState.stepSchedules || {}));
+        }catch(_){ }
+      }
+
+      function loadStepSchedules(){
+        try{
+          const raw = JSON.parse(localStorage.getItem(LS_STEP_SCHEDULES_KEY) || '{}') || {};
+          if(!raw || typeof raw !== 'object') return {};
+          const out = {};
+          for(const [key, value] of Object.entries(raw)){
+            if(!value || typeof value !== 'object') continue;
+            const scope = value.scope === 'push' ? 'push' : 'major';
+            const platform = scope === 'push' ? (value.platform === 'android' ? 'android' : 'ios') : '';
+            const stepIdx = Number(value.stepIdx);
+            const targetMs = Number(value.targetMs);
+            if(!Number.isFinite(stepIdx) || stepIdx < 0) continue;
+            if(!Number.isFinite(targetMs)) continue;
+            out[key] = {
+              scope,
+              platform,
+              stepIdx,
+              targetMs,
+              note: String(value.note || '').trim(),
+              createdAt: Number(value.createdAt) || Date.now()
+            };
+          }
+          return out;
+        }catch(_){
+          return {};
+        }
+      }
+
+      function clearStepScheduleTimer(key){
+        if(appState.stepScheduleTimers[key]){
+          clearTimeout(appState.stepScheduleTimers[key]);
+          delete appState.stepScheduleTimers[key];
+        }
+      }
+
+      function ensureStepScheduleTicker(){
+        if(appState.stepScheduleTickTimerId){
+          clearInterval(appState.stepScheduleTickTimerId);
+          appState.stepScheduleTickTimerId = 0;
+        }
+        if(!Object.keys(appState.stepSchedules || {}).length) return;
+        appState.stepScheduleTickTimerId = window.setInterval(() => {
+          if(!Object.keys(appState.stepSchedules || {}).length){
+            clearInterval(appState.stepScheduleTickTimerId);
+            appState.stepScheduleTickTimerId = 0;
+            return;
+          }
+          refreshStepScheduleStatusNodes();
+        }, 1000);
+      }
+
+      function cancelStepSchedule(key, options){
+        clearStepScheduleTimer(key);
+        if(appState.stepSchedules[key]){
+          delete appState.stepSchedules[key];
+          saveStepSchedules();
+        }
+        if(options && options.message){
+          showToast(String(options.message || '').trim());
+        }
+        ensureStepScheduleTicker();
+        renderWorkflow();
+        renderPushWorkflow();
+      }
+
+      function cancelStepSchedulesByScope(scope, platform){
+        const keys = Object.keys(appState.stepSchedules || {});
+        for(const key of keys){
+          const plan = appState.stepSchedules[key];
+          if(!plan) continue;
+          if(plan.scope !== scope) continue;
+          if(scope === 'push' && platform && plan.platform !== platform) continue;
+          cancelStepSchedule(key);
+        }
+      }
+
+      function updateStepScheduleDraft(key, field, value){
+        const draft = getStepScheduleDraft(key);
+        draft[field] = String(value || '');
+      }
+
+      function formatStepScheduleStatus(plan){
+        const when = formatMskDateTimeHuman(plan.targetMs);
+        if(Date.now() >= plan.targetMs){
+          return plan.note
+            ? `Ожидает выполнения: ${plan.note}`
+            : `Время наступило: ${when}`;
+        }
+        return `Запланировано на ${when}`;
+      }
+
+      function getStepScheduleStatusMeta(plan){
+        if(plan){
+          return {
+            text: formatStepScheduleStatus(plan),
+            className: 'text-[11px] text-sky-700'
+          };
+        }
+        return {
+          text: 'Можно запланировать этот шаг по таймеру или к точному времени.',
+          className: 'text-[11px] text-slate-500'
+        };
+      }
+
+      function renderStepScheduleStatusNode(key, plan){
+        const meta = getStepScheduleStatusMeta(plan);
+        return `<div class="${meta.className}" data-step-schedule-status-key="${escHtml(key)}">${escHtml(meta.text)}</div>`;
+      }
+
+      function refreshStepScheduleStatusNodes(){
+        document.querySelectorAll('[data-step-schedule-status-key]').forEach((node) => {
+          const key = String(node.getAttribute('data-step-schedule-status-key') || '');
+          const meta = getStepScheduleStatusMeta(appState.stepSchedules[key]);
+          node.className = meta.className;
+          node.textContent = meta.text;
+        });
+      }
+
+      function renderStepScheduleControls(scope, platform, stepIdx, options){
+        const key = getStepScheduleKey(scope, platform, stepIdx);
+        const ids = getStepScheduleIds(scope, platform, stepIdx);
+        const draft = getStepScheduleDraft(key);
+        const plan = appState.stepSchedules[key];
+        const busy = !!(options && options.busy);
+        const disabled = busy ? 'disabled' : '';
+        return `
+          <div class="mt-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] px-3 py-2 space-y-2">
+            ${renderStepScheduleStatusNode(key, plan)}
+            <div class="flex items-center gap-2 flex-wrap">
+              <input id="${ids.delay}" class="input text-xs !px-2 !py-1.5 !w-24" type="number" min="1" step="1" value="${escHtml(draft.delayMinutes || '10')}" data-step-schedule-key="${key}" data-step-schedule-field="delayMinutes" ${disabled} />
+              <button type="button" class="btn btn-soft text-xs" data-step-schedule-action="delay" data-step-schedule-scope="${scope}" data-step-schedule-platform="${platform}" data-step-schedule-step="${stepIdx}" ${disabled}>Таймер</button>
+              <input id="${ids.date}" class="input text-xs !px-2 !py-1.5 !w-36" type="date" value="${escHtml(draft.date || '')}" data-step-schedule-key="${key}" data-step-schedule-field="date" ${disabled} />
+              <input id="${ids.time}" class="input text-xs !px-2 !py-1.5 !w-28" type="time" step="60" value="${escHtml(draft.time || '')}" data-step-schedule-key="${key}" data-step-schedule-field="time" ${disabled} />
+              <button type="button" class="btn btn-soft text-xs" data-step-schedule-action="schedule" data-step-schedule-scope="${scope}" data-step-schedule-platform="${platform}" data-step-schedule-step="${stepIdx}" ${disabled}>По времени</button>
+              ${plan ? `<button type="button" class="btn btn-soft text-xs text-rose-600" data-step-schedule-action="cancel" data-step-schedule-key="${key}" ${disabled}>Отменить</button>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      function buildStepSchedulePlan(scope, platform, stepIdx, triggerMode){
+        const key = getStepScheduleKey(scope, platform, stepIdx);
+        const draft = getStepScheduleDraft(key);
+        let targetMs = NaN;
+        if(triggerMode === 'schedule'){
+          targetMs = parseMskDateTimeToMs(draft.date, draft.time);
+        }else{
+          const delayMinutes = Math.max(1, Number(draft.delayMinutes) || 0);
+          targetMs = Date.now() + delayMinutes * 60 * 1000;
+        }
+        if(!Number.isFinite(targetMs)){
+          throw new Error('Заполни дату и время для шага.');
+        }
+        if(targetMs <= Date.now()){
+          throw new Error('Время выполнения шага должно быть позже текущего момента.');
+        }
+        return {
+          key,
+          scope,
+          platform: scope === 'push' ? platform : '',
+          stepIdx: Number(stepIdx),
+          targetMs,
+          note: '',
+          createdAt: Date.now()
+        };
+      }
+
+      function rescheduleStepPlan(key, delayMs, note){
+        const plan = appState.stepSchedules[key];
+        if(!plan) return;
+        plan.targetMs = Date.now() + Math.max(1000, Number(delayMs) || 0);
+        plan.note = String(note || '').trim();
+        armStepSchedule(plan);
+      }
+
+      function armStepSchedule(plan){
+        if(!plan || typeof plan !== 'object') return;
+        const key = String(plan.key || getStepScheduleKey(plan.scope, plan.platform, plan.stepIdx));
+        plan.key = key;
+        appState.stepSchedules[key] = plan;
+        saveStepSchedules();
+        clearStepScheduleTimer(key);
+        const delayMs = Math.max(0, Number(plan.targetMs) - Date.now());
+        appState.stepScheduleTimers[key] = window.setTimeout(() => {
+          executeStepSchedule(key).catch(() => { });
+        }, delayMs);
+        ensureStepScheduleTicker();
+        renderWorkflow();
+        renderPushWorkflow();
+      }
+
+      async function executeStepSchedule(key){
+        const plan = appState.stepSchedules[key];
+        if(!plan) return;
+
+        if(Date.now() < Number(plan.targetMs)){
+          armStepSchedule(plan);
+          return;
+        }
+
+        if(plan.scope === 'major'){
+          const step = WORKFLOW_STEPS[plan.stepIdx];
+          if(!step){
+            cancelStepSchedule(key);
+            return;
+          }
+          if(appState.running || appState.workflowRunning || appState.runCreateRunning || appState.startButtonBusy){
+            rescheduleStepPlan(key, 30000, 'интерфейс занят');
+            return;
+          }
+          const status = String(appState.workflowStatuses[plan.stepIdx] || 'pending');
+          if(status === 'done' || status === 'skipped'){
+            cancelStepSchedule(key);
+            return;
+          }
+          if(plan.stepIdx !== appState.workflowCurrentIndex || status !== 'pending' || (plan.stepIdx === 0 && !appState.lastRun)){
+            rescheduleStepPlan(key, 30000, 'ждёт предыдущие шаги');
+            return;
+          }
+          try{
+            await applyWorkflowDecision(plan.stepIdx, 'yes');
+            cancelStepSchedule(key, { message: `${step.code} выполнен по расписанию` });
+          }catch(error){
+            const msg = error && error.message ? error.message : String(error || 'Ошибка');
+            log(`[${step.code}] Ошибка отложенного шага: ${msg}`, 'err');
+            rescheduleStepPlan(key, 60000, `ошибка: ${msg}`);
+          }
+          return;
+        }
+
+        const isIos = plan.platform === 'ios';
+        const steps = isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS;
+        const statusesKey = isIos ? 'pushIosStatuses' : 'pushAndStatuses';
+        const currentKey = isIos ? 'pushIosCurrentIndex' : 'pushAndCurrentIndex';
+        const running = isIos
+          ? (appState.pushIosRunning || appState.pushIosSyncing)
+          : (appState.pushAndRunning || appState.pushAndSyncing);
+        const step = steps[plan.stepIdx];
+        if(!step){
+          cancelStepSchedule(key);
+          return;
+        }
+        if(running || appState.running || appState.workflowRunning || appState.runCreateRunning || appState.startButtonBusy){
+          rescheduleStepPlan(key, 30000, 'интерфейс занят');
+          return;
+        }
+        const status = String(appState[statusesKey][plan.stepIdx] || 'pending');
+        if(status === 'done' || status === 'skipped'){
+          cancelStepSchedule(key);
+          return;
+        }
+        if(plan.stepIdx !== appState[currentKey] || status !== 'pending'){
+          rescheduleStepPlan(key, 30000, 'ждёт предыдущие шаги');
+          return;
+        }
+        try{
+          await applyPushWorkflowDecision(plan.platform, plan.stepIdx, 'yes');
+          cancelStepSchedule(key, { message: `${isIos ? 'iOS' : 'Android'} · шаг ${step.code} выполнен по расписанию` });
+        }catch(error){
+          const msg = error && error.message ? error.message : String(error || 'Ошибка');
+          logMajorPush(`[${isIos ? 'iOS' : 'Android'}][${step.code}] Ошибка отложенного шага: ${msg}`, 'err');
+          rescheduleStepPlan(key, 60000, `ошибка: ${msg}`);
+        }
+      }
+
       function normalizeDeployLabToken(rawToken){
         const text = String(rawToken || '').trim();
         if(!text) return '';
@@ -1939,6 +2608,7 @@
       }
 
       function resetWorkflowState(){
+        cancelStepSchedulesByScope('major');
         appState.workflowCurrentIndex = 0;
         appState.workflowStatuses = WORKFLOW_STEPS.map(() => 'pending');
         appState.workflowRunning = false;
@@ -2001,6 +2671,7 @@
           const pingFoundComment = (idx === 0 && appState.workflowPingFound)
             ? '<div class="text-[11px] mt-1 text-emerald-700">Сообщение пинг-найдено</div>'
             : '';
+          const scheduleBlock = renderStepScheduleControls('major', '', idx, { busy: appState.running || appState.workflowRunning });
           return `
             <div class="rounded-2xl p-3 release-launch-workflow-row ${rowClass}">
               <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -2011,6 +2682,7 @@
                     <span class="inline-flex items-center mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ring-1 ${statusBadgeClass}">${statusText}</span>
                     ${blockedComment}
                     ${pingFoundComment}
+                    ${scheduleBlock}
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -2071,6 +2743,7 @@
         if(decision === 'no'){
           appState.workflowStatuses[stepIdx] = 'skipped';
           appState.workflowCurrentIndex += 1;
+          cancelStepSchedule(getStepScheduleKey('major', '', stepIdx));
           log(`[${step.code}] Пропущено по решению пользователя.`, 'warn');
           renderWorkflow();
           if(appState.workflowCurrentIndex >= WORKFLOW_STEPS.length){
@@ -2089,6 +2762,7 @@
           await runWorkflowStepAction(step.action);
           appState.workflowStatuses[stepIdx] = 'done';
           appState.workflowCurrentIndex += 1;
+          cancelStepSchedule(getStepScheduleKey('major', '', stepIdx));
           log(`[${step.code}] Выполнено.`, 'ok');
           if(appState.workflowCurrentIndex >= WORKFLOW_STEPS.length){
             showToast('Все шаги сценария пройдены');
@@ -3670,7 +4344,14 @@
         if(!isBuildAutoResolvedMode(mode)){
           return '';
         }
+        const allowMissingBuild = mode === '1';
         if(!String((cfg && cfg.bandCookiesRead) || '').trim()){
+          if(allowMissingBuild){
+            runCreatorInfo('Сборка: Cookies для чтения не заданы, продолжаю без pipeline.', { kind: 'warn' });
+            clearResolvedRunBuildValue();
+            syncResolvedBuildToInput('');
+            return '';
+          }
           throw new Error('Заполни Cookies (чтение/поиск users и post) для запроса сборки у release-android-bot.');
         }
 
@@ -3687,6 +4368,11 @@
         });
         const rootId = String((rootPost && rootPost.id) || '').trim();
         if(!rootId){
+          if(allowMissingBuild){
+            runCreatorInfo('Сборка: не удалось создать тред запроса к release-android-bot, продолжаю без pipeline.', { kind: 'warn' });
+            syncResolvedBuildToInput('');
+            return '';
+          }
           throw new Error('Не удалось создать тред запроса к release-android-bot.');
         }
 
@@ -3717,6 +4403,11 @@
         const tail = lastBotMessage
           ? ` Последний ответ бота: ${lastBotMessage.replace(/\s+/g, ' ').trim().slice(0, 220)}`
           : '';
+        if(allowMissingBuild){
+          runCreatorInfo(`Сборка: pipeline ещё не появился, продолжаю без него.${tail}`, { kind: 'warn' });
+          syncResolvedBuildToInput('');
+          return '';
+        }
         throw new Error(`Не удалось получить ссылку на pipeline от release-android-bot.${tail}`);
       }
 
@@ -4008,6 +4699,7 @@
         if((nonMajorLocked || !isNonMajor) && !appState.runCreateRunning){
           closeSwatScheduleMenu();
         }
+        renderAutomationControls();
       }
 
       function setRunCreateRunning(running){
@@ -4125,7 +4817,7 @@
       }
 
       async function runCollection(){
-        if(appState.running) return;
+        if(appState.running) return false;
 
         const cfg = collectSettings();
         if(!String(cfg.bandCookiesRead || '').length) throw new Error('Заполни Cookies (чтение/поиск users и post)');
@@ -4212,6 +4904,7 @@
           setStatus('Сбор завершен', 'release-launch-status-ok');
           showToast('Сбор завершен');
           log('Готово: данные обновлены.', 'ok');
+          return true;
         }catch(error){
           if(ctrl.signal.aborted){
             setStatus('Сбор остановлен', 'release-launch-status-warn');
@@ -4221,6 +4914,7 @@
             log(`Ошибка: ${error.message || error}`, 'err');
             showToast('Ошибка во время сбора', false);
           }
+          return false;
         }finally{
           appState.abortController = null;
           setRunning(false);
@@ -4784,6 +5478,7 @@
 
       function resetPushWorkflow(platform){
         if(!platform || platform === 'ios'){
+          cancelStepSchedulesByScope('push', 'ios');
           stopComponentsTimer('ios');
           if(appState.pushIosSyncTimerId){
             clearTimeout(appState.pushIosSyncTimerId);
@@ -4796,6 +5491,7 @@
           appState.pushIosRunning = false;
         }
         if(!platform || platform === 'android'){
+          cancelStepSchedulesByScope('push', 'android');
           stopComponentsTimer('android');
           if(appState.pushAndSyncTimerId){
             clearTimeout(appState.pushAndSyncTimerId);
@@ -4887,6 +5583,7 @@
               </div>`;
             }
           }
+          const scheduleBlock = renderStepScheduleControls('push', platform, idx, { busy: running || appState.running || appState.workflowRunning || appState.runCreateRunning || appState.startButtonBusy });
           return `
             <div class="rounded-2xl p-3 release-launch-workflow-row ${rowClass}">
               <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -4896,6 +5593,7 @@
                     <div class="text-sm font-semibold text-slate-800">${step.code}. ${escHtml(step.title)}</div>
                     <span class="inline-flex items-center mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ring-1 ${badgeClass}">${text}</span>
                     ${timerBlock}
+                    ${scheduleBlock}
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -5408,6 +6106,7 @@
 
         if(decision === 'no'){
           appState[statusesKey][stepIdx] = 'skipped';
+          cancelStepSchedule(getStepScheduleKey('push', platform, stepIdx));
           logMajorPush(`[${label}][${step.code}] Пропущено.`, 'warn');
           if(stepIdx === appState[currentKey]){
             advanceCurrentIndex();
@@ -5430,6 +6129,7 @@
           await runPushWorkflowStepAction(step.action);
           appState[statusesKey][stepIdx] = 'done';
           advanceCurrentIndex();
+          cancelStepSchedule(getStepScheduleKey('push', platform, stepIdx));
           logMajorPush(`[${label}][${step.code}] Выполнено.`, 'ok');
           if(appState[currentKey] >= steps.length){
             showToast(`Все шаги ${label} пройдены!`);
@@ -5792,6 +6492,15 @@
             runBuildInput.value = '';
           }
         }
+        if(automationTriggerModeSelect){
+          automationTriggerModeSelect.value = 'delay';
+        }
+        if(automationDelayMinutesInput && !String(automationDelayMinutesInput.value || '').trim()){
+          automationDelayMinutesInput.value = '10';
+        }
+        const defaultAutomationMs = buildDefaultAutomationScheduleMs(Date.now());
+        if(automationDateInput) automationDateInput.value = formatMskDateInputValue(defaultAutomationMs);
+        if(automationTimeInput) automationTimeInput.value = formatMskTimeInputValue(defaultAutomationMs);
         setRunMode('');
 
         for(const key of SETTINGS_FIELDS){
@@ -5941,6 +6650,73 @@
           }catch(_){ }
           schedulePreviewRefresh();
         });
+        document.addEventListener('input', (event) => {
+          const field = event.target && event.target.closest
+            ? event.target.closest('[data-step-schedule-key][data-step-schedule-field]')
+            : null;
+          if(!field) return;
+          updateStepScheduleDraft(
+            String(field.getAttribute('data-step-schedule-key') || ''),
+            String(field.getAttribute('data-step-schedule-field') || ''),
+            field.value
+          );
+        });
+        document.addEventListener('change', (event) => {
+          const field = event.target && event.target.closest
+            ? event.target.closest('[data-step-schedule-key][data-step-schedule-field]')
+            : null;
+          if(!field) return;
+          updateStepScheduleDraft(
+            String(field.getAttribute('data-step-schedule-key') || ''),
+            String(field.getAttribute('data-step-schedule-field') || ''),
+            field.value
+          );
+        });
+        document.addEventListener('click', (event) => {
+          const scheduleBtn = event.target && event.target.closest
+            ? event.target.closest('[data-step-schedule-action]')
+            : null;
+          if(!scheduleBtn) return;
+          const action = String(scheduleBtn.getAttribute('data-step-schedule-action') || '');
+          if(action === 'cancel'){
+            const key = String(scheduleBtn.getAttribute('data-step-schedule-key') || '');
+            if(key) cancelStepSchedule(key, { message: 'План шага отменён' });
+            return;
+          }
+          const scope = String(scheduleBtn.getAttribute('data-step-schedule-scope') || 'major');
+          const platform = String(scheduleBtn.getAttribute('data-step-schedule-platform') || '');
+          const stepIdx = Number(scheduleBtn.getAttribute('data-step-schedule-step'));
+          const triggerMode = action === 'schedule' ? 'schedule' : 'delay';
+          try{
+            const plan = buildStepSchedulePlan(scope, platform, stepIdx, triggerMode);
+            armStepSchedule(plan);
+            showToast(`Шаг запланирован на ${formatMskDateTimeHuman(plan.targetMs)}`);
+          }catch(error){
+            showToast((error && error.message) ? error.message : 'Ошибка планирования шага', false);
+          }
+        });
+        automationTriggerModeSelect?.addEventListener('change', renderAutomationControls);
+        automationDelayMinutesInput?.addEventListener('input', renderAutomationControls);
+        automationDateInput?.addEventListener('input', renderAutomationControls);
+        automationTimeInput?.addEventListener('input', renderAutomationControls);
+        automationScheduleBtn?.addEventListener('click', () => {
+          try{
+            const plan = buildAutomationPlanFromInputs();
+            armAutomationPlan(plan);
+            const human = formatMskDateTimeHuman(plan.targetMs);
+            appState.automationLastMessage = '';
+            showToast(`Автовыполнение запланировано на ${human}`);
+          }catch(error){
+            const message = error && error.message ? error.message : String(error || 'Не удалось запланировать');
+            appState.automationLastMessage = `Ошибка планирования: ${message}`;
+            renderAutomationControls();
+            showToast(message, false);
+          }
+        });
+        automationCancelBtn?.addEventListener('click', () => {
+          clearAutomationPlan({ message: 'Автовыполнение отменено.' });
+          showToast('Автовыполнение отменено');
+        });
         document.addEventListener('click', (event) => {
           const target = event.target;
           if(!runPushSwatSplit || !target || runPushSwatScheduleMenu?.hidden) return;
@@ -6003,6 +6779,13 @@
         });
         $('pushWorkflowResetBtn')?.addEventListener('click', () => resetPushWorkflow());
 
+        appState.stepSchedules = loadStepSchedules();
+        for(const plan of Object.values(appState.stepSchedules)){
+          armStepSchedule(plan);
+        }
+        saveAutomationPlan(null);
+        appState.automationPlan = null;
+        renderAutomationControls();
         schedulePreviewRefresh();
       }
 
