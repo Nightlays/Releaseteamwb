@@ -1,0 +1,2582 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTrack Wiki Search Redesign</title>
+  <style>
+    :root{
+      --bg:#070b13;
+      --bg2:#0b1020;
+      --panel:rgba(255,255,255,.035);
+      --panel-2:rgba(255,255,255,.025);
+      --stroke:rgba(255,255,255,.08);
+      --stroke-2:rgba(255,255,255,.12);
+      --text:#f4f7fb;
+      --muted:#96a0b5;
+      --muted-2:#697389;
+      --indigo:#6677ff;
+      --indigo-2:#8fa0ff;
+      --good:#44d08a;
+      --warn:#ffbe55;
+      --bad:#ff6b7d;
+      --shadow:0 16px 48px rgba(0,0,0,.35);
+      --radius:24px;
+      --radius-sm:16px;
+      --radius-xs:12px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top, rgba(102,119,255,.18), transparent 26%),
+        radial-gradient(circle at 16% 18%, rgba(59,130,246,.08), transparent 18%),
+        linear-gradient(180deg, #070b13, #060910 45%, #05080f 100%);
+      overflow:hidden;
+    }
+    .app{
+      display:grid;
+      grid-template-columns:72px minmax(0,1fr);
+      min-height:100vh;
+      height:100vh;
+    }
+    .sidebar{
+      border-right:1px solid rgba(255,255,255,.06);
+      background:rgba(0,0,0,.18);
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      align-items:center;
+      padding:14px 10px;
+      gap:16px;
+    }
+    .nav-group{display:flex;flex-direction:column;gap:10px}
+    .icon-btn,.logo{
+      width:44px;height:44px;border-radius:18px;border:1px solid rgba(255,255,255,.06);
+      display:grid;place-items:center;background:rgba(255,255,255,.03);color:#aab2c5;
+      transition:.18s ease; cursor:pointer; user-select:none;
+      appearance:none;
+      padding:0;
+      font:inherit;
+    }
+    .logo{
+      color:#d8ddff;background:rgba(102,119,255,.14);border-color:rgba(102,119,255,.28);
+      box-shadow:0 0 0 1px rgba(102,119,255,.15) inset;
+      font-weight:700;font-size:18px;
+    }
+    .icon-btn:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:#fff}
+    .icon-btn.active{
+      background:rgba(102,119,255,.14);border-color:rgba(102,119,255,.32);color:#fff;
+      box-shadow:0 0 0 1px rgba(102,119,255,.16) inset;
+    }
+    .icon-btn:focus-visible{
+      outline:none;
+      border-color:rgba(102,119,255,.4);
+      box-shadow:0 0 0 3px rgba(102,119,255,.14);
+    }
+
+    .main{
+      padding:4px 0 4px 8px;
+      max-width:1700px;
+      width:100%;
+      margin:0 auto;
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 252px;
+      gap:4px;
+      min-height:100vh;
+      height:100vh;
+      overflow:hidden;
+    }
+    .workspace{min-width:0; display:flex; flex-direction:column; gap:0; min-height:0; overflow:hidden}
+    .hero{
+      border:1px solid rgba(255,255,255,.07);
+      background:var(--panel);
+      border-radius:18px;
+      padding:4px 6px 6px;
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(16px);
+    }
+    .hero-top{
+      display:flex;gap:8px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;
+      margin-bottom:2px;
+    }
+    .eyebrow{
+      display:flex;align-items:center;gap:8px;
+      font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);
+      margin-bottom:4px;
+    }
+    h1{font-size:16px;line-height:1.02;letter-spacing:-.03em;margin:0 0 2px}
+    .sub{
+      max-width:980px;color:var(--muted);font-size:10px;line-height:1.25;margin:0;
+    }
+    .status-pills{display:flex;gap:8px;flex-wrap:wrap}
+    .pill{
+      display:flex;align-items:center;gap:8px;
+      font-size:10px;color:#d7dcec;padding:5px 8px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);
+      white-space:nowrap;
+    }
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--good)}
+    .search-box{
+      border-radius:16px;border:1px solid rgba(255,255,255,.07);
+      background:rgba(0,0,0,.2);padding:6px 8px;
+    }
+    .search-row{
+      display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    }
+    .search-input-wrap{
+      flex:1 1 520px; min-width:280px; position:relative;
+    }
+    .search-input{
+      width:100%; height:34px; border-radius:12px; border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03); color:var(--text); padding:0 16px 0 44px; font-size:14px;
+      outline:none;
+    }
+    .search-input:focus{border-color:rgba(102,119,255,.5); box-shadow:0 0 0 3px rgba(102,119,255,.12)}
+    .search-icon{
+      position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted-2); font-size:14px;
+    }
+    .chip-row{display:flex;gap:8px;flex-wrap:wrap}
+    .chip,.btn,.mini-chip{
+      border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.04); color:#e5e9f6;
+      border-radius:12px; padding:6px 10px; font-size:12px;
+    }
+    .mini-chip{
+      padding:6px 10px; font-size:12px; color:#c2cadb; border-radius:999px; background:transparent;
+    }
+    .btn{cursor:pointer; transition:.16s ease}
+    .btn:hover{background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.14)}
+    .btn.primary{background:var(--indigo); border-color:transparent; color:white}
+    .btn.primary:hover{background:#7a89ff}
+    .suggestions{
+      display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; align-items:center;
+      color:var(--muted-2); font-size:11px;
+    }
+
+    .content-grid{
+      display:grid; grid-template-columns:252px minmax(0,1fr); gap:4px; min-height:0; flex:1 1 auto; overflow:hidden;
+    }
+
+    .panel{
+      border:1px solid rgba(255,255,255,.07);
+      background:var(--panel);
+      border-radius:24px;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      backdrop-filter:blur(16px);
+    }
+    .panel-head{
+      padding:12px 14px 8px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    }
+    .panel-title{font-size:16px; font-weight:600; margin:0 0 5px}
+    .panel-desc{font-size:13px; color:var(--muted); margin:0}
+    .panel-body{padding:10px; min-height:0}
+    .scroll{overflow:auto; min-height:0}
+    .panel-body.scroll{flex:1 1 auto}
+    .results-list{display:flex; flex-direction:column; gap:12px}
+    .result{
+      width:100%; text-align:left; padding:16px; border-radius:22px; cursor:pointer;
+      border:1px solid rgba(255,255,255,.06); background:var(--panel-2); color:inherit;
+      transition:.18s ease;
+    }
+    .result:hover{background:rgba(255,255,255,.045); border-color:rgba(255,255,255,.12)}
+    .result.active{
+      background:rgba(102,119,255,.10); border-color:rgba(102,119,255,.32);
+      box-shadow:0 0 0 1px rgba(102,119,255,.18) inset;
+    }
+    .result-top{
+      display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:10px;
+    }
+    .result-title{font-size:14px; font-weight:600; margin:0 0 4px}
+    .result-meta{font-size:12px; color:var(--muted-2)}
+    .score{
+      white-space:nowrap; padding:6px 10px; border-radius:999px;
+      background:rgba(255,255,255,.08); font-size:12px; color:#e8ecf8;
+    }
+    .result-snippet{font-size:14px; color:#d3daeb; line-height:1.65; margin:0}
+    .result-bottom{
+      margin-top:12px; display:flex; justify-content:space-between; gap:12px; align-items:flex-end; flex-wrap:wrap;
+    }
+    .tags{display:flex; gap:8px; flex-wrap:wrap}
+    .tag{
+      border:1px solid rgba(255,255,255,.10); color:#c3cbdd; padding:5px 10px;
+      border-radius:999px; font-size:11px;
+    }
+
+    .article-top{
+      display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    .article-eyebrow{
+      font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted-2); margin-bottom:8px;
+    }
+    .article-title{font-size:40px; line-height:1.01; letter-spacing:-.04em; margin:0 0 6px}
+    .article-meta{font-size:13px; color:var(--muted)}
+    .article-actions{display:flex; gap:10px; flex-wrap:wrap}
+    .subnav{display:flex; gap:8px; flex-wrap:wrap; margin-top:2px}
+    .subnav .mini-chip{cursor:pointer}
+    .article-scroll{flex:1 1 auto; min-height:0; max-height:none; overflow:auto; scroll-behavior:smooth}
+    .article-inner{padding:18px 20px 22px; display:flex; flex-direction:column; gap:18px}
+    .section-kicker{font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted-2); margin-bottom:8px}
+    .p{
+      color:#d3daeb; font-size:15px; line-height:1.8; margin:0; max-width:none;
+    }
+    .cards-3,.cards-2{display:grid; gap:12px}
+    .cards-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .cards-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .mini-card{
+      border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.2); border-radius:22px; padding:16px;
+    }
+    .mini-card h4{margin:0 0 8px; font-size:14px}
+    .mini-card p{margin:0; color:var(--muted); font-size:13px; line-height:1.7}
+    .snippet{
+      border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.025);
+      border-radius:18px; padding:16px; color:#d4dcef; font-size:14px; line-height:1.75;
+    }
+    .hl{
+      display:inline-block; padding:1px 6px; border-radius:8px; background:rgba(102,119,255,.16); color:#dbe2ff;
+      margin-right:4px;
+    }
+    .meta-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px}
+    .meta-item{
+      border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.2); border-radius:18px; padding:16px;
+    }
+    .meta-label{font-size:11px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted-2)}
+    .meta-value{margin-top:8px; font-size:15px; font-weight:600}
+    .article-render{
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.02);
+      border-radius:20px;
+      padding:18px 18px 20px;
+    }
+    .article-render h1,
+    .article-render h2,
+    .article-render h3,
+    .article-render h4{
+      margin:0 0 12px;
+      color:var(--text);
+      line-height:1.18;
+      letter-spacing:-.02em;
+    }
+    .article-render h1{font-size:26px}
+    .article-render h2{font-size:22px}
+    .article-render h3{font-size:18px}
+    .article-render h4{font-size:16px}
+    .article-render p,
+    .article-render li{
+      color:#334155;
+      font-size:14px;
+      line-height:1.75;
+    }
+    .article-render p{margin:0 0 12px}
+    .article-render ul,
+    .article-render ol{margin:0 0 14px 20px; padding:0}
+    .article-render table{
+      width:100%;
+      border-collapse:collapse;
+      margin:10px 0 16px;
+      font-size:13px;
+    }
+    .article-render .table-wrap{
+      overflow:auto;
+      margin:10px 0 16px;
+      border:1px solid rgba(15,23,42,.08);
+      border-radius:16px;
+      background:#fff;
+    }
+    .article-render .table-wrap table{
+      margin:0;
+      min-width:640px;
+      border:none;
+    }
+    .article-render td,
+    .article-render th{
+      border:1px solid rgba(15,23,42,.08);
+      padding:8px 10px;
+      text-align:left;
+      vertical-align:top;
+    }
+    .article-render th{
+      background:#f6f8fc;
+      font-weight:600;
+    }
+    .article-render tr:nth-child(even) td{
+      background:rgba(15,23,42,.02);
+    }
+    .article-render code{
+      padding:.12em .4em;
+      border-radius:8px;
+      background:rgba(85,103,245,.08);
+      color:#334155;
+      font:500 12px/1.3 "JetBrains Mono", ui-monospace, monospace;
+    }
+    .article-render pre{
+      margin:0 0 14px;
+      padding:14px 16px;
+      overflow:auto;
+      border-radius:16px;
+      background:#f5f7fb;
+      border:1px solid rgba(15,23,42,.08);
+    }
+    .article-render pre code{
+      padding:0;
+      background:transparent;
+    }
+    .article-render blockquote{
+      margin:0 0 14px;
+      padding:10px 14px;
+      border-left:3px solid rgba(85,103,245,.28);
+      background:rgba(85,103,245,.05);
+      border-radius:0 12px 12px 0;
+      color:#475467;
+    }
+    .article-render a{
+      color:var(--indigo);
+      text-decoration:none;
+    }
+    .article-render a:hover{text-decoration:underline}
+
+    .right{
+      position:sticky; top:18px; align-self:start;
+      height:calc(100vh - 36px);
+      display:flex; flex-direction:column; min-height:0;
+    }
+    .right-top{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:0 0 6px 2px;
+    }
+    .context-small{font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted-2)}
+    .context-title{margin-top:4px; font-size:14px; font-weight:600}
+    .right-body{overflow:auto; padding-right:2px; min-height:0}
+    .stack{display:flex; flex-direction:column; gap:14px}
+    .ctx-card{
+      border:1px solid rgba(255,255,255,.08); background:var(--panel); border-radius:24px; overflow:hidden;
+      backdrop-filter:blur(16px);
+    }
+    .ctx-head{padding:16px 16px 10px}
+    .ctx-title{margin:0; font-size:15px; font-weight:600}
+    .ctx-desc{font-size:13px; color:var(--muted); margin-top:5px}
+    .ctx-content{padding:0 16px 16px}
+    .note{
+      border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.2); border-radius:18px;
+      padding:14px; color:#d6ddef; font-size:14px; line-height:1.75;
+    }
+    .action-list{display:flex; flex-direction:column; gap:8px}
+    .action-item{
+      display:flex; justify-content:space-between; gap:12px; align-items:center; width:100%;
+      border-radius:18px; border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.2);
+      color:#d4dcef; padding:12px 14px; font-size:14px; cursor:pointer;
+    }
+    .action-item:hover{background:rgba(255,255,255,.03); border-color:rgba(255,255,255,.14)}
+    .entity-wrap{display:flex; gap:8px; flex-wrap:wrap}
+    .signal-row{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.2); border-radius:18px;
+      padding:12px 14px; font-size:14px; color:#d6ddef;
+    }
+    .ok{color:#8ae7b4}
+    .warn{color:#ffd280}
+    .status-row{
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+      border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.2); border-radius:18px;
+      padding:12px 14px; font-size:14px;
+    }
+    .badge{
+      padding:5px 10px; border-radius:999px; font-size:12px; white-space:nowrap;
+      background:rgba(255,255,255,.08); color:#e9edf8;
+    }
+    .badge.good{background:rgba(68,208,138,.14); color:#9bf0be}
+    .badge.indigo{background:rgba(102,119,255,.16); color:#cdd6ff}
+    .reason-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    .summary-block{display:flex; flex-direction:column; gap:14px}
+    .summary-main{
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(0,0,0,.2);
+      border-radius:18px;
+      padding:14px 16px;
+    }
+    .summary-main p{
+      margin:0;
+      color:#d6ddef;
+      font-size:14px;
+      line-height:1.75;
+    }
+    .summary-main p + p{margin-top:10px}
+    .summary-list{
+      margin:0;
+      padding-left:18px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      color:#d6ddef;
+      font-size:14px;
+      line-height:1.7;
+    }
+    .summary-list li{padding-left:2px}
+    .focus-target{
+      transition:box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
+    }
+    .focus-target.is-focused{
+      border-color:rgba(102,119,255,.28);
+      box-shadow:0 0 0 3px rgba(102,119,255,.12);
+    }
+    .skeleton{display:flex; flex-direction:column; gap:8px}
+    .sk{
+      height:10px; border-radius:999px; background:rgba(255,255,255,.10)
+    }
+
+    .settings-drawer{position:fixed; inset:0; z-index:50}
+    .settings-backdrop{position:absolute; inset:0; background:rgba(15,23,42,.18); backdrop-filter:blur(8px)}
+    .settings-panel{
+      position:absolute; top:16px; right:16px; bottom:16px; width:min(460px, calc(100vw - 32px));
+      border:1px solid var(--stroke); border-radius:28px; background:var(--panel); box-shadow:var(--shadow);
+      overflow:hidden; display:flex; flex-direction:column;
+    }
+
+    .mobile-topbar{display:none}
+
+    @media (max-width: 1320px){
+      .main{grid-template-columns:minmax(0,1fr)}
+      .right{display:none}
+    }
+    @media (max-width: 1100px){
+      .content-grid{grid-template-columns:1fr}
+      body{overflow:auto}
+      .app{min-height:auto}
+      .main{min-height:auto; height:auto; overflow:visible}
+      .workspace{overflow:visible}
+    }
+    @media (max-width: 860px){
+      .app{grid-template-columns:1fr}
+      .sidebar{display:none}
+      .mobile-topbar{
+        display:flex; justify-content:space-between; align-items:center; gap:10px;
+        position:sticky; top:0; z-index:20;
+        padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.06);
+        background:rgba(7,11,19,.84); backdrop-filter:blur(14px);
+      }
+      .mobile-topbar strong{font-size:14px}
+      .main{padding:12px}
+      .hero{padding:16px; border-radius:22px}
+      h1{font-size:24px}
+      .cards-3,.cards-2,.meta-grid{grid-template-columns:1fr}
+      .panel, .ctx-card{border-radius:22px}
+      .article-inner{padding:18px}
+      body{overflow:auto}
+    }
+
+    /* Light theme override */
+    :root{
+      color-scheme:light;
+      --bg:#f5f7fb;
+      --bg2:#eef2f8;
+      --panel:#ffffff;
+      --panel-2:#fafbfd;
+      --stroke:rgba(15,23,42,.08);
+      --stroke-2:rgba(15,23,42,.12);
+      --text:#111827;
+      --muted:#5f6b7c;
+      --muted-2:#8792a5;
+      --indigo:#5567f5;
+      --indigo-2:#7d8cff;
+      --good:#1f9d62;
+      --warn:#bf7a12;
+      --bad:#cc4456;
+      --shadow:0 16px 44px rgba(15,23,42,.08);
+    }
+
+    body{
+      color:var(--text);
+      background:
+        radial-gradient(circle at top, rgba(85,103,245,.08), transparent 28%),
+        linear-gradient(180deg, #f7f9fc, #f3f6fb 50%, #eef2f8 100%);
+    }
+
+    .sidebar{
+      border-right:1px solid rgba(15,23,42,.08);
+      background:rgba(255,255,255,.72);
+      backdrop-filter:blur(18px);
+    }
+
+    .icon-btn,.logo{
+      border:1px solid rgba(15,23,42,.08);
+      background:#fff;
+      color:#667085;
+      box-shadow:0 6px 18px rgba(15,23,42,.04);
+    }
+
+    .logo{
+      color:#4c5fe6;
+      background:rgba(85,103,245,.08);
+      border-color:rgba(85,103,245,.18);
+      box-shadow:none;
+    }
+
+    .icon-btn:hover{
+      background:#f5f7fb;
+      border-color:rgba(15,23,42,.12);
+      color:#111827;
+    }
+
+    .icon-btn.active{
+      background:rgba(85,103,245,.10);
+      border-color:rgba(85,103,245,.20);
+      color:#1f2a44;
+      box-shadow:none;
+    }
+
+    .hero,
+    .panel,
+    .ctx-card{
+      border:1px solid rgba(15,23,42,.08);
+      background:rgba(255,255,255,.88);
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(16px);
+    }
+
+    .eyebrow,
+    .article-eyebrow,
+    .section-kicker,
+    .context-small,
+    .meta-label{
+      color:var(--muted-2);
+    }
+
+    .sub,
+    .panel-desc,
+    .article-meta,
+    .ctx-desc,
+    .mini-card p{
+      color:var(--muted);
+    }
+
+    .pill{
+      color:#334155;
+      border:1px solid rgba(15,23,42,.08);
+      background:#fff;
+    }
+
+    .search-box{
+      border:1px solid rgba(15,23,42,.08);
+      background:#f8fafc;
+    }
+
+    .search-input{
+      border:1px solid rgba(15,23,42,.08);
+      background:#fff;
+      color:#111827;
+    }
+
+    .search-input::placeholder{
+      color:#94a3b8;
+    }
+
+    .search-input:focus{
+      border-color:rgba(85,103,245,.42);
+      box-shadow:0 0 0 3px rgba(85,103,245,.10);
+    }
+
+    .search-icon{
+      color:#94a3b8;
+    }
+
+    .chip,.btn,.mini-chip{
+      border:1px solid rgba(15,23,42,.08);
+      background:#fff;
+      color:#334155;
+    }
+
+    .mini-chip{
+      background:#f8fafc;
+      color:#475467;
+    }
+
+    .btn:hover{
+      background:#f5f7fb;
+      border-color:rgba(15,23,42,.12);
+    }
+
+    .btn.primary{
+      background:var(--indigo);
+      color:#fff;
+      box-shadow:none;
+    }
+
+    .btn.primary:hover{
+      background:#495ce8;
+    }
+
+    .result{
+      border:1px solid rgba(15,23,42,.08);
+      background:#fff;
+    }
+
+    .result:hover{
+      background:#f8fafc;
+      border-color:rgba(15,23,42,.12);
+    }
+
+    .result.active{
+      background:rgba(85,103,245,.06);
+      border-color:rgba(85,103,245,.22);
+      box-shadow:0 0 0 1px rgba(85,103,245,.10) inset;
+    }
+
+    .result-meta,
+    .result-bottom .result-meta,
+    .result-snippet,
+    .p,
+    .note,
+    .signal-row,
+    .status-row,
+    .snippet{
+      color:#334155;
+    }
+
+    .score{
+      background:#eef2ff;
+      color:#3f51cc;
+    }
+
+    .tag{
+      border:1px solid rgba(15,23,42,.08);
+      color:#526072;
+      background:#fff;
+    }
+
+    .mini-card,
+    .meta-item,
+    .note,
+    .summary-main,
+    .action-item,
+    .signal-row,
+    .status-row{
+      border:1px solid rgba(15,23,42,.08);
+      background:#fff;
+    }
+
+    .action-item{
+      color:#1f2937;
+    }
+
+    .action-item:hover{
+      background:#f8fafc;
+      border-color:rgba(15,23,42,.12);
+    }
+
+    .snippet{
+      border:1px solid rgba(15,23,42,.08);
+      background:#fff;
+    }
+
+    .summary-main p,
+    .summary-list{
+      color:#334155;
+    }
+
+    .hl{
+      background:rgba(85,103,245,.10);
+      color:#4052d8;
+    }
+
+    .meta-value,
+    .panel-title,
+    .article-title,
+    .ctx-title,
+    h1{
+      color:#111827;
+    }
+
+    .badge{
+      background:#eef2f7;
+      color:#475467;
+    }
+
+    .badge.good{
+      background:rgba(31,157,98,.10);
+      color:#1f9d62;
+    }
+
+    .badge.indigo{
+      background:rgba(85,103,245,.10);
+      color:#4c5fe6;
+    }
+
+    .summary-main,
+    .focus-target.is-focused{
+      border-color:rgba(15,23,42,.10);
+      box-shadow:0 0 0 3px rgba(85,103,245,.08);
+    }
+
+    .sk{
+      background:#e5eaf1;
+    }
+
+    .mobile-topbar{
+      border-bottom:1px solid rgba(15,23,42,.08);
+      background:rgba(255,255,255,.86);
+      backdrop-filter:blur(14px);
+    }
+  </style>
+</head>
+<body>
+  <div class="mobile-topbar">
+    <strong>Search / Inspect / Summarize</strong>
+    <button class="btn" onclick="document.getElementById('jumpResults').scrollIntoView({behavior:'smooth'})">Результаты</button>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="nav-group">
+        <div class="logo">⌕</div>
+        <button class="icon-btn active" data-rail="search" title="Search" aria-label="Search">⌕</button>
+        <button class="icon-btn" data-rail="history" title="History" aria-label="History">🕘</button>
+        <button class="icon-btn" data-rail="articles" title="Articles" aria-label="Articles">📄</button>
+        <button class="icon-btn" data-rail="saved" title="Saved" aria-label="Saved">★</button>
+        <button class="icon-btn" data-rail="settings" id="sideSettingsBtn" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+      <div class="nav-group">
+        <button class="icon-btn" data-rail="health" title="System health" aria-label="System health">🛡</button>
+        <button class="icon-btn" data-rail="llm" title="LLM" aria-label="LLM">✦</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="workspace">
+        <section class="hero focus-target" id="heroSection">
+          <div class="hero-top">
+            <div>
+              <div class="eyebrow">◌ Internal knowledge console</div>
+              <h1>Search / Inspect / Summarize</h1>
+              <p class="sub">
+                Поиск по wiki YouTrack с просмотром статьи в центре и контекстной intelligence-панелью справа. Да, теперь это похоже на инструмент, а не на склад форм и страданий.
+              </p>
+            </div>
+            <div class="status-pills">
+              <div class="pill" id="proxyPill"><span class="dot" id="proxyPillDot"></span><span id="proxyPillText">Proxy unknown</span></div>
+              <div class="pill" id="tokenPill"><span class="dot" id="tokenPillDot"></span><span id="tokenPillText">Token missing</span></div>
+              <div class="pill" id="llmPill"><span class="dot" id="llmPillDot"></span><span id="llmPillText">LLM optional</span></div>
+            </div>
+          </div>
+
+          <div class="search-box">
+            <div class="search-row">
+              <div class="search-input-wrap">
+                <div class="search-icon">⌕</div>
+                <input id="queryInput" class="search-input" value="миграция llm wiki search" placeholder="Искать статьи, сигналы, proxy flow, owners, testplan..." />
+              </div>
+              <div class="chip-row">
+                <div class="chip" id="projectChip">project: MD</div>
+                <div class="chip">wiki</div>
+                <div class="chip" id="tagChip">tag: auto</div>
+                <div class="chip" id="limitChip">limit: 15</div>
+                <button class="btn" id="openSettingsBtn">Filters</button>
+                <button class="btn primary" id="searchBtn">Search</button>
+              </div>
+            </div>
+            <div class="suggestions">
+              <span>Suggestions:</span>
+              <button class="mini-chip" data-suggestion="proxy errors 403/502">proxy errors 403/502</button>
+              <button class="mini-chip" data-suggestion="signals in article">signals in article</button>
+              <button class="mini-chip" data-suggestion="query refinement">query refinement</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <section class="panel focus-target" id="jumpResults">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Результаты поиска</h2>
+                <p class="panel-desc">Компактный список совпадений без бесполезных карточек на полэкрана.</p>
+              </div>
+              <div class="badge" id="resultsCountBadge">0 hits</div>
+            </div>
+            <div class="panel-body scroll">
+              <div class="results-list" id="resultsList"></div>
+            </div>
+          </section>
+
+          <section class="panel focus-target" id="articlePanel">
+            <div class="panel-head">
+              <div style="width:100%">
+                <div class="article-top">
+                  <div>
+                    <div class="article-eyebrow">Article inspector</div>
+                    <h2 class="article-title" id="articleTitle">Выбери статью из результатов</h2>
+                    <div class="article-meta" id="articleMeta">Wiki / Search / Routing</div>
+                  </div>
+                  <div class="article-actions">
+                    <button class="btn" id="originalBtn">Original</button>
+                    <button class="btn" id="toggleArticleBtn">Показать статью</button>
+                    <button class="btn primary" id="llmBtn">Ask LLM</button>
+                  </div>
+                </div>
+                <div class="subnav" id="articleNav"></div>
+              </div>
+            </div>
+            <div class="panel-body scroll article-scroll" id="articleScroller">
+              <div class="article-inner">
+                <section id="articleOverviewSection" class="focus-target">
+                  <div class="section-kicker">Overview</div>
+                  <p class="p" id="articleOverview">
+                    После поиска здесь откроется выбранная статья YouTrack wiki, ее ключевые секции, совпавшие фрагменты и метаданные источника.
+                  </p>
+                </section>
+
+                <section id="articleSectionsSection" class="focus-target">
+                  <div class="section-kicker">Key sections</div>
+                  <div class="cards-3" id="flowCards"></div>
+                </section>
+
+                <section id="articleSnippetsSection" class="focus-target">
+                  <div class="section-kicker">Matched snippets</div>
+                  <div style="display:flex; flex-direction:column; gap:10px" id="matchedSnippets"></div>
+                </section>
+
+                <section id="articleMetaSection" class="focus-target">
+                  <div class="section-kicker">Source metadata</div>
+                  <div class="meta-grid">
+                    <div class="meta-item"><div class="meta-label">Article ID</div><div class="meta-value" id="metaId">—</div></div>
+                    <div class="meta-item"><div class="meta-label">Source</div><div class="meta-value" id="metaSource">YouTrack wiki</div></div>
+                    <div class="meta-item"><div class="meta-label">Owner</div><div class="meta-value" id="metaOwner">—</div></div>
+                    <div class="meta-item"><div class="meta-label">Relevance</div><div class="meta-value" id="metaScore">—</div></div>
+                  </div>
+                </section>
+
+                <section id="articleFullSection" class="focus-target" hidden>
+                  <div class="section-kicker">Полная статья</div>
+                  <div class="article-render" id="articleFullContent"></div>
+                </section>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <aside class="right focus-target" id="contextSection">
+        <div class="right-top">
+          <div>
+            <div class="context-small">Context panel</div>
+            <div class="context-title" id="contextTitle">Article intelligence</div>
+          </div>
+          <button class="btn" id="contextPanelBtn">Panel</button>
+        </div>
+        <div class="right-body">
+          <div class="stack" id="contextPanel"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div class="settings-drawer" id="settingsDrawer" hidden>
+    <div class="settings-backdrop" id="settingsBackdrop"></div>
+    <aside class="settings-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Workspace setup</h2>
+          <p class="panel-desc">Подключение к YouTrack wiki, proxy и опциональный LLM.</p>
+        </div>
+        <button class="btn" id="closeSettingsBtn">Close</button>
+      </div>
+      <div class="panel-body scroll">
+        <div class="stack">
+          <div class="meta-item">
+            <div class="meta-label">YouTrack</div>
+            <div style="display:grid; gap:12px; margin-top:10px">
+              <label>
+                <div class="meta-label" style="margin-bottom:8px">Token</div>
+                <input class="search-input" id="tokenInput" type="password" placeholder="perm:..." style="height:44px;padding:0 14px" />
+              </label>
+              <label>
+                <div class="meta-label" style="margin-bottom:8px">Proxy base</div>
+                <input class="search-input" id="proxyBaseInput" type="text" value="http://localhost:8787" style="height:44px;padding:0 14px" />
+              </label>
+              <label>
+                <div class="meta-label" style="margin-bottom:8px">Project</div>
+                <input class="search-input" id="projectInput" type="text" value="MD" style="height:44px;padding:0 14px" />
+              </label>
+              <label>
+                <div class="meta-label" style="margin-bottom:8px">Top K</div>
+                <input class="search-input" id="limitInput" type="number" min="1" max="50" value="15" style="height:44px;padding:0 14px" />
+              </label>
+              <label style="display:flex;align-items:center;gap:10px">
+                <input id="useProxyInput" type="checkbox" checked />
+                <span class="result-meta">Use local proxy</span>
+              </label>
+              <button class="btn" id="checkProxyBtn">Check proxy</button>
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-label">Target article</div>
+            <div style="display:grid; gap:12px; margin-top:10px">
+              <label>
+                <div class="meta-label" style="margin-bottom:8px">Article URL / ID</div>
+                <input class="search-input" id="articleRefInput" type="text" value="MD-A-889" style="height:44px;padding:0 14px" />
+              </label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <button class="btn" id="analyzeTargetBtn">Load article</button>
+                <button class="btn" id="openTargetBtn">Open original</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-label">LLM (optional)</div>
+            <div style="display:grid; gap:12px; margin-top:10px">
+              <label>
+                <div class="meta-label" style="margin-bottom:8px">Base URL</div>
+                <input class="search-input" id="llmBaseUrlInput" type="text" value="https://api.openai.com/v1" style="height:44px;padding:0 14px" />
+              </label>
+              <label>
+                <div class="meta-label" style="margin-bottom:8px">API key</div>
+                <input class="search-input" id="llmApiKeyInput" type="password" placeholder="sk-..." style="height:44px;padding:0 14px" />
+              </label>
+              <label>
+                <div class="meta-label" style="margin-bottom:8px">Model</div>
+                <input class="search-input" id="llmModelInput" type="text" value="gpt-5-mini" style="height:44px;padding:0 14px" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const YT_BASE = "https://youtrack.wildberries.ru";
+    const DEFAULT_PROXY = "http://localhost:8787";
+    const LS_KEY = "yt_wiki_search_redesign_state_v1";
+    const SEARCH_FIELDS = "id,idReadable,summary,content,updated,project(name,shortName),tags(name),updatedBy(login,name,fullName)";
+    const ARTICLE_FIELDS = "id,idReadable,summary,content,updated,created,project(name,shortName),tags(name),updatedBy(login,name,fullName),createdBy(login,name,fullName)";
+    const QUERY_STOPWORDS = new Set([
+      "как","что","где","когда","кто","какой","какие","какая","какое","нужно","надо","можно","ли",
+      "по","для","про","о","об","в","во","на","с","со","и","или","из","к","ко","у","от","до","не",
+      "это","эта","этот","эти","мне","нам","вам","их","его","ее","её","через","без","под","над",
+      "wiki","вики","article","articles","статья","статьи","документ","документы"
+    ]);
+    const SEARCH_EXPANSIONS = [
+      { test: /(миграц|migration)/i, phrases: ["миграция", "тестирование миграций", "процесс миграции", "миграция бд"] },
+      { test: /(регресс|regress|regression)/i, phrases: ["прохождение регресса", "форма отчета регресса", "селективный регресс"] },
+      { test: /(тест|test|qa)/i, phrases: ["тестирование", "чек-лист проверок", "процесс работы QA"] },
+      { test: /(owner|ответствен|дежур|lead|лид)/i, phrases: ["ответственный", "дежурный", "лид"] },
+      { test: /(rollback|откат)/i, phrases: ["rollback", "откат"] },
+      { test: /(proxy|прокси|403|502|api)/i, phrases: ["proxy", "api", "ошибка 403", "ошибка 502"] },
+      { test: /(testplan|план|plan)/i, phrases: ["testplan", "testplan/"] }
+    ];
+
+    const ui = {
+      queryInput: document.getElementById("queryInput"),
+      searchBtn: document.getElementById("searchBtn"),
+      railButtons: Array.from(document.querySelectorAll("[data-rail]")),
+      resultsList: document.getElementById("resultsList"),
+      resultsCountBadge: document.getElementById("resultsCountBadge"),
+      heroSection: document.getElementById("heroSection"),
+      resultsSection: document.getElementById("jumpResults"),
+      articlePanel: document.getElementById("articlePanel"),
+      articleScroller: document.getElementById("articleScroller"),
+      articleOverviewSection: document.getElementById("articleOverviewSection"),
+      articleSectionsSection: document.getElementById("articleSectionsSection"),
+      articleSnippetsSection: document.getElementById("articleSnippetsSection"),
+      articleMetaSection: document.getElementById("articleMetaSection"),
+      articleFullSection: document.getElementById("articleFullSection"),
+      articleTitle: document.getElementById("articleTitle"),
+      articleMeta: document.getElementById("articleMeta"),
+      articleOverview: document.getElementById("articleOverview"),
+      articleFullContent: document.getElementById("articleFullContent"),
+      articleNav: document.getElementById("articleNav"),
+      flowCards: document.getElementById("flowCards"),
+      matchedSnippets: document.getElementById("matchedSnippets"),
+      metaId: document.getElementById("metaId"),
+      metaSource: document.getElementById("metaSource"),
+      metaOwner: document.getElementById("metaOwner"),
+      metaScore: document.getElementById("metaScore"),
+      contextTitle: document.getElementById("contextTitle"),
+      contextSection: document.getElementById("contextSection"),
+      contextPanel: document.getElementById("contextPanel"),
+      originalBtn: document.getElementById("originalBtn"),
+      toggleArticleBtn: document.getElementById("toggleArticleBtn"),
+      llmBtn: document.getElementById("llmBtn"),
+      openSettingsBtn: document.getElementById("openSettingsBtn"),
+      contextPanelBtn: document.getElementById("contextPanelBtn"),
+      sideSettingsBtn: document.getElementById("sideSettingsBtn"),
+      settingsDrawer: document.getElementById("settingsDrawer"),
+      settingsBackdrop: document.getElementById("settingsBackdrop"),
+      closeSettingsBtn: document.getElementById("closeSettingsBtn"),
+      tokenInput: document.getElementById("tokenInput"),
+      proxyBaseInput: document.getElementById("proxyBaseInput"),
+      projectInput: document.getElementById("projectInput"),
+      limitInput: document.getElementById("limitInput"),
+      useProxyInput: document.getElementById("useProxyInput"),
+      articleRefInput: document.getElementById("articleRefInput"),
+      analyzeTargetBtn: document.getElementById("analyzeTargetBtn"),
+      openTargetBtn: document.getElementById("openTargetBtn"),
+      checkProxyBtn: document.getElementById("checkProxyBtn"),
+      llmBaseUrlInput: document.getElementById("llmBaseUrlInput"),
+      llmApiKeyInput: document.getElementById("llmApiKeyInput"),
+      llmModelInput: document.getElementById("llmModelInput"),
+      projectChip: document.getElementById("projectChip"),
+      tagChip: document.getElementById("tagChip"),
+      limitChip: document.getElementById("limitChip"),
+      proxyPillText: document.getElementById("proxyPillText"),
+      tokenPillText: document.getElementById("tokenPillText"),
+      llmPillText: document.getElementById("llmPillText"),
+      proxyPillDot: document.getElementById("proxyPillDot"),
+      tokenPillDot: document.getElementById("tokenPillDot"),
+      llmPillDot: document.getElementById("llmPillDot")
+    };
+
+    const state = {
+      searchResults: [],
+      selectedId: "",
+      mode: "empty",
+      searchQuery: "",
+      searchComposedQuery: "",
+      searchPlans: [],
+      searchInsights: null,
+      targetArticle: null,
+      targetAnalysis: null,
+      proxyHealth: null,
+      llmBusy: false,
+      llmOutput: "",
+      llmError: "",
+      articleExpanded: false,
+      viewedArticleIds: [],
+      historyIndex: 0
+    };
+
+    function readState() {
+      try {
+        return JSON.parse(localStorage.getItem(LS_KEY) || "{}") || {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify({
+          query: ui.queryInput.value || "",
+          token: ui.tokenInput.value || "",
+          proxyBase: ui.proxyBaseInput.value || "",
+          project: ui.projectInput.value || "",
+          limit: ui.limitInput.value || "",
+          useProxy: ui.useProxyInput.checked,
+          articleRef: ui.articleRefInput.value || "",
+          llmBaseUrl: ui.llmBaseUrlInput.value || "",
+          llmApiKey: ui.llmApiKeyInput.value || "",
+          llmModel: ui.llmModelInput.value || ""
+        }));
+      } catch (_) {}
+    }
+
+    function restoreState() {
+      const saved = readState();
+      if (typeof saved.query === "string") ui.queryInput.value = saved.query;
+      if (typeof saved.token === "string") ui.tokenInput.value = saved.token;
+      if (typeof saved.proxyBase === "string" && saved.proxyBase.trim()) ui.proxyBaseInput.value = saved.proxyBase;
+      if (typeof saved.project === "string" && saved.project.trim()) ui.projectInput.value = saved.project;
+      if (typeof saved.limit === "string" && saved.limit.trim()) ui.limitInput.value = saved.limit;
+      if (typeof saved.useProxy === "boolean") ui.useProxyInput.checked = saved.useProxy;
+      if (typeof saved.articleRef === "string" && saved.articleRef.trim()) ui.articleRefInput.value = saved.articleRef;
+      if (typeof saved.llmBaseUrl === "string" && saved.llmBaseUrl.trim()) ui.llmBaseUrlInput.value = saved.llmBaseUrl;
+      if (typeof saved.llmApiKey === "string") ui.llmApiKeyInput.value = saved.llmApiKey;
+      if (typeof saved.llmModel === "string" && saved.llmModel.trim()) ui.llmModelInput.value = saved.llmModel;
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function normalizeToken(raw) {
+      const token = String(raw || "").trim();
+      if (!token) return "";
+      return /^bearer\s+/i.test(token) ? token : `Bearer ${token}`;
+    }
+
+    function normalizeProxyBase(raw) {
+      return String(raw || "").trim().replace(/\/+$/, "") || DEFAULT_PROXY;
+    }
+
+    function extractArticleId(input) {
+      const raw = String(input || "").trim();
+      if (!raw) return "";
+      const readableMatch = raw.match(/\b[A-Z][A-Z0-9_]*-A-\d+\b/i);
+      if (readableMatch) return readableMatch[0].toUpperCase();
+      return raw.toUpperCase();
+    }
+
+    function buildArticleUiUrl(idReadable) {
+      return `${YT_BASE}/articles/${encodeURIComponent(idReadable)}`;
+    }
+
+    function buildArticleApiUrl(idReadable, fields = ARTICLE_FIELDS) {
+      const params = new URLSearchParams();
+      params.set("fields", fields);
+      return `${YT_BASE}/api/articles/${encodeURIComponent(idReadable)}?${params.toString()}`;
+    }
+
+    function buildSearchApiUrl(query, top) {
+      const params = new URLSearchParams();
+      params.set("$top", String(top));
+      params.set("fields", SEARCH_FIELDS);
+      params.set("query", query);
+      return `${YT_BASE}/api/articles?${params.toString()}`;
+    }
+
+    function buildProxyUrl(targetUrl) {
+      const proxyBase = normalizeProxyBase(ui.proxyBaseInput.value);
+      const p = new URL(proxyBase);
+      if (!/\/proxy$/i.test(p.pathname)) p.pathname = p.pathname.replace(/\/+$/, "") + "/proxy";
+      p.searchParams.set("url", targetUrl);
+      return p.toString();
+    }
+
+    function buildProxyHealthUrl() {
+      const proxyBase = normalizeProxyBase(ui.proxyBaseInput.value);
+      const p = new URL(proxyBase);
+      if (/\/proxy$/i.test(p.pathname)) {
+        p.pathname = p.pathname.replace(/\/proxy$/i, "/health");
+      } else {
+        p.pathname = p.pathname.replace(/\/+$/, "") + "/health";
+      }
+      return p.toString();
+    }
+
+    async function requestJson(targetUrl, { method = "GET", headers = {}, body } = {}) {
+      const attempt = async url => {
+        const response = await fetch(url, {
+          method,
+          headers,
+          body,
+          cache: "no-store"
+        });
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(`HTTP ${response.status}${text ? `: ${text.slice(0, 220)}` : ""}`);
+        }
+        return response.json();
+      };
+
+      if (!ui.useProxyInput.checked) {
+        return attempt(targetUrl);
+      }
+
+      try {
+        const payload = await attempt(buildProxyUrl(targetUrl));
+        state.proxyHealth = true;
+        return payload;
+      } catch (proxyError) {
+        state.proxyHealth = false;
+        try {
+          return await attempt(targetUrl);
+        } catch (directError) {
+          throw new Error(`Proxy failed: ${proxyError?.message || proxyError}. Direct failed: ${directError?.message || directError}`);
+        }
+      }
+    }
+
+    async function fetchJson(targetUrl, headers = {}) {
+      return requestJson(targetUrl, { method: "GET", headers });
+    }
+
+    function formatDate(ms) {
+      const num = Number(ms);
+      if (!Number.isFinite(num)) return "—";
+      try {
+        return new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short" }).format(new Date(num));
+      } catch (_) {
+        return new Date(num).toISOString();
+      }
+    }
+
+    function decodeMarkdownEscapes(text) {
+      return String(text || "")
+        .replace(/\\-/g, "-")
+        .replace(/\\\|/g, "|")
+        .replace(/\\\[/g, "[")
+        .replace(/\\\]/g, "]")
+        .replace(/\\\(/g, "(")
+        .replace(/\\\)/g, ")");
+    }
+
+    function normalizeArticleText(markdown) {
+      return decodeMarkdownEscapes(String(markdown || ""))
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, " $1 ")
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, " $1 ")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/^\s*\|/gm, "")
+        .replace(/\|\s*$/gm, "")
+        .replace(/\|/g, " | ")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/[ \t]{2,}/g, " ")
+        .trim();
+    }
+
+    function collectQueryTerms(query) {
+      return Array.from(new Set(
+        String(query || "")
+          .split(/\s+/)
+          .map(term => term.trim().replace(/^["'`(]+|["'`),.:;!?]+$/g, ""))
+          .filter(term => term && term.length > 1 && !/^project:$/i.test(term))
+      ));
+    }
+
+    function normalizeKeyword(term) {
+      const value = String(term || "").toLowerCase().replace(/ё/g, "е").trim();
+      if (!value) return "";
+      const english = {
+        migration: "миграция",
+        regress: "регресс",
+        regression: "регресс",
+        test: "тестирование",
+        testing: "тестирование",
+        owner: "ответственный",
+        duty: "дежурный",
+        lead: "лид",
+        article: "статья",
+        wiki: "вики",
+        summary: "сводка",
+        signal: "сигнал",
+        signals: "сигналы",
+        rollback: "rollback",
+        proxy: "proxy"
+      };
+      const mapped = english[value] || value;
+      if (mapped.length <= 5) return mapped;
+      return mapped
+        .replace(/(иями|ями|ами|ией|ий|ия|ие|ии|ию|ью|ого|ому|ыми|ыми|ый|ой|ая|ое|ые|ам|ям|ах|ях|ов|ев|ом|ем|ую|юю|а|я|ы|и|е|о|у|ю)$/i, "")
+        .trim() || mapped;
+    }
+
+    function getMeaningfulTerms(query) {
+      const original = collectQueryTerms(query)
+        .map(term => String(term || "").trim())
+        .filter(Boolean);
+      const normalized = [];
+      for (const term of original) {
+        const lower = term.toLowerCase().replace(/ё/g, "е");
+        if (QUERY_STOPWORDS.has(lower)) continue;
+        normalized.push({ raw: term, key: normalizeKeyword(term) || lower });
+      }
+      const deduped = [];
+      const seen = new Set();
+      for (const term of normalized) {
+        const key = term.key || term.raw.toLowerCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(term);
+      }
+      return deduped;
+    }
+
+    function buildSearchPlans(rawQuery, project, targetAnalysis) {
+      const plans = [];
+      const seen = new Set();
+      const meaningful = getMeaningfulTerms(rawQuery);
+      const queryText = String(rawQuery || "").trim();
+      const addPlan = (text, weight, reason) => {
+        const trimmed = String(text || "").trim();
+        if (!trimmed) return;
+        const scoped = composeSearchQuery(project, trimmed);
+        const key = scoped.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        plans.push({ query: scoped, baseQuery: trimmed, weight, reason });
+      };
+
+      addPlan(queryText, 32, "exact");
+
+      const normalizedPhrase = meaningful.map(term => term.raw).join(" ").trim();
+      if (normalizedPhrase && normalizedPhrase.toLowerCase() !== queryText.toLowerCase()) {
+        addPlan(normalizedPhrase, 26, "meaningful terms");
+      }
+
+      const conceptPhrases = [];
+      const lowerRaw = queryText.toLowerCase();
+      for (const expansion of SEARCH_EXPANSIONS) {
+        if (expansion.test.test(lowerRaw) || meaningful.some(term => expansion.test.test(term.key) || expansion.test.test(term.raw.toLowerCase()))) {
+          conceptPhrases.push(...expansion.phrases);
+        }
+      }
+      for (const phrase of conceptPhrases.slice(0, 8)) {
+        addPlan(phrase, 20, "concept expansion");
+      }
+
+      for (const term of meaningful.slice(0, 4)) {
+        addPlan(term.raw, 14, "single term");
+        if (term.key && term.key !== term.raw.toLowerCase()) {
+          addPlan(term.key, 12, "term stem");
+        }
+      }
+
+      const targetTerms = (targetAnalysis?.terms || []).filter(Boolean);
+      if (queryText && queryText.split(/\s+/).length <= 2) {
+        for (const term of targetTerms.slice(0, 3)) {
+          addPlan(`${queryText} ${term}`, 12, "target-assisted");
+        }
+      }
+
+      if (!plans.length && project) addPlan(`project: ${project}`, 6, "project fallback");
+      return plans.slice(0, 8);
+    }
+
+    function escapeRegex(text) {
+      return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function highlightText(text, terms) {
+      const safe = escapeHtml(text);
+      if (!terms.length) return safe;
+      const pattern = new RegExp(`(${terms.map(escapeRegex).join("|")})`, "gi");
+      return safe.replace(pattern, "<span class=\"hl\">$1</span>");
+    }
+
+    function collectUnique(values, limit) {
+      const out = [];
+      const seen = new Set();
+      for (const value of values) {
+        const text = normalizeArticleText(value);
+        if (!text) continue;
+        const key = text.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(text);
+        if (limit && out.length >= limit) break;
+      }
+      return out;
+    }
+
+    function summarizeArticle(markdown, maxLen = 260) {
+      const text = normalizeArticleText(markdown).replace(/\s+/g, " ").trim();
+      if (!text) return "Тело статьи пока не загружено.";
+      if (text.length <= maxLen) return text;
+      return `${text.slice(0, maxLen).trim()}…`;
+    }
+
+    function toSentence(text, maxLen = 170) {
+      const normalized = normalizeArticleText(text).replace(/\s+/g, " ").trim();
+      if (!normalized) return "";
+      return normalized.length > maxLen ? `${normalized.slice(0, maxLen).trim()}…` : normalized;
+    }
+
+    function getSectionText(section, separator = "\n") {
+      const lines = section?.lines;
+      if (Array.isArray(lines)) return lines.join(separator);
+      if (typeof lines === "string") return lines;
+      return "";
+    }
+
+    function extractChecklistSteps(article, query, limit = 5) {
+      const sections = article?.__analysis?.sections || [];
+      const q = String(query || "").toLowerCase();
+      const weighted = [];
+      const sectionWeight = section => {
+        const title = String(section?.title || "").toLowerCase();
+        let score = 0;
+        if (/чек|check|step|шаг|план|plan/.test(title)) score += 4;
+        if (/мигра|регресс|release|rollback|owner|дежур|testplan|proxy|api/.test(title)) score += 3;
+        if (q && title.includes(q)) score += 2;
+        return score;
+      };
+      for (const section of sections) {
+        const lines = decodeMarkdownEscapes(getSectionText(section, "\n")).split(/\r?\n/);
+        for (const line of lines) {
+          const raw = String(line || "").trim();
+          if (!raw) continue;
+          const clean = toSentence(raw.replace(/^[-*•]\s+/, "").replace(/^\d+[.)]\s+/, ""), 170);
+          if (!clean) continue;
+          const actionable = /^[-*•]\s+/.test(raw) || /^\d+[.)]\s+/.test(raw) || /(проверь|открой|сверь|убедись|запусти|настрой|посмотри|ознаком|собери|найди|уточни)/i.test(clean);
+          if (!actionable) continue;
+          weighted.push({ text: clean, score: sectionWeight(section) });
+        }
+      }
+      return weighted
+        .sort((a, b) => b.score - a.score)
+        .map(item => item.text)
+        .filter(Boolean)
+        .filter((item, index, arr) => arr.findIndex(other => other.toLowerCase() === item.toLowerCase()) === index)
+        .slice(0, limit);
+    }
+
+    function buildDirectAnswer(top, query) {
+      const lead = top[0];
+      if (!lead) {
+        return "По выдаче пока нельзя собрать уверенный ответ. Сузь запрос или проверь scope.";
+      }
+      const q = String(query || "").toLowerCase();
+      const firstSection = lead.__analysis?.sections?.find(section => !/^overview$/i.test(section.title)) || lead.__analysis?.sections?.[0];
+      const extraSignals = collectUnique([
+        ...(lead.__analysis?.plans || []),
+        ...(lead.__analysis?.owners || [])
+      ], 3);
+      let answer = `Лучший старт сейчас — статья ${lead.idReadable}: ${lead.title}.`;
+      if (firstSection?.title) {
+        answer += ` Открой секцию "${firstSection.title}", там лежит ближайший к запросу рабочий контекст.`;
+      }
+      if (/мигра/.test(q)) {
+        answer += " Для миграции сначала проверь основной процесс, затем чек-лист проверок, после этого артефакты и ответственных.";
+      } else if (/регресс/.test(q)) {
+        answer += " Для регресса сначала нужен основной сценарий прогона, потом соседние статьи с чек-листами и ограничениями.";
+      } else if (/proxy|403|502|ошиб/.test(q)) {
+        answer += " Для proxy-проблем сначала сверяй конкретную ошибку, затем смежные статьи с API и инфраструктурными ссылками.";
+      } else {
+        answer += " Начни с процессной статьи, затем сравни ее с соседними материалами из top hits.";
+      }
+      if (extraSignals.length) {
+        answer += ` Отдельно проверь: ${extraSignals.join(", ")}.`;
+      }
+      return answer.trim();
+    }
+
+    function buildSearchNarrative(top, query) {
+      const directAnswer = buildDirectAnswer(top, query);
+      const checklist = collectUnique(top.flatMap(item => extractChecklistSteps(item, query, 3)), 5);
+      const openFirst = top.slice(0, 3).map(item => ({
+        idReadable: item.idReadable,
+        title: item.title,
+        reason: item.__analysis?.sections?.find(section => !/^overview$/i.test(section.title))?.title || item.sectionLabel
+      }));
+      const evidence = collectUnique(top.flatMap(item => item.__analysis?.sections?.slice(0, 2).map(section => `${item.idReadable}: ${section.title}`) || []), 4);
+      return {
+        directAnswer,
+        checklist,
+        openFirst,
+        evidence
+      };
+    }
+
+    function formatAnswerHtml(text) {
+      const value = String(text || "").trim();
+      if (!value) return "<p>Ответ пока пустой.</p>";
+      const blocks = value.split(/\n{2,}/).map(block => block.trim()).filter(Boolean);
+      return blocks.map(block => {
+        const lines = block.split(/\n/).map(line => line.trim()).filter(Boolean);
+        const looksLikeList = lines.length > 1 && lines.every(line => /^[-*•]|\d+[.)]/.test(line));
+        if (looksLikeList) {
+          return `<ul class="summary-list">${lines.map(line => `<li>${escapeHtml(line.replace(/^[-*•]\s+/, "").replace(/^\d+[.)]\s+/, ""))}</li>`).join("")}</ul>`;
+        }
+        return `<p>${escapeHtml(block).replace(/\n/g, "<br>")}</p>`;
+      }).join("");
+    }
+
+    function highlightSection(target) {
+      const node = target?.classList?.contains("focus-target") ? target : target?.closest?.(".focus-target");
+      if (!node) return;
+      node.classList.add("is-focused");
+      clearTimeout(node.__focusTimer);
+      node.__focusTimer = window.setTimeout(() => node.classList.remove("is-focused"), 1200);
+    }
+
+    function scrollSectionIntoView(target) {
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+      highlightSection(target);
+    }
+
+    function scrollArticleTo(sectionId) {
+      const section = document.getElementById(sectionId);
+      if (!section || !ui.articleScroller) return;
+      const top = Math.max(0, section.offsetTop - 14);
+      ui.articleScroller.scrollTo({ top, behavior: "smooth" });
+      highlightSection(section);
+    }
+
+    function setActiveRail(key) {
+      ui.railButtons.forEach(button => {
+        button.classList.toggle("active", button.dataset.rail === key);
+      });
+    }
+
+    function rememberViewedArticle(id) {
+      const readable = String(id || "").trim();
+      if (!readable) return;
+      state.viewedArticleIds = [readable, ...state.viewedArticleIds.filter(item => item !== readable)].slice(0, 12);
+      state.historyIndex = 0;
+    }
+
+    function estimateConfidence(item, query) {
+      const terms = collectUnique([
+        ...collectQueryTerms(query),
+        ...(item?.__searchTerms || [])
+      ], 12);
+      if (!terms.length) return 64;
+      const content = normalizeArticleText(`${item?.summary || ""}\n${item?.content || ""}`).toLowerCase();
+      const title = String(item?.summary || "").toLowerCase();
+      let total = 46;
+      let contentHits = 0;
+      let titleHits = 0;
+      for (const term of terms) {
+        const needle = term.toLowerCase();
+        if (content.includes(needle)) contentHits += 1;
+        if (title.includes(needle)) titleHits += 1;
+      }
+      total += Math.round((contentHits / terms.length) * 26);
+      total += Math.round((titleHits / terms.length) * 18);
+      total += Number(item?.__queryWeight || 0);
+      return Math.max(38, Math.min(98, total));
+    }
+
+    function extractSnippet(markdown, query) {
+      const normalized = normalizeArticleText(markdown);
+      if (!normalized) return "Совпадение найдено, но тело статьи пустое.";
+      const lower = normalized.toLowerCase();
+      const terms = collectQueryTerms(query);
+      let index = -1;
+      let matchedTerm = "";
+      for (const term of terms) {
+        const found = lower.indexOf(term.toLowerCase());
+        if (found !== -1 && (index === -1 || found < index)) {
+          index = found;
+          matchedTerm = term;
+        }
+      }
+      if (index === -1) {
+        const fallback = normalized.slice(0, 220);
+        return highlightText(fallback + (normalized.length > 220 ? "…" : ""), terms);
+      }
+      const radius = matchedTerm.length > 24 ? 80 : 120;
+      const start = Math.max(0, index - radius);
+      const end = Math.min(normalized.length, index + matchedTerm.length + radius);
+      const snippet = `${start > 0 ? "…" : ""}${normalized.slice(start, end)}${end < normalized.length ? "…" : ""}`;
+      return highlightText(snippet, terms);
+    }
+
+    function extractArticleSections(markdown) {
+      const lines = decodeMarkdownEscapes(String(markdown || "")).split(/\r?\n/);
+      const sections = [];
+      let current = { title: "Overview", lines: [] };
+      const flush = () => {
+        const hasContent = current.lines.some(line => String(line || "").trim());
+        if (hasContent) sections.push({ title: current.title, lines: current.lines.slice() });
+      };
+      for (const line of lines) {
+        const headingMatch = line.match(/^(#{1,6})\s+(.+?)\s*$/);
+        if (headingMatch) {
+          flush();
+          current = { title: normalizeArticleText(headingMatch[2]) || "Section", lines: [] };
+          continue;
+        }
+        current.lines.push(line);
+      }
+      flush();
+      return sections.length ? sections : [{ title: "Overview", lines: lines.filter(Boolean) }];
+    }
+
+    function analyzeArticleContent(article) {
+      const content = String(article?.content || "");
+      const text = normalizeArticleText(content);
+      const sections = extractArticleSections(content);
+      const plans = Array.from(new Set(Array.from(content.matchAll(/testplan\/(\d+)/gi)).map(match => `testplan/${match[1]}`)));
+      const links = Array.from(content.matchAll(/https?:\/\/[^\s)]+/gi)).map(match => match[0]);
+      const owners = collectUnique(Array.from(text.matchAll(/\b(?:owner|ответствен|лид|дежурн(?:ый|ая)?)[:\s-]+([A-ZА-ЯЁ][A-Za-zА-Яа-яЁё.\- ]{2,})/g)).map(match => match[1]), 6);
+      const terms = collectUnique([
+        ...(Array.isArray(article?.tags) ? article.tags.map(tag => tag?.name) : []),
+        ...plans,
+        ...owners,
+        ...sections.map(section => section.title)
+      ], 10);
+      return {
+        plans,
+        links: collectUnique(links, 8),
+        owners,
+        sections,
+        terms
+      };
+    }
+
+    function enrichResults(items, query) {
+      return (Array.isArray(items) ? items : []).map(item => {
+        const analysis = analyzeArticleContent(item);
+        const matchTerms = collectUnique([
+          ...(item?.__searchTerms || []),
+          ...collectQueryTerms(query)
+        ], 12);
+        return {
+          ...item,
+          title: item.summary || item.idReadable || "Без заголовка",
+          author: item?.updatedBy?.fullName || item?.updatedBy?.name || item?.updatedBy?.login || "—",
+          updatedLabel: formatDate(item.updated || item.created),
+          score: estimateConfidence(item, query),
+          snippetHtml: extractSnippet(item.content, query),
+          overview: summarizeArticle(item.content, 340),
+          sectionLabel: `${item.project?.shortName || "Wiki"} / ${analysis.sections.slice(0, 2).map(section => section.title).join(" / ") || "Article"}`,
+          tagsView: collectUnique([...(Array.isArray(item.tags) ? item.tags.map(tag => tag?.name) : []), ...analysis.plans], 4),
+          __analysis: analysis,
+          __matchTerms: matchTerms
+        };
+      }).sort((a, b) => {
+        if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+        return Number(b.updated || 0) - Number(a.updated || 0);
+      });
+    }
+
+    function mergeSearchBuckets(buckets, rawQuery) {
+      const merged = new Map();
+      for (const bucket of buckets) {
+        for (const item of bucket.items || []) {
+          const key = item?.idReadable || item?.id || "";
+          if (!key) continue;
+          const previous = merged.get(key);
+          const terms = collectUnique([
+            ...(previous?.__searchTerms || []),
+            ...collectQueryTerms(bucket.baseQuery || ""),
+            ...collectQueryTerms(rawQuery || "")
+          ], 12);
+          if (!previous) {
+            merged.set(key, {
+              ...item,
+              __queryWeight: bucket.weight || 0,
+              __searchTerms: terms,
+              __searchReasons: [bucket.reason]
+            });
+            continue;
+          }
+          previous.__queryWeight = Math.max(Number(previous.__queryWeight || 0), Number(bucket.weight || 0));
+          previous.__searchTerms = collectUnique([...(previous.__searchTerms || []), ...terms], 12);
+          previous.__searchReasons = collectUnique([...(previous.__searchReasons || []), bucket.reason], 6);
+        }
+      }
+      return Array.from(merged.values());
+    }
+
+    function buildSearchInsights(items, query) {
+      const top = items.slice(0, 3);
+      const narrative = buildSearchNarrative(top, query);
+      const entities = collectUnique([
+        ...collectQueryTerms(query),
+        ...top.flatMap(item => item.tagsView || []),
+        ...top.flatMap(item => item.__analysis?.owners || []),
+        ...top.flatMap(item => item.__analysis?.plans || []),
+        ...top.flatMap(item => item.__analysis?.sections.slice(0, 2).map(section => section.title) || [])
+      ], 12);
+      const actions = collectUnique([
+        top[0] ? `Начни со статьи ${top[0].idReadable}: ${top[0].title}.` : "",
+        top[0]?.__analysis?.sections[0] ? `Сначала проверь секцию "${top[0].__analysis.sections[0].title}".` : "",
+        top[1] ? `Следом открой ${top[1].idReadable}, чтобы проверить соседний контекст.` : "",
+        top.some(item => item.__analysis?.plans?.length) ? `Проверь артефакты: ${collectUnique(top.flatMap(item => item.__analysis?.plans || []), 3).join(", ")}.` : "",
+        top.some(item => item.__analysis?.owners?.length) ? `Сверь ответственных: ${collectUnique(top.flatMap(item => item.__analysis?.owners || []), 4).join(", ")}.` : ""
+      ].filter(Boolean), 5);
+      const summary = top.length
+        ? narrative.directAnswer
+        : "Поиск пока не дал статей, из которых можно собрать общий ответ.";
+      return { top, entities, actions, summary, narrative };
+    }
+
+    function composeSearchQuery(project, rawQuery) {
+      const query = String(rawQuery || "").trim();
+      const scope = String(project || "").trim();
+      if (!scope) return query;
+      if (!query) return `project: ${scope}`;
+      if (/\bproject\s*:/i.test(query)) return query;
+      return `project: ${scope} ${query}`;
+    }
+
+    function getSelected() {
+      return state.searchResults.find(item => item.idReadable === state.selectedId) || state.targetArticle || null;
+    }
+
+    function getSelectedAnalysis() {
+      const selected = getSelected();
+      if (!selected) return state.targetAnalysis;
+      return selected.__analysis || state.targetAnalysis || analyzeArticleContent(selected);
+    }
+
+    function setDot(node, kind) {
+      if (!node) return;
+      const palette = {
+        good: "var(--good)",
+        warn: "var(--warn)",
+        bad: "var(--bad)",
+        muted: "#c8d0db"
+      };
+      node.style.background = palette[kind] || palette.muted;
+    }
+
+    function renderStatusPills() {
+      const hasToken = Boolean(ui.tokenInput.value.trim());
+      ui.tokenPillText.textContent = hasToken ? "YouTrack token set" : "YouTrack token missing";
+      setDot(ui.tokenPillDot, hasToken ? "good" : "bad");
+
+      const proxyState = state.proxyHealth === true ? "Proxy healthy" : state.proxyHealth === false ? "Proxy error" : "Proxy unknown";
+      ui.proxyPillText.textContent = proxyState;
+      setDot(ui.proxyPillDot, state.proxyHealth === true ? "good" : state.proxyHealth === false ? "bad" : "warn");
+
+      const llmReady = Boolean(ui.llmApiKeyInput.value.trim() && ui.llmModelInput.value.trim());
+      ui.llmPillText.textContent = llmReady ? "LLM ready" : "LLM optional";
+      setDot(ui.llmPillDot, llmReady ? "good" : "warn");
+    }
+
+    function renderSearchChips() {
+      ui.projectChip.textContent = `project: ${String(ui.projectInput.value || "").trim() || "all"}`;
+      ui.limitChip.textContent = `limit: ${Math.max(1, Math.min(50, Number(ui.limitInput.value) || 15))}`;
+      const tagValues = state.searchInsights?.entities?.slice(0, 2) || state.targetAnalysis?.terms?.slice(0, 2) || [];
+      ui.tagChip.textContent = tagValues.length ? `tag: ${tagValues.join(" · ")}` : "tag: auto";
+    }
+
+    function renderResults() {
+      const selected = getSelected();
+      ui.resultsCountBadge.textContent = `${state.searchResults.length} ${state.searchResults.length === 1 ? "hit" : "hits"}`;
+      if (!state.searchResults.length) {
+        const tried = (state.searchPlans || []).slice(0, 4).map(plan => plan.query);
+        const extra = tried.length
+          ? `<div class="note" style="margin-top:12px"><div class="meta-label" style="margin-bottom:8px">Пробовал запросы</div>${tried.map(query => `<div>${escapeHtml(query)}</div>`).join("")}</div>`
+          : "";
+        const error = state.llmError ? `<div class="note" style="margin-top:12px">${escapeHtml(state.llmError)}</div>` : "";
+        ui.resultsList.innerHTML = `<div class="note">${escapeHtml(state.searchQuery ? "Поиск еще не дал статей. Проверь token, proxy, project scope или сократи query." : "Выполни поиск, чтобы увидеть реальные статьи YouTrack wiki.")}</div>${extra}${error}`;
+        return;
+      }
+      ui.resultsList.innerHTML = state.searchResults.map(item => `
+        <button class="result ${selected?.idReadable === item.idReadable ? "active" : ""}" data-result-id="${escapeHtml(item.idReadable || "")}">
+          <div class="result-top">
+            <div>
+              <div class="result-title">${escapeHtml(item.title)}</div>
+              <div class="result-meta">${escapeHtml(item.sectionLabel)}</div>
+            </div>
+            <div class="score">${item.score}% match</div>
+          </div>
+          <p class="result-snippet">${item.snippetHtml}</p>
+          <div class="result-bottom">
+            <div class="tags">
+              ${(item.tagsView || []).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
+              ${(item.__searchReasons || []).slice(0, 1).map(reason => `<span class="tag">${escapeHtml(reason)}</span>`).join("")}
+            </div>
+            <div class="result-meta">${escapeHtml(item.author)} · ${escapeHtml(item.updatedLabel)}</div>
+          </div>
+        </button>
+      `).join("");
+      ui.resultsList.querySelectorAll("[data-result-id]").forEach(button => {
+        button.addEventListener("click", () => selectResult(button.getAttribute("data-result-id") || ""));
+      });
+    }
+
+    function buildSectionCards(item) {
+      const sections = item?.__analysis?.sections || [];
+      const picked = sections.filter(section => !/^overview$/i.test(section.title)).slice(0, 3);
+      const source = picked.length ? picked : sections.slice(0, 3);
+      return source.map((section, index) => `
+        <div class="mini-card">
+          <h4>${escapeHtml(`${index + 1}. ${section.title}`)}</h4>
+          <p>${escapeHtml(summarizeArticle(getSectionText(section, "\n"), 110))}</p>
+        </div>
+      `).join("") || `
+        <div class="mini-card"><h4>1. Overview</h4><p>Секция еще не выделилась автоматически.</p></div>
+      `;
+    }
+
+    function buildMatchedSnippets(item, query) {
+      const sections = item?.__analysis?.sections || [];
+      const terms = collectQueryTerms(query);
+      const textCandidates = [];
+      for (const section of sections) {
+        const text = normalizeArticleText(getSectionText(section, "\n"));
+        if (!text) continue;
+        if (!terms.length || terms.some(term => text.toLowerCase().includes(term.toLowerCase()))) {
+          textCandidates.push(text);
+        }
+      }
+      const picked = (textCandidates.length ? textCandidates : [normalizeArticleText(item?.content || "")])
+        .filter(Boolean)
+        .slice(0, 3);
+      return picked.map(text => `<div class="snippet">${highlightText(text.slice(0, 240) + (text.length > 240 ? "…" : ""), terms)}</div>`).join("") || '<div class="note">Подходящие сниппеты не выделились.</div>';
+    }
+
+    function buildArticleOverview(item, query) {
+      const sections = item?.__analysis?.sections || [];
+      const leadSection = sections.find(section => !/^overview$/i.test(section.title)) || sections[0];
+      const leadText = leadSection ? toSentence(getSectionText(leadSection, " "), 220) : "";
+      const summary = summarizeArticle(item?.content || "", 220);
+      const checks = collectUnique([
+        ...(item?.__analysis?.plans || []),
+        ...(item?.__analysis?.owners || []),
+        leadSection?.title ? `Секция: ${leadSection.title}` : ""
+      ], 3);
+      const intro = /мигра/i.test(String(query || "")) && leadText
+        ? `По миграции эта статья полезна прежде всего секцией "${leadSection.title}". ${leadText}`
+        : leadText || summary;
+      return `${intro}${checks.length ? ` Что еще проверить: ${checks.join(", ")}.` : ""}`.trim();
+    }
+
+    function splitMarkdownTableRow(line) {
+      const raw = String(line || "").trim().replace(/^\|/, "").replace(/\|$/, "");
+      return raw.split("|").map(cell => cell.trim());
+    }
+
+    function isMarkdownTableDelimiter(line) {
+      return /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(String(line || ""));
+    }
+
+    function sanitizeUrl(url) {
+      const value = String(url || "").trim();
+      if (!value) return "#";
+      if (/^(https?:|mailto:|#|\/)/i.test(value)) return value;
+      return "#";
+    }
+
+    function renderInlineMarkdown(text) {
+      let html = escapeHtml(String(text || ""));
+      html = html.replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+      html = html.replace(/`([^`]+)`/g, (_, code) => `<code>${code}</code>`);
+      html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "");
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => `<a href="${escapeHtml(sanitizeUrl(href))}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+      html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      html = html.replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s),.])/g, "$1<em>$2</em>");
+      return html;
+    }
+
+    function sanitizeRenderedHtml(html) {
+      const allowedTags = new Set(["A","P","BR","UL","OL","LI","STRONG","EM","CODE","PRE","TABLE","THEAD","TBODY","TR","TH","TD","H1","H2","H3","H4","BLOCKQUOTE","DIV"]);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+      const root = doc.body.firstElementChild;
+      const walk = node => {
+        if (node.nodeType === Node.TEXT_NODE) return;
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+          node.remove();
+          return;
+        }
+        if (!allowedTags.has(node.tagName)) {
+          const parent = node.parentNode;
+          while (node.firstChild) parent.insertBefore(node.firstChild, node);
+          node.remove();
+          return;
+        }
+        const attrs = Array.from(node.attributes || []);
+        for (const attr of attrs) {
+          const name = attr.name.toLowerCase();
+          if (node.tagName === "A" && ["href","target","rel"].includes(name)) continue;
+          if (node.tagName === "DIV" && name === "class" && node.classList.contains("table-wrap")) continue;
+          node.removeAttribute(attr.name);
+        }
+        if (node.tagName === "A") {
+          node.setAttribute("href", sanitizeUrl(node.getAttribute("href")));
+          node.setAttribute("target", "_blank");
+          node.setAttribute("rel", "noopener noreferrer");
+        }
+        Array.from(node.childNodes).forEach(walk);
+      };
+      Array.from(root.childNodes).forEach(walk);
+      return root.innerHTML;
+    }
+
+    function renderArticleBody(markdown) {
+      const raw = decodeMarkdownEscapes(String(markdown || "")).replace(/\r/g, "").trim();
+      if (!raw) return "<p>Тело статьи пустое.</p>";
+
+      const lines = raw.split("\n");
+      const blocks = [];
+      let i = 0;
+
+      const collectParagraph = start => {
+        const chunk = [];
+        let cursor = start;
+        while (cursor < lines.length) {
+          const line = lines[cursor];
+          const trimmed = line.trim();
+          if (!trimmed) break;
+          if (/^#{1,6}\s+/.test(trimmed)) break;
+          if (/^\s*[-*]\s+/.test(trimmed) || /^\s*\d+[.)]\s+/.test(trimmed)) break;
+          if (trimmed.includes("|") && cursor + 1 < lines.length && isMarkdownTableDelimiter(lines[cursor + 1])) break;
+          if (/^```/.test(trimmed)) break;
+          if (/^>\s?/.test(trimmed)) break;
+          chunk.push(trimmed);
+          cursor += 1;
+        }
+        return { html: `<p>${chunk.map(renderInlineMarkdown).join("<br>")}</p>`, next: cursor };
+      };
+
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (!trimmed) {
+          i += 1;
+          continue;
+        }
+
+        if (/^```/.test(trimmed)) {
+          const codeLines = [];
+          i += 1;
+          while (i < lines.length && !/^```/.test(lines[i].trim())) {
+            codeLines.push(lines[i]);
+            i += 1;
+          }
+          if (i < lines.length) i += 1;
+          blocks.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+          continue;
+        }
+
+        const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+        if (headingMatch) {
+          const level = Math.min(4, headingMatch[1].length);
+          blocks.push(`<h${level}>${renderInlineMarkdown(headingMatch[2])}</h${level}>`);
+          i += 1;
+          continue;
+        }
+
+        if (/^>\s?/.test(trimmed)) {
+          const quoteLines = [];
+          while (i < lines.length && /^>\s?/.test(lines[i].trim())) {
+            quoteLines.push(lines[i].trim().replace(/^>\s?/, ""));
+            i += 1;
+          }
+          blocks.push(`<blockquote>${quoteLines.map(renderInlineMarkdown).join("<br>")}</blockquote>`);
+          continue;
+        }
+
+        if (trimmed.includes("|") && i + 1 < lines.length && isMarkdownTableDelimiter(lines[i + 1])) {
+          const header = splitMarkdownTableRow(trimmed);
+          i += 2;
+          const bodyRows = [];
+          while (i < lines.length) {
+            const rowLine = lines[i].trim();
+            if (!rowLine || !rowLine.includes("|")) break;
+            bodyRows.push(splitMarkdownTableRow(rowLine));
+            i += 1;
+          }
+          const columns = header.length;
+          const thead = `<thead><tr>${header.map(cell => `<th>${renderInlineMarkdown(cell)}</th>`).join("")}</tr></thead>`;
+          const tbody = `<tbody>${bodyRows.map(row => {
+            const cells = Array.from({ length: columns }, (_, index) => row[index] || "");
+            return `<tr>${cells.map(cell => `<td>${renderInlineMarkdown(cell)}</td>`).join("")}</tr>`;
+          }).join("")}</tbody>`;
+          blocks.push(`<div class="table-wrap"><table>${thead}${tbody}</table></div>`);
+          continue;
+        }
+
+        if (/^\s*[-*]\s+/.test(trimmed) || /^\s*\d+[.)]\s+/.test(trimmed)) {
+          const ordered = /^\s*\d+[.)]\s+/.test(trimmed);
+          const items = [];
+          while (i < lines.length) {
+            const current = lines[i].trim();
+            const isMatch = ordered ? /^\s*\d+[.)]\s+/.test(current) : /^\s*[-*]\s+/.test(current);
+            if (!isMatch) break;
+            items.push(current.replace(/^\s*[-*]\s+/, "").replace(/^\s*\d+[.)]\s+/, ""));
+            i += 1;
+          }
+          const tag = ordered ? "ol" : "ul";
+          blocks.push(`<${tag}>${items.map(item => `<li>${renderInlineMarkdown(item)}</li>`).join("")}</${tag}>`);
+          continue;
+        }
+
+        const paragraph = collectParagraph(i);
+        blocks.push(paragraph.html);
+        i = paragraph.next;
+      }
+
+      return sanitizeRenderedHtml(blocks.join(""));
+    }
+
+    function renderArticleExpandedState(item) {
+      const isOpen = Boolean(state.articleExpanded && item);
+      ui.articleFullSection.hidden = !isOpen;
+      ui.toggleArticleBtn.textContent = isOpen ? "Скрыть статью" : "Показать статью";
+      if (isOpen) {
+        ui.articleFullContent.innerHTML = renderArticleBody(item?.content || "");
+      } else {
+        ui.articleFullContent.innerHTML = "";
+      }
+    }
+
+    function buildSearchInsightsSafe(items, query) {
+      try {
+        return buildSearchInsights(items, query);
+      } catch (error) {
+        return {
+          top: items.slice(0, 3),
+          entities: collectUnique([
+            ...collectQueryTerms(query),
+            ...items.slice(0, 3).flatMap(item => item.tagsView || [])
+          ], 10),
+          actions: [
+            items[0] ? `Начни со статьи ${items[0].idReadable}: ${items[0].title}.` : "Открой верхнюю статью из выдачи.",
+            "Сверь секции, артефакты и ответственных вручную.",
+            "Если нужно, запусти LLM summary."
+          ],
+          summary: items[0]
+            ? `Лучший старт сейчас — ${items[0].idReadable}: ${items[0].title}.`
+            : "Поиск пока не дал статей, из которых можно собрать общий ответ.",
+          narrative: {
+            directAnswer: items[0]
+              ? `Лучший старт сейчас — статья ${items[0].idReadable}: ${items[0].title}.`
+              : "По выдаче пока нельзя собрать уверенный ответ.",
+            checklist: [],
+            openFirst: items.slice(0, 3).map(item => ({
+              idReadable: item.idReadable,
+              title: item.title,
+              reason: item.sectionLabel || "Article"
+            })),
+            evidence: []
+          },
+          error: String(error?.message || error)
+        };
+      }
+    }
+
+    function renderArticle() {
+      const selected = getSelected();
+      if (!selected) {
+        ui.articleTitle.textContent = "Выбери статью из результатов";
+        ui.articleMeta.textContent = "Search / Inspect / Summarize";
+        ui.articleOverview.textContent = "После реального поиска здесь откроется выбранная статья YouTrack wiki, а не статический демо-текст.";
+        ui.flowCards.innerHTML = `<div class="mini-card"><h4>1. Search</h4><p>Выполни поиск по wiki.</p></div>`;
+        ui.matchedSnippets.innerHTML = `<div class="note">Сниппеты появятся после поиска.</div>`;
+        ui.articleNav.innerHTML = `
+          <button class="mini-chip" data-article-target="articleOverviewSection">Обзор</button>
+          <button class="mini-chip" data-article-target="articleSectionsSection">Секции</button>
+          <button class="mini-chip" data-article-target="articleSnippetsSection">Сниппеты</button>
+          <button class="mini-chip" data-article-target="articleMetaSection">Метаданные</button>
+          <button class="mini-chip" data-article-target="articleFullSection">Статья</button>
+        `;
+        ui.metaId.textContent = "—";
+        ui.metaSource.textContent = "YouTrack wiki";
+        ui.metaOwner.textContent = "—";
+        ui.metaScore.textContent = "—";
+        ui.originalBtn.onclick = () => {};
+        state.articleExpanded = false;
+        renderArticleExpandedState(null);
+        bindArticleNav();
+        return;
+      }
+
+      ui.articleTitle.textContent = `${selected.idReadable} · ${selected.title}`;
+      ui.articleMeta.textContent = `${selected.sectionLabel} · ${selected.author} · ${selected.updatedLabel}`;
+      ui.articleOverview.textContent = buildArticleOverview(selected, state.searchQuery || state.searchComposedQuery);
+      ui.flowCards.innerHTML = buildSectionCards(selected);
+      ui.matchedSnippets.innerHTML = buildMatchedSnippets(selected, state.searchQuery);
+      ui.articleNav.innerHTML = `
+        <button class="mini-chip" data-article-target="articleOverviewSection">Обзор</button>
+        <button class="mini-chip" data-article-target="articleSectionsSection">Секции</button>
+        <button class="mini-chip" data-article-target="articleSnippetsSection">Сниппеты</button>
+        <button class="mini-chip" data-article-target="articleMetaSection">Метаданные</button>
+        <button class="mini-chip" data-article-target="articleFullSection">Статья</button>
+      `;
+      ui.metaId.textContent = selected.idReadable || "—";
+      ui.metaSource.textContent = selected.project?.name || selected.project?.shortName || "YouTrack wiki";
+      ui.metaOwner.textContent = selected.author || "—";
+      ui.metaScore.textContent = `${selected.score}%`;
+      ui.originalBtn.onclick = () => window.open(buildArticleUiUrl(selected.idReadable), "_blank", "noopener,noreferrer");
+      renderArticleExpandedState(selected);
+      if (ui.articleScroller) ui.articleScroller.scrollTop = 0;
+      bindArticleNav();
+    }
+
+    function bindArticleNav() {
+      ui.articleNav.querySelectorAll("[data-article-target]").forEach(button => {
+        button.addEventListener("click", () => {
+          const targetId = button.getAttribute("data-article-target") || "";
+          if (targetId === "articleFullSection" && !state.articleExpanded) {
+            state.articleExpanded = true;
+            renderArticleExpandedState(getSelected());
+          }
+          scrollArticleTo(targetId);
+        });
+      });
+    }
+
+    function card(title, desc, content) {
+      return `
+        <section class="ctx-card">
+          <div class="ctx-head">
+            <h3 class="ctx-title">${escapeHtml(title)}</h3>
+            ${desc ? `<div class="ctx-desc">${escapeHtml(desc)}</div>` : ``}
+          </div>
+          <div class="ctx-content">${content}</div>
+        </section>
+      `;
+    }
+
+    function renderContext() {
+      const selected = getSelected();
+      const analysis = getSelectedAnalysis();
+      const panel = ui.contextPanel;
+      const narrative = state.searchInsights?.narrative || buildSearchNarrative(state.searchResults.slice(0, 3), state.searchQuery || state.searchComposedQuery);
+
+      if (state.mode === "thinking") {
+        ui.contextTitle.textContent = "Reasoning";
+        if (state.llmBusy) {
+          panel.innerHTML = card("LLM reasoning", "Собираю ответ по query, top hits и выбранной статье.", `
+            <div class="note">
+              <div class="meta-label" style="margin-bottom:10px">Draft answer</div>
+              <div class="skeleton">
+                <div class="sk" style="width:92%"></div>
+                <div class="sk" style="width:86%"></div>
+                <div class="sk" style="width:72%"></div>
+              </div>
+            </div>
+          `);
+          ui.llmBtn.textContent = "Hide reasoning";
+          return;
+        }
+
+        const llmText = state.llmOutput
+          ? `<div class="summary-main">${formatAnswerHtml(state.llmOutput)}</div>`
+          : `<div class="summary-main">${formatAnswerHtml(narrative.directAnswer || "LLM не настроен. Ниже локальный search brief по найденным статьям.")}</div>`;
+        panel.innerHTML = [
+          card("Reasoning view", "Источники и итоговый ответ.", `
+            <div class="summary-block">
+              ${llmText}
+              <div class="summary-main">
+                <div class="meta-label" style="margin-bottom:10px">Sources used</div>
+                <ul class="summary-list">
+                  ${(state.searchInsights?.top || []).map(item => `<li>${escapeHtml(item.idReadable)} · ${escapeHtml(item.title)}</li>`).join("") || "<li>Пока нет источников.</li>"}
+                </ul>
+              </div>
+            </div>
+          `)
+        ].join("");
+        ui.llmBtn.textContent = "Hide reasoning";
+        return;
+      }
+
+      if (!state.searchResults.length) {
+        ui.contextTitle.textContent = "Search guidance";
+        panel.innerHTML = [
+          card("Как система поймет запрос", "Query interpretation и scope.", `
+            <div class="note">
+              ${escapeHtml(state.searchQuery
+                ? `Текущий query: ${composeSearchQuery(ui.projectInput.value, state.searchQuery)}.`
+                : "Сформулируй вопрос обычным языком. Лучше описывать задачу, а не только название статьи.")}
+            </div>
+          `),
+          card("Suggested refinements", "", `
+            <div class="action-list">
+              ${[
+                "как тестировать миграцию",
+                "proxy errors 403/502",
+                "signals in article",
+                "owner rollback testplan"
+              ].map(x => `<button class="action-item" data-suggestion="${escapeHtml(x)}">${escapeHtml(x)}<span>→</span></button>`).join("")}
+            </div>
+          `),
+          card("System status", "", `
+            <div class="action-list">
+              <div class="status-row"><span>Proxy</span><span class="badge ${state.proxyHealth === true ? "good" : "indigo"}">${escapeHtml(state.proxyHealth === true ? "Healthy" : state.proxyHealth === false ? "Error" : "Unknown")}</span></div>
+              <div class="status-row"><span>YouTrack token</span><span class="badge ${ui.tokenInput.value.trim() ? "good" : "indigo"}">${escapeHtml(ui.tokenInput.value.trim() ? "Set" : "Missing")}</span></div>
+              <div class="status-row"><span>LLM</span><span class="badge ${ui.llmApiKeyInput.value.trim() ? "good" : "indigo"}">${escapeHtml(ui.llmApiKeyInput.value.trim() ? "Ready" : "Optional")}</span></div>
+            </div>
+          `)
+        ].join("");
+        panel.querySelectorAll("[data-suggestion]").forEach(button => {
+          button.addEventListener("click", () => applySuggestion(button.getAttribute("data-suggestion") || ""));
+        });
+        ui.llmBtn.textContent = "Ask LLM";
+        return;
+      }
+
+      ui.contextTitle.textContent = selected ? "Article intelligence" : "Search intelligence";
+      const related = state.searchResults.filter(item => item.idReadable !== selected?.idReadable).slice(0, 3);
+      const summaryText = selected
+        ? buildArticleOverview(selected, state.searchQuery || state.searchComposedQuery)
+        : (narrative.directAnswer || "Summary появится после поиска.");
+      const entities = collectUnique([
+        ...(state.searchInsights?.entities || []),
+        ...(analysis?.terms || [])
+      ], 10);
+      panel.innerHTML = [
+        card("Executive summary", "Короткий ответ по запросу и рабочий старт.", `
+          <div class="summary-block">
+            <div class="summary-main">${formatAnswerHtml(summaryText)}</div>
+            <div class="summary-main">
+              <div class="meta-label" style="margin-bottom:10px">Что проверить сейчас</div>
+              <ul class="summary-list">
+                ${(narrative.checklist || state.searchInsights?.actions || [
+                  "Открой верхнюю статью и проверь релевантную секцию.",
+                  "Сверь testplan, owners и rollback.",
+                  "Проверь смежные статьи из top hits."
+                ]).slice(0, 4).map(item => `<li>${escapeHtml(item)}</li>`).join("")}
+              </ul>
+            </div>
+          </div>
+        `),
+        card("Key entities", "", `
+          <div class="entity-wrap">${entities.map(x => `<span class="tag">${escapeHtml(x)}</span>`).join("") || "<span class=\"tag\">scope</span>"}</div>
+        `),
+        card("Signals from article", "", `
+          <div class="action-list">
+            <div class="signal-row"><span>Testplan links</span><span class="${analysis?.plans?.length ? "ok" : "warn"}">${analysis?.plans?.length ? "✓" : "△"}</span></div>
+            <div class="signal-row"><span>Owners / duty</span><span class="${analysis?.owners?.length ? "ok" : "warn"}">${analysis?.owners?.length ? "✓" : "△"}</span></div>
+            <div class="signal-row"><span>Sections parsed</span><span class="ok">${escapeHtml(String(analysis?.sections?.length || 0))}</span></div>
+            <div class="signal-row"><span>Links found</span><span class="${analysis?.links?.length ? "ok" : "warn"}">${escapeHtml(String(analysis?.links?.length || 0))}</span></div>
+          </div>
+        `),
+        card("Какие статьи открыть", "", `
+          <div class="action-list">
+            ${(narrative.openFirst || []).map(item => `<button class="action-item" data-related-id="${escapeHtml(item.idReadable)}"><span>${escapeHtml(item.idReadable)} · ${escapeHtml(item.title)}</span><span>${escapeHtml(item.reason)}</span></button>`).join("") || related.map(item => `<button class="action-item" data-related-id="${escapeHtml(item.idReadable)}">${escapeHtml(item.idReadable)} · ${escapeHtml(item.title)}<span>→</span></button>`).join("") || '<div class="note">Соседние статьи появятся после более широкой выдачи.</div>'}
+          </div>
+        `),
+        card("Recommended next steps", "", `
+          <div class="action-list">
+            ${(state.searchInsights?.actions || [
+              "Открой верхнюю статью и проверь релевантную секцию.",
+              "Сверь testplan, owners и rollback.",
+              "Если нужно, запусти LLM summary."
+            ]).map(item => `<div class="note">${escapeHtml(item)}</div>`).join("")}
+          </div>
+        `)
+      ].join("");
+      panel.querySelectorAll("[data-related-id]").forEach(button => {
+        button.addEventListener("click", () => selectResult(button.getAttribute("data-related-id") || ""));
+      });
+      ui.llmBtn.textContent = "Ask LLM";
+    }
+
+    function renderAll() {
+      renderStatusPills();
+      renderSearchChips();
+      renderResults();
+      renderArticle();
+      renderContext();
+      saveState();
+    }
+
+    function openSettings() {
+      ui.settingsDrawer.hidden = false;
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeSettings() {
+      ui.settingsDrawer.hidden = true;
+      document.body.style.overflow = "";
+    }
+
+    function handleRailAction(key) {
+      switch (key) {
+        case "search":
+          setActiveRail("search");
+          if (ui.tokenInput.value.trim()) {
+            runSearch();
+          } else {
+            ui.queryInput.focus();
+            scrollSectionIntoView(ui.heroSection);
+          }
+          break;
+        case "history":
+          setActiveRail("history");
+          if (state.viewedArticleIds.length > 1) {
+            state.historyIndex = Math.min(state.historyIndex + 1, state.viewedArticleIds.length - 1);
+            const nextId = state.viewedArticleIds[state.historyIndex];
+            if (nextId) {
+              state.selectedId = nextId;
+              state.articleExpanded = true;
+              state.mode = "article";
+              renderAll();
+              scrollSectionIntoView(ui.articlePanel);
+              scrollArticleTo("articleFullSection");
+            }
+          } else {
+            scrollSectionIntoView(ui.resultsSection);
+          }
+          break;
+        case "articles":
+          if (!state.selectedId && state.searchResults[0]?.idReadable) {
+            state.selectedId = state.searchResults[0].idReadable;
+          }
+          if (!state.selectedId && state.targetArticle?.idReadable) {
+            state.selectedId = state.targetArticle.idReadable;
+          }
+          setActiveRail("articles");
+          if (state.selectedId) {
+            state.articleExpanded = true;
+            renderAll();
+            scrollSectionIntoView(ui.articlePanel);
+            scrollArticleTo("articleFullSection");
+          } else {
+            scrollSectionIntoView(ui.articlePanel);
+          }
+          break;
+        case "saved":
+          setActiveRail("saved");
+          {
+            const current = getSelected();
+            if (current?.idReadable) {
+              window.open(buildArticleUiUrl(current.idReadable), "_blank", "noopener,noreferrer");
+            } else {
+              scrollSectionIntoView(ui.resultsSection);
+            }
+          }
+          break;
+        case "settings":
+          setActiveRail("settings");
+          openSettings();
+          break;
+        case "health":
+          setActiveRail("health");
+          checkProxy();
+          scrollSectionIntoView(ui.contextSection);
+          break;
+        case "llm":
+          setActiveRail("llm");
+          if (getSelected() || state.searchResults.length) {
+            askLlm();
+          } else {
+            scrollSectionIntoView(ui.contextSection);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+
+    function selectResult(id) {
+      if (!id) return;
+      state.selectedId = id;
+      state.mode = "article";
+      state.llmOutput = "";
+      state.llmError = "";
+      rememberViewedArticle(id);
+      setActiveRail("articles");
+      renderAll();
+      scrollSectionIntoView(ui.articlePanel);
+    }
+
+    function applySuggestion(value) {
+      ui.queryInput.value = value;
+      saveState();
+      runSearch();
+    }
+
+    async function checkProxy() {
+      try {
+        const response = await fetch(buildProxyHealthUrl(), { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        state.proxyHealth = payload?.ok === true;
+      } catch (_) {
+        state.proxyHealth = false;
+      }
+      renderAll();
+    }
+
+    async function loadTargetArticle() {
+      const token = normalizeToken(ui.tokenInput.value);
+      const articleId = extractArticleId(ui.articleRefInput.value);
+      if (!token || !articleId) {
+        state.mode = "empty";
+        renderAll();
+        return;
+      }
+      try {
+        const article = await fetchJson(buildArticleApiUrl(articleId), { Authorization: token, Accept: "application/json" });
+        const [enriched] = enrichResults([article], state.searchQuery || ui.queryInput.value.trim() || articleId);
+        state.targetArticle = enriched || null;
+        state.targetAnalysis = enriched?.__analysis || null;
+        if (!state.selectedId && enriched?.idReadable) state.selectedId = enriched.idReadable;
+        if (enriched?.idReadable) rememberViewedArticle(enriched.idReadable);
+        state.mode = "article";
+        setActiveRail("articles");
+        renderAll();
+      } catch (error) {
+        state.mode = "empty";
+        state.llmError = String(error?.message || error);
+        renderAll();
+      }
+    }
+
+    async function runSearch() {
+      const token = normalizeToken(ui.tokenInput.value);
+      const rawQuery = String(ui.queryInput.value || "").trim();
+      const composedQuery = composeSearchQuery(ui.projectInput.value, rawQuery);
+      const top = Math.max(1, Math.min(50, Number(ui.limitInput.value) || 15));
+      const plans = buildSearchPlans(rawQuery, ui.projectInput.value, state.targetAnalysis);
+
+      state.searchQuery = rawQuery;
+      state.searchComposedQuery = composedQuery;
+      state.searchPlans = plans;
+      state.llmError = "";
+
+      if (!token || !composedQuery) {
+        state.searchResults = [];
+        state.searchInsights = null;
+        state.mode = "empty";
+        setActiveRail("search");
+        renderAll();
+        return;
+      }
+
+      ui.resultsList.innerHTML = `<div class="note">Ищу статьи по нескольким вариантам запроса. Базовый query: ${escapeHtml(composedQuery)}</div>`;
+      try {
+        const perPlanTop = Math.min(12, Math.max(5, top));
+        const buckets = [];
+        for (const plan of plans) {
+          const items = await fetchJson(buildSearchApiUrl(plan.query, perPlanTop), { Authorization: token, Accept: "application/json" });
+          buckets.push({ ...plan, items: Array.isArray(items) ? items : [] });
+          const mergedNow = mergeSearchBuckets(buckets, rawQuery || composedQuery);
+          if (mergedNow.length >= top + 2 && plan.reason !== "exact") break;
+        }
+        const merged = mergeSearchBuckets(buckets, rawQuery || composedQuery);
+        state.searchResults = enrichResults(merged, rawQuery || composedQuery).slice(0, top);
+        state.searchInsights = buildSearchInsightsSafe(state.searchResults, rawQuery || composedQuery);
+        state.selectedId = state.searchResults[0]?.idReadable || state.targetArticle?.idReadable || "";
+        if (state.selectedId) rememberViewedArticle(state.selectedId);
+        state.mode = state.searchResults.length ? "article" : "empty";
+        state.llmError = state.searchInsights?.error || "";
+        setActiveRail(state.searchResults.length ? "articles" : "search");
+      } catch (error) {
+        state.searchResults = [];
+        state.searchInsights = null;
+        state.mode = "empty";
+        state.llmError = String(error?.message || error);
+        setActiveRail("search");
+      }
+      renderAll();
+    }
+
+    function normalizeLlmBaseUrl(raw) {
+      const value = String(raw || "").trim();
+      if (!value) return "https://api.openai.com/v1";
+      if (/\/v1$/i.test(value)) return value.replace(/\/+$/, "");
+      return value.replace(/\/+$/, "") + "/v1";
+    }
+
+    function extractLlmText(payload) {
+      if (!payload || typeof payload !== "object") return "";
+      if (Array.isArray(payload.choices) && payload.choices[0]?.message?.content) {
+        const content = payload.choices[0].message.content;
+        if (typeof content === "string") return content.trim();
+      }
+      if (typeof payload.output_text === "string") return payload.output_text.trim();
+      return "";
+    }
+
+    async function askLlm() {
+      if (state.mode === "thinking" && !state.llmBusy) {
+        state.mode = state.searchResults.length ? "article" : "empty";
+        renderAll();
+        return;
+      }
+
+      state.mode = "thinking";
+      state.llmOutput = "";
+      state.llmError = "";
+      const selected = getSelected();
+      const apiKey = String(ui.llmApiKeyInput.value || "").trim();
+      const model = String(ui.llmModelInput.value || "").trim();
+      const narrative = state.searchInsights?.narrative || buildSearchNarrative(state.searchResults.slice(0, 3), state.searchQuery || state.searchComposedQuery);
+      if (!apiKey || !model || !selected) {
+        state.llmBusy = false;
+        state.llmOutput = [
+          narrative.directAnswer || "Не удалось собрать уверенный ответ.",
+          narrative.checklist?.length ? "" : "",
+          narrative.checklist?.length ? "Что проверить:" : "",
+          ...(narrative.checklist || []).map(item => `- ${item}`),
+          narrative.openFirst?.length ? "" : "",
+          narrative.openFirst?.length ? "Что открыть:" : "",
+          ...(narrative.openFirst || []).map(item => `- ${item.idReadable} · ${item.title}`)
+        ].filter(Boolean).join("\n");
+        renderAll();
+        return;
+      }
+
+      state.llmBusy = true;
+      renderAll();
+
+      try {
+        const prompt = [
+          `Пользовательский запрос: ${state.searchQuery || "—"}`,
+          `Scoped query: ${state.searchComposedQuery || "—"}`,
+          `Лучшая статья: ${selected.idReadable} / ${selected.title}`,
+          `Summary статьи: ${selected.overview}`,
+          `Соседние статьи: ${(state.searchInsights?.top || []).map(item => `${item.idReadable} / ${item.title}`).join("; ") || "—"}`,
+          `Сигналы: ${collectUnique([...(selected.__analysis?.plans || []), ...(selected.__analysis?.owners || []), ...(selected.__analysis?.terms || [])], 12).join(", ") || "—"}`,
+          "Дай короткий рабочий ответ на русском: что делать, какие статьи открыть, что проверить."
+        ].join("\n");
+
+        const payload = await requestJson(`${normalizeLlmBaseUrl(ui.llmBaseUrlInput.value)}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: "Ты помогаешь искать ответ по внутренней wiki YouTrack. Отвечай кратко и по делу на русском." },
+              { role: "user", content: prompt }
+            ]
+          })
+        });
+
+        state.llmOutput = extractLlmText(payload) || "Модель вернула пустой ответ.";
+      } catch (error) {
+        state.llmOutput = `Ошибка LLM: ${error?.message || error}`;
+      }
+
+      state.llmBusy = false;
+      renderAll();
+    }
+
+    function bindEvents() {
+      ui.searchBtn.addEventListener("click", runSearch);
+      ui.queryInput.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          runSearch();
+        }
+      });
+      document.querySelectorAll("[data-suggestion]").forEach(button => {
+        button.addEventListener("click", () => applySuggestion(button.getAttribute("data-suggestion") || ""));
+      });
+      ui.railButtons.forEach(button => {
+        button.addEventListener("click", () => handleRailAction(button.dataset.rail || ""));
+      });
+      [ui.queryInput, ui.tokenInput, ui.proxyBaseInput, ui.projectInput, ui.limitInput, ui.articleRefInput, ui.llmBaseUrlInput, ui.llmApiKeyInput, ui.llmModelInput].forEach(node => {
+        node.addEventListener("input", () => {
+          renderStatusPills();
+          renderSearchChips();
+          saveState();
+        });
+      });
+      ui.useProxyInput.addEventListener("change", () => {
+        renderStatusPills();
+        saveState();
+      });
+      ui.openSettingsBtn.addEventListener("click", openSettings);
+      ui.sideSettingsBtn.addEventListener("click", openSettings);
+      ui.contextPanelBtn.addEventListener("click", () => scrollSectionIntoView(ui.contextSection));
+      ui.settingsBackdrop.addEventListener("click", closeSettings);
+      ui.closeSettingsBtn.addEventListener("click", closeSettings);
+      ui.checkProxyBtn.addEventListener("click", checkProxy);
+      ui.analyzeTargetBtn.addEventListener("click", loadTargetArticle);
+      ui.openTargetBtn.addEventListener("click", () => {
+        const id = extractArticleId(ui.articleRefInput.value);
+        if (id) window.open(buildArticleUiUrl(id), "_blank", "noopener,noreferrer");
+      });
+      ui.toggleArticleBtn.addEventListener("click", () => {
+        state.articleExpanded = !state.articleExpanded;
+        renderArticleExpandedState(getSelected());
+        if (state.articleExpanded) {
+          scrollArticleTo("articleFullSection");
+        }
+      });
+      ui.llmBtn.addEventListener("click", askLlm);
+    }
+
+    restoreState();
+    bindEvents();
+    setActiveRail("search");
+    renderAll();
+    if (ui.tokenInput.value.trim() && ui.queryInput.value.trim()) {
+      runSearch();
+    } else if (ui.tokenInput.value.trim() && ui.articleRefInput.value.trim()) {
+      loadTargetArticle();
+
+    }
+  </script>
+</body>
+</html>
