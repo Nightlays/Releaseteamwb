@@ -885,12 +885,12 @@
         <span id="summaryEventsHint" class="hint">Сколько сообщений удалось распарсить.</span>
       </article>
       <article class="summary-card">
-        <span id="summaryOnePercentLabel" class="label">GP 1%</span>
+        <span id="summaryOnePercentLabel" class="label">ПР старт</span>
         <span id="summaryOnePercent" class="value">0</span>
         <span id="summaryOnePercentHint" class="hint">Сколько релизов имеют точку входа на 1%.</span>
       </article>
       <article class="summary-card">
-        <span id="summaryHundredPercentLabel" class="label">GP 100%</span>
+        <span id="summaryHundredPercentLabel" class="label">ПР 100%</span>
         <span id="summaryHundredPercent" class="value">0</span>
         <span id="summaryHundredPercentHint" class="hint">Сколько релизов дошли до 100% хотя бы одной версией семейства.</span>
       </article>
@@ -916,6 +916,7 @@
           <div class="results-actions">
             <button id="exportCsvBtn" class="btn-secondary" type="button">CSV</button>
             <button id="exportExcelBtn" class="btn-secondary" type="button">Excel</button>
+            <button id="exportPdfBtn" class="btn-secondary" type="button">PDF</button>
             <div class="mini-chip"><span id="resultsCount">0</span> строк</div>
           </div>
         </div>
@@ -974,7 +975,7 @@
         <div class="hint-box settings-hint-box">
           <strong>Правила обработки</strong>
           <ul id="settingsRulesList">
-            <li>В поле <span class="mono">GP 1%</span> берётся первое найденное сообщение на 1% для семейства релиза.</li>
+            <li>В поле <span class="mono">ПР старт</span> берётся первое найденное процентное сообщение для семейства релиза. Если 1% нет, берётся следующее доступное значение, например 5%.</li>
           </ul>
         </div>
       </div>
@@ -1008,23 +1009,23 @@
         channelId: 'mccs6h69jtdhu8uzeeg3nz1wxa',
         channelUrl: 'https://band.wb.ru/mobile-team/channels/android-announcement',
         heroTitle: 'Android rollout report',
-        heroDescription: 'Отчёт по Android announcement: показывает старт и финал раскатки в <strong>Google Play</strong> и последние найденные версии в <strong>RuStore</strong> и <strong>AppGallery</strong>.',
+        heroDescription: 'Отчёт по Android announcement: показывает старт процента раскатки и финал раскатки в <strong>Google Play</strong>, а также последние найденные версии в <strong>RuStore</strong> и <strong>AppGallery</strong>.',
         heroFacts: [
           { label: 'Канал', value: 'Android announcement' },
-          { label: 'Старт', value: 'Первое сообщение на 1% в Google Play' },
-          { label: 'Финал', value: 'Последнее 100%-сообщение, включая hotfix 0001 / 0002' },
+          { label: 'Старт', value: 'Первое процентное сообщение: 1%, 5%, 10% и т.д.' },
+          { label: 'Финал', value: 'Последнее сообщение процента раскатки на 100%, включая hotfix 0001 / 0002' },
           { label: 'Доп. stores', value: 'Последние версии RuStore и AppGallery' }
         ],
         sourceSubtitle: 'Band cookies + proxy. Канал выбирается вкладкой и скрыт в коде.',
         channelMeta: 'Android announcement · канал зафиксирован в коде',
         openLinkLabel: 'Открыть Android канал ↗',
         resultsTitle: 'Android релизы и магазины',
-        resultsSubtitle: 'Табличный отчёт по release-family: отдельные колонки для Google Play, RuStore и AppGallery.',
+        resultsSubtitle: 'Табличный отчёт по release-family: старт процента раскатки, финал раскатки и отдельные колонки для RuStore и AppGallery.',
         rulesTitle: 'Как считается Android отчёт',
         rulesIntro: 'Группировка строится по base-release: версия вида <span class="mono">7.5.6002</span> попадает в семейство <span class="mono">7.5.6000</span>. Это позволяет видеть, какой hotfix довёл релиз до 100% и какие версии ушли в другие stores.',
         rules: [
-          'В поле <span class="mono">GP 1%</span> берётся первое найденное сообщение на 1% для семейства релиза.',
-          'В поле <span class="mono">GP 100%</span> берётся последнее найденное сообщение на 100% и показывается фактическая версия, например <span class="mono">7.5.6002</span>.',
+          'В поле <span class="mono">ПР старт</span> берётся первое найденное процентное сообщение для семейства релиза. Если 1% отсутствует, используется следующее доступное значение, например <span class="mono">5%</span>.',
+          'В поле <span class="mono">ПР 100%</span> берётся последнее найденное сообщение на 100% и показывается фактическая версия, например <span class="mono">7.5.6002</span>.',
           'Для <span class="mono">RuStore</span> и <span class="mono">AppGallery</span> показывается последнее найденное сообщение по семейству и его фактическая версия.',
           'Сообщения без версии или без store-маркера не участвуют.',
           'Диапазон релизов работает inclusively: можно задать <span class="mono">7.5</span> → <span class="mono">7.6</span> или точные версии.'
@@ -1119,6 +1120,7 @@
       resultsCount: document.getElementById('resultsCount'),
       exportCsvBtn: document.getElementById('exportCsvBtn'),
       exportExcelBtn: document.getElementById('exportExcelBtn'),
+      exportPdfBtn: document.getElementById('exportPdfBtn'),
       settingsLogicFacts: document.getElementById('settingsLogicFacts'),
       settingsRulesTitle: document.getElementById('settingsRulesTitle'),
       settingsRulesIntro: document.getElementById('settingsRulesIntro'),
@@ -1225,9 +1227,9 @@
       ui.summaryEventsHint.textContent = 'Сколько сообщений удалось распарсить.';
 
       if(state.activePlatform === 'android'){
-        ui.summaryOnePercentLabel.textContent = 'GP 1%';
-        ui.summaryOnePercentHint.textContent = 'Сколько релизов имеют точку входа на 1%.';
-        ui.summaryHundredPercentLabel.textContent = 'GP 100%';
+        ui.summaryOnePercentLabel.textContent = 'ПР старт';
+        ui.summaryOnePercentHint.textContent = 'Сколько релизов имеют первое найденное процентное событие раскатки.';
+        ui.summaryHundredPercentLabel.textContent = 'ПР 100%';
         ui.summaryHundredPercentHint.textContent = 'Сколько релизов дошли до 100% хотя бы одной версией семейства.';
         ui.summaryExtraALabel.textContent = 'RuStore';
         ui.summaryExtraAHint.textContent = 'Сколько релизов имеют найденную версию или событие в RuStore.';
@@ -1765,7 +1767,7 @@
             group.appStoreFinal = event;
           }
         }else{
-          if(event.store === 'google_play' && event.percent === 1 && !group.googleOnePercent){
+          if(event.store === 'google_play' && event.percent !== null && !group.googleOnePercent){
             group.googleOnePercent = event;
           }
           if(event.store === 'google_play' && event.percent === 100){
@@ -1791,7 +1793,7 @@
             group.appStoreFinal = finalEvents.length ? finalEvents[finalEvents.length - 1] : null;
           }else{
             if(!group.googleOnePercent){
-              group.googleOnePercent = group.events.find((event) => event.store === 'google_play' && event.percent === 1) || null;
+              group.googleOnePercent = group.events.find((event) => event.store === 'google_play' && event.percent !== null) || null;
             }
             const allGoogleHundred = group.events.filter((event) => event.store === 'google_play' && event.percent === 100);
             group.googleHundredPercent = allGoogleHundred.length ? allGoogleHundred[allGoogleHundred.length - 1] : null;
@@ -1897,8 +1899,8 @@
                 <th>Релиз</th>
                 <th>Сообщения</th>
                 <th>Версии</th>
-                <th>GP 1%</th>
-                <th>GP 100%</th>
+                <th>ПР старт</th>
+                <th>ПР 100%</th>
                 <th>RuStore</th>
                 <th>AppGallery</th>
                 <th>Matched</th>
@@ -1984,6 +1986,7 @@
       const disabled = state.loading || !Array.isArray(state.groups) || !state.groups.length;
       if(ui.exportCsvBtn) ui.exportCsvBtn.disabled = disabled;
       if(ui.exportExcelBtn) ui.exportExcelBtn.disabled = disabled;
+      if(ui.exportPdfBtn) ui.exportPdfBtn.disabled = disabled;
     }
 
     function buildExportRows(groups, platformId){
@@ -2082,7 +2085,7 @@
     }
 
     function exportCsv(){
-      const rows = buildExportRows(state.groups);
+      const rows = buildExportRows(state.groups, state.activePlatform);
       if(!rows.length){
         log('CSV export пропущен: нет данных.');
         return;
@@ -2099,7 +2102,7 @@
     }
 
     function exportExcel(){
-      const rows = buildExportRows(state.groups);
+      const rows = buildExportRows(state.groups, state.activePlatform);
       if(!rows.length){
         log('Excel export пропущен: нет данных.');
         return;
@@ -2133,6 +2136,141 @@ ${closeHtmlTag}`;
       const filename = buildExportFilename('xls');
       downloadBlob(filename, blob);
       log(`Экспортирован Excel: ${filename}`);
+    }
+
+    function buildPrintableResultsTable(groups, platformId){
+      const platform = platformId === 'ios' ? 'ios' : 'android';
+      if(platform === 'ios'){
+        return `
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Релиз</th>
+                <th>Сообщения</th>
+                <th>Версии</th>
+                <th>AS старт</th>
+                <th>AS финал</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(Array.isArray(groups) ? groups : []).map((group) => {
+                const matchedVersions = Array.from(new Set((group.events || []).map((event) => event.version))).sort(compareVersionsDesc);
+                return `
+                  <tr>
+                    <td><div class="table-release">${escHtml(group.family)}</div></td>
+                    <td><span class="mini-chip">${group.events.length} сообщений</span></td>
+                    <td><div class="table-versions">${escHtml(matchedVersions.join(', '))}</div></td>
+                    <td>${renderPointCell(group.appStoreFirstRollout, { emphasizeVersion: false, showStoreTag: true })}</td>
+                    <td>${renderPointCell(group.appStoreFinal, { emphasizeVersion: true, showStoreTag: true })}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+      return `
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Релиз</th>
+              <th>Сообщения</th>
+              <th>Версии</th>
+                <th>ПР старт</th>
+                <th>ПР 100%</th>
+                <th>RuStore</th>
+                <th>AppGallery</th>
+              </tr>
+            </thead>
+            <tbody>
+            ${(Array.isArray(groups) ? groups : []).map((group) => {
+              const matchedVersions = Array.from(new Set((group.events || []).map((event) => event.version))).sort(compareVersionsDesc);
+              return `
+                <tr>
+                  <td><div class="table-release">${escHtml(group.family)}</div></td>
+                  <td><span class="mini-chip">${group.events.length} сообщений</span></td>
+                  <td><div class="table-versions">${escHtml(matchedVersions.join(', '))}</div></td>
+                  <td>${renderPointCell(group.googleOnePercent, { emphasizeVersion: false })}</td>
+                  <td>${renderPointCell(group.googleHundredPercent, { emphasizeVersion: true })}</td>
+                  <td>${renderPointCell(group.ruStoreLatest, { emphasizeVersion: true, showStoreTag: true })}</td>
+                  <td>${renderPointCell(group.appGalleryLatest, { emphasizeVersion: true, showStoreTag: true })}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function buildPrintableHtml(groups, platformId){
+      const platform = getActivePlatformConfig();
+      const settings = readSettings();
+      const closeScriptTag = '</' + 'script>';
+      const closeBodyTag = '</' + 'body>';
+      const closeHtmlTag = '</' + 'html>';
+      const rangeLabel = [
+        settings.releaseFrom ? `с ${settings.releaseFrom}` : '',
+        settings.releaseTo ? `по ${settings.releaseTo}` : ''
+      ].filter(Boolean).join(' ');
+      return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escHtml(buildExportFilename('pdf'))}</title>
+  <style>
+    @page{ size: landscape; margin: 12mm; }
+    body{ font-family: Arial, sans-serif; color:#1f1a2d; margin:0; }
+    h1{ margin:0 0 6px; font-size:22px; }
+    p{ margin:0 0 12px; color:#5c5470; font-size:12px; line-height:1.45; }
+    .results-table{ width:100%; border-collapse:collapse; font-size:10px; }
+    .results-table th,.results-table td{ border:1px solid #d8ddea; padding:6px 7px; vertical-align:top; text-align:left; }
+    .results-table th{ background:#f2f5fb; font-weight:700; text-transform:uppercase; letter-spacing:.08em; font-size:9px; }
+    .results-table tr:nth-child(even) td{ background:#fafcff; }
+    .table-release{ font-size:14px; font-weight:800; line-height:1; white-space:nowrap; }
+    .mini-chip{ display:inline-block; padding:3px 7px; border:1px solid #d8ddea; border-radius:999px; background:#f8faff; color:#5e5378; font-size:9px; font-weight:700; white-space:nowrap; }
+    .table-versions{ color:#5e5378; font-size:10px; line-height:1.45; word-break:break-word; }
+    .table-point{ font-size:12px; line-height:1.15; font-weight:800; color:#2c2740; margin-bottom:4px; white-space:nowrap; }
+    .table-muted{ display:block; color:#6f6784; font-size:9px; line-height:1.4; margin-top:2px; word-break:break-word; }
+    .table-empty{ display:inline-block; color:#9a90b1; font-size:10px; font-weight:700; }
+    .store-tag{ display:inline-block; padding:2px 6px; margin-bottom:5px; border-radius:999px; background:#eef4ff; border:1px solid #d5e2ff; color:#4b5f8a; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+    .print-match-list{ display:flex; flex-direction:column; gap:5px; min-width:240px; }
+    .print-match-item{ border:1px solid #e7ebf5; border-radius:8px; background:#fff; padding:5px 6px; break-inside:avoid; }
+    .print-match-head{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size:8px; color:#6a5f82; margin-bottom:4px; }
+    .print-match-text{ white-space:pre-wrap; word-break:break-word; color:#312945; font-size:9px; line-height:1.35; }
+  </style>
+</head>
+<body>
+  <h1>${escHtml(platform.label)} rollout report</h1>
+  ${buildPrintableResultsTable(groups, platformId)}
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => window.print(), 120);
+    });
+    window.addEventListener('afterprint', () => {
+      setTimeout(() => window.close(), 120);
+    });
+  ${closeScriptTag}
+${closeBodyTag}
+${closeHtmlTag}`;
+    }
+
+    function exportPdf(){
+      const groups = Array.isArray(state.groups) ? state.groups : [];
+      if(!groups.length){
+        log('PDF export пропущен: нет данных.');
+        return;
+      }
+      const filename = buildExportFilename('pdf');
+      const popup = window.open('', '_blank');
+      if(!popup){
+        log('PDF export не открыт: браузер заблокировал новое окно.');
+        return;
+      }
+      popup.document.open();
+      popup.document.write(buildPrintableHtml(groups, state.activePlatform));
+      popup.document.close();
+      log(`Открыт PDF preview: ${filename}. В диалоге печати выбери Save as PDF.`);
     }
 
     function setLoading(next){
@@ -2228,6 +2366,7 @@ ${closeHtmlTag}`;
       ui.proxyCheckBtn.addEventListener('click', handleProxyCheck);
       ui.exportCsvBtn.addEventListener('click', exportCsv);
       ui.exportExcelBtn.addEventListener('click', exportExcel);
+      ui.exportPdfBtn.addEventListener('click', exportPdf);
       [
         ui.proxyBaseInput,
         ui.bandCookiesInput,
