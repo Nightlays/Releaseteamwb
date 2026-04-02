@@ -1511,6 +1511,116 @@ html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
   height: 100%;
   object-fit: cover;
 }
+.dp-mark-art--reference {
+  object-position: center;
+  transform: scale(1.04);
+  transform-origin: center;
+  animation: dpMarkFloat 7.2s ease-in-out infinite;
+}
+.ph-mascot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.ph-mascot * {
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ph-mascot__float {
+  animation: phFloat 6.6s ease-in-out infinite;
+}
+.ph-mascot__head {
+  animation: phHeadDrift 7.2s ease-in-out infinite;
+}
+.ph-mascot__blink {
+  transform-origin: center;
+  animation: phBlink 8.4s ease-in-out infinite;
+}
+.ph-mascot__tongue {
+  transform-origin: top center;
+  animation: phTongue 9.2s ease-in-out infinite;
+}
+.ph-mascot__aura {
+  animation: phAuraPulse 5.8s ease-in-out infinite;
+}
+.ph-mascot__orb {
+  animation: phOrbDrift 4.8s ease-in-out infinite;
+}
+.ph-mascot__codebit {
+  animation: phCodeFloat 7.8s linear infinite;
+}
+.ph-mascot__codebit--b { animation-delay: -2.2s; }
+.ph-mascot__codebit--c { animation-delay: -4.4s; }
+.ph-mascot__hood-line {
+  animation: phHoodGlow 6.4s ease-in-out infinite;
+}
+.ph-mascot__accent {
+  animation: phAccentPulse 3.2s ease-in-out infinite;
+}
+.ph-mascot--thinking .ph-mascot__float {
+  animation-name: phThinkingFloat;
+  animation-duration: 4.8s;
+}
+.ph-mascot--thinking .ph-mascot__accent {
+  animation-duration: 2.2s;
+}
+.ph-mascot--success .ph-mascot__aura {
+  animation-duration: 3.6s;
+}
+.ph-mascot--success .ph-mascot__accent {
+  animation-name: phSuccessSpark;
+}
+.ph-mascot--oops .ph-mascot__float {
+  animation-name: phOopsFloat;
+  animation-duration: 4.2s;
+}
+.ph-mascot--oops .ph-mascot__head {
+  animation-duration: 3.8s;
+}
+.ph-mascot--idle {
+  filter: saturate(.92) brightness(.98);
+}
+.ph-mascot--idle .ph-mascot__float {
+  animation-duration: 9.8s;
+}
+.ph-mascot--idle .ph-mascot__blink {
+  animation-duration: 11.6s;
+}
+.ph-mascot--mini .ph-mascot__codebit,
+.ph-mascot--mini .ph-mascot__accent,
+.ph-mascot--mini .ph-mascot__orb {
+  display: none;
+}
+.ph-mascot--mini .ph-mascot__float {
+  animation-duration: 7.4s;
+}
+.ph-mascot--hero .ph-mascot__float {
+  animation-duration: 7.8s;
+}
+.ph-mascot--hero .ph-mascot__accent {
+  animation-duration: 2.8s;
+}
+.dp-brand-mark .ph-mascot,
+.dp-sidebar-mark .ph-mascot {
+  width: 100%;
+  height: 100%;
+}
+.dp-brand-mark,
+.dp-sidebar-mark { position: relative; isolation: isolate; }
+.dp-brand-mark::after,
+.dp-sidebar-mark::after {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  background: radial-gradient(circle at 30% 28%, rgba(255,255,255,.24), transparent 34%);
+  mix-blend-mode: screen;
+  opacity: .56;
+  animation: dpMarkShine 5.8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
 .dp-brand-text { line-height: 1; }
 .dp-brand-name {
   font-size: 14.5px; font-weight: 800; letter-spacing: -.28px;
@@ -1519,6 +1629,14 @@ html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
 .dp-brand-sub {
   font-size: 10.5px; font-weight: 600; color: color-mix(in srgb, var(--muted) 82%, var(--text) 18%); margin-top: 2px;
   letter-spacing: .08px;
+}
+.dp-topbar-mascot,
+.dp-topbar-mascot-copy,
+.dp-topbar-mascot-kicker,
+.dp-topbar-mascot-title,
+.dp-topbar-mascot-note,
+.dp-sidebar-mascot-panel {
+  display: none !important;
 }
 .dp-topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
@@ -1678,6 +1796,286 @@ html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
   font-size: 12.5px; color: color-mix(in srgb, var(--muted) 76%, var(--text) 24%); line-height: 1.5; margin-top: 6px;
   font-weight: 550;
 }
+.dp-sidebar-mascot-panel {
+  margin-top: 14px;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 142px;
+  gap: 10px;
+  min-height: 138px;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 42%, transparent);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--wb) 20%, transparent), transparent 44%),
+    linear-gradient(145deg, color-mix(in srgb, var(--card) 90%, var(--wb) 10%) 0%, color-mix(in srgb, var(--card) 76%, var(--wb-deep) 24%) 100%);
+  box-shadow:
+    0 14px 28px color-mix(in srgb, var(--bg) 12%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.18);
+  overflow: hidden;
+  isolation: isolate;
+}
+.dp-sidebar-mascot-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.14) 0, rgba(255,255,255,0) 36%),
+    repeating-linear-gradient(90deg, rgba(94,242,255,.05) 0 1px, transparent 1px 18px);
+  pointer-events: none;
+}
+.dp-sidebar-mascot-copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+.dp-sidebar-mascot-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--muted) 70%, var(--text) 30%);
+}
+.dp-sidebar-mascot-title {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text);
+}
+.dp-sidebar-mascot-note {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--muted) 76%, var(--text) 24%);
+}
+.dp-sidebar-mascot-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--wb) 78%, transparent), color-mix(in srgb, var(--wb-deep) 84%, transparent));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--wb) 20%, transparent);
+}
+.dp-sidebar-mascot-state::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8dfcb8;
+  box-shadow: 0 0 0 5px rgba(141,252,184,.12);
+}
+.dp-sidebar-mascot-visual {
+  position: relative;
+  z-index: 1;
+  min-height: 114px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 40%, transparent);
+  background:
+    radial-gradient(circle at 16% 18%, rgba(255,255,255,.14), transparent 28%),
+    linear-gradient(145deg, rgba(9, 18, 40, .62), rgba(25, 33, 78, .26));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1);
+}
+.dp-sidebar-mascot-visual::before {
+  content: '';
+  position: absolute;
+  inset: -12% -8% auto auto;
+  width: 98px;
+  height: 98px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(95, 235, 255, .22) 0%, rgba(95, 235, 255, 0) 72%);
+  filter: blur(8px);
+  animation: dpMascotAura 5.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.dp-sidebar-mascot-visual::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.98), rgba(255,210,120,.96) 28%, rgba(245,164,58,.86) 58%, rgba(245,164,58,0) 78%);
+  box-shadow: 0 0 0 6px rgba(252, 207, 132, .12), 0 10px 22px rgba(255, 198, 89, .26);
+  animation: dpMascotOrb 4.2s cubic-bezier(.4,0,.2,1) infinite;
+  pointer-events: none;
+}
+.dp-sidebar-mascot-code {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(7, 11, 28, .56);
+  border: 1px solid rgba(133, 218, 255, .18);
+  color: #b8f4ff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 18px rgba(8, 18, 34, .14);
+}
+.dp-sidebar-mascot-art {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  transform: scale(1.03);
+  filter: saturate(1.05) contrast(1.02) drop-shadow(0 10px 20px rgba(10, 12, 30, .22));
+  animation: dpMascotFloat 6.8s ease-in-out infinite;
+  transition: filter .28s ease, transform .28s ease;
+}
+.dp-sidebar-mascot-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.dp-sidebar-mascot-panel.is-neutral .dp-sidebar-mascot-state::before { background: #8dfcb8; box-shadow: 0 0 0 5px rgba(141,252,184,.12); }
+.dp-sidebar-mascot-panel.is-neutral .dp-sidebar-mascot-visual::before { background: radial-gradient(circle, rgba(95, 235, 255, .22) 0%, rgba(95, 235, 255, 0) 72%); }
+
+.dp-sidebar-mascot-panel.is-thinking .dp-sidebar-mascot-state {
+  background: linear-gradient(135deg, rgba(49, 146, 255, .96), rgba(86, 208, 255, .92));
+}
+.dp-sidebar-mascot-panel.is-thinking .dp-sidebar-mascot-state::before { background: #d7f7ff; box-shadow: 0 0 0 5px rgba(215,247,255,.16); }
+.dp-sidebar-mascot-panel.is-thinking .dp-sidebar-mascot-visual::before { background: radial-gradient(circle, rgba(63, 208, 255, .3) 0%, rgba(63, 208, 255, 0) 74%); }
+.dp-sidebar-mascot-panel.is-thinking .dp-sidebar-mascot-art {
+  transform: scale(1.05) translateY(-2px);
+  filter: saturate(1.12) brightness(1.02) drop-shadow(0 12px 22px rgba(10, 20, 48, .28));
+  animation: dpMascotThink 3.8s ease-in-out infinite;
+}
+
+.dp-sidebar-mascot-panel.is-success .dp-sidebar-mascot-state {
+  background: linear-gradient(135deg, rgba(20, 191, 113, .96), rgba(79, 221, 145, .92));
+}
+.dp-sidebar-mascot-panel.is-success .dp-sidebar-mascot-state::before { background: #e7ffef; box-shadow: 0 0 0 5px rgba(79,221,145,.16); }
+.dp-sidebar-mascot-panel.is-success .dp-sidebar-mascot-visual::before { background: radial-gradient(circle, rgba(82, 238, 150, .28) 0%, rgba(82, 238, 150, 0) 72%); }
+.dp-sidebar-mascot-panel.is-success .dp-sidebar-mascot-art {
+  transform: scale(1.04);
+  filter: saturate(1.16) brightness(1.05) drop-shadow(0 12px 22px rgba(17, 66, 34, .24));
+}
+
+.dp-sidebar-mascot-panel.is-oops .dp-sidebar-mascot-state {
+  background: linear-gradient(135deg, rgba(250, 161, 54, .98), rgba(255, 112, 112, .92));
+}
+.dp-sidebar-mascot-panel.is-oops .dp-sidebar-mascot-state::before { background: #fff0cc; box-shadow: 0 0 0 5px rgba(250,161,54,.16); }
+.dp-sidebar-mascot-panel.is-oops .dp-sidebar-mascot-visual::before { background: radial-gradient(circle, rgba(255, 121, 121, .24) 0%, rgba(255, 121, 121, 0) 74%); }
+.dp-sidebar-mascot-panel.is-oops .dp-sidebar-mascot-art {
+  transform: scale(1.03) translateX(-2px);
+  filter: saturate(1.08) brightness(1.01) drop-shadow(0 12px 24px rgba(83, 29, 18, .24));
+  animation: dpMascotOops 4.6s ease-in-out infinite;
+}
+
+.dp-sidebar-mascot-panel.is-idle .dp-sidebar-mascot-state {
+  background: linear-gradient(135deg, rgba(111, 122, 178, .94), rgba(148, 162, 214, .88));
+}
+.dp-sidebar-mascot-panel.is-idle .dp-sidebar-mascot-state::before { background: #edf2ff; box-shadow: 0 0 0 5px rgba(237,242,255,.14); }
+.dp-sidebar-mascot-panel.is-idle .dp-sidebar-mascot-visual::before { background: radial-gradient(circle, rgba(180, 206, 255, .2) 0%, rgba(180, 206, 255, 0) 70%); }
+.dp-sidebar-mascot-panel.is-idle .dp-sidebar-mascot-art {
+  transform: scale(1);
+  filter: saturate(.92) brightness(.98) drop-shadow(0 10px 18px rgba(16, 21, 40, .18));
+  animation: dpMascotIdle 8.6s ease-in-out infinite;
+}
+
+@keyframes phFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-3px) scale(1.01); }
+}
+@keyframes phThinkingFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(-1deg); }
+  75% { transform: translateY(-3px) rotate(1deg); }
+}
+@keyframes phOopsFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  20% { transform: translateY(-1px) rotate(-1.5deg); }
+  45% { transform: translateY(-2px) rotate(1.5deg); }
+  70% { transform: translateY(-1px) rotate(-1deg); }
+}
+@keyframes phHeadDrift {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-1.2deg); }
+}
+@keyframes phBlink {
+  0%, 44%, 48%, 100% { transform: scaleY(0); opacity: 0; }
+  45%, 47% { transform: scaleY(1); opacity: 1; }
+}
+@keyframes phTongue {
+  0%, 78%, 100% { transform: scaleY(.2); opacity: 0; }
+  82%, 88% { transform: scaleY(1); opacity: 1; }
+}
+@keyframes phAuraPulse {
+  0%, 100% { opacity: .55; transform: scale(.96); }
+  50% { opacity: .9; transform: scale(1.04); }
+}
+@keyframes phOrbDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-5px, 4px) scale(1.05); }
+}
+@keyframes phCodeFloat {
+  0% { transform: translateY(0); opacity: .42; }
+  50% { transform: translateY(-6px); opacity: .9; }
+  100% { transform: translateY(-12px); opacity: .12; }
+}
+@keyframes phHoodGlow {
+  0%, 100% { opacity: .56; }
+  50% { opacity: .95; }
+}
+@keyframes phAccentPulse {
+  0%, 100% { transform: scale(.94); opacity: .72; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+@keyframes phSuccessSpark {
+  0%, 100% { transform: scale(.9) rotate(0deg); opacity: .7; }
+  50% { transform: scale(1.1) rotate(12deg); opacity: 1; }
+}
+
+@keyframes dpMarkFloat {
+  0%, 100% { transform: scale(1.72) translateY(0); }
+  50% { transform: scale(1.72) translateY(-2px); }
+}
+@keyframes dpMarkShine {
+  0%, 100% { transform: translateX(-8px); opacity: .48; }
+  50% { transform: translateX(10px); opacity: .78; }
+}
+@keyframes dpMascotFloat {
+  0%, 100% { transform: scale(1.08) translate3d(0, 0, 0); }
+  50% { transform: scale(1.1) translate3d(0, -3px, 0); }
+}
+@keyframes dpMascotThink {
+  0%, 100% { transform: scale(1.12) translateY(-1px); }
+  50% { transform: scale(1.14) translateY(-5px); }
+}
+@keyframes dpMascotOops {
+  0%, 100% { transform: scale(1.09) translateX(-2px); }
+  25% { transform: scale(1.09) translateX(-5px); }
+  50% { transform: scale(1.09) translateX(2px); }
+  75% { transform: scale(1.09) translateX(-3px); }
+}
+@keyframes dpMascotIdle {
+  0%, 100% { transform: scale(1.05) translateY(0); }
+  50% { transform: scale(1.035) translateY(1px); }
+}
+@keyframes dpMascotAura {
+  0%, 100% { transform: scale(.92); opacity: .52; }
+  50% { transform: scale(1.08); opacity: .82; }
+}
+@keyframes dpMascotOrb {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -5px, 0) scale(1.08); }
+}
 .dp-sidebar-toggle {
   width: 100%; min-height: 36px; margin-top: 12px; padding: 0 12px;
   border-radius: 8px; font-size: 12.5px; font-weight: 700; color: color-mix(in srgb, var(--muted) 74%, var(--text) 26%);
@@ -1709,18 +2107,20 @@ html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
 }
 .dp-nav-section:first-child { padding-top: 6px; }
 .dp-nav-btn {
-  position: relative; display: flex; align-items: center; gap: 8px;
+  position: relative; display: flex; align-items: center; gap: 10px;
   width: 100%; min-height: var(--nav-item-h); max-height: var(--nav-item-h);
-  padding: 0 9px; border-radius: var(--nav-radius);
-  font-family: 'Inter', system-ui, sans-serif; font-size: 13.5px; font-weight: 600;
-  color: color-mix(in srgb, var(--text) 82%, transparent);
+  padding: 0 10px 0 6px; border-radius: var(--nav-radius);
+  font-family: 'Inter', system-ui, sans-serif; font-size: 14.5px; font-weight: 700;
+  color: color-mix(in srgb, var(--text) 90%, transparent);
   background: transparent; border: 1px solid transparent;
   cursor: pointer; text-align: left; overflow: hidden;
-  flex-shrink: 0; transition: background .1s, color .1s;
+  flex-shrink: 0; transition: background .1s, color .1s, border-color .1s, box-shadow .1s;
 }
 .dp-nav-btn:hover {
   background: color-mix(in srgb, var(--wb) 9%, var(--btn-bg) 91%);
   color: var(--text);
+  border-color: color-mix(in srgb, var(--line-strong) 42%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
 }
 .dp-nav-btn.active {
   background: var(--grad); color: #fff; font-weight: 600;
@@ -1731,16 +2131,49 @@ html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
   display: none; /* no left bar in gradient mode */
 }
 .dp-nav-icon {
-  flex: 0 0 22px; width: 22px; height: 22px;
+  flex: 0 0 40px; width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--btn-bg) 88%, var(--card) 12%);
+  border: 1px solid color-mix(in srgb, var(--line-strong) 34%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  overflow: hidden;
+  transition: background .12s, border-color .12s, box-shadow .12s, transform .12s;
 }
-.dp-nav-icon svg { width: 18px; height: 18px; opacity: .78; transition: opacity .12s; stroke: currentColor; }
-.dp-nav-btn:hover .dp-nav-icon svg { opacity: .85; }
-.dp-nav-btn.active .dp-nav-icon svg { opacity: 1; stroke: #fff; }
+.dp-nav-icon svg,
+.dp-nav-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  flex: 0 0 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.dp-nav-icon svg {
+  opacity: .96;
+  transition: opacity .12s, transform .12s;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  transform: scale(.88);
+  transform-origin: center;
+}
+.dp-nav-btn:hover .dp-nav-icon {
+  background: color-mix(in srgb, var(--wb) 12%, var(--btn-bg) 88%);
+  border-color: color-mix(in srgb, var(--line-strong) 56%, transparent);
+  transform: translateY(-1px);
+}
+.dp-nav-btn:hover .dp-nav-icon svg { opacity: 1; transform: scale(.92); }
+.dp-nav-btn.active .dp-nav-icon svg { opacity: 1; stroke: #fff; transform: scale(.92); }
+.dp-nav-btn.active .dp-nav-icon {
+  background: rgba(255,255,255,.16);
+  border-color: rgba(255,255,255,.22);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 8px 16px rgba(29, 12, 55, .18);
+}
 .dp-nav-label {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; font-size: 13.5px; font-weight: inherit; color: inherit;
+  white-space: nowrap; font-size: 14.5px; font-weight: inherit; color: inherit;
   line-height: 1.3;
+  letter-spacing: -.01em;
 }
 
 body.theme-wb-light .dp-shell-menu,
@@ -1763,6 +2196,7 @@ body.theme-wb-light .dp-theme-option:focus-visible {
 .dp-shell.collapsed .dp-sidebar-head-top { justify-content: center; }
 .dp-shell.collapsed .dp-sidebar-title,
 .dp-shell.collapsed .dp-sidebar-sub,
+.dp-shell.collapsed .dp-sidebar-mascot-panel,
 .dp-shell.collapsed .dp-sidebar-toggle-label { display: none; }
 .dp-shell.collapsed .dp-sidebar { overflow: visible; }
 .dp-shell.collapsed .dp-sidebar-toggle {
@@ -1781,27 +2215,46 @@ body.theme-wb-light .dp-theme-option:focus-visible {
 .dp-shell.collapsed .dp-nav { padding: 6px 6px 10px; overflow-y: auto; overflow-x: visible; }
 .dp-shell.collapsed .dp-nav-section { display: none; }
 .dp-shell.collapsed .dp-nav-btn {
-  min-height: 48px; max-height: 48px; padding: 0; justify-content: center; gap: 0;
+  min-height: 58px; max-height: 58px; padding: 0; justify-content: center; gap: 0;
   margin: 2px 0;
   overflow: visible;
-  border-radius: 12px;
-  border-color: color-mix(in srgb, var(--line) 72%, transparent);
-  background: color-mix(in srgb, var(--card) 94%, var(--wb) 6%);
+  border-radius: 16px;
+  border-color: color-mix(in srgb, var(--line-strong) 42%, transparent);
+  background: color-mix(in srgb, var(--card) 96%, var(--wb) 4%);
   color: color-mix(in srgb, var(--text) 92%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 18px rgba(28, 12, 44, .04);
 }
 .dp-shell.collapsed .dp-nav-label { display: none; }
 .dp-shell.collapsed .dp-nav-icon {
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--btn-bg) 90%, white 10%);
+  border-color: color-mix(in srgb, var(--line-strong) 54%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 8px 18px rgba(36, 18, 56, .06);
 }
 .dp-shell.collapsed .dp-nav-icon svg {
-  width: 34px;
-  height: 34px;
-  opacity: .98;
-  stroke-width: 1.8;
+  opacity: 1;
+  stroke-width: 1.95;
+  transform: scale(.92);
 }
 .dp-shell.collapsed .dp-nav-btn.active { background: var(--grad); }
+.dp-shell.collapsed .dp-nav-btn:hover .dp-nav-icon,
+.dp-shell.collapsed .dp-nav-btn:focus-visible .dp-nav-icon {
+  background: color-mix(in srgb, var(--wb) 12%, white 88%);
+  border-color: color-mix(in srgb, var(--wb-deep) 44%, var(--line-strong) 56%);
+}
+.dp-shell.collapsed .dp-nav-btn:hover .dp-nav-icon svg,
+.dp-shell.collapsed .dp-nav-btn:focus-visible .dp-nav-icon svg,
+.dp-shell.collapsed .dp-nav-btn.active .dp-nav-icon svg {
+  transform: scale(.96);
+}
+.dp-shell.collapsed .dp-nav-btn.active .dp-nav-icon {
+  background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.24);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 12px 22px rgba(45, 17, 68, .16);
+}
 .dp-shell.collapsed .dp-nav-btn::after,
 .dp-shell.collapsed .dp-sidebar-toggle::after {
   content: attr(data-label);
@@ -1857,6 +2310,18 @@ body.theme-wb-light .dp-theme-option:focus-visible {
 body.theme-wb-light .dp-shell.collapsed .dp-nav-btn,
 body.theme-ocean-glass .dp-shell.collapsed .dp-nav-btn {
   box-shadow: 0 6px 14px rgba(20, 12, 38, 0.05);
+}
+body.theme-wb-light .dp-nav-icon,
+body.theme-ocean-glass .dp-nav-icon {
+  background: color-mix(in srgb, #ffffff 92%, var(--wb) 8%);
+  border-color: color-mix(in srgb, var(--line-strong) 42%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 16px rgba(96, 63, 128, .06);
+}
+body.theme-wb-light .dp-nav-btn:hover .dp-nav-icon,
+body.theme-wb-light .dp-nav-btn:focus-visible .dp-nav-icon,
+body.theme-ocean-glass .dp-nav-btn:hover .dp-nav-icon,
+body.theme-ocean-glass .dp-nav-btn:focus-visible .dp-nav-icon {
+  background: color-mix(in srgb, var(--wb) 10%, #ffffff 90%);
 }
 body.theme-wb-light .dp-sidebar-toggle {
   background: color-mix(in srgb, white 96%, var(--wb) 4%);
@@ -2252,8 +2717,77 @@ body.theme-wb-light .dp-tt-tag {
   position: fixed; inset: 0; z-index: 100;
   display: flex; align-items: center; justify-content: center;
   background: var(--bg);
+  padding: 28px;
 }
 .dp-auth.hidden { display: none; }
+.dp-auth-shell {
+  width: min(1120px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, .92fr);
+  gap: 24px;
+  align-items: center;
+}
+.dp-auth-stage {
+  position: relative;
+  min-height: 560px;
+  padding: 30px;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 32%, transparent);
+  background:
+    radial-gradient(circle at 16% 18%, color-mix(in srgb, var(--wb) 14%, transparent), transparent 32%),
+    radial-gradient(circle at 84% 24%, rgba(92, 229, 255, .16), transparent 26%),
+    linear-gradient(155deg, color-mix(in srgb, var(--card) 92%, var(--wb) 8%), color-mix(in srgb, var(--card) 78%, var(--wb-deep) 22%));
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.dp-auth-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.10), transparent 34%),
+    linear-gradient(transparent 0 calc(100% - 1px), rgba(255,255,255,.03) calc(100% - 1px) 100%),
+    linear-gradient(90deg, transparent 0 calc(100% - 1px), rgba(255,255,255,.03) calc(100% - 1px) 100%);
+  background-size: auto, 100% 38px, 38px 100%;
+  pointer-events: none;
+}
+.dp-auth-stage-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 420px;
+}
+.dp-auth-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--muted) 58%, var(--text) 42%);
+}
+.dp-auth-hero-title {
+  margin-top: 12px;
+  font-size: clamp(38px, 5vw, 60px);
+  line-height: .95;
+  font-weight: 900;
+  letter-spacing: -.05em;
+  color: var(--text);
+}
+.dp-auth-hero-note {
+  margin-top: 14px;
+  max-width: 440px;
+  font-size: 15px;
+  line-height: 1.65;
+  font-weight: 550;
+  color: color-mix(in srgb, var(--muted) 68%, var(--text) 32%);
+}
+.dp-auth-hero-visual {
+  position: absolute;
+  right: clamp(8px, 1.8vw, 28px);
+  bottom: 6px;
+  width: min(48%, 470px);
+  aspect-ratio: 1 / 1.08;
+  z-index: 1;
+  filter: drop-shadow(0 24px 48px rgba(18, 16, 46, .18));
+}
 .dp-auth-card {
   background: color-mix(in srgb, var(--card) 90%, transparent);
   border: 1px solid var(--line); border-radius: 18px;
@@ -2302,6 +2836,34 @@ body.theme-wb-light .dp-tt-tag {
 
 /* Mobile */
 @media (max-width: 980px) {
+  .dp-topbar-mascot {
+    display: none;
+  }
+  .dp-auth {
+    padding: 18px;
+    align-items: stretch;
+    overflow-y: auto;
+  }
+  .dp-auth-shell {
+    grid-template-columns: 1fr;
+    width: 100%;
+    align-items: stretch;
+  }
+  .dp-auth-stage {
+    min-height: 360px;
+    padding: 22px;
+  }
+  .dp-auth-hero-visual {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: min(100%, 320px);
+    margin: 24px auto 0;
+  }
+  .dp-auth-card {
+    width: 100%;
+    max-width: 100%;
+  }
   .dp-shell { grid-template-columns: 1fr !important; height: auto; overflow: auto; }
   .dp-sidebar {
     position: fixed; top: var(--topbar-h); left: 0; bottom: 0;
@@ -2343,7 +2905,10 @@ body, .dp-topbar, .dp-sidebar, .dp-modal, .dp-btn, .dp-role-btn, .dp-nav-btn, .d
   .rb-auth-screen {
     position: fixed;
     inset: 0;
-    background: url("./dom_pitona_logo1.png") center center / contain no-repeat;
+    background:
+      radial-gradient(circle at 22% 24%, rgba(140, 255, 178, 0.16), transparent 24%),
+      radial-gradient(circle at 76% 20%, rgba(96, 198, 255, 0.14), transparent 22%),
+      linear-gradient(160deg, #140021 0%, #1b1032 52%, #13243f 100%);
     background-color: #140021;
     display: flex;
     justify-content: center;
@@ -3576,9 +4141,254 @@ function useToast() {
   return [toast, showToast];
 }
 
+// Legacy mascot state shims kept to avoid runtime crashes from stale cached code.
+const MASCOT_STATES = [{ id: 'neutral', label: 'neutral', title: 'neutral', note: '' }];
+const MASCOT_STATE_MAP = { neutral: MASCOT_STATES[0] };
+
+// ── Python House Mascot ───────────────────────────────────────────────────
+function PythonHouseMascot({ variant = 'panel', stateId = 'neutral', idSuffix = 'mascot', className = '' }) {
+  const isMini = variant === 'mini';
+  const isHero = variant === 'hero';
+  const ids = {
+    aura: `ph-aura-${idSuffix}`,
+    hood: `ph-hood-${idSuffix}`,
+    hoodInner: `ph-hood-inner-${idSuffix}`,
+    skin: `ph-skin-${idSuffix}`,
+    skinSoft: `ph-skin-soft-${idSuffix}`,
+    belly: `ph-belly-${idSuffix}`,
+    hoodie: `ph-hoodie-${idSuffix}`,
+    coil: `ph-coil-${idSuffix}`,
+    eye: `ph-eye-${idSuffix}`,
+    glare: `ph-glare-${idSuffix}`,
+    badge: `ph-badge-${idSuffix}`
+  };
+
+  if (isMini) {
+    return html`
+      <svg class=${`ph-mascot ph-mascot--mini ph-mascot--${stateId} ${className}`.trim()} viewBox="0 0 88 88" aria-hidden="true">
+        <defs>
+          <radialGradient id=${ids.aura} cx="50%" cy="40%" r="70%">
+            <stop offset="0%" stop-color="#F7FBFF"/>
+            <stop offset="60%" stop-color="#E9D7FF"/>
+            <stop offset="100%" stop-color="#C88BFF"/>
+          </radialGradient>
+          <linearGradient id=${ids.hood} x1="14" y1="16" x2="74" y2="74" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#54D9FF"/>
+            <stop offset="52%" stop-color="#4A81FF"/>
+            <stop offset="100%" stop-color="#8C54FF"/>
+          </linearGradient>
+          <linearGradient id=${ids.hoodInner} x1="18" y1="18" x2="66" y2="68" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#11203D"/>
+            <stop offset="100%" stop-color="#1B0F31"/>
+          </linearGradient>
+          <linearGradient id=${ids.skin} x1="26" y1="22" x2="58" y2="58" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#C4FF6C"/>
+            <stop offset="40%" stop-color="#61D84E"/>
+            <stop offset="100%" stop-color="#1D9A53"/>
+          </linearGradient>
+          <linearGradient id=${ids.belly} x1="36" y1="50" x2="50" y2="71" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#FFF8E6"/>
+            <stop offset="100%" stop-color="#F0D7B2"/>
+          </linearGradient>
+          <radialGradient id=${ids.eye} cx="50%" cy="38%" r="70%">
+            <stop offset="0%" stop-color="#DDF9FF"/>
+            <stop offset="32%" stop-color="#5EEBFF"/>
+            <stop offset="100%" stop-color="#2440A8"/>
+          </radialGradient>
+        </defs>
+        <g class="ph-mascot__float">
+          <path d="M44 7L69 17L77 43L69 69L44 81L19 69L11 43L19 17L44 7Z" fill="url(#${ids.aura})" opacity=".98"/>
+          <path d="M44 11L66 20L73 43L66 66L44 77L22 66L15 43L22 20L44 11Z" fill="#FFFFFF" opacity=".72"/>
+          <path d="M44 14L63 22L69 43L63 64L44 72L25 64L19 43L25 22L44 14Z" fill="url(#${ids.hood})"/>
+          <path d="M44 19L58 25L63 43L58 61L44 67L30 61L25 43L30 25L44 19Z" fill="url(#${ids.hoodInner})"/>
+          <g class="ph-mascot__head">
+            <path d="M44 22C51 22 57 27 58 35C59 43 56 50 50 54L50 63C50 68 47 72 44 72C41 72 38 68 38 63V54C32 50 29 43 30 35C31 27 37 22 44 22Z" fill="url(#${ids.skin})" stroke="#0E7C50" stroke-width="1.6"/>
+            <path d="M38 50H50V64C50 69 47 72 44 72C41 72 38 69 38 64V50Z" fill="url(#${ids.belly})"/>
+            <path d="M33 35C35 32 38 30 44 30C50 30 53 32 55 35" fill="none" stroke="#E6FFB7" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M35 28C37 26 40 25 44 25C48 25 51 26 53 28" fill="none" stroke="#B2FF94" stroke-width="1.6" stroke-linecap="round" opacity=".85"/>
+            <ellipse cx="37" cy="40" rx="5.6" ry="6.8" fill="white"/>
+            <ellipse cx="51" cy="40" rx="5.6" ry="6.8" fill="white"/>
+            <ellipse cx="37" cy="40.5" rx="4.4" ry="5.8" fill="url(#${ids.eye})"/>
+            <ellipse cx="51" cy="40.5" rx="4.4" ry="5.8" fill="url(#${ids.eye})"/>
+            <ellipse cx="38" cy="42" rx="2" ry="2.7" fill="#111731"/>
+            <ellipse cx="52" cy="42" rx="2" ry="2.7" fill="#111731"/>
+            <circle cx="39.5" cy="39.4" r="1.2" fill="#fff"/>
+            <circle cx="53.5" cy="39.4" r="1.2" fill="#fff"/>
+            <g class="ph-mascot__blink">
+              <path d="M32.5 39.5C34.4 37.6 36.2 36.8 38.8 36.8C41 36.8 42.8 37.6 44 39.5" fill="none" stroke="#1D8A55" stroke-width="2.2" stroke-linecap="round"/>
+              <path d="M44 39.5C45.9 37.6 47.7 36.8 50.3 36.8C52.5 36.8 54.3 37.6 55.5 39.5" fill="none" stroke="#1D8A55" stroke-width="2.2" stroke-linecap="round"/>
+            </g>
+            <ellipse cx="41" cy="48" rx="1.2" ry="1.5" fill="#16352A"/>
+            <ellipse cx="47" cy="48" rx="1.2" ry="1.5" fill="#16352A"/>
+            <path d="M36.5 53C38.4 56 41 57.4 44 57.4C47 57.4 49.6 56 51.5 53" fill="none" stroke="#14392B" stroke-width="2.1" stroke-linecap="round"/>
+            <path class="ph-mascot__tongue" d="M44 55.4L42 59.6L44 63.2L46 59.6L44 55.4Z" fill="#FF7B9D"/>
+          </g>
+        </g>
+      </svg>`;
+  }
+
+  const accent = stateId === 'thinking'
+    ? html`<g class="ph-mascot__accent" transform="translate(244 44)">
+        <circle cx="0" cy="0" r="23" fill="rgba(31,95,207,.92)" stroke="#CFF4FF" stroke-width="3"/>
+        <text x="0" y="6" fill="#FFFFFF" text-anchor="middle" font-size="17" font-weight="800" font-family="Inter, system-ui, sans-serif">&lt;/&gt;</text>
+      </g>`
+    : stateId === 'success'
+      ? html`<g class="ph-mascot__accent" transform="translate(246 44)">
+          <circle cx="0" cy="0" r="22" fill="rgba(17,176,92,.94)" stroke="#E7FFEF" stroke-width="3"/>
+          <path d="M-8 1L-2 7L9 -6" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>`
+      : stateId === 'oops'
+        ? html`<g class="ph-mascot__accent" transform="translate(246 44)">
+            <circle cx="0" cy="0" r="22" fill="rgba(244,134,52,.96)" stroke="#FFF4D9" stroke-width="3"/>
+            <text x="0" y="6" fill="#FFFFFF" text-anchor="middle" font-size="20" font-weight="900" font-family="Inter, system-ui, sans-serif">!</text>
+          </g>`
+        : stateId === 'idle'
+          ? html`<g class="ph-mascot__accent" transform="translate(248 42)">
+              <text x="0" y="0" fill="#DCE7FF" text-anchor="middle" font-size="16" font-weight="800" font-family="Inter, system-ui, sans-serif">Z</text>
+              <text x="10" y="-10" fill="#B8C8FF" text-anchor="middle" font-size="12" font-weight="800" font-family="Inter, system-ui, sans-serif">z</text>
+            </g>`
+          : html`<g class="ph-mascot__accent" transform="translate(248 44)">
+              <circle cx="0" cy="0" r="9" fill="#FFD66E"/>
+              <circle cx="-2" cy="-2" r="2" fill="#FFF6D1"/>
+            </g>`;
+
+  return html`
+    <svg class=${`ph-mascot ph-mascot--${variant} ph-mascot--${stateId} ${className}`.trim()} viewBox="0 0 320 280" aria-hidden="true">
+      <defs>
+        <radialGradient id=${ids.aura} cx="50%" cy="44%" r="60%">
+          <stop offset="0%" stop-color="#FFFFFF"/>
+          <stop offset="58%" stop-color="#D8E5FF"/>
+          <stop offset="100%" stop-color="#CFA3FF"/>
+        </radialGradient>
+        <linearGradient id=${ids.hood} x1="86" y1="28" x2="230" y2="178" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#58E3FF"/>
+          <stop offset="35%" stop-color="#4E8DFF"/>
+          <stop offset="100%" stop-color="#8B4FFF"/>
+        </linearGradient>
+        <linearGradient id=${ids.hoodInner} x1="102" y1="58" x2="214" y2="168" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#10253F"/>
+          <stop offset="100%" stop-color="#170D2C"/>
+        </linearGradient>
+        <linearGradient id=${ids.skin} x1="118" y1="58" x2="215" y2="170" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#D2FF6B"/>
+          <stop offset="35%" stop-color="#6CE056"/>
+          <stop offset="100%" stop-color="#159655"/>
+        </linearGradient>
+        <linearGradient id=${ids.skinSoft} x1="104" y1="74" x2="215" y2="184" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#A8F56A"/>
+          <stop offset="100%" stop-color="#26B76A"/>
+        </linearGradient>
+        <linearGradient id=${ids.belly} x1="150" y1="134" x2="170" y2="244" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#FFF8E8"/>
+          <stop offset="100%" stop-color="#ECCB9F"/>
+        </linearGradient>
+        <linearGradient id=${ids.hoodie} x1="96" y1="152" x2="240" y2="248" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#76D3FF"/>
+          <stop offset="55%" stop-color="#3D88FF"/>
+          <stop offset="100%" stop-color="#243C8D"/>
+        </linearGradient>
+        <linearGradient id=${ids.coil} x1="66" y1="190" x2="246" y2="252" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#B8FF6C"/>
+          <stop offset="44%" stop-color="#63D853"/>
+          <stop offset="100%" stop-color="#18A258"/>
+        </linearGradient>
+        <radialGradient id=${ids.eye} cx="50%" cy="36%" r="70%">
+          <stop offset="0%" stop-color="#F5FFFF"/>
+          <stop offset="26%" stop-color="#76F3FF"/>
+          <stop offset="100%" stop-color="#2340AE"/>
+        </radialGradient>
+        <radialGradient id=${ids.glare} cx="40%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#FFFFFF" stop-opacity=".96"/>
+          <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id=${ids.badge} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#63D8FF"/>
+          <stop offset="100%" stop-color="#FFF082"/>
+        </linearGradient>
+      </defs>
+
+      ${isHero && html`
+        <g opacity=".8">
+          <rect x="18" y="24" width="284" height="232" rx="28" fill="#0F1830" opacity=".28"/>
+          <ellipse class="ph-mascot__aura" cx="158" cy="126" rx="118" ry="102" fill="url(#${ids.aura})" opacity=".72"/>
+          <path d="M40 86H88" stroke="#59E6FF" stroke-width="4" stroke-linecap="round" opacity=".75"/>
+          <path d="M42 98H72" stroke="#7DD1FF" stroke-width="4" stroke-linecap="round" opacity=".56"/>
+          <path d="M232 92H276" stroke="#D9E68A" stroke-width="4" stroke-linecap="round" opacity=".6"/>
+          <path d="M236 106H266" stroke="#D9E68A" stroke-width="4" stroke-linecap="round" opacity=".45"/>
+        </g>`}
+
+      <g class="ph-mascot__float">
+        <g class="ph-mascot__codebit ph-mascot__codebit--a" opacity=".4">
+          <path d="M38 202L54 188M38 214L54 200" stroke="#8BEFFF" stroke-width="4" stroke-linecap="round"/>
+        </g>
+        <g class="ph-mascot__codebit ph-mascot__codebit--b" opacity=".34">
+          <path d="M246 188H268M246 198H264M246 208H276" stroke="#DDF98A" stroke-width="4" stroke-linecap="round"/>
+        </g>
+        <g class="ph-mascot__codebit ph-mascot__codebit--c" opacity=".28">
+          <path d="M62 110C74 103 86 103 98 110" fill="none" stroke="#69E5FF" stroke-width="3" stroke-linecap="round"/>
+        </g>
+
+        <ellipse cx="160" cy="246" rx="98" ry="18" fill="#1B1332" opacity=".16"/>
+        <g transform="translate(58 178)">
+          <path d="M18 36C48 14 96 6 154 8C196 10 220 18 234 34C215 53 179 60 122 60C72 60 34 52 18 36Z" fill="url(#${ids.coil})" stroke="#0E8E58" stroke-width="4"/>
+          <path d="M50 39C82 26 127 23 181 29" fill="none" stroke="#E7FFB6" stroke-width="3.5" stroke-linecap="round" opacity=".72"/>
+          <path d="M42 49C84 39 132 39 192 47" fill="none" stroke="#78F48B" stroke-width="3" stroke-linecap="round" opacity=".56"/>
+        </g>
+
+        <g transform="translate(88 136)">
+          <path d="M16 86C22 34 58 8 126 8C188 8 226 34 234 86C212 100 183 109 145 112V91C145 80 137 71 126 71C115 71 107 80 107 91V112C69 109 38 100 16 86Z" fill="url(#${ids.hoodie})" stroke="#224897" stroke-width="4"/>
+          <path d="M58 18L44 60" fill="none" stroke="#DDE9FF" stroke-width="4" stroke-linecap="round"/>
+          <path d="M192 18L206 60" fill="none" stroke="#DDE9FF" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="42" cy="62" r="5" fill="#F5FAFF"/>
+          <circle cx="208" cy="62" r="5" fill="#F5FAFF"/>
+          <rect x="104" y="54" width="44" height="38" rx="14" fill="#15274A" opacity=".32"/>
+          <path d="M119 63C126 57 136 57 143 63C136 66 133 71 133 78C126 78 121 73 119 63Z" fill="url(#${ids.badge})"/>
+          <path d="M131 76C137 70 145 71 151 76C146 79 142 83 142 89C135 89 131 84 131 76Z" fill="url(#${ids.badge})"/>
+        </g>
+
+        <g class="ph-mascot__head">
+          <path d="M76 38C88 18 112 8 160 8C208 8 232 18 244 38C227 44 214 56 205 74L115 74C107 57 93 45 76 38Z" fill="url(#${ids.hood})" opacity=".92"/>
+          <path d="M90 46C105 24 127 16 160 16C193 16 215 24 230 46C214 54 203 64 196 78H124C117 64 106 54 90 46Z" fill="url(#${ids.hoodInner})"/>
+          <path class="ph-mascot__hood-line" d="M103 43C118 26 135 20 160 20C185 20 202 26 217 43" fill="none" stroke="#F0FFB5" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+
+          <path d="M160 44C186 44 207 63 207 90C207 114 191 136 173 148L173 188C173 208 167 220 160 220C153 220 147 208 147 188V148C129 136 113 114 113 90C113 63 134 44 160 44Z" fill="url(#${ids.skin})" stroke="#0C8B58" stroke-width="4"/>
+          <path d="M141 132H179V188C179 210 170 220 160 220C150 220 141 210 141 188V132Z" fill="url(#${ids.belly})"/>
+          <path d="M129 86C135 74 146 68 160 68C174 68 185 74 191 86" fill="none" stroke="#F1FFBC" stroke-width="4" stroke-linecap="round"/>
+          <path d="M124 63C133 55 145 52 160 52C175 52 187 55 196 63" fill="none" stroke="#9EFF82" stroke-width="3" stroke-linecap="round" opacity=".82"/>
+          <path d="M126 122C138 113 146 110 160 110C174 110 182 113 194 122" fill="none" stroke="#0EA15B" stroke-width="3" stroke-linecap="round" opacity=".6"/>
+
+          <ellipse cx="138" cy="96" rx="20" ry="24" fill="#FFFFFF"/>
+          <ellipse cx="182" cy="96" rx="20" ry="24" fill="#FFFFFF"/>
+          <ellipse cx="138" cy="98" rx="15" ry="20" fill="url(#${ids.eye})"/>
+          <ellipse cx="182" cy="98" rx="15" ry="20" fill="url(#${ids.eye})"/>
+          <ellipse cx="142" cy="103" rx="6.5" ry="9" fill="#11162E"/>
+          <ellipse cx="186" cy="103" rx="6.5" ry="9" fill="#11162E"/>
+          <ellipse cx="146" cy="92" rx="5" ry="7" fill="url(#${ids.glare})"/>
+          <ellipse cx="190" cy="92" rx="5" ry="7" fill="url(#${ids.glare})"/>
+          <g class="ph-mascot__blink">
+            <path d="M120 97C126 89 132 86 140 86C147 86 153 89 158 97" fill="none" stroke="#178B54" stroke-width="6" stroke-linecap="round"/>
+            <path d="M164 97C170 89 176 86 184 86C191 86 197 89 202 97" fill="none" stroke="#178B54" stroke-width="6" stroke-linecap="round"/>
+          </g>
+
+          <ellipse cx="151" cy="118" rx="3.5" ry="4.2" fill="#13352C"/>
+          <ellipse cx="169" cy="118" rx="3.5" ry="4.2" fill="#13352C"/>
+          <path d="M128 134C136 145 146 150 160 150C174 150 184 145 192 134" fill="none" stroke="#10352A" stroke-width="5" stroke-linecap="round"/>
+          <path class="ph-mascot__tongue" d="M160 146L152 165L160 179L168 165L160 146Z" fill="#FF7B97"/>
+        </g>
+
+        ${accent}
+        ${isHero && html`
+          <g opacity=".88">
+            <path d="M264 60L284 50L294 64L277 73Z" fill="#52D8FF"/>
+            <path d="M274 52C279 46 286 44 296 48" fill="none" stroke="#DFFB7C" stroke-width="3" stroke-linecap="round"/>
+          </g>`}
+      </g>
+    </svg>`;
+}
+
 // ── NavIcon ────────────────────────────────────────────────────────────────
 function NavIcon({ id }) {
-  return html`<svg class="dp-nav-icon-svg" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:inherit">
+  return html`<svg class="dp-nav-icon-svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="inherit" aria-hidden="true">
     <use href=${`#icon-${id}`} />
   </svg>`;
 }
@@ -3598,8 +4408,8 @@ function Sidebar({ collapsed, role, login, activeModule, accessMap, userAccessMa
     <aside class="dp-sidebar">
       <div class="dp-sidebar-head">
         <div class="dp-sidebar-head-top">
-          <div class="dp-sidebar-mark">
-            <img src="dom_pitona_logo1.png" alt="" class="dp-mark-art" />
+          <div class="dp-sidebar-mark" aria-hidden="true">
+            <${PythonHouseMascot} variant="mini" stateId="neutral" idSuffix="sidebar-mark" className="dp-mark-art dp-mark-art--reference" />
           </div>
           ${!collapsed && html`<div>
             <div class="dp-sidebar-title">Дом Питона</div>
@@ -3638,9 +4448,7 @@ function Sidebar({ collapsed, role, login, activeModule, accessMap, userAccessMa
             aria-label=${item.label}
           >
             <span class="dp-nav-icon">
-              <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round">
-                <use href=${`#icon-${item.icon}`} />
-              </svg>
+              ${NavIcon({ id: item.icon })}
             </span>
             ${!collapsed && html`<span class="dp-nav-label">${item.label}</span>`}
           </button>`;
@@ -3672,8 +4480,8 @@ function TopBar({ role, roleLabel, menuOpen, themeOpen, currentTheme, onMenuTogg
         </svg>
       </button>
       <div class="dp-brand">
-        <div class="dp-brand-mark">
-          <img src="dom_pitona_logo1.png" alt="" class="dp-mark-art" />
+        <div class="dp-brand-mark" aria-hidden="true">
+          <${PythonHouseMascot} variant="mini" stateId="neutral" idSuffix="topbar-mark" className="dp-mark-art dp-mark-art--reference" />
         </div>
         <div class="dp-brand-text">
           <div class="dp-brand-name">Дом Питона</div>
@@ -4004,20 +4812,32 @@ function AuthScreen({ onAuth }) {
   }
 
   return html`<div class="dp-auth">
-    <form class="dp-auth-card" onSubmit=${handleSubmit} autocomplete="off">
-      <div class="dp-auth-title">Вход</div>
-      <div class="dp-auth-note">Доступ к дашборду по логину и паролю</div>
-      <div class="dp-auth-field">
-        <label>Логин</label>
-        <input value=${loginVal} onInput=${e => setLoginVal(e.target.value)} placeholder="Введите логин" autocomplete="username"/>
-      </div>
-      <div class="dp-auth-field">
-        <label>Пароль</label>
-        <input type="password" value=${passVal} onInput=${e => setPassVal(e.target.value)} placeholder="Введите пароль" autocomplete="current-password"/>
-      </div>
-      <div class="dp-auth-error">${err}</div>
-      <button type="submit" class="dp-auth-btn">Войти</button>
-    </form>
+    <div class="dp-auth-shell">
+      <section class="dp-auth-stage" aria-hidden="true">
+        <div class="dp-auth-stage-copy">
+          <div class="dp-auth-kicker">Python House Interface</div>
+          <div class="dp-auth-hero-title">Дом Питона</div>
+          <div class="dp-auth-hero-note">Дашборд релизов, аналитики и контроля качества с бренд-маскотом для приветственного экрана, онбординга и понятного входа в продукт.</div>
+        </div>
+        <div class="dp-auth-hero-visual">
+          <${PythonHouseMascot} variant="hero" stateId="neutral" idSuffix="auth-hero" />
+        </div>
+      </section>
+      <form class="dp-auth-card" onSubmit=${handleSubmit} autocomplete="off">
+        <div class="dp-auth-title">Вход</div>
+        <div class="dp-auth-note">Доступ к дашборду по логину и паролю</div>
+        <div class="dp-auth-field">
+          <label>Логин</label>
+          <input value=${loginVal} onInput=${e => setLoginVal(e.target.value)} placeholder="Введите логин" autocomplete="username"/>
+        </div>
+        <div class="dp-auth-field">
+          <label>Пароль</label>
+          <input type="password" value=${passVal} onInput=${e => setPassVal(e.target.value)} placeholder="Введите пароль" autocomplete="current-password"/>
+        </div>
+        <div class="dp-auth-error">${err}</div>
+        <button type="submit" class="dp-auth-btn">Войти</button>
+      </form>
+    </div>
   </div>`;
 }
 
@@ -4229,7 +5049,13 @@ function App() {
         onHoverHintClear=${clearNavHint}
       />
       <div class="dp-content">
-        <iframe ref=${iframeRef} class="dp-iframe" id="rbModuleFrame" title="Модуль" src=${activeModule}/>
+        <iframe
+          ref=${iframeRef}
+          class="dp-iframe"
+          id="rbModuleFrame"
+          title="Модуль"
+          src=${activeModule}
+        />
       </div>
     </div>
     ${modal && html`<${TeamModal}
