@@ -1,0 +1,98 @@
+diff --git a/index-stable.html b/index-stable.html
+index 4b3849b..99ced70 100644
+--- a/index-stable.html
++++ b/index-stable.html
+@@ -21,6 +21,7 @@
+     const VALID_MODES = new Set(['experimental', 'stable']);
+     const params = new URLSearchParams(window.location.search);
+     const queryMode = params.get('mode');
++    const previewMode = params.get('preview') === '1';
+     let storedMode = null;
+ 
+     try {
+@@ -32,9 +33,11 @@
+       : (VALID_MODES.has(storedMode) ? storedMode : 'stable');
+ 
+     if (currentMode === 'experimental') {
+-      try {
+-        localStorage.setItem(SHELL_VARIANT_KEY, 'experimental');
+-      } catch (e) {}
++      if (!previewMode) {
++        try {
++          localStorage.setItem(SHELL_VARIANT_KEY, 'experimental');
++        } catch (e) {}
++      }
+       params.set('mode', 'experimental');
+       const query = params.toString();
+       const nextUrl = query ? `${INDEX_SHELL_URL}?${query}` : `${INDEX_SHELL_URL}?mode=experimental`;
+@@ -42,9 +45,11 @@
+       return;
+     }
+ 
+-    try {
+-      localStorage.setItem(SHELL_VARIANT_KEY, 'stable');
+-    } catch (e) {}
++    if (!previewMode) {
++      try {
++        localStorage.setItem(SHELL_VARIANT_KEY, 'stable');
++      } catch (e) {}
++    }
+   })();
+ </script>
+ 
+@@ -2220,7 +2225,6 @@ document.addEventListener('DOMContentLoaded', () => {
+     <button data-module="Сбор ЧП.html"data-guard="shell--finalchp">Сбор ЧП</button>
+     <button data-module="УВУ.html"data-guard="shell--finalchp">Расчет uWu</button>
+     <button data-module="BiUser.html"data-guard="shell--finalchp">Пользователи по версиям</button>
+-    <button data-module="Популярные устройства.html"data-guard="shell--finalchp">Популярные устройства</button>
+     <button data-module="Графики.html"data-guard="shell--finalchp">Графики</button>
+     <button data-module="SWAT релиз.html"data-guard="shell--finalchp">SWAT релиз</button>
+     <button data-module="Копирование данных из YT.html"data-guard="shell--finalchp">Epic / User Story</button>
+diff --git a/index.html b/index.html
+index 7bd9fb7..9531656 100644
+--- a/index.html
++++ b/index.html
+@@ -22,6 +22,7 @@
+     const VALID_MODES = new Set(['experimental', 'stable']);
+     const params = new URLSearchParams(window.location.search);
+     const queryMode = params.get('mode');
++    const previewMode = params.get('preview') === '1';
+     let storedMode = null;
+ 
+     try {
+@@ -32,9 +33,11 @@
+       ? queryMode
+       : (VALID_MODES.has(storedMode) ? storedMode : 'stable');
+ 
+-    try {
+-      localStorage.setItem(SHELL_VARIANT_KEY, currentMode);
+-    } catch (e) {}
++    if (!previewMode) {
++      try {
++        localStorage.setItem(SHELL_VARIANT_KEY, currentMode);
++      } catch (e) {}
++    }
+ 
+     if (currentMode === 'stable') {
+       params.set('mode', 'stable');
+diff --git a/indexNEW.html b/indexNEW.html
+index 4de0823..e534de3 100644
+--- a/indexNEW.html
++++ b/indexNEW.html
+@@ -6,15 +6,10 @@
+ <title>Дом Питона — Shell</title>
+ <script>
+   (() => {
+-    const SHELL_VARIANT_KEY = 'rb_shell_design_mode_v1';
+     const INDEX_SHELL_URL = 'index.html';
+     const params = new URLSearchParams(window.location.search);
+-
+-    try {
+-      localStorage.setItem(SHELL_VARIANT_KEY, 'experimental');
+-    } catch (e) {}
+-
+     params.set('mode', 'experimental');
++    params.set('preview', '1');
+     const query = params.toString();
+     window.location.replace(query ? `${INDEX_SHELL_URL}?${query}` : `${INDEX_SHELL_URL}?mode=experimental`);
+   })();
