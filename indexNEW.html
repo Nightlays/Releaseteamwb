@@ -6,15 +6,11 @@
 <title>Дом Питона — Shell</title>
 <script>
   (() => {
-    const SHELL_VARIANT_KEY = 'rb_shell_design_mode_v1';
     const INDEX_SHELL_URL = 'index.html';
     const params = new URLSearchParams(window.location.search);
 
-    try {
-      localStorage.setItem(SHELL_VARIANT_KEY, 'experimental');
-    } catch (e) {}
-
     params.set('mode', 'experimental');
+    params.set('preview', '1');
     const query = params.toString();
     window.location.replace(query ? `${INDEX_SHELL_URL}?${query}` : `${INDEX_SHELL_URL}?mode=experimental`);
   })();

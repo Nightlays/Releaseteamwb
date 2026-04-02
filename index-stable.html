@@ -21,6 +21,7 @@
     const VALID_MODES = new Set(['experimental', 'stable']);
     const params = new URLSearchParams(window.location.search);
     const queryMode = params.get('mode');
+    const previewMode = params.get('preview') === '1';
     let storedMode = null;
 
     try {
@@ -32,9 +33,11 @@
       : (VALID_MODES.has(storedMode) ? storedMode : 'stable');
 
     if (currentMode === 'experimental') {
-      try {
-        localStorage.setItem(SHELL_VARIANT_KEY, 'experimental');
-      } catch (e) {}
+      if (!previewMode) {
+        try {
+          localStorage.setItem(SHELL_VARIANT_KEY, 'experimental');
+        } catch (e) {}
+      }
       params.set('mode', 'experimental');
       const query = params.toString();
       const nextUrl = query ? `${INDEX_SHELL_URL}?${query}` : `${INDEX_SHELL_URL}?mode=experimental`;
@@ -42,9 +45,11 @@
       return;
     }
 
-    try {
-      localStorage.setItem(SHELL_VARIANT_KEY, 'stable');
-    } catch (e) {}
+    if (!previewMode) {
+      try {
+        localStorage.setItem(SHELL_VARIANT_KEY, 'stable');
+      } catch (e) {}
+    }
   })();
 </script>
 
@@ -2220,7 +2225,6 @@ document.addEventListener('DOMContentLoaded', () => {
     <button data-module="Сбор ЧП.html"data-guard="shell--finalchp">Сбор ЧП</button>
     <button data-module="УВУ.html"data-guard="shell--finalchp">Расчет uWu</button>
     <button data-module="BiUser.html"data-guard="shell--finalchp">Пользователи по версиям</button>
-    <button data-module="Популярные устройства.html"data-guard="shell--finalchp">Популярные устройства</button>
     <button data-module="Графики.html"data-guard="shell--finalchp">Графики</button>
     <button data-module="SWAT релиз.html"data-guard="shell--finalchp">SWAT релиз</button>
     <button data-module="Копирование данных из YT.html"data-guard="shell--finalchp">Epic / User Story</button>

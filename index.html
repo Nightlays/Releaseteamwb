@@ -8,7 +8,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Onest:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
 <!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Дом Питона — Release Team</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- ExcelJS (не используется напрямую, оставляю как было) -->
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- SheetJS (Excel) -->
@@ -22,6 +28,7 @@
     const VALID_MODES = new Set(['experimental', 'stable']);
     const params = new URLSearchParams(window.location.search);
     const queryMode = params.get('mode');
+    const previewMode = params.get('preview') === '1';
     let storedMode = null;
 
     try {
@@ -30,11 +37,13 @@
 
     const currentMode = VALID_MODES.has(queryMode)
       ? queryMode
-      : (VALID_MODES.has(storedMode) ? storedMode : 'stable');
+      : (VALID_MODES.has(storedMode) ? storedMode : 'experimental');
 
-    try {
-      localStorage.setItem(SHELL_VARIANT_KEY, currentMode);
-    } catch (e) {}
+    if (!previewMode) {
+      try {
+        localStorage.setItem(SHELL_VARIANT_KEY, currentMode);
+      } catch (e) {}
+    }
 
     if (currentMode === 'stable') {
       params.set('mode', 'stable');
@@ -45,794 +54,9 @@
   })();
 </script>
 
-<style>
-  /* ---------------- Wildberries Theme (drop-in) ---------------- */
-  :root{
-    /* Базовая палитра (светлая) */
-    --bg:#faf7fc;            /* фон страницы */
-    --card:#ffffff;          /* фон карточек */
-    --text:#2a1446;          /* основной текст */
-    --muted:#8d77a6;         /* вторичный текст */
 
-    /* Бренд / акценты */
-    --wb:#cb11ab;            /* магента WB */
-    --wb-deep:#6e0bd4;       /* фирм. фиолетовый */
-    --grad:linear-gradient(135deg, var(--wb) 0%, var(--wb-deep) 100%);
-
-    /* Цвета метрик (читает JS) */
-    --c1:#7a3af9;            /* total */
-    --c2:#00c48c;            /* finished */
-    --c3:#ffb020;            /* remaining */
-    --c4:#ff5aad;            /* in_progress */
-
-    /* Контролы/бордеры */
-    --line:#efe5f7;
-    --line-strong:#e7d8f4;
-    --ink:#3a235b;
-    --btn-bg:#ffffff;
-    --btn-br:#e6d9f4;
-    --btn-hl:rgba(203,17,171,.08);
-
-    /* Семантика */
-    --ok:#12b76a;
-    --bad:#ef4444;
-
-    /* Доп. визуал */
-    --shadow-lg:0 14px 44px rgba(103,39,170,.12);
-    --shadow-md:0 10px 30px rgba(103,39,170,.10);
-    --shadow-sm:0 6px 20px rgba(103,39,170,.08);
-  }
-
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0;
-    background:
-      radial-gradient(1000px 600px at 0% -10%, rgba(110,11,212,.05), transparent 60%) no-repeat,
-      linear-gradient(180deg,#fbf9fe 0%, #faf7fc 45%, #ffffff 100%);
-    color:var(--text);
-    font:14px/1.55 Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-  }
-
-  /* ----- Топ-бар с логотипом WB ----- */
-  .topbar{
-    position:sticky; top:0; z-index:20;
-    background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.58));
-    backdrop-filter: blur(10px);
-    border-bottom:1px solid var(--line);
-  }
-  .topbar .inner{
-    max-width:1600px; margin:0 auto; padding:10px 20px;
-    display:flex; align-items:center; gap:14px;
-  }
-  .brand{
-    display:flex; align-items:center; gap:10px;
-    font-weight:900; letter-spacing:.2px;
-  }
-  .brand .logo{
-    width:36px; height:28px; display:inline-block;
-    filter: drop-shadow(0 10px 20px rgba(203,17,171,.35));
-  }
-  .brand .title{
-    font-size:16px; color:var(--ink);
-  }
-  .topbar .actions{
-    margin-left:auto; display:flex; gap:8px;
-  }
-  .nav-toggle{
-    display:none;
-    align-items:center;
-    justify-content:center;
-    width:40px;
-    height:40px;
-    border-radius:12px;
-    border:1px solid var(--line);
-    background:#fff;
-    color:var(--ink);
-    cursor:pointer;
-    box-shadow:var(--shadow-sm);
-    font-size:18px;
-    line-height:1;
-  }
-  .nav-toggle:hover{ border-color:var(--line-strong); }
-  .nav-toggle:active{ transform:translateY(1px); }
-
-  .wrap{max-width:1600px;margin:24px auto;padding:0 20px}
-
-  /* Заголовок страницы */
-  h1{
-    margin:12px 0 14px;
-    font-weight:900; letter-spacing:.2px; font-size:28px;
-    display:flex; align-items:center; gap:12px;
-  }
-  h1::before{
-    content:"";
-    width:28px; height:28px; border-radius:10px;
-    background:var(--grad);
-    box-shadow:0 8px 24px rgba(110,11,212,.25), inset 0 0 0 1px rgba(255,255,255,.5);
-  }
-
-  /* Табы — стеклянные плашки */
-  .tabs{display:flex; gap:10px; margin:10px 0 16px}
-  .tabs button{
-    padding:10px 14px;
-    border:1px solid var(--line);
-    border-radius:12px;
-    background:#fff;
-    color:var(--ink);
-    cursor:pointer;
-    font-weight:800;
-    transition:.15s ease, transform .06s;
-    box-shadow:var(--shadow-sm);
-  }
-  .tabs button:hover{border-color:var(--line-strong); transform:translateY(-1px)}
-  .tabs button.active{
-    color:#fff; background:var(--grad); border-color:transparent;
-    box-shadow:0 10px 24px rgba(203,17,171,.28);
-  }
-
-  /* Mobile header menu */
-  @media (max-width: 900px){
-    .topbar .inner{ position:relative; gap:10px; }
-    .nav-toggle{ display:inline-flex; margin-left:auto; }
-    .topbar .actions{ margin-left:0; }
-    .topbar-tabs{
-      position:absolute;
-      top:calc(100% + 6px);
-      left:0;
-      right:0;
-      background:rgba(255,255,255,.98);
-      border:1px solid var(--line);
-      border-radius:14px;
-      padding:10px;
-      box-shadow:var(--shadow-lg);
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:8px;
-      max-height: calc(100vh - 84px);
-      overflow:auto;
-      opacity:0;
-      pointer-events:none;
-      transform:translateY(-8px);
-      transition:opacity .2s ease, transform .2s ease;
-      z-index:40;
-    }
-    body.nav-open .topbar-tabs{
-      opacity:1;
-      pointer-events:auto;
-      transform:translateY(0);
-    }
-    body.nav-open::before{
-      content:"";
-      position:fixed;
-      inset:0;
-      background:rgba(20,0,33,.35);
-      backdrop-filter: blur(2px);
-      z-index:25;
-    }
-    .tabs{ margin:0; }
-    .tabs button{ width:100%; justify-content:flex-start; }
-  }
-
-  /* Карточки */
-  .card{
-    background:var(--card);
-    border-radius:18px;
-    border:1px solid var(--line);
-    box-shadow:var(--shadow-md);
-    padding:16px 16px 14px;
-    position:relative;
-    overflow:hidden;
-    transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
-  }
-  .card::before{
-    content:"";
-    position:absolute; inset:0 0 auto 0; height:3px;
-    background:linear-gradient(90deg, var(--wb), var(--wb-deep));
-    opacity:.18;
-  }
-  .card:hover{ transform:translateY(-2px); box-shadow:var(--shadow-lg); border-color:var(--line-strong); }
-
-  .head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end}
-  .nums{color:var(--muted);font-variant-numeric:tabular-nums}
-
-  /* Гриды */
-  .panel{display:grid;gap:12px;grid-template-columns:repeat(12, minmax(0,1fr));align-items:end}
-  .grid{display:grid;gap:18px;margin-top:16px;grid-template-columns:repeat(4,minmax(360px,1fr))}
-  @media (max-width:1400px){ .grid{grid-template-columns:repeat(3,minmax(320px,1fr));} }
-  @media (max-width:1100px){ .grid{grid-template-columns:repeat(2,minmax(320px,1fr));} }
-  @media (max-width:700px){ .grid{grid-template-columns:1fr;} }
-
-  /* Формы */
-  .field{display:grid;grid-template-rows:auto auto;gap:8px}
-  .field label{font-size:12px;color:var(--muted)}
-  .panel input,.panel select{
-    height:44px;padding:10px 12px;border-radius:12px;
-    border:1px solid var(--line);
-    background:#fff;color:var(--ink);
-    outline:none; transition:.2s;
-    box-shadow:var(--shadow-sm);
-  }
-  .panel input::placeholder{color:#bda9d4}
-  .panel input:focus,.panel select:focus{
-    border-color:transparent;
-    box-shadow:0 0 0 4px rgba(203,17,171,.22), var(--shadow-md);
-  }
-
-  /* Кнопки */
-  .btn{
-    height:44px;padding:10px 14px;border-radius:12px;
-    border:1px solid var(--btn-br);
-    background:var(--btn-bg); color:var(--ink);
-    font-weight:900; cursor:pointer;
-    transition:transform .06s, background-color .15s, box-shadow .2s, border-color .15s, filter .15s;
-    box-shadow:var(--shadow-sm);
-  }
-  .btn:hover{background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
-  .btn:active{transform:translateY(1px) scale(.995)}
-  .btn:disabled{opacity:.55; cursor:not-allowed}
-
-  .btn.primary{
-    background:var(--grad); color:#fff; border-color:transparent;
-    box-shadow:0 12px 28px rgba(203,17,171,.30);
-  }
-  .btn.success{
-    background:linear-gradient(135deg,#12b76a,#0ea65f); color:#fff; border-color:transparent;
-    box-shadow:0 12px 28px rgba(18,183,106,.22);
-  }
-  .btn.danger{
-    background:linear-gradient(135deg,#ef4444,#db2c2c); color:#fff; border-color:transparent;
-    box-shadow:0 12px 28px rgba(239,68,68,.22);
-  }
-
-  /* Чип-кнопки */
-  .mini{
-    height:28px;padding:6px 10px;border-radius:999px;
-    border:1px solid var(--line);
-    background:#fff;color:var(--ink);
-    font-size:12px;font-weight:800; line-height:1;
-    cursor:pointer; transition:.15s;
-  }
-  .mini:hover{border-color:var(--line-strong); background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
-  .mini:active{transform:translateY(1px)}
-
-  /* Чарты */
-  .chart-wrap{
-    position:relative;height:340px;display:flex;align-items:center;justify-content:center;
-    background:conic-gradient(from 110deg at 80% -40%, rgba(203,17,171,.06), transparent 35%) no-repeat,
-               radial-gradient(800px 400px at 0% -10%, rgba(110,11,212,.06), transparent 60%) no-repeat;
-    border:1px solid var(--line);
-    border-radius:16px;
-  }
-  .chart{width:100%;height:100%}
-
-  /* KPI плитки */
-  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-  .kpi{
-    display:grid;grid-template-columns:1fr auto;gap:6px;
-    padding:8px 10px;border:1px solid var(--line);
-    border-radius:12px;background:linear-gradient(180deg, #fff, #fff) padding-box,
-                                    linear-gradient(90deg, rgba(203,17,171,.2), rgba(110,11,212,.2)) border-box;
-    font-size:12px;min-height:42px;min-width:0
-  }
-  .kpi .label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .kpi .val{text-align:right;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-  /* Логи */
-  .log{
-    white-space:pre-wrap;background:#fff;border-radius:12px;padding:12px;
-    color:var(--ink);max-height:300px;min-height:140px;overflow:auto;
-    border:1px solid var(--line);
-    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    box-shadow:var(--shadow-sm);
-  }
-  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media (max-width:900px){ .split{grid-template-columns:1fr} }
-
-  /* Тост */
-  .toast{
-    position:fixed;right:16px;bottom:16px;
-    min-width:min(360px, calc(100vw - 28px));
-    max-width:min(440px, calc(100vw - 28px));
-    display:flex;
-    align-items:flex-start;
-    gap:12px;
-    background:#fff;color:var(--ink);
-    border:1px solid var(--line);padding:14px 16px;border-radius:18px;
-    box-shadow:0 12px 40px rgba(110,11,212,.18);
-    opacity:0;pointer-events:none;transition:.25s;
-    transform:translateY(12px);
-    z-index:96;
-  }
-  .toast.show{opacity:1;transform:translateY(-6px)}
-  .toast-kind{
-    flex:0 0 auto;
-    min-width:78px;
-    padding:7px 10px;
-    border-radius:999px;
-    font-size:11px;
-    font-weight:900;
-    letter-spacing:.14em;
-    text-transform:uppercase;
-    text-align:center;
-    border:1px solid color-mix(in srgb, var(--line) 86%, transparent);
-    background:color-mix(in srgb, var(--card) 92%, transparent);
-  }
-  .toast-copy{
-    min-width:0;
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-  }
-  .toast-title{
-    font-size:14px;
-    font-weight:900;
-    line-height:1.25;
-  }
-  .toast-text{
-    font-size:13px;
-    line-height:1.45;
-    color:var(--muted);
-  }
-  .toast.toast--success .toast-kind{
-    color:#0f8f53;
-    background:rgba(16,185,129,.12);
-    border-color:rgba(16,185,129,.2);
-  }
-  .toast.toast--info .toast-kind{
-    color:#2563eb;
-    background:rgba(59,130,246,.12);
-    border-color:rgba(59,130,246,.2);
-  }
-  .toast.toast--warning .toast-kind{
-    color:#b45309;
-    background:rgba(245,158,11,.14);
-    border-color:rgba(245,158,11,.22);
-  }
-  .toast.toast--error .toast-kind{
-    color:#dc2626;
-    background:rgba(239,68,68,.12);
-    border-color:rgba(239,68,68,.2);
-  }
-  @media (max-width:760px){
-    .toast{
-      left:12px;
-      right:12px;
-      bottom:12px;
-      min-width:0;
-      max-width:none;
-      padding:12px 14px;
-      gap:10px;
-    }
-    .toast-kind{
-      min-width:68px;
-      padding:6px 8px;
-      font-size:10px;
-    }
-  }
-
-  /* Срезы */
-  .snap-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-items:start}
-  .snap{
-    display:flex;align-items:center;gap:10px;
-    border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;min-width:0;
-    box-shadow:var(--shadow-sm);
-  }
-  .snap .title{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .snap .meta{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .snap .del{
-    height:28px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);
-    background:#fff;color:#a4167e; cursor:pointer
-  }
-  .snap .del:hover{background:linear-gradient(0deg, var(--btn-hl), var(--btn-hl)), #fff}
-
-  /* Прогресс */
-  .progress{
-    height:10px;background:#f5ecff;border-radius:999px;overflow:hidden;border:1px solid var(--line)
-  }
-  .progress>div{
-    height:100%;width:0;background:var(--grad); transition:width .25s ease
-  }
-
-  /* Таблицы */
-  table{border-collapse:separate;border-spacing:0;width:100%;font-variant-numeric:tabular-nums}
-  th,td{border:1px solid var(--line);padding:8px 10px;background:#fff}
-  th{
-    background:linear-gradient(180deg,#fcf8ff 0%,#fff 100%);
-    text-align:left;color:var(--ink); font-weight:900
-  }
-  td:first-child, th:first-child{border-top-left-radius:10px; border-bottom-left-radius:10px}
-  td:last-child,  th:last-child{border-top-right-radius:10px; border-bottom-right-radius:10px}
-
-  /* Пилюли / линии статуса */
-  .pill{display:inline-block;padding:3px 8px;border-radius:999px;font-weight:900}
-  .pill-ok{background:rgba(18,183,106,.12);color:#027a48;border:1px solid rgba(18,183,106,.25)}
-  .pill-bad{background:rgba(239,68,68,.12);color:#b42318;border:1px solid rgba(239,68,68,.25)}
-  .line-ok{color:#12b76a;font-weight:900}
-  .line-bad{color:#b42318;font-weight:900}
-
-  /* Фильтры блока РАН */
-  .filters{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;margin-top:10px}
-  .filters .field{grid-column:span 3}
-  .filters .field.small{grid-column:span 2}
-  @media (max-width:900px){ .filters .field{grid-column:span 6} .filters .field.small{grid-column:span 6} }
-
-  /* Ссылки/алерты */
-  .alert-row{margin:6px 0 14px 0}
-  .alert-row a{color:#7a3af9;text-decoration:none;font-weight:900}
-  .alert-row a:hover{text-decoration:underline}
-  .ok{color:var(--ok)}
-  .bad{color:var(--bad)}
-  .warn{color:var(--c3)}
-
-  /* Скроллбар (приятнее) */
-  ::-webkit-scrollbar{height:12px;width:12px}
-  ::-webkit-scrollbar-thumb{background:linear-gradient(180deg, #dcb4ef, #f0bce8); border-radius:10px; border:3px solid #fff}
-
-  /* Readiness cards */
-  .release-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-  @media (max-width:900px){ .release-row{grid-template-columns:1fr} }
-  .release-card{
-    border:1px solid var(--line); border-radius:12px; background:#fff; padding:12px;
-    box-shadow:var(--shadow-sm); display:grid; gap:10px;
-  }
-  .mini-grid{
-    display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
-    gap:12px; align-items:stretch;
-  }
-  .mini-card{
-    border:1px solid var(--line); border-radius:12px; background:#fff;
-    box-shadow:var(--shadow-sm); padding:10px;
-    display:grid; grid-template-rows:auto 120px auto; align-items:center; text-align:center;
-  }
-  .mini-title{
-    font-weight:900; font-size:12px;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  }
-  .mini-title a{ color: inherit; text-decoration: none; }
-  .mini-title a:hover{ text-decoration: underline; }
-  .mini-fig{ position:relative; height:120px; }
-  .mini-fig canvas{ width:100%; height:100%; }
-  .mini-remaining{ font-size:12px; color:var(--muted); margin-top:6px; }
-  .release-title{display:flex;justify-content:space-between;align-items:center;font-weight:900}
-  .release-sub{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center}
-  .release-chip{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-weight:800;font-size:12px}
-  .release-chip strong{font-variant-numeric:tabular-nums}
-  .release-bar{height:10px;background:#f5ecff;border-radius:999px;overflow:hidden;border:1px solid var(--line)}
-  .release-bar>div{height:100%;width:0;background:var(--grad);transition:width .25s ease}
-  .release-link{font-weight:900;color:#7a3af9;text-decoration:none}
-  .release-link:hover{text-decoration:underline}
-
-  /* Подтабы для срезов */
-  .subtabs{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px}
-  .subtabs .mini.active{ color:#fff; background:var(--grad); border-color:transparent; box-shadow:0 10px 24px rgba(203,17,171,.28); }
-
-.hidden {
-  display: none;
-}
-
-/* ================== Mobile Overrides (added by ChatGPT) ================== */
-@media (max-width: 1024px){
-  .wrap{ padding: 0 16px; }
-  .chart-wrap{ height: 300px; }
-  .kpis{ grid-template-columns: repeat(2,1fr); }
-}
-  @media (max-width: 768px){
-    body{ font-size: 13px; }
-    .topbar .inner{ padding: 8px 12px; }
-    .brand .title{ font-size: 14px; max-width: 50vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tabs:not(.topbar-tabs){ overflow:auto; }
-    .tabs:not(.topbar-tabs) button{ flex: 1 1 auto; }
-    .wrap{ padding: 0 12px; }
-  /* Panels/fields stack to one column */
-  .panel{ grid-template-columns: 1fr !important; }
-  .panel .field{ grid-column: 1 / -1 !important; }
-  /* Buttons row at the end of the panel stacks */
-  .panel > div[style*="display:flex"][style*="align-items:end"]{ flex-wrap: wrap; }
-  /* Auto-run block stacks vertically */
-  .auto{ grid-auto-flow: row !important; justify-items: start; }
-  .chart-wrap{ height: 260px; }
-  .kpis{ grid-template-columns: 1fr; }
-  .grid{ grid-template-columns: 1fr !important; }
-  .mini-grid{ grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); }
-  .release-row{ grid-template-columns: 1fr; }
-  .release-sub{ grid-template-columns: 1fr; }
-  .mini-title{ font-size: 11px; }
-  .mini-fig{ height: 100px; }
-  .log{ min-height: 120px; max-height: 220px; }
-  /* Filters on RUN tab wrap nicely */
-  .filters{ grid-template-columns: 1fr 1fr; }
-  .filters .field, .filters .field.small{ grid-column: span 2 !important; }
-  /* Tables become horizontally scrollable with better spacing */
-  table{ font-size: 12px; }
-  th, td{ padding: 6px 8px; }
-}
-@media (max-width: 480px){
-  body{ font-size: 12.5px; }
-  .brand .logo{ width: 30px; height: 24px; }
-  .brand .title{ display: none; } /* leave just the WB badge on very small screens */
-  h1{ font-size: 22px; gap: 10px; }
-  h1::before{ width: 22px; height: 22px; border-radius: 8px; }
-  .btn, .panel input, .panel select{ height: 42px; }
-  .mini{ height: 28px; }
-  .chart-wrap{ height: 220px; }
-}
-/* Improve tap experience */
-button, .btn, .mini{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-/* iOS safe-area for sticky topbar */
-.topbar{ padding-top: env(safe-area-inset-top); }
-
-</style>
-
-<script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
-
-<style id="fullscreen-ui-overrides">
-/* ===== Edge-to-edge fullscreen UI (no extra FS buttons) ===== */
-html, body { height: 100%; }
-body { margin: 0; overflow: auto; }
-.topbar { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid rgba(0,0,0,.04); }
-.topbar .inner { max-width: 100%; padding-left: 20px; padding-right: 20px; }
-.wrap { max-width: 100%; padding-left: 20px; padding-right: 20px; }
-.tabs { flex-wrap: wrap; }
-.card { border-radius: 16px; }
-.panel { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-.grid { grid-template-columns: repeat(4, minmax(280px, 1fr)); }
-.chart-wrap { height: 420px; }
-@media (max-width: 1400px){ .grid{ grid-template-columns: repeat(3, minmax(280px,1fr)); } }
-@media (max-width: 1100px){ .grid{ grid-template-columns: repeat(2, minmax(280px,1fr)); } }
-@media (max-width: 780px){
-  .panel{ grid-template-columns: 1fr !important; }
-  .panel .field{ grid-column: 1 / -1 !important; }
-  .grid{ grid-template-columns: 1fr !important; }
-  .chart-wrap{ height: 300px; }
-}
-/* Make charts and tables fill the viewport width nicely */
-#runChartWrap { height: 420px; }
-#runTable { font-size: 13px; }
-</style>
-
-
-<style id="typography-and-controls-normalize">
-/* ===== Readability & Alignment Normalize ===== */
-:root{
-  --font-ui: Inter, "SF Pro Text", -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --fg:#1b1233; --muted:#6d5d86; --soft:#f3ebff;
-  --btn-h: 42px;               /* единая высота кнопок/инпутов */
-  --inp-pad-y: 9px;            /* вертикальный паддинг инпутов */
-  --inp-pad-x: 12px;           /* горизонтальный паддинг инпутов */
-  --radius: 12px;
-}
-html, body { font-family: var(--font-ui); color: var(--fg); }
-body, input, button, select { font-size: 14.5px; line-height: 1.35; letter-spacing: 0; }
-h1,h2,h3 { letter-spacing: -0.01em; }
-small, .muted { color: var(--muted); }
-
-/* Контролы: одинаковая высота, базовая сетка по базовой линии */
-input[type="text"], input[type="number"], input[type="search"], select {
-  height: var(--btn-h);
-  padding: var(--inp-pad-y) var(--inp-pad-x);
-  border-radius: var(--radius);
-  border: 1px solid #eadbff;
-  background: #fcfaff;
-  outline: none;
-  box-shadow: 0 2px 0 rgba(123,31,162,0.02) inset;
-}
-input::placeholder{ color: #a596c7; opacity: .9; }
-
-button, .btn {
-  height: var(--btn-h);
-  padding: 0 14px;
-  border-radius: var(--radius);
-  font-weight: 600;
-  display: inline-flex; align-items: center; justify-content: center;
-  transform: translateZ(0);
-}
-button .icon{ margin-right: 6px; }
-
-/* Согласованные размеры всех «пилюль» кнопок в панелях */
-.panel .btn, .panel button, .tabs .btn, .tabs button,
-.card .btn, .card button {
-  min-height: var(--btn-h);
-  line-height: 1;              /* чтобы не прыгали */
-}
-
-/* Выравнивание групп кнопок и полей по baseline */
-.controls-row, .panel .row, .panel .actions, .tabs, .filters, .card .actions {
-  display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center;
-}
-/* Блоки с подписью левее — подправить вертикальный отступ */
-.label-inline { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
-
-/* Читаемость: слегка увеличенный контраст */
-.card, .panel { color: var(--fg); }
-.card p, .panel p, label { font-size: 13px; color: var(--muted); }
-th { font-weight: 600; }
-table { font-size: 13.5px; }
-
-/* Улучшение кликабельности маленьких кнопок в правой части блока */
-.pill, .chip, .mini {
-  height: var(--btn-h);
-  padding: 0 12px;
-  border-radius: 999px;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-
-/* Исправление «дрожи» из-за разных внутренних паддингов */
-.btn, button, .pill, .mini, input, select { vertical-align: middle; }
-
-/* Немного больше воздуха между большими секциями */
-.section + .section, .card + .card { margin-top: 16px; }
-</style>
-
-
-<style id="runreport-rebuild-fix-css">
-/* Снизу не показываем декоративные разделители */
-.report, .card, .section { position: relative; }
-.report hr, .card hr, .section hr { display: none !important; }
-</style>
-
-
-<style id="stream-multiselect-css">
-/* ========== Stream multiselect styles ========== */
-.stream-filter-wrap{ position: relative; display:inline-block; }
-.stream-filter-btn{ height:42px;padding:0 12px;border-radius:12px;border:1px solid #eadbff;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(123,31,162,.08) }
-.stream-filter-btn .count{ background:#6b15d6;color:#fff;border-radius:10px;padding:2px 6px;font-size:12px }
-.stream-menu{ position:absolute; top:calc(100% + 6px); right:0; z-index:60; min-width:240px; max-height:320px; overflow:auto;
-  background:#fff;border:1px solid #eadbff;border-radius:12px; box-shadow:0 16px 40px rgba(14,0,65,.15); padding:8px }
-.stream-menu .row{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; }
-.stream-menu .row:hover{ background:#f7f2ff }
-.stream-menu input{ width:16px; height:16px; }
-.stream-menu .hdr{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 6px 8px; border-bottom:1px solid #f0e7ff; margin-bottom:6px }
-.stream-menu .actions{ display:flex; gap:8px }
-.stream-menu .mini{ height:32px; padding:0 10px; border-radius:10px; }
-.hide{ display:none !important; }
-</style>
-
-
-<style id="stream-multiselect-css-v2">
-.stream-filter-wrap{ position: relative; display:inline-block; margin-left:8px; }
-.stream-filter-btn{ height:42px;padding:0 12px;border-radius:12px;border:1px solid #eadbff;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(123,31,162,.08) }
-.stream-filter-btn .count{ background:#6b15d6;color:#fff;border-radius:10px;padding:2px 6px;font-size:12px }
-.stream-menu{ position:absolute; top:calc(100% + 6px); right:0; z-index:9999; min-width:260px; max-height:320px; overflow:auto;
-  background:#fff;border:1px solid #eadbff;border-radius:12px; box-shadow:0 16px 40px rgba(14,0,65,.15); padding:8px }
-.stream-menu .row{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; }
-.stream-menu .row:hover{ background:#f7f2ff }
-.stream-menu input{ width:16px; height:16px; }
-.stream-menu .hdr{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 6px 8px; border-bottom:1px solid #f0e7ff; margin-bottom:6px }
-.stream-menu .actions{ display:flex; gap:8px }
-.stream-menu .mini{ height:32px; padding:0 10px; border-radius:10px; }
-.hide{ display:none !important; }
-</style>
-
-
-<style id="stream-multiselect-css-v3">
-.stream-filter-wrap{ position: relative; display:inline-block; margin-left:8px; }
-.stream-filter-btn{ height:42px;padding:0 12px;border-radius:12px;border:1px solid #eadbff;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(123,31,162,.08) }
-.stream-filter-btn .count{ background:#6b15d6;color:#fff;border-radius:10px;padding:2px 6px;font-size:12px }
-.stream-menu{ position:absolute; top:calc(100% + 6px); right:0; z-index:9999; min-width:260px; max-height:320px; overflow:auto;
-  background:#fff;border:1px solid #eadbff;border-radius:12px; box-shadow:0 16px 40px rgba(14,0,65,.15); padding:8px }
-.stream-menu .row{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; }
-.stream-menu .row:hover{ background:#f7f2ff }
-.stream-menu input{ width:16px; height:16px; }
-.stream-menu .hdr{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 6px 8px; border-bottom:1px solid #f0e7ff; margin-bottom:6px }
-.stream-menu .actions{ display:flex; gap:8px }
-.stream-menu .mini{ height:32px; padding:0 10px; border-radius:10px; }
-.hide{ display:none !important; }
-</style>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<style id="rr-stream-select-css">
-  .rr-stream-dd {position: relative; display:inline-flex; align-items:center; gap:8px;}
-  .rr-dd-trigger {
-    height:36px; padding:0 12px; border:1px solid rgba(0,0,0,.12); border-radius:10px;
-    background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.04); cursor:pointer; display:flex; align-items:center; gap:8px;
-  }
-  .rr-dd-trigger .rr-badge {background:#6b15d6; color:#fff; border-radius:999px; padding:2px 8px; font-size:12px}
-  .rr-dd-menu {
-    position:absolute; top:110%; right:0; min-width:260px; max-height:360px; overflow:auto; z-index:9999;
-    background:#fff; border:1px solid rgba(0,0,0,.12); box-shadow:0 8px 24px rgba(0,0,0,.12); border-radius:12px; padding:8px;
-    display:none;
-  }
-  .rr-dd-menu.open {display:block;}
-  .rr-dd-item {display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer;}
-  .rr-dd-item:hover {background:#f7f5ff;}
-  .rr-dd-item input {accent-color:#6b15d6;}
-  .mini-card.hide, .miniCard.hide {display:none !important}
-</style>
-
-
-<!-- INLINE FILTERS OVERRIDE: keep controls on one line -->
-<style id="rr-inline-filters">
-  /* target the mini-launch card toolbar controls */
-  #miniLaunchCard .head .export,
-  #miniLaunchCard .head .controls,
-  .card#miniLaunchCard .head .export {
-    display: flex !important;
-    gap: 10px !important;
-    align-items: center !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
-  }
-  /* ensure each control does not shrink and stays readable */
-  #miniLaunchCard .head .export > *,
-  #miniLaunchCard .head .controls > * {
-    flex: 0 0 auto !important;
-    white-space: nowrap !important;
-  }
-  /* keep the stream dropdown visible on the right */
-  .rr-stream-dd { margin-left: 8px !important; }
-  /* small screens: allow scroll and slightly reduce gaps */
-  @media (max-width: 1000px) {
-    #miniLaunchCard .head .export { gap: 8px !important; }
-  }
-</style>
-<style>
-  .dp-top-nav{
-    position:fixed;
-    top:16px;
-    right:16px;
-    z-index:9100;
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-    font-family:-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif;
-  }
-  .dp-nav-link{
-    padding:6px 12px;
-    border-radius:999px;
-    border:1px solid rgba(255,255,255,.5);
-    background:rgba(0,0,0,.35);
-    backdrop-filter:blur(12px);
-    color:#fff;
-    text-decoration:none;
-    font-size:13px;
-    line-height:1.3;
-    box-shadow:0 6px 18px rgba(0,0,0,.25);
-    white-space:nowrap;
-  }
-  .dp-nav-link:hover{
-    background:rgba(110,11,212,.85);
-    border-color:rgba(255,255,255,.9);
-  }
-  .dp-nav-link--active{
-    background:linear-gradient(90deg,#cb11ab,#6e0bd4);
-  }
-  @media (max-width: 600px){
-    .dp-top-nav{
-      left:8px;
-      right:8px;
-      justify-content:center;
-    }
-    .dp-nav-link{
-      font-size:12px;
-      padding:5px 10px;
-    }
-  }
-</style>
-<script src="proxy-bootstrap.js"></script>
-<style id="wb-learning-portal-shell-theme">
+  <script src="proxy-bootstrap.js"></script>
+  <style id="wb-learning-portal-shell-theme">
   :root{
     --bg:#0A0A0F;
     --card:#12121A;
@@ -1974,9 +1198,855 @@ table { font-size: 13.5px; }
     }
   }
 </style>
-</head>
-<body class="rb-locked theme-wb-dark">
-<!-- ===== RB AUTH SCREEN ===== -->
+
+  <style id="fullscreen-ui-overrides">
+/* ===== Edge-to-edge fullscreen UI (no extra FS buttons) ===== */
+html, body { height: 100%; }
+body { margin: 0; overflow: auto; }
+.topbar { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid rgba(0,0,0,.04); }
+.topbar .inner { max-width: 100%; padding-left: 20px; padding-right: 20px; }
+.wrap { max-width: 100%; padding-left: 20px; padding-right: 20px; }
+.tabs { flex-wrap: wrap; }
+.card { border-radius: 16px; }
+.panel { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.grid { grid-template-columns: repeat(4, minmax(280px, 1fr)); }
+.chart-wrap { height: 420px; }
+@media (max-width: 1400px){ .grid{ grid-template-columns: repeat(3, minmax(280px,1fr)); } }
+@media (max-width: 1100px){ .grid{ grid-template-columns: repeat(2, minmax(280px,1fr)); } }
+@media (max-width: 780px){
+  .panel{ grid-template-columns: 1fr !important; }
+  .panel .field{ grid-column: 1 / -1 !important; }
+  .grid{ grid-template-columns: 1fr !important; }
+  .chart-wrap{ height: 300px; }
+}
+/* Make charts and tables fill the viewport width nicely */
+#runChartWrap { height: 420px; }
+#runTable { font-size: 13px; }
+</style>
+
+
+<style id="typography-and-controls-normalize">
+/* ===== Readability & Alignment Normalize ===== */
+:root{
+  --font-ui: Inter, "SF Pro Text", -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --fg:#1b1233; --muted:#6d5d86; --soft:#f3ebff;
+  --btn-h: 42px;               /* единая высота кнопок/инпутов */
+  --inp-pad-y: 9px;            /* вертикальный паддинг инпутов */
+  --inp-pad-x: 12px;           /* горизонтальный паддинг инпутов */
+  --radius: 12px;
+}
+html, body { font-family: var(--font-ui); color: var(--fg); }
+body, input, button, select { font-size: 14.5px; line-height: 1.35; letter-spacing: 0; }
+h1,h2,h3 { letter-spacing: -0.01em; }
+small, .muted { color: var(--muted); }
+
+/* Контролы: одинаковая высота, базовая сетка по базовой линии */
+input[type="text"], input[type="number"], input[type="search"], select {
+  height: var(--btn-h);
+  padding: var(--inp-pad-y) var(--inp-pad-x);
+  border-radius: var(--radius);
+  border: 1px solid #eadbff;
+  background: #fcfaff;
+  outline: none;
+  box-shadow: 0 2px 0 rgba(123,31,162,0.02) inset;
+}
+input::placeholder{ color: #a596c7; opacity: .9; }
+
+button, .btn {
+  height: var(--btn-h);
+  padding: 0 14px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  transform: translateZ(0);
+}
+button .icon{ margin-right: 6px; }
+
+/* Согласованные размеры всех «пилюль» кнопок в панелях */
+.panel .btn, .panel button, .tabs .btn, .tabs button,
+.card .btn, .card button {
+  min-height: var(--btn-h);
+  line-height: 1;              /* чтобы не прыгали */
+}
+
+/* Выравнивание групп кнопок и полей по baseline */
+.controls-row, .panel .row, .panel .actions, .tabs, .filters, .card .actions {
+  display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center;
+}
+/* Блоки с подписью левее — подправить вертикальный отступ */
+.label-inline { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+
+/* Читаемость: слегка увеличенный контраст */
+.card, .panel { color: var(--fg); }
+.card p, .panel p, label { font-size: 13px; color: var(--muted); }
+th { font-weight: 600; }
+table { font-size: 13.5px; }
+
+/* Улучшение кликабельности маленьких кнопок в правой части блока */
+.pill, .chip, .mini {
+  height: var(--btn-h);
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* Исправление «дрожи» из-за разных внутренних паддингов */
+.btn, button, .pill, .mini, input, select { vertical-align: middle; }
+
+/* Немного больше воздуха между большими секциями */
+.section + .section, .card + .card { margin-top: 16px; }
+</style>
+
+
+<style id="runreport-rebuild-fix-css">
+/* Снизу не показываем декоративные разделители */
+.report, .card, .section { position: relative; }
+.report hr, .card hr, .section hr { display: none !important; }
+</style>
+
+
+<style id="stream-multiselect-css">
+/* ========== Stream multiselect styles ========== */
+.stream-filter-wrap{ position: relative; display:inline-block; }
+.stream-filter-btn{ height:42px;padding:0 12px;border-radius:12px;border:1px solid #eadbff;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(123,31,162,.08) }
+.stream-filter-btn .count{ background:#6b15d6;color:#fff;border-radius:10px;padding:2px 6px;font-size:12px }
+.stream-menu{ position:absolute; top:calc(100% + 6px); right:0; z-index:60; min-width:240px; max-height:320px; overflow:auto;
+  background:#fff;border:1px solid #eadbff;border-radius:12px; box-shadow:0 16px 40px rgba(14,0,65,.15); padding:8px }
+.stream-menu .row{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; }
+.stream-menu .row:hover{ background:#f7f2ff }
+.stream-menu input{ width:16px; height:16px; }
+.stream-menu .hdr{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 6px 8px; border-bottom:1px solid #f0e7ff; margin-bottom:6px }
+.stream-menu .actions{ display:flex; gap:8px }
+.stream-menu .mini{ height:32px; padding:0 10px; border-radius:10px; }
+.hide{ display:none !important; }
+</style>
+
+
+<style id="stream-multiselect-css-v2">
+.stream-filter-wrap{ position: relative; display:inline-block; margin-left:8px; }
+.stream-filter-btn{ height:42px;padding:0 12px;border-radius:12px;border:1px solid #eadbff;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(123,31,162,.08) }
+.stream-filter-btn .count{ background:#6b15d6;color:#fff;border-radius:10px;padding:2px 6px;font-size:12px }
+.stream-menu{ position:absolute; top:calc(100% + 6px); right:0; z-index:9999; min-width:260px; max-height:320px; overflow:auto;
+  background:#fff;border:1px solid #eadbff;border-radius:12px; box-shadow:0 16px 40px rgba(14,0,65,.15); padding:8px }
+.stream-menu .row{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; }
+.stream-menu .row:hover{ background:#f7f2ff }
+.stream-menu input{ width:16px; height:16px; }
+.stream-menu .hdr{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 6px 8px; border-bottom:1px solid #f0e7ff; margin-bottom:6px }
+.stream-menu .actions{ display:flex; gap:8px }
+.stream-menu .mini{ height:32px; padding:0 10px; border-radius:10px; }
+.hide{ display:none !important; }
+</style>
+
+
+<style id="stream-multiselect-css-v3">
+.stream-filter-wrap{ position: relative; display:inline-block; margin-left:8px; }
+.stream-filter-btn{ height:42px;padding:0 12px;border-radius:12px;border:1px solid #eadbff;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(123,31,162,.08) }
+.stream-filter-btn .count{ background:#6b15d6;color:#fff;border-radius:10px;padding:2px 6px;font-size:12px }
+.stream-menu{ position:absolute; top:calc(100% + 6px); right:0; z-index:9999; min-width:260px; max-height:320px; overflow:auto;
+  background:#fff;border:1px solid #eadbff;border-radius:12px; box-shadow:0 16px 40px rgba(14,0,65,.15); padding:8px }
+.stream-menu .row{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; }
+.stream-menu .row:hover{ background:#f7f2ff }
+.stream-menu input{ width:16px; height:16px; }
+.stream-menu .hdr{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 6px 8px; border-bottom:1px solid #f0e7ff; margin-bottom:6px }
+.stream-menu .actions{ display:flex; gap:8px }
+.stream-menu .mini{ height:32px; padding:0 10px; border-radius:10px; }
+.hide{ display:none !important; }
+</style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style id="rr-stream-select-css">
+  .rr-stream-dd {position: relative; display:inline-flex; align-items:center; gap:8px;}
+  .rr-dd-trigger {
+    height:36px; padding:0 12px; border:1px solid rgba(0,0,0,.12); border-radius:10px;
+    background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.04); cursor:pointer; display:flex; align-items:center; gap:8px;
+  }
+  .rr-dd-trigger .rr-badge {background:#6b15d6; color:#fff; border-radius:999px; padding:2px 8px; font-size:12px}
+  .rr-dd-menu {
+    position:absolute; top:110%; right:0; min-width:260px; max-height:360px; overflow:auto; z-index:9999;
+    background:#fff; border:1px solid rgba(0,0,0,.12); box-shadow:0 8px 24px rgba(0,0,0,.12); border-radius:12px; padding:8px;
+    display:none;
+  }
+  .rr-dd-menu.open {display:block;}
+  .rr-dd-item {display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer;}
+  .rr-dd-item:hover {background:#f7f5ff;}
+  .rr-dd-item input {accent-color:#6b15d6;}
+  .mini-card.hide, .miniCard.hide {display:none !important}
+</style>
+
+
+<!-- INLINE FILTERS OVERRIDE: keep controls on one line -->
+<style id="rr-inline-filters">
+  /* target the mini-launch card toolbar controls */
+  #miniLaunchCard .head .export,
+  #miniLaunchCard .head .controls,
+  .card#miniLaunchCard .head .export {
+    display: flex !important;
+    gap: 10px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  /* ensure each control does not shrink and stays readable */
+  #miniLaunchCard .head .export > *,
+  #miniLaunchCard .head .controls > * {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+  /* keep the stream dropdown visible on the right */
+  .rr-stream-dd { margin-left: 8px !important; }
+  /* small screens: allow scroll and slightly reduce gaps */
+  @media (max-width: 1000px) {
+    #miniLaunchCard .head .export { gap: 8px !important; }
+  }
+</style>
+<style>
+  .dp-top-nav{
+    position:fixed;
+    top:16px;
+    right:16px;
+    z-index:9100;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    font-family:-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif;
+  }
+  .dp-nav-link{
+    padding:6px 12px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.5);
+    background:rgba(0,0,0,.35);
+    backdrop-filter:blur(12px);
+    color:#fff;
+    text-decoration:none;
+    font-size:13px;
+    line-height:1.3;
+    box-shadow:0 6px 18px rgba(0,0,0,.25);
+    white-space:nowrap;
+  }
+  .dp-nav-link:hover{
+    background:rgba(110,11,212,.85);
+    border-color:rgba(255,255,255,.9);
+  }
+  .dp-nav-link--active{
+    background:linear-gradient(90deg,#cb11ab,#6e0bd4);
+  }
+  @media (max-width: 600px){
+    .dp-top-nav{
+      left:8px;
+      right:8px;
+      justify-content:center;
+    }
+    .dp-nav-link{
+      font-size:12px;
+      padding:5px 10px;
+    }
+  }
+</style>
+
+<style id="dp-shell-css">
+
+/* ═══ SHELL CSS — Дом Питона v4 (React) ═══════════════════════════════════ */
+:root {
+  --topbar-h: 56px;
+  --sidebar-w: 252px;
+  --sidebar-w-collapsed: 56px;
+  --nav-item-h: 38px;
+  --nav-radius: 7px;
+  --nav-active-bg: color-mix(in srgb, var(--wb) 14%, var(--btn-bg) 86%);
+  --nav-hover-bg:  color-mix(in srgb, var(--wb) 7%,  var(--btn-bg) 93%);
+  --sidebar-bg:    color-mix(in srgb, var(--card) 90%, var(--wb) 10%);
+}
+html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
+
+/* ── Topbar ─────────────────────────────── */
+.dp-topbar {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--topbar-h);
+  display: flex; align-items: center;
+  padding: 0 clamp(12px,1.2vw,18px);
+  gap: 8px;
+  background: color-mix(in srgb, var(--card) 86%, transparent);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+.dp-brand {
+  display: flex; align-items: center; gap: 9px; flex-shrink: 0;
+  text-decoration: none;
+}
+.dp-brand-mark {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .6px; color: #fff;
+  background: linear-gradient(135deg, var(--wb-deep) 0%, var(--wb) 100%);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--wb) 40%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.24);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.dp-brand-text { line-height: 1; }
+.dp-brand-name {
+  font-size: 14px; font-weight: 700; letter-spacing: -.25px;
+  color: var(--text); font-family: 'Inter', system-ui, sans-serif;
+}
+.dp-brand-sub {
+  font-size: 10px; font-weight: 500; color: var(--muted); margin-top: 1px;
+  letter-spacing: .05px;
+}
+.dp-topbar-spacer { flex: 1; }
+.dp-topbar-actions { display: flex; align-items: center; gap: 6px; }
+
+/* Role chip */
+.dp-role-chip {
+  display: inline-flex; align-items: center;
+  height: 26px; padding: 0 10px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .35px;
+  text-transform: uppercase;
+  background: var(--grad); color: #fff;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Icon button (3-dot menu, nav-toggle) */
+.dp-icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 7px; flex-shrink: 0;
+  background: color-mix(in srgb, var(--btn-bg) 90%, transparent);
+  border: 1px solid var(--line);
+  color: var(--text); cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.dp-icon-btn:hover {
+  background: var(--nav-hover-bg); border-color: var(--line-strong);
+}
+.dp-icon-btn svg { opacity: .7; transition: opacity .12s; }
+.dp-icon-btn:hover svg { opacity: 1; }
+
+/* Shell menu dropdown */
+.dp-shell-menu-wrap { position: relative; }
+.dp-shell-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: min(220px, 92vw);
+  background: color-mix(in srgb, var(--card) 95%, transparent);
+  border: 1px solid var(--line); border-radius: 12px;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 20px 48px color-mix(in srgb, var(--bg) 36%, transparent),
+              0 4px 12px color-mix(in srgb, var(--bg) 58%, transparent);
+  padding: 6px; display: flex; flex-direction: column; gap: 2px; z-index: 50;
+}
+.dp-shell-menu-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 8px 10px; border-radius: 7px;
+  font-size: 13px; font-weight: 500; color: var(--text);
+  background: transparent; border: none; cursor: pointer; text-align: left;
+  font-family: 'Inter', system-ui, sans-serif;
+  transition: background .1s;
+}
+.dp-shell-menu-item:hover { background: var(--nav-hover-bg); }
+.dp-shell-menu-item.danger { color: color-mix(in srgb, var(--bad, #e53e3e) 85%, var(--text) 15%); }
+.dp-shell-menu-item.danger:hover { background: color-mix(in srgb, var(--bad, #e53e3e) 10%, var(--card) 90%); }
+.dp-shell-menu-divider { height: 1px; background: var(--line); margin: 3px 6px; }
+
+/* Theme submenu */
+.dp-theme-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: min(200px, 92vw);
+  background: color-mix(in srgb, var(--card) 98%, transparent);
+  border: 1px solid var(--line); border-radius: 10px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--bg) 44%, transparent);
+  padding: 4px; z-index: 60;
+}
+.dp-theme-option {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 7px 10px; border-radius: 7px; border: none;
+  font-size: 13px; font-weight: 500; color: var(--text);
+  background: transparent; cursor: pointer;
+  font-family: 'Inter', system-ui, sans-serif;
+  transition: background .1s;
+}
+.dp-theme-option:hover { background: var(--nav-hover-bg); }
+.dp-theme-option.active { font-weight: 700; }
+.dp-theme-swatch {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 1px solid var(--line);
+}
+
+/* ── Layout: grid ─────────────────────────── */
+.dp-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  height: calc(100vh - var(--topbar-h));
+  overflow: hidden;
+  transition: grid-template-columns 300ms cubic-bezier(.4,0,.2,1);
+}
+.dp-shell.collapsed {
+  grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
+}
+
+/* ── Sidebar ──────────────────────────────── */
+.dp-sidebar {
+  background: color-mix(in srgb, var(--card) 90%, var(--wb) 10%);
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column;
+  height: 100%; overflow: hidden;
+  position: sticky; top: var(--topbar-h);
+  transition: opacity 220ms ease;
+}
+.dp-sidebar-head {
+  padding: 14px 12px 12px; flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 94%, var(--wb) 6%);
+}
+.dp-sidebar-head-top { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.dp-sidebar-mark {
+  width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--wb-deep) 0%, var(--wb) 100%);
+  font-size: 9.5px; font-weight: 800; letter-spacing: .5px; color: #fff;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--wb) 32%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.2);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.dp-sidebar-title {
+  font-size: 13px; font-weight: 700; letter-spacing: -.15px;
+  color: var(--text); font-family: 'Inter', system-ui, sans-serif;
+}
+.dp-sidebar-sub {
+  font-size: 11px; color: var(--muted); line-height: 1.45; margin-top: 5px;
+}
+.dp-sidebar-toggle {
+  width: 100%; min-height: 32px; margin-top: 10px; padding: 0 10px;
+  border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--muted);
+  display: flex; align-items: center; justify-content: space-between;
+  background: transparent; border: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+  cursor: pointer; font-family: 'Inter', system-ui, sans-serif;
+  transition: color .12s, background .12s, border-color .12s;
+}
+.dp-sidebar-toggle:hover { color: var(--text); background: var(--nav-hover-bg); border-color: var(--line); }
+
+/* Nav list */
+.dp-nav {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 6px 6px 10px; display: flex; flex-direction: column; gap: 1px;
+}
+.dp-nav::-webkit-scrollbar { width: 3px; }
+.dp-nav::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--line) 70%, transparent); border-radius: 2px; }
+.dp-nav-section {
+  padding: 14px 9px 3px; font-size: 10px; font-weight: 700;
+  letter-spacing: .7px; text-transform: uppercase;
+  color: var(--muted); opacity: .6; user-select: none; pointer-events: none;
+  flex-shrink: 0;
+}
+.dp-nav-section:first-child { padding-top: 6px; }
+.dp-nav-btn {
+  position: relative; display: flex; align-items: center; gap: 8px;
+  width: 100%; min-height: var(--nav-item-h); max-height: var(--nav-item-h);
+  padding: 0 9px; border-radius: var(--nav-radius);
+  font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 500;
+  color: color-mix(in srgb, var(--text) 65%, transparent);
+  background: transparent; border: 1px solid transparent;
+  cursor: pointer; text-align: left; overflow: hidden;
+  flex-shrink: 0; transition: background .1s, color .1s;
+}
+.dp-nav-btn:hover {
+  background: color-mix(in srgb, var(--wb) 9%, var(--btn-bg) 91%);
+  color: var(--text);
+}
+.dp-nav-btn.active {
+  background: var(--grad); color: #fff; font-weight: 600;
+  border-color: transparent;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--wb) 32%, transparent);
+}
+.dp-nav-btn.active::before {
+  display: none; /* no left bar in gradient mode */
+}
+.dp-nav-icon {
+  flex: 0 0 18px; width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+}
+.dp-nav-icon svg { width: 14px; height: 14px; opacity: .55; transition: opacity .12s; stroke: currentColor; }
+.dp-nav-btn:hover .dp-nav-icon svg { opacity: .85; }
+.dp-nav-btn.active .dp-nav-icon svg { opacity: 1; stroke: #fff; }
+.dp-nav-label {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 13px; font-weight: inherit; color: inherit;
+  line-height: 1.3;
+}
+
+/* Collapsed sidebar */
+.dp-shell.collapsed .dp-sidebar-head { padding: 10px 6px; }
+.dp-shell.collapsed .dp-sidebar-head-top { justify-content: center; }
+.dp-shell.collapsed .dp-sidebar-title,
+.dp-shell.collapsed .dp-sidebar-sub,
+.dp-shell.collapsed .dp-sidebar-toggle-label { display: none; }
+.dp-shell.collapsed .dp-sidebar-toggle {
+  justify-content: center; padding: 0; margin-top: 8px;
+  border: none; background: transparent; min-height: 26px; height: 26px;
+}
+.dp-shell.collapsed .dp-nav { padding: 4px 4px 8px; }
+.dp-shell.collapsed .dp-nav-section { display: none; }
+.dp-shell.collapsed .dp-nav-btn {
+  min-height: 40px; max-height: 40px; padding: 0; justify-content: center; gap: 0;
+}
+.dp-shell.collapsed .dp-nav-label { display: none; }
+.dp-shell.collapsed .dp-nav-icon { flex: 0 0 24px; width: 24px; height: 24px; }
+.dp-shell.collapsed .dp-nav-icon svg { width: 17px; height: 17px; }
+.dp-shell.collapsed .dp-nav-btn.active { background: var(--grad); }
+
+/* ── Content area ────────────────────────── */
+.dp-content {
+  min-width: 0; height: calc(100vh - var(--topbar-h));
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.dp-iframe {
+  flex: 1; width: 100%; border: 0; display: block; background: transparent;
+}
+
+/* ── Team Modal ──────────────────────────── */
+.dp-modal-backdrop {
+  position: fixed; inset: 0; z-index: 80;
+  background: var(--scrim); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.dp-modal {
+  width: min(900px, 96vw); max-height: 88vh;
+  background: color-mix(in srgb, var(--card) 96%, transparent);
+  border: 1px solid var(--line); border-radius: 16px;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 32px 80px color-mix(in srgb, var(--bg) 28%, transparent),
+              0 8px 24px color-mix(in srgb, var(--bg) 48%, transparent);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.dp-modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 20px 22px 0; gap: 12px; flex-shrink: 0;
+}
+.dp-modal-head-text {}
+.dp-modal-title {
+  font-size: 17px; font-weight: 700; letter-spacing: -.2px;
+  color: var(--text); font-family: 'Inter', system-ui, sans-serif; margin: 0;
+}
+.dp-modal-note { font-size: 13px; color: var(--muted); margin-top: 3px; }
+.dp-modal-close {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--line);
+  color: var(--text); cursor: pointer; font-size: 14px;
+  transition: background .12s, border-color .12s;
+}
+.dp-modal-close:hover { background: var(--nav-hover-bg); border-color: var(--line-strong); }
+
+/* Modal tabs */
+.dp-modal-tabs {
+  display: flex; gap: 4px; padding: 12px 22px 0;
+  border-bottom: 1px solid var(--line); flex-shrink: 0;
+}
+.dp-modal-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px 10px;
+  border: none; border-bottom: 2px solid transparent;
+  font-size: 13px; font-weight: 500; color: var(--muted);
+  background: transparent; cursor: pointer;
+  font-family: 'Inter', system-ui, sans-serif;
+  transition: color .15s, border-color .15s;
+  margin-bottom: -1px;
+}
+.dp-modal-tab svg { opacity: .55; transition: opacity .15s; }
+.dp-modal-tab:hover { color: var(--text); }
+.dp-modal-tab:hover svg { opacity: .8; }
+.dp-modal-tab.active {
+  color: var(--wb-deep); font-weight: 600;
+  border-bottom-color: var(--wb-deep);
+}
+.dp-modal-tab.active svg { opacity: 1; stroke: var(--wb-deep); }
+.dp-tab-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 16px; padding: 0 5px; border-radius: 999px;
+  font-size: 10px; font-weight: 700;
+  background: color-mix(in srgb, var(--wb) 16%, var(--btn-bg) 84%);
+  color: color-mix(in srgb, var(--wb-deep) 85%, var(--text) 15%);
+}
+
+/* Modal body */
+.dp-modal-body { flex: 1; overflow: hidden; }
+.dp-modal-pane { height: 100%; overflow-y: auto; padding: 18px 22px 20px; }
+.dp-modal-pane::-webkit-scrollbar { width: 5px; }
+.dp-modal-pane::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+/* Team table */
+.dp-team-table-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.dp-team-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dp-team-table thead th {
+  padding: 10px 14px; text-align: left;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--muted); background: color-mix(in srgb, var(--card) 96%, var(--wb) 4%);
+  border-bottom: 1px solid var(--line);
+}
+.dp-team-table tbody tr { border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); transition: background .12s; }
+.dp-team-table tbody tr:last-child { border-bottom: none; }
+.dp-team-table tbody tr:hover { background: color-mix(in srgb, var(--wb) 4%, var(--card) 96%); }
+.dp-team-table tbody tr.current { background: color-mix(in srgb, var(--wb) 7%, var(--card) 93%); }
+.dp-team-table td { padding: 11px 14px; vertical-align: middle; color: var(--text); }
+.dp-tt-name { font-weight: 600; font-size: 13.5px; color: var(--text); display: flex; align-items: center; gap: 7px; }
+.dp-tt-you {
+  font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+  background: color-mix(in srgb, var(--wb-deep) 15%, var(--btn-bg) 85%);
+  color: var(--wb-deep); border: 1px solid color-mix(in srgb, var(--wb-deep) 30%, transparent);
+  letter-spacing: .2px;
+}
+/* Role badge colors by role */
+.dp-role-badge {
+  display: inline-flex; align-items: center; padding: 3px 11px;
+  border-radius: 999px; font-size: 11.5px; font-weight: 700;
+  background: var(--grad); color: #fff; white-space: nowrap;
+}
+.dp-role-badge[data-role="manager"]  { background: linear-gradient(135deg,#0ea5e9,#38bdf8); }
+.dp-role-badge[data-role="analyst"]  { background: linear-gradient(135deg,#f59e0b,#fbbf24); color: #1a0a00; }
+.dp-role-badge[data-role="viewer"]   { background: color-mix(in srgb, var(--muted) 20%, var(--btn-bg) 80%); color: var(--muted); border: 1px solid var(--line); }
+.dp-role-badge[data-role="admin"]    { background: linear-gradient(135deg,#6366f1,#818cf8); }
+.dp-tt-modules { display: flex; flex-wrap: wrap; gap: 4px; }
+.dp-tt-tag {
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  border-radius: 5px; font-size: 11px; font-weight: 500;
+  background: color-mix(in srgb, var(--wb) 10%, var(--card) 90%);
+  border: 1px solid color-mix(in srgb, var(--wb) 20%, transparent);
+  color: color-mix(in srgb, var(--wb-deep) 70%, var(--text) 30%);
+  white-space: nowrap;
+}
+.dp-table-footer { margin-top: 10px; text-align: right; font-size: 12px; color: var(--muted); }
+
+/* Roles panel */
+.dp-roles-layout {
+  display: grid; grid-template-columns: 160px 1fr; gap: 0;
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-height: 340px;
+}
+.dp-col-side {
+  border-right: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 96%, var(--wb) 4%);
+}
+.dp-col-head {
+  padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--muted); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: color-mix(in srgb, var(--card) 98%, var(--wb) 2%);
+}
+.dp-col-side .dp-col-head { background: color-mix(in srgb, var(--card) 96%, var(--wb) 4%); }
+.dp-col-actions { display: flex; gap: 4px; }
+.dp-col-actions .dp-btn-sm {
+  padding: 3px 9px; font-size: 11.5px; border-radius: 5px; height: auto; font-weight: 600;
+}
+.dp-col-list { padding: 6px; overflow-y: auto; height: calc(100% - 41px); }
+.dp-col-list::-webkit-scrollbar { width: 3px; }
+.dp-col-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+.dp-role-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; border-radius: 7px; font-size: 13px; font-weight: 500;
+  color: var(--text); background: transparent; border: none; cursor: pointer;
+  font-family: 'Inter', system-ui, sans-serif; text-align: left;
+  transition: background .12s;
+}
+.dp-role-btn:hover { background: color-mix(in srgb, var(--wb) 9%, var(--btn-bg) 91%); }
+.dp-role-btn.active { background: var(--grad); color: #fff; font-weight: 700; }
+.dp-role-count {
+  font-size: 11px; font-weight: 700; opacity: .75;
+  background: rgba(255,255,255,.18); padding: 1px 6px; border-radius: 999px;
+}
+.dp-role-btn:not(.active) .dp-role-count {
+  background: color-mix(in srgb, var(--line) 80%, transparent); color: var(--muted);
+}
+
+.dp-col-main { display: flex; flex-direction: column; }
+.dp-module-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px; padding: 14px; flex: 1;
+}
+.dp-access-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border-radius: 7px; border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--btn-bg) 90%, transparent);
+  font-size: 12.5px; font-weight: 500; color: var(--text); cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.dp-access-item:hover { border-color: var(--line-strong); }
+.dp-access-item input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--wb); flex-shrink: 0; cursor: pointer; }
+.dp-access-item:has(input:checked) {
+  border-color: color-mix(in srgb, var(--wb) 40%, var(--line) 60%);
+  background: color-mix(in srgb, var(--wb) 8%, var(--btn-bg) 92%);
+}
+.dp-save-row {
+  padding: 12px 14px; border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 96%, var(--wb) 4%);
+}
+
+/* Users panel */
+.dp-create-strip {
+  background: color-mix(in srgb, var(--card) 96%, var(--wb) 4%);
+  border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;
+}
+.dp-create-strip-head {
+  font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .5px; margin-bottom: 10px;
+}
+.dp-create-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; align-items: end;
+}
+.dp-users-layout {
+  display: grid; grid-template-columns: 180px 1fr; gap: 0;
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-height: 340px;
+}
+.dp-user-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px; border-radius: 7px; font-size: 13px; font-weight: 500;
+  color: var(--text); background: transparent; border: none; cursor: pointer; gap: 6px;
+  font-family: 'Inter', system-ui, sans-serif; text-align: left;
+  transition: background .12s;
+}
+.dp-user-btn:hover { background: color-mix(in srgb, var(--wb) 9%, var(--btn-bg) 91%); }
+.dp-user-btn.active { background: var(--grad); color: #fff; font-weight: 700; }
+.dp-user-rolebadge {
+  font-size: 10px; padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+  background: rgba(255,255,255,.2);
+}
+.dp-user-btn:not(.active) .dp-user-rolebadge {
+  background: color-mix(in srgb, var(--line) 80%, transparent); color: var(--muted);
+}
+.dp-edit-col { display: flex; flex-direction: column; overflow-y: auto; }
+.dp-edit-section { padding: 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.dp-field { display: flex; flex-direction: column; gap: 4px; }
+.dp-field label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.dp-field input, .dp-field select {
+  padding: 8px 10px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--btn-bg); color: var(--text); font-size: 13px;
+  font-family: 'Inter', system-ui, sans-serif; outline: none;
+  transition: border-color .12s;
+}
+.dp-field input:focus, .dp-field select:focus { border-color: var(--line-strong); }
+.dp-toggle-row { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text); }
+.dp-toggle-row input { width: 15px; height: 15px; accent-color: var(--wb); cursor: pointer; }
+
+/* General buttons */
+.dp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  font-family: 'Inter', system-ui, sans-serif; cursor: pointer;
+  transition: background .12s, border-color .12s, transform .1s;
+  border: none; white-space: nowrap;
+}
+.dp-btn:hover { transform: translateY(-1px); }
+.dp-btn-primary { background: var(--grad); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--wb) 32%, transparent); }
+.dp-btn-primary:hover { filter: brightness(1.06); }
+.dp-btn-secondary { background: var(--btn-bg); color: var(--text); border: 1px solid var(--line); }
+.dp-btn-secondary:hover { border-color: var(--line-strong); }
+.dp-btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+/* Auth screen */
+.dp-auth {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+}
+.dp-auth.hidden { display: none; }
+.dp-auth-card {
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  border: 1px solid var(--line); border-radius: 18px;
+  padding: 36px 32px; width: min(400px, 92vw);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-lg);
+}
+.dp-auth-title { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 4px; font-family: 'Inter', system-ui, sans-serif; }
+.dp-auth-note { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+.dp-auth-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.dp-auth-field label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .3px; }
+.dp-auth-field input {
+  padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--btn-bg) 80%, transparent);
+  color: var(--text); font-size: 14px; font-family: 'Inter', system-ui, sans-serif;
+  outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.dp-auth-field input:focus { border-color: var(--wb); box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb) 25%, transparent); }
+.dp-auth-error { color: #ef4444; font-size: 12.5px; min-height: 18px; margin-bottom: 8px; }
+.dp-auth-btn { width: 100%; padding: 11px; background: var(--grad); color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Inter', system-ui, sans-serif; transition: filter .15s; }
+.dp-auth-btn:hover { filter: brightness(1.07); }
+
+/* Toast */
+.dp-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 16px; border-radius: 12px;
+  background: color-mix(in srgb, var(--card) 96%, transparent);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-md);
+  min-width: 240px; max-width: 360px;
+  transform: translateY(120%); opacity: 0;
+  transition: transform .3s cubic-bezier(.2,1,.4,1), opacity .3s ease;
+  pointer-events: none;
+}
+.dp-toast.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.dp-toast-kind {
+  font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 5px; flex-shrink: 0; margin-top: 1px;
+  background: color-mix(in srgb, var(--wb) 18%, var(--btn-bg) 82%);
+  color: color-mix(in srgb, var(--wb-deep) 85%, var(--text));
+}
+.dp-toast-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.dp-toast-msg { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* Mobile */
+@media (max-width: 980px) {
+  .dp-shell { grid-template-columns: 1fr !important; height: auto; overflow: auto; }
+  .dp-sidebar {
+    position: fixed; top: var(--topbar-h); left: 0; bottom: 0;
+    width: min(80vw, 280px); height: auto; z-index: 60;
+    border-radius: 0 14px 14px 0; border-right: 1px solid var(--line);
+    box-shadow: 4px 0 32px color-mix(in srgb, var(--bg) 36%, transparent);
+    transform: translateX(-108%);
+    transition: transform .24s cubic-bezier(.4,0,.2,1);
+  }
+  .dp-shell.nav-open .dp-sidebar { transform: translateX(0); }
+  .dp-content { height: auto; }
+  .dp-iframe { min-height: calc(100vh - var(--topbar-h)); }
+  .dp-shell.collapsed { grid-template-columns: 1fr !important; }
+  .dp-nav-section { display: block !important; }
+}
+@media (min-width: 981px) {
+  .dp-nav-toggle-btn { display: none !important; }
+}
+
+/* Scrollbar global */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Transitions on theme change */
+body, .dp-topbar, .dp-sidebar, .dp-modal, .dp-btn, .dp-role-btn, .dp-nav-btn, .dp-access-item {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: .3s; transition-timing-function: ease;
+}
+
+</style>
 <style>
   body.rb-locked .topbar,
   body.rb-locked .wrap,
@@ -2090,9 +2160,9 @@ table { font-size: 13.5px; }
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: #fff;
-    border: none;
-    color: #1a0424;
+    background: var(--btn-bg);
+    border: 1px solid var(--line);
+    color: var(--ink);
     border-radius: 10px;
     padding: 8px 16px;
     font-weight: 600;
@@ -2100,15 +2170,16 @@ table { font-size: 13.5px; }
     transition: all .2s;
   }
   .btn-logout:hover {
-    background: #cb11ab;
-    color: #fff;
+    background: color-mix(in srgb, var(--bad,#e53e3e) 12%, var(--btn-bg) 88%);
+    border-color: var(--bad,#e53e3e);
+    color: var(--bad,#e53e3e);
   }
   .btn-secondary{
-    background:#fff;
+    background:var(--btn-bg);
     border:1px solid var(--line);
     border-radius:10px;
     padding:8px 12px;
-    color:var(--ink);
+    color:var(--text);
     font-weight:700;
     cursor:pointer;
     transition:.15s ease;
@@ -2278,28 +2349,15 @@ table { font-size: 13.5px; }
   }
 </style>
 
-<!-- HTML -->
-<div class="rb-auth-screen" id="rbAuthScreen" aria-hidden="true">
-  <form class="rb-auth-card" id="rbAuthForm" autocomplete="off">
-    <div class="rb-auth-title">Вход</div>
-    <div class="rb-auth-note">Доступ к дашборду по логину и паролю</div>
+<!-- Preact 10 + htm (UMD globals, no importmap needed) -->
+<script src="https://unpkg.com/preact@10/dist/preact.umd.js" crossorigin></script>
+<script src="https://unpkg.com/preact@10/hooks/dist/hooks.umd.js" crossorigin></script>
+<script src="https://unpkg.com/htm@3/dist/htm.umd.js" crossorigin></script>
+</head>
+<body class="rb-locked theme-wb-dark">
 
-    <div class="rb-auth-field">
-      <label>Логин</label>
-      <input id="rbAuthLogin" placeholder="Введите логин" />
-    </div>
-    <div class="rb-auth-field">
-      <label>Пароль</label>
-      <input id="rbAuthPass" type="password" placeholder="Введите пароль" />
-    </div>
+<div id="root"></div>
 
-    <div class="rb-auth-error" id="rbAuthError">Неверный логин или пароль</div>
-
-    <div class="rb-auth-actions">
-      <button type="submit" class="rb-auth-btn primary">Войти</button>
-    </div>
-  </form>
-</div>
 <script>
 (() => {
   const RB_CONFIG_URL = 'rb_roles_access.json';
@@ -2829,6 +2887,7 @@ table { font-size: 13.5px; }
     return refreshConfigSnapshot();
   };
 })();
+
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -2956,1829 +3015,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
-<!-- ======= ШАПКА + БОКОВАЯ НАВИГАЦИЯ ======= -->
-<div class="topbar">
-  <div class="inner">
-    <button class="nav-toggle" aria-label="Открыть меню">☰</button>
-    <div class="brand">
-      <svg class="logo" viewBox="0 0 72 56" xmlns="http://www.w3.org/2000/svg" aria-label="Wildberries">
-        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#CB11AB"/><stop offset="1" stop-color="#6E0BD4"/></linearGradient></defs>
-        <rect x="0" y="4" rx="14" ry="14" width="72" height="48" fill="url(#g)"/>
-        <text x="14" y="38" font-family="Inter, Segoe UI, Arial" font-weight="900" font-size="28" fill="#fff">WB</text>
-      </svg>
-      <div class="title">WB Dashboard Shell</div>
-    </div>
-    <div class="actions">
-      <div class="shell-actions" id="shellActions">
-        <button id="shellMenuBtn" class="btn-secondary shell-menu-btn" type="button" aria-expanded="false">
-          <span>Меню</span>
-          <span>▾</span>
-        </button>
-        <div class="shell-menu" id="shellMenu">
-          <button id="shellModeToggleBtn" class="btn-secondary" type="button">Режим: Экспериментальный → Стабильный</button>
-          <button id="profileToggleBtn" class="btn-secondary" type="button" aria-expanded="false">Профиль команды</button>
-          <div class="theme-switcher" id="themeSwitcher">
-            <button id="themeToggleBtn" class="btn-secondary theme-toggle-btn" type="button">
-              <span id="themeToggleLabel">Тема: WB Dark</span>
-              <span>▾</span>
-            </button>
-            <div class="theme-menu" id="themeMenu">
-              <button class="theme-option" data-theme="theme-wb-dark"><span>WB Dark</span><span class="theme-swatch dark"></span></button>
-              <button class="theme-option" data-theme="theme-wb-light"><span>WB Light</span><span class="theme-swatch light"></span></button>
-              <button class="theme-option" data-theme="theme-aurora"><span>Aurora</span><span class="theme-swatch aurora"></span></button>
-              <button class="theme-option" data-theme="theme-ember"><span>Ember</span><span class="theme-swatch ember"></span></button>
-              <button class="theme-option" data-theme="theme-mint"><span>Mint Grid</span><span class="theme-swatch mint"></span></button>
-              <button class="theme-option" data-theme="theme-carbon"><span>Carbon Mono</span><span class="theme-swatch carbon"></span></button>
-              <button class="theme-option" data-theme="theme-ocean-glass"><span>Ocean Glass</span><span class="theme-swatch ocean"></span></button>
-            </div>
-          </div>
-          <button id="accessToggleBtn" class="btn-secondary" type="button" aria-expanded="false">Доступы</button>
-          <div class="role-chip" id="roleChip">роль</div>
-          <button id="rbAuthLogout" class="btn-logout" type="button">Выйти</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="shell-grid">
-  <aside class="shell-sidebar">
-    <div class="shell-sidebar-head">
-      <div class="shell-sidebar-head-top">
-        <div class="shell-sidebar-title">
-          <span class="shell-sidebar-mark">WB</span>
-          <span>Навигация</span>
-        </div>
-      </div>
-      <div class="shell-sidebar-sub">Инструменты релизов, аналитики и контроля качества</div>
-      <div class="shell-sidebar-hero" aria-hidden="true">
-        <img src="sidebar-nav-hero.svg" alt="" decoding="async" />
-      </div>
-      <button id="sidebarToggleBtn" class="btn-secondary header-menu-toggle" type="button" aria-label="Скрыть меню">
-        <span class="header-menu-toggle-label">Скрыть меню</span>
-        <span class="header-menu-toggle-icon" aria-hidden="true">&larr;</span>
-      </button>
-    </div>
-    <div class="tabs rb-shell-tabs sidebar-tabs">
-      <button class="active" data-module="dashboard_run_module.html" data-guard="shell--dashboard-run">Дашборд + РАН-отчёт</button>
-      <button data-module="Ванговатор.html" data-guard="shell--vangovator">Ванговатор</button>
-      <button data-module="Создание рана.html" data-guard="shell--createrun">Создание рана</button>
-      <button data-module="Запуск релиза.html" data-explicit-access="true">Запуск релиза</button>
-      <button data-module="Сбор ЧП.html" data-guard="shell--finalchp">Сбор ЧП</button>
-      <button data-module="УВУ.html" data-guard="shell--finalchp">Расчет uWu</button>
-      <button data-module="BiUser.html" data-guard="shell--finalchp">Пользователи по версиям</button>
-      <button data-module="Популярные устройства.html" data-guard="shell--finalchp">Популярные устройства</button>
-      <button data-module="Графики.html" data-guard="shell--finalchp">Графики</button>
-      <button data-module="SWAT релиз.html" data-guard="shell--finalchp">SWAT релиз</button>
-      <button data-module="Копирование данных из YT.html" data-guard="shell--finalchp">Epic / User Story</button>
-      <button data-module="youtrack-wiki-v4.html" data-superadmin-only="true">Wiki Intelligence v4</button>
-      <button data-module="LearnHub-Portal.html" data-explicit-access="true" data-open-new-tab="true">Learning Hub</button>
-      <button data-module="band-android-rollout.html" data-explicit-access="true">Band rollout report</button>
-      <!-- Пример для будущих модулей:
-      <button data-module="swat_only.html">SWAT-таблица</button>
-      <button data-module="bi_users_calc.html">Статистика BI</button>
-      -->
-    </div>
-  </aside>
-  <div class="shell-content">
-    <div class="wrap">
-    <!-- Панель вкладок оболочки: сюда можно добавлять кнопки с data-module="file.html" --><!-- Контейнер для подгружаемых HTML-модулей -->
-    <div class="card card-shell" style="padding:0; overflow:hidden; background:transparent;">
-      <iframe id="rbModuleFrame"
-              title="Модуль"
-              src="dashboard_run_module.html"
-              style="width:100%; min-height:80vh; border:0; display:block; background:transparent;">
-      </iframe>
-    </div>
-  </div>
-</div>
-</div>
-
-<div class="shell-modal" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle" aria-hidden="true" hidden>
-  <div class="shell-modal-dialog">
-    <div class="shell-modal-head">
-      <div>
-        <div class="shell-modal-title" id="profileModalTitle">Профиль команды</div>
-        <div class="shell-modal-note">Роли участников и фактические доступы по модулям собраны в одном окне.</div>
-      </div>
-      <button id="profileModalClose" class="btn-secondary shell-modal-close" type="button" aria-label="Закрыть профиль команды">×</button>
-    </div>
-    <div class="shell-modal-body">
-      <div class="card profile-directory-card" id="teamProfileCard">
-        <div class="head" style="align-items:center;">
-          <div>
-            <div style="font-weight:900; font-size:16px;">Профиль команды</div>
-            <div class="nums">Роли участников и фактические доступы по модулям</div>
-          </div>
-          <div class="nums" id="teamProfileSummary">0 участников</div>
-        </div>
-        <div class="profile-user-grid" id="teamProfileList"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="shell-modal" id="accessModal" role="dialog" aria-modal="true" aria-labelledby="accessModalTitle" aria-hidden="true" hidden>
-  <div class="shell-modal-dialog">
-    <div class="shell-modal-head">
-      <div>
-        <div class="shell-modal-title" id="accessModalTitle">Доступы и роли</div>
-        <div class="shell-modal-note">Управление доступом к модулям и персональными настройками пользователей.</div>
-      </div>
-      <button id="accessModalClose" class="btn-secondary shell-modal-close" type="button" aria-label="Закрыть окно доступов">×</button>
-    </div>
-    <div class="shell-modal-body">
-      <div class="shell-modal-stack">
-        <div class="card role-access-card" id="roleAccessCard">
-          <div class="head" style="align-items:center;">
-            <div>
-              <div style="font-weight:900; font-size:16px;">Роли и доступы</div>
-              <div class="nums">Настройка доступа к модулям для каждой роли</div>
-            </div>
-            <div class="nums" id="roleAccessHint">Доступно администратору</div>
-          </div>
-          <div class="role-access-grid" style="margin-top:12px;">
-            <div class="role-list" id="roleList"></div>
-            <div>
-              <div class="access-list" id="accessList"></div>
-              <div class="role-actions">
-                <button class="btn-secondary" id="accessSelectAll" type="button">Выбрать все</button>
-                <button class="btn-secondary" id="accessClearAll" type="button">Очистить</button>
-                <button class="btn-primary" id="accessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить доступы</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card role-access-card" id="userAccessCard">
-          <div class="head" style="align-items:center;">
-            <div>
-              <div style="font-weight:900; font-size:16px;">Пользователи и доступы</div>
-              <div class="nums">Назначение роли и доступа для каждого пользователя</div>
-            </div>
-            <div class="nums">Только для Nightlays (суперадмин)</div>
-          </div>
-          <div class="user-create-card" style="margin-top:12px;">
-            <div class="user-create-grid">
-              <div class="field">
-                <label>Никнейм</label>
-                <input id="newUserLogin" type="text" placeholder="Например, Artem" />
-              </div>
-              <div class="field">
-                <label>Пароль</label>
-                <input id="newUserPass" type="password" placeholder="Введите пароль" />
-              </div>
-              <div class="field">
-                <label>Стартовая роль</label>
-                <select id="newUserRoleSelect"></select>
-              </div>
-              <button class="btn-primary" id="createUserBtn" type="button" style="padding:10px 18px;">Создать пользователя</button>
-            </div>
-            <div class="user-create-note">После создания пользователь сразу появится в списке ниже. Дальше можно сохранить ему индивидуальную роль и доступы в App Script, с fallback на локальный `rb_roles_access.json`.</div>
-          </div>
-          <div class="role-access-grid" style="margin-top:12px;">
-            <div class="role-list" id="userList"></div>
-            <div>
-              <div class="field" style="margin-bottom:10px;">
-                <label>Роль пользователя</label>
-                <select id="userRoleSelect"></select>
-              </div>
-              <div class="field" style="margin-bottom:10px;">
-                <label>Новый пароль</label>
-                <input id="userPassInput" type="password" placeholder="Оставьте пустым, если менять не нужно" />
-              </div>
-              <label class="access-item" style="margin-bottom:10px;">
-                <input type="checkbox" id="userUseRoleAccess" checked />
-                <span>Использовать доступы роли</span>
-              </label>
-              <div class="access-list" id="userAccessList"></div>
-              <div class="role-actions">
-                <button class="btn-secondary" id="userAccessSelectAll" type="button">Выбрать все</button>
-                <button class="btn-secondary" id="userAccessClearAll" type="button">Очистить</button>
-                <button class="btn-primary" id="userAccessSave" type="button" style="width:auto; padding:10px 18px;">Сохранить пользователя</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-// Оболочка: переключение модулей по кнопкам data-module + гарды по data-guard
-document.addEventListener('DOMContentLoaded', () => {
-  const frame = document.getElementById('rbModuleFrame');
-  const tabBars = Array.from(document.querySelectorAll('.rb-shell-tabs'));
-  if (!tabBars.length || !frame) return;
-
-  const SIDEBAR_MODULE_META = {
-    'dashboard_run_module.html': { label: 'Дашборд + РАН-отчёт', icon: 'dashboard' },
-    'Ванговатор.html': { label: 'Ванговатор', icon: 'vangovator' },
-    'Создание рана.html': { label: 'Создание рана', icon: 'create-run' },
-    'Запуск релиза.html': { label: 'Запуск релиза', icon: 'story' },
-    'Сбор ЧП.html': { label: 'Сбор ЧП', icon: 'incident' },
-    'УВУ.html': { label: 'Расчет uWu', icon: 'uwu' },
-    'BiUser.html': { label: 'Пользователи по версиям', icon: 'users' },
-    'Популярные устройства.html': { label: 'Популярные устройства', icon: 'devices' },
-    'Графики.html': { label: 'Графики', icon: 'charts' },
-    'SWAT релиз.html': { label: 'SWAT релиз', icon: 'swat' },
-    'Копирование данных из YT.html': { label: 'Epic / User Story', icon: 'story' },
-    'youtrack-wiki-v4.html': { label: 'Wiki Intelligence v4', icon: 'charts' },
-    'LearnHub-Portal.html': { label: 'Learning Hub', icon: 'story' },
-    'band-android-rollout.html': { label: 'Band rollout report', icon: 'charts' }
-  };
-
-  function decorateSidebarButtons() {
-    const sidebarButtons = Array.from(document.querySelectorAll('.sidebar-tabs [data-module]'));
-    sidebarButtons.forEach(btn => {
-      const moduleId = btn.getAttribute('data-module');
-      const meta = SIDEBAR_MODULE_META[moduleId];
-      const label = meta?.label || (btn.textContent || '').trim();
-      const iconId = meta?.icon || 'dashboard';
-      btn.classList.add('sidebar-tab-button');
-      btn.dataset.moduleLabel = label;
-      btn.title = label;
-      btn.setAttribute('aria-label', label);
-      btn.innerHTML = `
-        <span class="sidebar-tab-media" aria-hidden="true">
-          <svg class="sidebar-tab-icon" viewBox="0 0 64 64" focusable="false">
-            <use href="#icon-${iconId}"></use>
-          </svg>
-        </span>
-        <span class="sidebar-tab-label">${label}</span>
-      `;
-    });
-  }
-
-  function getButtonLabel(btn) {
-    if (!btn) return '';
-    return btn.dataset.moduleLabel
-      || btn.querySelector('.sidebar-tab-label')?.textContent?.trim()
-      || (btn.textContent || '').trim();
-  }
-
-  decorateSidebarButtons();
-
-  const buttons = tabBars.flatMap(tabBar => Array.from(tabBar.querySelectorAll('[data-module]')));
-  const buttonsByModule = new Map();
-  buttons.forEach(btn => {
-    const moduleId = btn.getAttribute('data-module');
-    if (!buttonsByModule.has(moduleId)) buttonsByModule.set(moduleId, []);
-    buttonsByModule.get(moduleId).push(btn);
-  });
-  const HIDDEN_MODULES = [
-    {
-      id: 'youtrack-wiki-v4.html',
-      label: 'Wiki Intelligence v4',
-      aliases: ['yt-wiki', 'youtrack-wiki', 'wiki-intelligence'],
-      requiresSuperadmin: true
-    }
-  ];
-  const hiddenModulesById = new Map(HIDDEN_MODULES.map(module => [module.id, module]));
-  const hiddenModuleAliasMap = new Map();
-  HIDDEN_MODULES.forEach(module => {
-    (module.aliases || []).forEach(alias => {
-      hiddenModuleAliasMap.set(String(alias || '').trim().toLowerCase(), module.id);
-    });
-  });
-  const guardClasses = buttons
-    .map(b => b.getAttribute('data-guard'))
-    .filter(Boolean);
-
-  const navToggle = document.querySelector('.nav-toggle');
-  const shellActions = document.getElementById('shellActions');
-  const shellMenuBtn = document.getElementById('shellMenuBtn');
-  const shellMenu = document.getElementById('shellMenu');
-  const shellModeToggleBtn = document.getElementById('shellModeToggleBtn');
-  const profileToggleBtn = document.getElementById('profileToggleBtn');
-  const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
-  const accessToggleBtn = document.getElementById('accessToggleBtn');
-  const themeSwitcher = document.getElementById('themeSwitcher');
-  const themeToggleBtn = document.getElementById('themeToggleBtn');
-  const themeToggleLabel = document.getElementById('themeToggleLabel');
-  const themeMenu = document.getElementById('themeMenu');
-  const themeOptions = Array.from(document.querySelectorAll('.theme-option[data-theme]'));
-  const profileModal = document.getElementById('profileModal');
-  const accessModal = document.getElementById('accessModal');
-  const profileModalCloseBtn = document.getElementById('profileModalClose');
-  const accessModalCloseBtn = document.getElementById('accessModalClose');
-  const ROLE_KEY = 'rb_role_v1';
-  const USER_KEY = 'rb_user_v1';
-  const ACCESS_KEY = 'rb_role_access_v1';
-  const USER_ROLE_KEY = 'rb_user_roles_v1';
-  const USER_ACCESS_KEY = 'rb_user_access_v1';
-  const SIDEBAR_COLLAPSED_KEY = 'rb_shell_sidebar_collapsed_v1';
-  const THEME_KEY = 'rb_shell_theme_v1';
-  const SHELL_VARIANT_KEY = 'rb_shell_design_mode_v1';
-  const CURRENT_SHELL_MODE = 'experimental';
-  const EXPERIMENTAL_SHELL_URL = 'index.html';
-  const STABLE_SHELL_URL = 'index.html';
-  const THEME_ITEMS = [
-    { id: 'theme-wb-dark', label: 'WB Dark' },
-    { id: 'theme-wb-light', label: 'WB Light' },
-    { id: 'theme-aurora', label: 'Aurora' },
-    { id: 'theme-ember', label: 'Ember' },
-    { id: 'theme-mint', label: 'Mint Grid' },
-    { id: 'theme-carbon', label: 'Carbon Mono' },
-    { id: 'theme-ocean-glass', label: 'Ocean Glass' }
-  ];
-  const THEME_IDS = THEME_ITEMS.map(item => item.id);
-  const roleListEl = document.getElementById('roleList');
-  const accessListEl = document.getElementById('accessList');
-  const roleChipEl = document.getElementById('roleChip');
-  const teamProfileCard = document.getElementById('teamProfileCard');
-  const teamProfileList = document.getElementById('teamProfileList');
-  const teamProfileSummary = document.getElementById('teamProfileSummary');
-  const selectAllBtn = document.getElementById('accessSelectAll');
-  const clearAllBtn = document.getElementById('accessClearAll');
-  const saveBtn = document.getElementById('accessSave');
-  const toastEl = document.getElementById('toast');
-  const toastKindEl = document.getElementById('toastKind');
-  const toastTitleEl = document.getElementById('toastTitle');
-  const toastTextEl = document.getElementById('toastText');
-  const userListEl = document.getElementById('userList');
-  const userRoleSelect = document.getElementById('userRoleSelect');
-  const userPassInput = document.getElementById('userPassInput');
-  const userUseRoleAccess = document.getElementById('userUseRoleAccess');
-  const userAccessList = document.getElementById('userAccessList');
-  const userSelectAllBtn = document.getElementById('userAccessSelectAll');
-  const userClearAllBtn = document.getElementById('userAccessClearAll');
-  const userSaveBtn = document.getElementById('userAccessSave');
-  const newUserLoginInput = document.getElementById('newUserLogin');
-  const newUserPassInput = document.getElementById('newUserPass');
-  const newUserRoleSelect = document.getElementById('newUserRoleSelect');
-  const createUserBtn = document.getElementById('createUserBtn');
-
-  let toastTimer = null;
-  let pendingActionToast = null;
-  let frameUiCleanup = () => {};
-  let lastRelayedToast = { text: '', at: 0 };
-  const TOAST_KIND_META = {
-    info: { badge: 'Инфо', title: 'Действие запущено' },
-    success: { badge: 'Готово', title: 'Действие выполнено' },
-    warning: { badge: 'Внимание', title: 'Проверьте действие' },
-    error: { badge: 'Ошибка', title: 'Нужно внимание' }
-  };
-  const ACTION_HINTS = [
-    {
-      id: 'save',
-      match: /(сохран|save)/i,
-      title: 'Сохранение',
-      tip: 'Сохраняет текущие настройки, данные или результат в модуле.',
-      pending: 'Сохраняем данные…',
-      kind: 'info'
-    },
-    {
-      id: 'load',
-      match: /(загруз|импорт|upload|load|подключить файл|выбрать файл|открыть)/i,
-      title: 'Загрузка',
-      tip: 'Загружает файл, настройки или данные в текущий модуль.',
-      pending: 'Загружаем данные…',
-      kind: 'info'
-    },
-    {
-      id: 'export',
-      match: /(экспорт|выгруз|download|pdf|csv|json|excel)/i,
-      title: 'Выгрузка',
-      tip: 'Подготавливает файл и запускает скачивание результата.',
-      pending: 'Готовим выгрузку…',
-      kind: 'info'
-    },
-    {
-      id: 'copy',
-      match: /(копир|буфер)/i,
-      title: 'Копирование',
-      tip: 'Копирует данные в буфер обмена или в служебный блок.',
-      pending: 'Копируем данные…',
-      kind: 'info'
-    },
-    {
-      id: 'run',
-      match: /(запус|старт|run|постро|сбор|обнов|рассчит|создат)/i,
-      title: 'Запуск',
-      tip: 'Запускает сбор, расчёт, создание или построение отчёта.',
-      pending: 'Запускаем действие…',
-      kind: 'info'
-    },
-    {
-      id: 'control',
-      match: /(стоп|останов|сброс|очист|удал|reset|выключ|отмен)/i,
-      title: 'Управление',
-      tip: 'Останавливает, очищает, сбрасывает или отменяет текущее действие.',
-      pending: 'Выполняем действие…',
-      kind: 'warning'
-    }
-  ];
-
-  function normalizeText(value) {
-    return String(value || '').replace(/\s+/g, ' ').trim();
-  }
-
-  function inferToastKindFromMessage(message) {
-    const text = normalizeText(message).toLowerCase();
-    if (!text) return 'info';
-    if (/(ошиб|не удалось|невозможно|не могу|нет данных|не найден|проблем|fail|timeout|exception)/i.test(text)) return 'error';
-    if (/(останов|сброш|очищ|отмен|предуп|вниман)/i.test(text)) return 'warning';
-    if (/(сохран|готово|успеш|ok\b|скопир|выгруж|экспорт|опублик|примен|обновл|добавлен|создан|подключен|заверш)/i.test(text)) return 'success';
-    return 'info';
-  }
-
-  function cancelPendingActionToast() {
-    if (!pendingActionToast) return;
-    window.clearTimeout(pendingActionToast);
-    pendingActionToast = null;
-  }
-
-  function showToast(message, kindOrOptions = null, extraOptions = null) {
-    if (!toastEl) return;
-    const normalized = normalizeText(message);
-    const options = kindOrOptions && typeof kindOrOptions === 'object'
-      ? kindOrOptions
-      : (extraOptions && typeof extraOptions === 'object' ? extraOptions : {});
-    const kind = typeof kindOrOptions === 'string' && TOAST_KIND_META[kindOrOptions]
-      ? kindOrOptions
-      : inferToastKindFromMessage(normalized);
-    const meta = TOAST_KIND_META[kind] || TOAST_KIND_META.info;
-    cancelPendingActionToast();
-    toastEl.classList.remove('toast--info', 'toast--success', 'toast--warning', 'toast--error');
-    toastEl.classList.add(`toast--${kind}`);
-    if (toastKindEl) toastKindEl.textContent = options.badge || meta.badge;
-    if (toastTitleEl) toastTitleEl.textContent = options.title || meta.title;
-    if (toastTextEl) toastTextEl.textContent = normalized;
-    else toastEl.textContent = normalized;
-    toastEl.classList.add('show');
-    if (toastTimer) window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => {
-      toastEl.classList.remove('show');
-    }, 2200);
-  }
-
-  function inferActionMeta(label) {
-    const normalized = normalizeText(label);
-    if (!normalized) return null;
-    return ACTION_HINTS.find(item => item.match.test(normalized)) || null;
-  }
-
-  function isElementNode(node) {
-    return !!node && node.nodeType === 1;
-  }
-
-  function getActionLabel(el) {
-    if (!isElementNode(el)) return '';
-    if (el.matches('input[type="file"]')) return el.getAttribute('aria-label') || el.getAttribute('title') || 'Выбрать файл';
-    const explicitLabel = normalizeText(
-      el.getAttribute('data-module-label')
-      || el.getAttribute('aria-label')
-      || el.getAttribute('data-shell-action-label')
-      || ''
-    );
-    if (explicitLabel) return explicitLabel;
-    if ((el.tagName === 'INPUT' || el.tagName === 'BUTTON') && normalizeText(el.value)) {
-      return normalizeText(el.value);
-    }
-    return normalizeText(el.textContent || el.getAttribute('title') || '');
-  }
-
-  function annotateActionElement(el) {
-    if (!isElementNode(el)) return;
-    const label = getActionLabel(el);
-    const meta = inferActionMeta(label);
-    if (!meta) return;
-    el.dataset.shellAction = meta.id;
-    el.dataset.shellActionLabel = label;
-    if (!el.getAttribute('title')) el.setAttribute('title', meta.tip);
-  }
-
-  function annotateActionables(root) {
-    if (!root) return;
-    const selector = 'button, a[href], input[type="file"], input[type="button"], input[type="submit"], [role="button"]';
-    if (isElementNode(root) && root.matches(selector)) annotateActionElement(root);
-    if (typeof root.querySelectorAll !== 'function') return;
-    root.querySelectorAll(selector).forEach(annotateActionElement);
-  }
-
-  function scheduleActionToastFromElement(el) {
-    if (!isElementNode(el)) return;
-    annotateActionElement(el);
-    const label = el.dataset.shellActionLabel || getActionLabel(el);
-    const meta = inferActionMeta(label);
-    if (!meta) return;
-    if (typeof el.disabled === 'boolean' && el.disabled) return;
-    if (el.getAttribute('aria-disabled') === 'true') return;
-    cancelPendingActionToast();
-    pendingActionToast = window.setTimeout(() => {
-      showToast(meta.pending, meta.kind, { title: meta.title });
-    }, 220);
-  }
-
-  function relayModuleToast(message, options = {}) {
-    const text = normalizeText(message);
-    if (!text) return;
-    const now = Date.now();
-    if (lastRelayedToast.text === text && now - lastRelayedToast.at < 1200) return;
-    lastRelayedToast = { text, at: now };
-    showToast(text, options.kind || inferToastKindFromMessage(text), {
-      title: options.title || 'Сообщение модуля'
-    });
-  }
-
-  function isVisibleElement(el, styles) {
-    if (!isElementNode(el) || !el.isConnected) return false;
-    let current = el;
-    let currentStyles = styles || null;
-    while (current && isElementNode(current)) {
-      const style = current === el && currentStyles ? currentStyles : getComputedStyle(current);
-      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || '1') === 0) return false;
-      if (current.hasAttribute('hidden') || current.getAttribute('aria-hidden') === 'true') return false;
-      current = current.parentElement;
-      currentStyles = null;
-    }
-    return el.getClientRects().length > 0 || el.offsetWidth > 0 || el.offsetHeight > 0;
-  }
-
-  function bindFrameNotifications(frameEl) {
-    frameUiCleanup();
-    frameUiCleanup = () => {};
-    if (!frameEl) return;
-    const doc = frameEl.contentDocument;
-    if (!doc || !doc.body) return;
-
-    annotateActionables(doc);
-
-    const onClick = (e) => {
-      const actionEl = isElementNode(e.target)
-        ? e.target.closest('button, a[href], input[type="button"], input[type="submit"], [role="button"]')
-        : null;
-      if (!actionEl) return;
-      scheduleActionToastFromElement(actionEl);
-    };
-
-    const onChange = (e) => {
-      const target = isElementNode(e.target) ? e.target : null;
-      if (!target) return;
-      if (target.matches('input[type="file"]')) {
-        annotateActionElement(target);
-        const names = Array.from(target.files || []).map(file => file.name).filter(Boolean);
-        relayModuleToast(names.length ? `Выбран файл: ${names.join(', ')}` : 'Файл выбран', {
-          kind: 'info',
-          title: 'Загрузка'
-        });
-        return;
-      }
-      annotateActionElement(target);
-    };
-
-    const actionObserver = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (isElementNode(node)) annotateActionables(node);
-        });
-      });
-    });
-    actionObserver.observe(doc.body, { childList: true, subtree: true });
-
-    const toastSelectors = [
-      '#toast',
-      '#toastBox',
-      '.toast',
-      '[id*="toast"]',
-      '[class*="toast"]',
-      '[role="status"][aria-live]',
-      '[aria-live="polite"]',
-      '[aria-live="assertive"]'
-    ];
-    let lastFrameToastText = '';
-    const readToastText = () => {
-      for (const selector of toastSelectors) {
-        const nodes = Array.from(doc.querySelectorAll(selector));
-        for (const node of nodes) {
-          const text = normalizeText(node.textContent);
-          if (!text || text.length > 220) continue;
-          if (!isVisibleElement(node)) continue;
-          return text;
-        }
-      }
-      return '';
-    };
-    const toastObserver = new MutationObserver(() => {
-      const text = readToastText();
-      if (!text || text === lastFrameToastText) return;
-      lastFrameToastText = text;
-      relayModuleToast(text);
-    });
-    toastObserver.observe(doc.body, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'open']
-    });
-
-    doc.addEventListener('click', onClick, true);
-    doc.addEventListener('change', onChange, true);
-
-    frameUiCleanup = () => {
-      doc.removeEventListener('click', onClick, true);
-      doc.removeEventListener('change', onChange, true);
-      actionObserver.disconnect();
-      toastObserver.disconnect();
-    };
-  }
-
-  function setSidebarCollapsed(collapsed) {
-    const next = !!collapsed;
-    document.body.classList.toggle('sidebar-collapsed', next);
-    if (sidebarToggleBtn) {
-      const toggleLabel = sidebarToggleBtn.querySelector('.header-menu-toggle-label');
-      const toggleIcon = sidebarToggleBtn.querySelector('.header-menu-toggle-icon');
-      const actionLabel = next ? 'Показать меню' : 'Скрыть меню';
-      if (toggleLabel) toggleLabel.textContent = next ? 'Меню' : actionLabel;
-      if (toggleIcon) toggleIcon.innerHTML = next ? '&rarr;' : '&larr;';
-      sidebarToggleBtn.setAttribute('aria-label', actionLabel);
-      sidebarToggleBtn.title = actionLabel;
-    }
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
-  }
-
-  function currentThemeLabel(themeId) {
-    return THEME_ITEMS.find(item => item.id === themeId)?.label || 'WB Dark';
-  }
-
-  function renderThemeState(themeId) {
-    if (themeToggleLabel) themeToggleLabel.textContent = `Тема: ${currentThemeLabel(themeId)}`;
-    themeOptions.forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-theme') === themeId);
-    });
-  }
-
-  function getCurrentThemeId() {
-    return THEME_IDS.find(id => document.body.classList.contains(id)) || 'theme-wb-dark';
-  }
-
-  function applyTheme(themeId, persist = true) {
-    const nextTheme = THEME_IDS.includes(themeId) ? themeId : 'theme-wb-dark';
-    document.body.classList.remove(...THEME_IDS);
-    document.body.classList.add(nextTheme);
-    renderThemeState(nextTheme);
-    if (persist) localStorage.setItem(THEME_KEY, nextTheme);
-  }
-
-  function closeThemeMenu() {
-    if (themeMenu) themeMenu.classList.remove('open');
-  }
-
-  function closeShellMenu() {
-    if (shellMenu) shellMenu.classList.remove('open');
-    if (shellMenuBtn) shellMenuBtn.setAttribute('aria-expanded', 'false');
-    closeThemeMenu();
-  }
-
-  function toggleShellMenu() {
-    if (!shellMenu) return;
-    const next = !shellMenu.classList.contains('open');
-    shellMenu.classList.toggle('open', next);
-    if (shellMenuBtn) shellMenuBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
-    if (!next) closeThemeMenu();
-  }
-
-  function renderShellModeToggle() {
-    if (!shellModeToggleBtn) return;
-    const nextMode = CURRENT_SHELL_MODE === 'experimental' ? 'stable' : 'experimental';
-    const currentLabel = CURRENT_SHELL_MODE === 'experimental' ? 'Экспериментальный' : 'Стабильный';
-    const nextLabel = nextMode === 'experimental' ? 'Экспериментальный' : 'Стабильный';
-    shellModeToggleBtn.textContent = `Режим: ${currentLabel} → ${nextLabel}`;
-  }
-
-  function syncModalState() {
-    const hasOpenModal =
-      document.body.classList.contains('profile-open') ||
-      document.body.classList.contains('access-open');
-    document.body.classList.toggle('modal-open', hasOpenModal);
-  }
-
-  function syncModalVisibility(modalEl, open) {
-    if (!modalEl) return;
-    const next = !!open;
-    modalEl.hidden = !next;
-    modalEl.style.display = next ? 'flex' : 'none';
-    modalEl.classList.toggle('open', next);
-    modalEl.setAttribute('aria-hidden', next ? 'false' : 'true');
-  }
-
-  function setProfileOpen(open) {
-    const next = !!open;
-    if (next) {
-      document.body.classList.remove('access-open');
-      syncModalVisibility(accessModal, false);
-      if (accessToggleBtn) {
-        accessToggleBtn.textContent = 'Доступы';
-        accessToggleBtn.setAttribute('aria-expanded', 'false');
-      }
-    }
-    document.body.classList.toggle('profile-open', next);
-    syncModalVisibility(profileModal, next);
-    if (profileToggleBtn) {
-      profileToggleBtn.textContent = next ? 'Закрыть профиль' : 'Профиль команды';
-      profileToggleBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
-    }
-    syncModalState();
-    if (next && profileModalCloseBtn) {
-      window.requestAnimationFrame(() => profileModalCloseBtn.focus({ preventScroll: true }));
-    }
-  }
-
-  localStorage.setItem(SHELL_VARIANT_KEY, 'experimental');
-  renderShellModeToggle();
-
-  const PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
-  const PROXY_CLIENT_CONFIG_URL = 'proxy-client-config.json';
-  const PROXY_SHARED_SETTINGS_KEY = 'bi_users_calc_settings_v1';
-  const PROXY_CHP_SETTINGS_KEY = 'chp_full_cfg_v1';
-  const DEFAULT_PROXY_BASE = 'http://localhost:8787';
-
-  function toAbsoluteUrl(raw) {
-    if (typeof raw !== 'string' || !raw.trim()) return '';
-    try {
-      return new URL(raw.trim(), location.href).toString();
-    } catch (e) {
-      return '';
-    }
-  }
-
-  function normalizeProxyBase(raw) {
-    const abs = toAbsoluteUrl(raw);
-    return abs ? abs.replace(/\/+$/, '') : '';
-  }
-
-  function readRuntimeProxyFromStorage() {
-    try {
-      const raw = localStorage.getItem(PROXY_RUNTIME_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      const base = normalizeProxyBase(parsed?.base || '');
-      if (!base) return null;
-      return {
-        base,
-        mode: parsed?.mode === 'prefix' ? 'prefix' : 'query',
-        useProxy: parsed?.useProxy !== false
-      };
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function persistRuntimeProxy(cfg) {
-    if (!cfg || !cfg.base) return;
-    localStorage.setItem(PROXY_RUNTIME_KEY, JSON.stringify(cfg));
-    window.__RB_PROXY_CONFIG = cfg;
-  }
-
-  function mergeStorageJson(key, patch) {
-    try {
-      const base = JSON.parse(localStorage.getItem(key) || '{}');
-      const next = { ...base, ...patch };
-      localStorage.setItem(key, JSON.stringify(next));
-    } catch (e) {
-      localStorage.setItem(key, JSON.stringify(patch));
-    }
-  }
-
-  function syncProxyConfigToStorage(cfg) {
-    if (!cfg || !cfg.base) return;
-    const baseWithSlash = `${cfg.base}/`;
-
-    mergeStorageJson(PROXY_SHARED_SETTINGS_KEY, {
-      proxyBase: baseWithSlash,
-      proxyMode: cfg.mode || 'query',
-      useProxy: cfg.useProxy !== false
-    });
-
-    mergeStorageJson(PROXY_CHP_SETTINGS_KEY, {
-      proxyBase: cfg.base,
-      proxyAsQuery: (cfg.mode || 'query') === 'query',
-      useProxy: cfg.useProxy !== false
-    });
-  }
-
-  function buildProxyAwareModuleUrl(rawUrl, cfg) {
-    if (!rawUrl || rawUrl === 'about:blank') return rawUrl;
-    if (!cfg || !cfg.base) return rawUrl;
-    const abs = toAbsoluteUrl(rawUrl);
-    if (!abs) return rawUrl;
-    try {
-      const u = new URL(abs);
-      u.searchParams.set('rbProxyBase', cfg.base);
-      u.searchParams.set('rbProxyMode', cfg.mode || 'query');
-      u.searchParams.set('rbUseProxy', cfg.useProxy !== false ? '1' : '0');
-      return u.toString();
-    } catch (e) {
-      return rawUrl;
-    }
-  }
-
-  function setFieldValue(el, value) {
-    if (!el) return;
-    if ('value' in el) el.value = value;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  function setCheckboxValue(el, checked) {
-    if (!el) return;
-    el.checked = !!checked;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  function applyProxyConfigToFrame(frameEl, cfg) {
-    if (!frameEl) return;
-    const win = frameEl.contentWindow;
-    const doc = frameEl.contentDocument;
-    if (!win || !doc) return;
-    if (!cfg || !cfg.base) return;
-
-    const baseWithSlash = `${cfg.base}/`;
-    try { win.__RB_PROXY_CONFIG = cfg; } catch (e) {}
-    try { win.localStorage.setItem(PROXY_RUNTIME_KEY, JSON.stringify(cfg)); } catch (e) {}
-
-    setFieldValue(doc.getElementById('proxyBase'), baseWithSlash);
-    setFieldValue(doc.getElementById('inp-proxy'), cfg.base);
-    setFieldValue(doc.getElementById('proxyMode'), cfg.mode || 'query');
-    setCheckboxValue(doc.getElementById('useProxy'), cfg.useProxy !== false);
-    setCheckboxValue(doc.getElementById('chk-proxy'), cfg.useProxy !== false);
-    setCheckboxValue(doc.getElementById('proxyAsQuery'), (cfg.mode || 'query') === 'query');
-  }
-
-  async function loadRuntimeProxyConfig() {
-    const defaults = {
-      base: normalizeProxyBase(DEFAULT_PROXY_BASE) || 'http://localhost:8787',
-      mode: 'query',
-      useProxy: true
-    };
-    let fileCfg = null;
-    try {
-      const res = await fetch(PROXY_CLIENT_CONFIG_URL, { cache: 'no-store' });
-      if (res.ok) fileCfg = await res.json();
-    } catch (e) {}
-
-    const candidates = [
-      fileCfg?.base,
-      ...(Array.isArray(fileCfg?.candidates) ? fileCfg.candidates : []),
-      defaults.base,
-      'http://localhost:8787'
-    ]
-      .map(normalizeProxyBase)
-      .filter(Boolean);
-
-    const uniqueCandidates = Array.from(new Set(candidates));
-
-    async function isHealthy(base, probeUrl) {
-      const endpoints = [`${base}/health`];
-      for (const endpoint of endpoints) {
-        const controller = new AbortController();
-        const t = window.setTimeout(() => controller.abort(), 1200);
-        try {
-          const res = await fetch(endpoint, { cache: 'no-store', signal: controller.signal });
-          if (!res.ok) continue;
-          const contentType = (res.headers.get('content-type') || '').toLowerCase();
-          if (!contentType.includes('application/json')) return true;
-          const body = await res.json().catch(() => ({}));
-          if (body && (body.ok === true || body.status === 'ok')) return true;
-        } catch (e) {
-        } finally {
-          window.clearTimeout(t);
-        }
-      }
-      if (!probeUrl) return false;
-      const controller = new AbortController();
-      const t = window.setTimeout(() => controller.abort(), 2200);
-      try {
-        const u = new URL(base);
-        u.searchParams.set('url', probeUrl);
-        const res = await fetch(u.toString(), { cache: 'no-store', signal: controller.signal });
-        if (res.status === 530) return false;
-        return true;
-      } catch (e) {
-        return false;
-      } finally {
-        window.clearTimeout(t);
-      }
-    }
-
-    const probeUrl = String(fileCfg?.probeUrl || 'https://deploy-lab-api.wb.ru/').trim();
-    let chosenBase = uniqueCandidates[0] || defaults.base;
-    for (const candidate of uniqueCandidates) {
-      const ok = await isHealthy(candidate, probeUrl);
-      if (ok) {
-        chosenBase = candidate;
-        break;
-      }
-    }
-
-    return {
-      base: chosenBase,
-      mode: fileCfg?.mode === 'prefix' ? 'prefix' : defaults.mode,
-      useProxy: fileCfg?.useProxy !== false
-    };
-  }
-
-  let runtimeProxyConfig = readRuntimeProxyFromStorage() || {
-    base: normalizeProxyBase(DEFAULT_PROXY_BASE) || 'http://localhost:8787',
-    mode: 'query',
-    useProxy: true
-  };
-  persistRuntimeProxy(runtimeProxyConfig);
-  syncProxyConfigToStorage(runtimeProxyConfig);
-
-  const modules = Array.from(buttonsByModule.entries()).map(([id, group]) => ({
-    id,
-    label: getButtonLabel(group[0]),
-    explicitAccess: group.some(btn => btn.dataset.explicitAccess === 'true'),
-    openNewTab: group.some(btn => btn.dataset.openNewTab === 'true')
-  }));
-  let currentModuleId = '';
-  const findModuleMeta = (moduleId) => modules.find(module => module.id === moduleId) || null;
-  const getDefaultGrantedModuleIds = () => modules.filter(module => !module.explicitAccess).map(module => module.id);
-
-  function resolveModuleRequest(raw) {
-    const value = String(raw || '').trim();
-    if (!value) return '';
-    if (buttonsByModule.has(value) || hiddenModulesById.has(value)) return value;
-    return hiddenModuleAliasMap.get(value.toLowerCase()) || '';
-  }
-
-  function isModuleAllowed(moduleId, roleId = (localStorage.getItem(ROLE_KEY) || 'viewer')) {
-    const hiddenModule = hiddenModulesById.get(moduleId);
-    if (!hiddenModule) return true;
-    if (hiddenModule.requiresSuperadmin) return roleId === 'superadmin';
-    return true;
-  }
-
-  function getFirstVisibleModuleId() {
-    const visible = buttons.find(btn => btn.style.display !== 'none');
-    return visible ? visible.getAttribute('data-module') || '' : '';
-  }
-
-  function syncModuleQuery(moduleId) {
-    if (!moduleId) return;
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set('module', moduleId);
-      window.history.replaceState({}, '', url.toString());
-    } catch (e) {}
-  }
-
-  const loadConfig = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
-  loadConfig.then((cfg) => {
-    const roles = Array.isArray(cfg?.roles) ? cfg.roles : [];
-    const configRoleAccess = cfg?.roleAccess || {};
-    const configUserAccess = cfg?.userAccess || {};
-    let managedUsers = [];
-
-  function buildDefaultAccess() {
-    const all = getDefaultGrantedModuleIds();
-    const byLabel = (re) => modules.filter(m => re.test(m.label)).map(m => m.id);
-    const analyst = byLabel(/Дашборд|Графики|Пользователи|Популярные|РАН/i);
-    return {
-      superadmin: all.slice(),
-      admin: all.slice(),
-      manager: all.slice(),
-      analyst: analyst.length ? analyst : (all[0] ? [all[0]] : []),
-      viewer: all[0] ? [all[0]] : []
-    };
-  }
-
-  function loadAccessMap() {
-    try {
-      const raw = localStorage.getItem(ACCESS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return { ...buildDefaultAccess(), ...configRoleAccess, ...parsed };
-      }
-    } catch (e) {}
-    return { ...buildDefaultAccess(), ...configRoleAccess };
-  }
-
-  let accessMap = loadAccessMap();
-  let selectedRole = roles[0].id;
-  let selectedUser = '';
-  let userRoleMap = {};
-  let userAccessMap = {};
-  let userEditUseRole = null;
-
-  function roleLabel(roleId) {
-    return roles.find(r => r.id === roleId)?.label || roleId;
-  }
-
-  function loadUserRoleMap() {
-    try {
-      const raw = localStorage.getItem(USER_ROLE_KEY);
-      if (raw) return JSON.parse(raw) || {};
-    } catch (e) {}
-    return {};
-  }
-
-  function loadUserAccessMap() {
-    try {
-      const raw = localStorage.getItem(USER_ACCESS_KEY);
-      if (raw) return JSON.parse(raw) || {};
-    } catch (e) {}
-    return {};
-  }
-
-  function buildRoleAccessForPersist() {
-    return Object.entries(accessMap || {}).reduce((acc, [roleId, list]) => {
-      const safeRoleId = String(roleId || '').trim();
-      if (!safeRoleId) return acc;
-      const normalized = Array.from(new Set(
-        (Array.isArray(list) ? list : [])
-          .map((item) => String(item || '').trim())
-          .filter(Boolean)
-      ));
-      acc[safeRoleId] = normalized.includes('*') ? ['*'] : normalized;
-      return acc;
-    }, {});
-  }
-
-  function buildUserAccessForPersist() {
-    return Object.entries(userAccessMap || {}).reduce((acc, [login, cfg]) => {
-      const safeLogin = String(login || '').trim();
-      if (!safeLogin) return acc;
-      const access = Array.from(new Set(
-        (Array.isArray(cfg?.access) ? cfg.access : [])
-          .map((item) => String(item || '').trim())
-          .filter(Boolean)
-      ));
-      acc[safeLogin] = {
-        useRole: cfg?.useRole !== false,
-        access
-      };
-      return acc;
-    }, {});
-  }
-
-  function buildUsersForPersist() {
-    const sourceUsers = Array.isArray(window.RB_CONFIG?.users) && window.RB_CONFIG.users.length
-      ? window.RB_CONFIG.users
-      : (Array.isArray(cfg?.users) ? cfg.users : []);
-    const seen = new Set();
-    return sourceUsers.reduce((acc, user) => {
-      const login = typeof user?.login === 'string' ? user.login.trim() : '';
-      const pass = typeof user?.pass === 'string' ? user.pass.trim() : '';
-      if (!login || !pass) return acc;
-      const key = login.toLowerCase();
-      if (seen.has(key)) return acc;
-      seen.add(key);
-      const role = login === 'Nightlays' ? 'superadmin' : resolveUserRole(login);
-      acc.push({ login, pass, role });
-      return acc;
-    }, []);
-  }
-
-  function clearLocalRbacDrafts() {
-    try {
-      localStorage.removeItem(ACCESS_KEY);
-      localStorage.removeItem(USER_ROLE_KEY);
-      localStorage.removeItem(USER_ACCESS_KEY);
-      localStorage.removeItem('rb_custom_users_v1');
-    } catch (e) {}
-  }
-
-  async function persistSharedRbacConfig() {
-    if (typeof window.saveRbConfigSource !== 'function') {
-      return { config: window.RB_CONFIG || null, meta: window.getRbConfigMeta?.() || null };
-    }
-    const payload = {
-      roles: roles.map(role => ({ ...role })),
-      users: buildUsersForPersist(),
-      roleAccess: buildRoleAccessForPersist(),
-      userAccess: buildUserAccessForPersist()
-    };
-    const result = await window.saveRbConfigSource(payload);
-    clearLocalRbacDrafts();
-    accessMap = { ...buildDefaultAccess(), ...(result?.config?.roleAccess || payload.roleAccess) };
-    syncManagedUsers();
-    userRoleMap = { ...managedUsers.reduce((acc, user) => { acc[user.login] = user.role; return acc; }, {}) };
-    userAccessMap = { ...(result?.config?.userAccess || payload.userAccess) };
-    return result;
-  }
-
-  function syncManagedUsers() {
-    const sourceUsers = Array.isArray(window.RB_CONFIG?.users) && window.RB_CONFIG.users.length
-      ? window.RB_CONFIG.users
-      : (Array.isArray(cfg?.users) ? cfg.users : []);
-    const seen = new Set();
-    managedUsers = sourceUsers.reduce((acc, user) => {
-      const login = typeof user?.login === 'string' ? user.login.trim() : '';
-      if (!login) return acc;
-      const key = login.toLowerCase();
-      if (seen.has(key)) return acc;
-      seen.add(key);
-      let role = typeof user?.role === 'string' && user.role.trim() ? user.role.trim() : 'viewer';
-      if (login !== 'Nightlays' && role === 'superadmin') role = 'admin';
-      acc.push({ login, role });
-      return acc;
-    }, []);
-    if (!managedUsers.some(user => user.login === selectedUser)) {
-      selectedUser = managedUsers[0]?.login || '';
-    }
-  }
-
-  function resolveUserRole(login) {
-    if (login === 'Nightlays') return 'superadmin';
-    const role = userRoleMap[login] || managedUsers.find(u => u.login === login)?.role || 'viewer';
-    return role === 'superadmin' ? 'admin' : role;
-  }
-
-  function getAllowedSet(roleId) {
-    const list = accessMap[roleId] || [];
-    if (list.includes('*')) {
-      const explicit = list.filter(id => id !== '*' && modules.some(module => module.id === id));
-      return new Set([...getDefaultGrantedModuleIds(), ...explicit]);
-    }
-    return new Set(list);
-  }
-
-  function resolveAllowedForUser(login, roleId) {
-    const userCfg = userAccessMap[login];
-    if (userCfg && userCfg.useRole === false) {
-      return new Set(userCfg.access || []);
-    }
-    return getAllowedSet(roleId);
-  }
-
-  function getAllowedModuleLabels(login, roleId) {
-    const allowed = resolveAllowedForUser(login, roleId);
-    return modules.filter(m => allowed.has(m.id)).map(m => m.label);
-  }
-
-  function applyRoleAccess(roleId, login) {
-    const allowed = resolveAllowedForUser(login, roleId);
-    buttons.forEach(btn => {
-      const moduleId = btn.getAttribute('data-module');
-      const isAllowed = allowed.has(moduleId);
-      btn.style.display = isAllowed ? '' : 'none';
-    });
-
-    const visibleModules = modules.filter(module => {
-      const group = buttonsByModule.get(module.id) || [];
-      return group.some(btn => btn.style.display !== 'none');
-    });
-    if (!visibleModules.length) {
-      frame.src = 'about:blank';
-      return;
-    }
-    const activeVisible = visibleModules.find(module => {
-      const group = buttonsByModule.get(module.id) || [];
-      return group.some(btn => btn.classList.contains('active'));
-    });
-    if (!activeVisible) {
-      activateButton(visibleModules[0].id);
-      return;
-    }
-    if (currentModuleId && !isModuleAllowed(currentModuleId, roleId)) {
-      activateButton(visibleModules[0].id);
-    }
-  }
-
-  function renderRoleList() {
-    if (!roleListEl) return;
-    roleListEl.innerHTML = roles.map(r => `
-      <div class="role-item ${r.id === selectedRole ? 'active' : ''}" data-role="${r.id}">
-        <span>${r.label}</span>
-        <span class="nums">${(accessMap[r.id]?.includes('*') ? 'Все' : (accessMap[r.id]?.length || 0))}</span>
-      </div>
-    `).join('');
-    roleListEl.querySelectorAll('.role-item').forEach(item => {
-      item.addEventListener('click', () => {
-        selectedRole = item.getAttribute('data-role');
-        renderRoleList();
-        renderAccessList();
-      });
-    });
-  }
-
-  function renderAccessList() {
-    if (!accessListEl) return;
-    const allowed = getAllowedSet(selectedRole);
-    accessListEl.innerHTML = modules.map(m => {
-      const checked = allowed.has(m.id) ? 'checked' : '';
-      return `
-        <label class="access-item">
-          <input type="checkbox" data-module="${m.id}" ${checked} />
-          <span>${m.label}</span>
-        </label>
-      `;
-    }).join('');
-  }
-
-  function renderCreateUserRoleSelect() {
-    if (!newUserRoleSelect) return;
-    const options = roles
-      .filter(role => role.id !== 'superadmin')
-      .map(role => `<option value="${role.id}">${role.label}</option>`)
-      .join('');
-    newUserRoleSelect.innerHTML = options || '<option value="viewer">Наблюдатель</option>';
-    if (!newUserRoleSelect.value) {
-      newUserRoleSelect.value = roles.some(role => role.id === 'viewer') ? 'viewer' : (newUserRoleSelect.options[0]?.value || 'viewer');
-    }
-  }
-
-  function renderUserList() {
-    if (!userListEl) return;
-    syncManagedUsers();
-    userListEl.innerHTML = managedUsers.map(u => {
-      const role = resolveUserRole(u.login);
-      return `
-        <div class="role-item ${u.login === selectedUser ? 'active' : ''}" data-user="${u.login}">
-          <span>${u.login}</span>
-          <span class="nums">${roleLabel(role)}</span>
-        </div>
-      `;
-    }).join('');
-    userListEl.querySelectorAll('.role-item').forEach(item => {
-      item.addEventListener('click', () => {
-        selectedUser = item.getAttribute('data-user');
-        userEditUseRole = null;
-        renderUserList();
-        renderUserEditor();
-      });
-    });
-  }
-
-  function renderUserEditor() {
-    if (!userRoleSelect || !userAccessList || !userUseRoleAccess || !userPassInput) return;
-    syncManagedUsers();
-    if (!selectedUser) {
-      userRoleSelect.innerHTML = '<option value="viewer">Наблюдатель</option>';
-      userRoleSelect.value = 'viewer';
-      userRoleSelect.disabled = true;
-      userPassInput.value = '';
-      userPassInput.disabled = true;
-      userUseRoleAccess.checked = true;
-      userUseRoleAccess.disabled = true;
-      userAccessList.innerHTML = '<div class="nums">Создайте пользователя, чтобы настроить ему права.</div>';
-      return;
-    }
-    const role = resolveUserRole(selectedUser);
-    const isNightlays = selectedUser === 'Nightlays';
-    const userCfg = userAccessMap[selectedUser] || { useRole: true, access: [] };
-    if (isNightlays) {
-      userRoleSelect.innerHTML = '<option value="superadmin">Суперадмин</option>';
-      userRoleSelect.value = 'superadmin';
-      userRoleSelect.disabled = true;
-      userUseRoleAccess.checked = true;
-    } else {
-      const roleOptions = roles.filter(r => r.id !== 'superadmin').map(r => `<option value="${r.id}">${r.label}</option>`).join('');
-      userRoleSelect.innerHTML = roleOptions;
-      userRoleSelect.value = role;
-      userRoleSelect.disabled = false;
-      userUseRoleAccess.checked = userEditUseRole !== null ? userEditUseRole : (userCfg.useRole !== false);
-    }
-    userPassInput.value = '';
-    userPassInput.disabled = false;
-    userUseRoleAccess.disabled = isNightlays;
-
-    const useRole = userUseRoleAccess.checked;
-    const allowed = useRole ? getAllowedSet(role) : new Set(userCfg.access || []);
-    userAccessList.innerHTML = modules.map(m => {
-      const checked = allowed.has(m.id) ? 'checked' : '';
-      const disabled = (isNightlays || useRole) ? 'disabled' : '';
-      return `
-        <label class="access-item">
-          <input type="checkbox" data-module="${m.id}" ${checked} ${disabled} />
-          <span>${m.label}</span>
-        </label>
-      `;
-    }).join('');
-  }
-
-  function renderTeamProfile() {
-    if (!teamProfileList) return;
-    syncManagedUsers();
-    const currentUser = localStorage.getItem(USER_KEY) || '';
-    const cards = managedUsers.map(user => {
-      const roleId = resolveUserRole(user.login);
-      const accessLabels = getAllowedModuleLabels(user.login, roleId);
-      const accessHtml = accessLabels.length
-        ? accessLabels.map(label => `<span class="profile-access-tag">${label}</span>`).join('')
-        : '<span class="profile-access-tag">Нет доступных модулей</span>';
-      return `
-        <article class="profile-user-card ${currentUser === user.login ? 'current' : ''}">
-          <div class="profile-user-head">
-            <div class="profile-user-name">${user.login}</div>
-            ${currentUser === user.login ? '<span class="profile-badge">Текущий</span>' : ''}
-          </div>
-          <div class="profile-user-meta">
-            <span class="profile-badge role">${roleLabel(roleId)}</span>
-            <span class="profile-badge">${accessLabels.length === modules.length ? 'Все модули' : `${accessLabels.length} доступов`}</span>
-          </div>
-          <div class="profile-access-title">Доступные модули</div>
-          <div class="profile-access-tags">${accessHtml}</div>
-        </article>
-      `;
-    }).join('');
-
-    teamProfileList.innerHTML = cards;
-    if (teamProfileSummary) {
-      teamProfileSummary.textContent = `${managedUsers.length} участников`;
-    }
-  }
-
-  function updateRoleChip(roleId) {
-    if (!roleChipEl) return;
-    roleChipEl.textContent = roleLabel(roleId);
-  }
-
-  function setAccessOpen(open) {
-    const next = !!open && document.body.classList.contains('role-superadmin');
-    if (next) {
-      document.body.classList.remove('profile-open');
-      syncModalVisibility(profileModal, false);
-      if (profileToggleBtn) {
-        profileToggleBtn.textContent = 'Профиль команды';
-        profileToggleBtn.setAttribute('aria-expanded', 'false');
-      }
-    }
-    document.body.classList.toggle('access-open', next);
-    syncModalVisibility(accessModal, next);
-    if (accessToggleBtn) {
-      accessToggleBtn.textContent = next ? 'Закрыть доступы' : 'Доступы';
-      accessToggleBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
-    }
-    syncModalState();
-    if (next && accessModalCloseBtn) {
-      window.requestAnimationFrame(() => accessModalCloseBtn.focus({ preventScroll: true }));
-    }
-  }
-
-  const closeNav = () => {
-    document.body.classList.remove('nav-open');
-    if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
-  };
-  const openNav = () => {
-    document.body.classList.add('nav-open');
-    if (navToggle) navToggle.setAttribute('aria-expanded', 'true');
-  };
-
-  if (navToggle) {
-    navToggle.setAttribute('aria-expanded', 'false');
-    navToggle.addEventListener('click', () => {
-      if (window.innerWidth <= 980) {
-        if (document.body.classList.contains('nav-open')) {
-          closeNav();
-        } else {
-          openNav();
-        }
-      } else {
-        setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
-      }
-    });
-  }
-
-  if (shellMenuBtn) {
-    shellMenuBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleShellMenu();
-    });
-  }
-
-  if (shellModeToggleBtn) {
-    shellModeToggleBtn.addEventListener('click', () => {
-      const nextMode = CURRENT_SHELL_MODE === 'experimental' ? 'stable' : 'experimental';
-      const nextUrl = nextMode === 'stable' ? STABLE_SHELL_URL : EXPERIMENTAL_SHELL_URL;
-      localStorage.setItem(SHELL_VARIANT_KEY, nextMode);
-      const params = new URLSearchParams(location.search);
-      params.set('mode', nextMode);
-      const query = params.toString();
-      location.href = query ? `${nextUrl}?${query}` : nextUrl;
-    });
-  }
-
-  if (profileToggleBtn) {
-    profileToggleBtn.addEventListener('click', () => {
-      const next = !document.body.classList.contains('profile-open');
-      renderTeamProfile();
-      setProfileOpen(next);
-      closeShellMenu();
-    });
-  }
-
-  if (sidebarToggleBtn) {
-    sidebarToggleBtn.addEventListener('click', () => {
-      setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
-      closeShellMenu();
-    });
-  }
-
-  if (themeToggleBtn) {
-    themeToggleBtn.addEventListener('click', () => {
-      if (!themeMenu) return;
-      themeMenu.classList.toggle('open');
-    });
-  }
-  themeOptions.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const themeId = btn.getAttribute('data-theme');
-      applyTheme(themeId, true);
-      closeShellMenu();
-      showToast('Тема применена');
-    });
-  });
-
-  annotateActionables(document);
-  document.addEventListener('click', (e) => {
-    const actionEl = isElementNode(e.target)
-      ? e.target.closest('button, a[href], input[type="button"], input[type="submit"], [role="button"]')
-      : null;
-    if (!actionEl || actionEl.closest('#rbModuleFrame')) return;
-    scheduleActionToastFromElement(actionEl);
-  }, true);
-  document.addEventListener('change', (e) => {
-    const target = isElementNode(e.target) ? e.target : null;
-    if (!target) return;
-    if (target.matches('input[type="file"]')) {
-      annotateActionElement(target);
-      const names = Array.from(target.files || []).map(file => file.name).filter(Boolean);
-      showToast(names.length ? `Выбран файл: ${names.join(', ')}` : 'Файл выбран', 'info', {
-        title: 'Загрузка'
-      });
-      return;
-    }
-    annotateActionElement(target);
-  }, true);
-
-  function activateButton(target) {
-    const moduleId = typeof target === 'string' ? target : target?.getAttribute('data-module');
-    if (!moduleId) return;
-    const currentRoleId = localStorage.getItem(ROLE_KEY) || 'viewer';
-    const currentLogin = localStorage.getItem(USER_KEY) || 'Nightlays';
-    const allowedForCurrentUser = resolveAllowedForUser(currentLogin, currentRoleId);
-    if (!allowedForCurrentUser.has(moduleId)) {
-      showToast('Модуль недоступен по текущим правам', 'warning', { title: 'Доступ' });
-      const fallbackModuleId = getFirstVisibleModuleId();
-      if (fallbackModuleId && fallbackModuleId !== moduleId) activateButton(fallbackModuleId);
-      return;
-    }
-    if (!isModuleAllowed(moduleId, currentRoleId)) {
-      showToast('Модуль Wiki Intelligence v4 доступен только суперадмину', 'warning', { title: 'Доступ' });
-      const fallbackModuleId = getFirstVisibleModuleId();
-      if (fallbackModuleId && fallbackModuleId !== moduleId) activateButton(fallbackModuleId);
-      return;
-    }
-    const relatedButtons = buttonsByModule.get(moduleId) || [];
-    const sourceBtn = relatedButtons.find(btn => btn.closest('.sidebar-tabs')) || relatedButtons[0] || null;
-    const hiddenModule = hiddenModulesById.get(moduleId) || null;
-    const moduleMeta = findModuleMeta(moduleId);
-    if (!sourceBtn && !hiddenModule) return;
-
-    if (moduleMeta?.openNewTab) {
-      const externalUrl = new URL(moduleId, window.location.href).toString();
-      window.open(externalUrl, '_blank', 'noopener');
-      if (!currentModuleId) {
-        const fallbackModuleId = getFirstVisibleModuleId();
-        if (fallbackModuleId && fallbackModuleId !== moduleId) activateButton(fallbackModuleId);
-      }
-      closeNav();
-      return;
-    }
-
-    // визульное состояние
-    buttons.forEach(b => {
-      b.classList.toggle('active', b.getAttribute('data-module') === moduleId);
-    });
-
-    // загрузка модуля
-    const url = moduleId;
-    const finalUrl = buildProxyAwareModuleUrl(url, runtimeProxyConfig);
-    if (finalUrl && frame.src !== finalUrl) {
-      frame.src = finalUrl;
-    }
-    currentModuleId = moduleId;
-    syncModuleQuery(moduleId);
-
-    // гарды вкладок на body
-    if (guardClasses.length) {
-      document.body.classList.remove(...guardClasses);
-    }
-    const guard = sourceBtn?.getAttribute('data-guard') || hiddenModule?.guard || '';
-    if (guard) {
-      document.body.classList.add(guard);
-    }
-    closeNav();
-  }
-
-  buttons.forEach(btn => {
-    btn.addEventListener('click', () => activateButton(btn));
-  });
-
-  frame.addEventListener('load', () => {
-    applyProxyConfigToFrame(frame, runtimeProxyConfig);
-    bindFrameNotifications(frame);
-  });
-
-  // Активируем первую кнопку по умолчанию, если она есть
-  const requestedModule = resolveModuleRequest(new URLSearchParams(location.search).get('module'));
-  const initiallyActive = buttons.find(b => b.classList.contains('active')) || buttons[0];
-  if (requestedModule) {
-    activateButton(requestedModule);
-  } else if (initiallyActive) {
-    activateButton(initiallyActive.getAttribute('data-module'));
-  }
-
-  loadRuntimeProxyConfig().then((freshCfg) => {
-    const freshBase = normalizeProxyBase(freshCfg?.base || '');
-    if (!freshBase) return;
-    const hasChanges =
-      runtimeProxyConfig.base !== freshBase ||
-      runtimeProxyConfig.mode !== freshCfg.mode ||
-      runtimeProxyConfig.useProxy !== freshCfg.useProxy;
-
-    runtimeProxyConfig = {
-      base: freshBase,
-      mode: freshCfg.mode || 'query',
-      useProxy: freshCfg.useProxy !== false
-    };
-    persistRuntimeProxy(runtimeProxyConfig);
-    syncProxyConfigToStorage(runtimeProxyConfig);
-    applyProxyConfigToFrame(frame, runtimeProxyConfig);
-
-    if (hasChanges) {
-      const activeBtn = buttons.find(b => b.classList.contains('active'));
-      if (activeBtn) activateButton(activeBtn.getAttribute('data-module'));
-    }
-  });
-
-  if (selectAllBtn) {
-    selectAllBtn.addEventListener('click', () => {
-      accessMap[selectedRole] = ['*'];
-      renderRoleList();
-      renderAccessList();
-    });
-  }
-  if (clearAllBtn) {
-    clearAllBtn.addEventListener('click', () => {
-      accessMap[selectedRole] = [];
-      renderRoleList();
-      renderAccessList();
-    });
-  }
-  if (saveBtn) {
-    saveBtn.addEventListener('click', async () => {
-      const checked = Array.from(accessListEl?.querySelectorAll('input[type="checkbox"]') || [])
-        .filter(i => i.checked)
-        .map(i => i.getAttribute('data-module'));
-      accessMap[selectedRole] = checked.length ? checked : [];
-      localStorage.setItem(ACCESS_KEY, JSON.stringify(accessMap));
-      renderRoleList();
-      renderAccessList();
-      const roleId = localStorage.getItem(ROLE_KEY) || 'viewer';
-      const login = localStorage.getItem(USER_KEY) || '';
-      applyRoleAccess(roleId, login);
-      renderTeamProfile();
-      try {
-        const persisted = await persistSharedRbacConfig();
-        renderRoleList();
-        renderAccessList();
-        renderUserList();
-        renderUserEditor();
-        renderTeamProfile();
-        const target = persisted?.meta?.mode === 'apps-script' ? 'в App Script' : 'в `rb_roles_access.json`';
-        showToast(`Настройки сохранены ${target}`);
-      } catch (error) {
-        showToast(error?.message || 'Настройки сохранены только локально', 'warning', { title: 'RBAC' });
-      }
-    });
-  }
-
-  syncManagedUsers();
-  userRoleMap = { ...managedUsers.reduce((acc, u) => { acc[u.login] = u.role; return acc; }, {}), ...loadUserRoleMap() };
-  userAccessMap = { ...configUserAccess, ...loadUserAccessMap() };
-  const savedTheme = localStorage.getItem(THEME_KEY) || 'theme-wb-dark';
-  applyTheme(savedTheme, false);
-  const savedSidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
-  setSidebarCollapsed(savedSidebarCollapsed);
-  const initialRole = localStorage.getItem(ROLE_KEY) || 'viewer';
-  const initialUser = localStorage.getItem(USER_KEY) || '';
-  document.body.dataset.role = initialRole;
-  document.body.classList.toggle('role-admin', initialRole === 'admin');
-  document.body.classList.toggle('role-superadmin', initialRole === 'superadmin');
-  setAccessOpen(false);
-  setProfileOpen(false);
-  updateRoleChip(initialRole);
-  renderCreateUserRoleSelect();
-  renderRoleList();
-  renderAccessList();
-  renderUserList();
-  renderUserEditor();
-  renderTeamProfile();
-  applyRoleAccess(initialRole, initialUser);
-
-  window.addEventListener('rb-role-changed', (e) => {
-    const roleId = e.detail?.role || 'viewer';
-    const login = e.detail?.user || localStorage.getItem(USER_KEY) || '';
-    document.body.dataset.role = roleId;
-    document.body.classList.toggle('role-admin', roleId === 'admin');
-    document.body.classList.toggle('role-superadmin', roleId === 'superadmin');
-    if (roleId !== 'superadmin') setAccessOpen(false);
-    updateRoleChip(roleId);
-    renderTeamProfile();
-    applyRoleAccess(roleId, login);
-  });
-  window.addEventListener('rb-users-updated', () => {
-    syncManagedUsers();
-    userRoleMap = { ...managedUsers.reduce((acc, user) => { acc[user.login] = user.role; return acc; }, {}), ...loadUserRoleMap() };
-    renderCreateUserRoleSelect();
-    renderUserList();
-    renderUserEditor();
-    renderTeamProfile();
-  });
-
-  if (accessToggleBtn) {
-    accessToggleBtn.addEventListener('click', () => {
-      const next = !document.body.classList.contains('access-open');
-      renderRoleList();
-      renderAccessList();
-      renderUserList();
-      renderUserEditor();
-      setAccessOpen(next);
-      closeShellMenu();
-    });
-  }
-
-  if (profileModalCloseBtn) {
-    profileModalCloseBtn.addEventListener('click', () => setProfileOpen(false));
-  }
-  if (accessModalCloseBtn) {
-    accessModalCloseBtn.addEventListener('click', () => setAccessOpen(false));
-  }
-  if (profileModal) {
-    profileModal.addEventListener('click', (e) => {
-      if (e.target === profileModal) setProfileOpen(false);
-    });
-  }
-  if (accessModal) {
-    accessModal.addEventListener('click', (e) => {
-      if (e.target === accessModal) setAccessOpen(false);
-    });
-  }
-
-  if (userUseRoleAccess) {
-    userUseRoleAccess.addEventListener('change', () => {
-      userEditUseRole = userUseRoleAccess.checked;
-      renderUserEditor();
-    });
-  }
-  if (userSelectAllBtn) {
-    userSelectAllBtn.addEventListener('click', () => {
-      userEditUseRole = false;
-      userUseRoleAccess.checked = false;
-      renderUserEditor();
-      userAccessList.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = true);
-    });
-  }
-  if (userClearAllBtn) {
-    userClearAllBtn.addEventListener('click', () => {
-      userEditUseRole = false;
-      userUseRoleAccess.checked = false;
-      renderUserEditor();
-      userAccessList.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = false);
-    });
-  }
-  if (createUserBtn) {
-    createUserBtn.addEventListener('click', async () => {
-      if (!document.body.classList.contains('role-superadmin')) {
-        showToast('Создавать пользователей может только суперадмин', 'error', { title: 'Пользователи' });
-        return;
-      }
-      const login = (newUserLoginInput?.value || '').trim();
-      const pass = (newUserPassInput?.value || '').trim();
-      const role = (newUserRoleSelect?.value || 'viewer').trim() || 'viewer';
-      if (!login || !pass) {
-        showToast('Заполните никнейм и пароль нового пользователя', 'warning', { title: 'Пользователи' });
-        return;
-      }
-      try {
-        if (typeof window.addRbCustomUser !== 'function') {
-          throw new Error('Хранилище пользователей недоступно');
-        }
-        window.addRbCustomUser({ login, pass, role });
-        userRoleMap[login] = role;
-        localStorage.setItem(USER_ROLE_KEY, JSON.stringify(userRoleMap));
-        selectedUser = login;
-        userEditUseRole = null;
-        if (newUserLoginInput) newUserLoginInput.value = '';
-        if (newUserPassInput) newUserPassInput.value = '';
-        renderCreateUserRoleSelect();
-        renderUserList();
-        renderUserEditor();
-        renderTeamProfile();
-        try {
-          const persisted = await persistSharedRbacConfig();
-          renderRoleList();
-          renderAccessList();
-          renderUserList();
-          renderUserEditor();
-          renderTeamProfile();
-          const suffix = persisted?.meta?.mode === 'apps-script' ? 'и сохранён в App Script' : 'и записан в `rb_roles_access.json`';
-          showToast(`Пользователь ${login} создан ${suffix}`, 'success', { title: 'Пользователи' });
-        } catch (persistError) {
-          showToast(`Пользователь ${login} создан только локально. ${persistError?.message || ''}`.trim(), 'warning', { title: 'Пользователи' });
-        }
-      } catch (error) {
-        showToast(error?.message || 'Не удалось создать пользователя', 'error', { title: 'Пользователи' });
-      }
-    });
-  }
-  if (userSaveBtn) {
-    userSaveBtn.addEventListener('click', async () => {
-      if (!selectedUser) return;
-      const isNightlays = selectedUser === 'Nightlays';
-      const chosenRole = isNightlays ? 'superadmin' : (userRoleSelect?.value || 'viewer');
-      const nextPass = (userPassInput?.value || '').trim();
-      userRoleMap[selectedUser] = chosenRole;
-      const useRole = isNightlays ? true : !!userUseRoleAccess.checked;
-      const checked = Array.from(userAccessList?.querySelectorAll('input[type="checkbox"]') || [])
-        .filter(i => i.checked)
-        .map(i => i.getAttribute('data-module'));
-      userAccessMap[selectedUser] = { useRole, access: checked };
-      localStorage.setItem(USER_ROLE_KEY, JSON.stringify(userRoleMap));
-      localStorage.setItem(USER_ACCESS_KEY, JSON.stringify(userAccessMap));
-      if (typeof window.updateRbCustomUser === 'function') {
-        window.updateRbCustomUser(selectedUser, { role: chosenRole, pass: nextPass || undefined });
-      }
-      userEditUseRole = null;
-      if (userPassInput) userPassInput.value = '';
-      renderUserList();
-      renderUserEditor();
-      const currentUser = localStorage.getItem(USER_KEY) || '';
-      if (currentUser === selectedUser) {
-        updateRoleChip(chosenRole);
-        applyRoleAccess(chosenRole, currentUser);
-      }
-      renderTeamProfile();
-      try {
-        const persisted = await persistSharedRbacConfig();
-        renderRoleList();
-        renderAccessList();
-        renderUserList();
-        renderUserEditor();
-        renderTeamProfile();
-        if (currentUser === selectedUser) {
-          const effectiveRole = selectedUser === 'Nightlays' ? 'superadmin' : resolveUserRole(selectedUser);
-          updateRoleChip(effectiveRole);
-          applyRoleAccess(effectiveRole, currentUser);
-        }
-        const baseMessage = nextPass ? 'Роль, доступы и пароль обновлены' : 'Настройки сохранены';
-        const target = persisted?.meta?.mode === 'apps-script' ? 'в App Script' : 'в `rb_roles_access.json`';
-        showToast(`${baseMessage} ${target}`);
-      } catch (error) {
-        const baseMessage = nextPass ? 'Роль, доступы и пароль обновлены только локально' : 'Настройки сохранены только локально';
-        showToast(`${baseMessage}. ${error?.message || ''}`.trim(), 'warning', { title: 'RBAC' });
-      }
-    });
-  }
-
-  // Close menu on outside click and escape
-  document.addEventListener('click', (e) => {
-    if (shellMenu && shellMenu.classList.contains('open') && !e.target.closest('#shellActions')) {
-      closeShellMenu();
-    }
-    if (themeMenu && themeMenu.classList.contains('open') && !e.target.closest('#themeSwitcher')) {
-      closeThemeMenu();
-    }
-    if (!document.body.classList.contains('nav-open')) return;
-    if (e.target.closest('.topbar')) return;
-    if (e.target.closest('.shell-sidebar')) return;
-    closeNav();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (document.body.classList.contains('access-open')) {
-        setAccessOpen(false);
-        return;
-      }
-      if (document.body.classList.contains('profile-open')) {
-        setProfileOpen(false);
-        return;
-      }
-      closeThemeMenu();
-      closeShellMenu();
-      closeNav();
-    }
-  });
-  window.addEventListener('resize', () => {
-    if (window.innerWidth <= 980) {
-      setSidebarCollapsed(false);
-    }
-    if (window.innerWidth > 980) closeNav();
-    closeShellMenu();
-  });
-  });
-});
-</script>
 
 <svg aria-hidden="true" width="0" height="0" style="position:absolute;inline-size:0;block-size:0;overflow:hidden">
   <defs>
@@ -4922,13 +3159,774 @@ document.addEventListener('DOMContentLoaded', () => {
   </defs>
 </svg>
 
-<div class="toast toast--info" id="toast" role="status" aria-live="polite">
+
+<!-- Legacy toast (kept for JS compat) -->
+<div class="toast toast--info" id="toast" role="status" aria-live="polite" style="display:none">
   <div class="toast-kind" id="toastKind">Инфо</div>
   <div class="toast-copy">
     <div class="toast-title" id="toastTitle">Действие запущено</div>
     <div class="toast-text" id="toastText"></div>
   </div>
 </div>
+
+<script>
+
+const { h, render: preactRender, Fragment } = preact;
+const { useState, useEffect, useRef, useCallback, useMemo } = preactHooks;
+const html = htm.bind(h);
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const THEME_KEY = 'rb_shell_theme_v1';
+const SIDEBAR_KEY = 'rb_shell_sidebar_collapsed_v1';
+const ROLE_KEY = 'rb_role_v1';
+const USER_KEY = 'rb_user_v1';
+const ACCESS_KEY = 'rb_role_access_v1';
+const USER_ROLE_KEY = 'rb_user_roles_v1';
+const USER_ACCESS_KEY = 'rb_user_access_v1';
+const AUTH_KEY = 'rb_auth_ok_v1';
+
+const THEMES = [
+  { id: 'theme-wb-dark',     label: 'WB Dark',      swatch: '#7B2D8B' },
+  { id: 'theme-wb-light',    label: 'WB Light',     swatch: '#8B3EA6' },
+  { id: 'theme-aurora',      label: 'Aurora',        swatch: '#0EA5E9' },
+  { id: 'theme-ember',       label: 'Ember',         swatch: '#D97706' },
+  { id: 'theme-mint',        label: 'Mint Grid',     swatch: '#10B981' },
+  { id: 'theme-carbon',      label: 'Carbon Mono',   swatch: '#6366F1' },
+  { id: 'theme-ocean-glass', label: 'Ocean Glass',   swatch: '#0369A1' },
+];
+const THEME_IDS = THEMES.map(t => t.id);
+
+const NAV = [
+  { section: 'Обзор' },
+  { id: 'dashboard_run_module.html', label: 'Дашборд + РАН-отчёт', icon: 'dashboard', guard: 'shell--dashboard-run' },
+  { section: 'Релизы' },
+  { id: 'Ванговатор.html',          label: 'Ванговатор',            icon: 'vangovator',  guard: 'shell--vangovator' },
+  { id: 'Создание рана.html',       label: 'Создание рана',         icon: 'create-run',  guard: 'shell--createrun' },
+  { id: 'Запуск релиза.html',       label: 'Запуск релиза',         icon: 'story',       explicitAccess: true },
+  { section: 'Аналитика' },
+  { id: 'Сбор ЧП.html',             label: 'Сбор ЧП',              icon: 'incident',    guard: 'shell--finalchp' },
+  { id: 'УВУ.html',                 label: 'Расчет uWu',            icon: 'uwu',         guard: 'shell--finalchp' },
+  { id: 'BiUser.html',              label: 'Пользователи по версиям',icon: 'users',      guard: 'shell--finalchp' },
+  { id: 'Графики.html',             label: 'Графики',               icon: 'charts',      guard: 'shell--finalchp' },
+  { id: 'SWAT релиз.html',          label: 'SWAT релиз',            icon: 'swat',        guard: 'shell--finalchp' },
+  { section: 'Инструменты' },
+  { id: 'Копирование данных из YT.html', label: 'Epic / User Story', icon: 'story',     guard: 'shell--finalchp' },
+  { id: 'youtrack-wiki-v4.html',    label: 'Wiki Intelligence v4',  icon: 'charts',      superadminOnly: true },
+  { id: 'LearnHub-Portal.html',     label: 'Learning Hub',          icon: 'story',       explicitAccess: true, openNewTab: true },
+  { id: 'band-android-rollout.html',label: 'Band rollout report',   icon: 'charts',      explicitAccess: true },
+];
+const MODULES = NAV.filter(n => n.id);
+
+const PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
+const DEFAULT_PROXY_BASE = 'http://localhost:8787';
+
+// ── Proxy utils ────────────────────────────────────────────────────────────
+function toAbsUrl(raw) {
+  if (!raw?.trim()) return '';
+  try { return new URL(raw.trim(), location.href).toString(); } catch { return ''; }
+}
+function normalizeProxyBase(raw) { const a = toAbsUrl(raw); return a ? a.replace(/\/+$/, '') : ''; }
+function loadRuntimeProxy() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PROXY_RUNTIME_KEY) || '{}');
+    const base = normalizeProxyBase(p?.base || '');
+    if (base) return { base, mode: p.mode === 'prefix' ? 'prefix' : 'query', useProxy: p.useProxy !== false };
+  } catch {}
+  return { base: normalizeProxyBase(DEFAULT_PROXY_BASE), mode: 'query', useProxy: true };
+}
+function buildProxyUrl(rawUrl, cfg) {
+  if (!rawUrl || rawUrl === 'about:blank' || !cfg?.base) return rawUrl;
+  const abs = toAbsUrl(rawUrl);
+  if (!abs) return rawUrl;
+  try {
+    const u = new URL(abs);
+    u.searchParams.set('rbProxyBase', cfg.base);
+    u.searchParams.set('rbProxyMode', cfg.mode || 'query');
+    u.searchParams.set('rbUseProxy', cfg.useProxy !== false ? '1' : '0');
+    return u.toString();
+  } catch { return rawUrl; }
+}
+
+// ── RBAC utils ─────────────────────────────────────────────────────────────
+function getDefaultAccess(modules) {
+  const all = modules.filter(m => !m.explicitAccess).map(m => m.id);
+  const analyst = all.filter(id => /Графики|BiUser|Популярные|dashboard/.test(id));
+  return {
+    superadmin: ['*'], admin: ['*'],
+    manager: all.slice(),
+    analyst: analyst.length ? analyst : all.slice(0,1),
+    viewer: all.slice(0,1)
+  };
+}
+function getAllowedSet(roleId, accessMap, modules) {
+  const list = accessMap[roleId] || [];
+  if (list.includes('*')) {
+    const explicit = list.filter(id => id !== '*' && modules.some(m => m.id === id));
+    return new Set([...modules.filter(m => !m.explicitAccess).map(m => m.id), ...explicit]);
+  }
+  return new Set(list);
+}
+function resolveAllowedForUser(login, roleId, accessMap, userAccessMap, modules) {
+  const cfg = userAccessMap[login];
+  if (cfg && cfg.useRole === false) return new Set(cfg.access || []);
+  return getAllowedSet(roleId, accessMap, modules);
+}
+function isModuleAllowed(moduleId, roleId) {
+  const mod = MODULES.find(m => m.id === moduleId);
+  if (mod?.superadminOnly) return roleId === 'superadmin';
+  return true;
+}
+
+// ── useToast ───────────────────────────────────────────────────────────────
+function useToast() {
+  const [toast, setToast] = useState({ show: false, kind: 'info', title: '', msg: '' });
+  const timer = useRef(null);
+  const showToast = useCallback((msg, kind = 'info', opts = {}) => {
+    if (timer.current) clearTimeout(timer.current);
+    setToast({ show: true, kind, title: opts.title || 'Действие', msg: String(msg || '') });
+    timer.current = setTimeout(() => setToast(t => ({ ...t, show: false })), opts.duration || 3200);
+  }, []);
+  return [toast, showToast];
+}
+
+// ── NavIcon ────────────────────────────────────────────────────────────────
+function NavIcon({ id }) {
+  return html`<svg class="dp-nav-icon-svg" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:inherit">
+    <use href=${`#icon-${id}`} />
+  </svg>`;
+}
+
+// ── Sidebar ────────────────────────────────────────────────────────────────
+function Sidebar({ collapsed, role, login, activeModule, accessMap, userAccessMap, onActivate, onToggle }) {
+  const visibleNav = useMemo(() => {
+    return NAV.map(item => {
+      if (item.section) return item;
+      const allowed = resolveAllowedForUser(login, role, accessMap, userAccessMap, MODULES);
+      const visible = allowed.has(item.id) && isModuleAllowed(item.id, role);
+      return { ...item, hidden: !visible };
+    });
+  }, [role, login, accessMap, userAccessMap]);
+
+  return html`
+    <aside class="dp-sidebar">
+      <div class="dp-sidebar-head">
+        <div class="dp-sidebar-head-top">
+          <div class="dp-sidebar-mark">ДП</div>
+          ${!collapsed && html`<div>
+            <div class="dp-sidebar-title">Дом Питона</div>
+          </div>`}
+        </div>
+        ${!collapsed && html`<div class="dp-sidebar-sub">Инструменты релизов, аналитики и контроля качества</div>`}
+        <button class="dp-sidebar-toggle" onClick=${onToggle} title=${collapsed ? 'Развернуть' : 'Свернуть'}>
+          ${!collapsed && html`<span class="dp-sidebar-toggle-label">Скрыть меню</span>`}
+          <span style="font-size:11px">${collapsed ? '→' : '←'}</span>
+        </button>
+      </div>
+      <nav class="dp-nav">
+        ${visibleNav.map(item => {
+          if (item.section) return html`<div key=${item.section} class="dp-nav-section">${item.section}</div>`;
+          if (item.hidden) return null;
+          return html`<button
+            key=${item.id}
+            class=${'dp-nav-btn' + (activeModule === item.id ? ' active' : '')}
+            onClick=${() => onActivate(item)}
+            title=${item.label}
+          >
+            <span class="dp-nav-icon">
+              <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round">
+                <use href=${`#icon-${item.icon}`} />
+              </svg>
+            </span>
+            ${!collapsed && html`<span class="dp-nav-label">${item.label}</span>`}
+          </button>`;
+        })}
+      </nav>
+    </aside>`;
+}
+
+// ── TopBar ─────────────────────────────────────────────────────────────────
+function TopBar({ role, roleLabel, menuOpen, themeOpen, currentTheme, onMenuToggle, onThemeToggle, onThemeSelect, onProfile, onAccess, onLogout, onNavToggle }) {
+  const menuRef = useRef(null);
+  const themeRef = useRef(null);
+
+  useEffect(() => {
+    function handler(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        if (menuOpen) onMenuToggle();
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen, onMenuToggle]);
+
+  return html`
+    <header class="dp-topbar">
+      <button class="dp-icon-btn dp-nav-toggle-btn" onClick=${onNavToggle} title="Меню" aria-label="Открыть меню">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+      <div class="dp-brand">
+        <div class="dp-brand-mark">ДП</div>
+        <div class="dp-brand-text">
+          <div class="dp-brand-name">Дом Питона</div>
+          <div class="dp-brand-sub">Release Team</div>
+        </div>
+      </div>
+      <div class="dp-topbar-spacer"/>
+      <div class="dp-topbar-actions">
+        <div class="dp-role-chip">${roleLabel}</div>
+        <div class="dp-shell-menu-wrap" ref=${menuRef}>
+          <button class="dp-icon-btn" onClick=${onMenuToggle} title="Настройки" aria-expanded=${menuOpen}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16">
+              <circle cx="8" cy="3.5" r=".5" fill="currentColor" stroke="none"/>
+              <circle cx="8" cy="8" r=".5" fill="currentColor" stroke="none"/>
+              <circle cx="8" cy="12.5" r=".5" fill="currentColor" stroke="none"/>
+            </svg>
+          </button>
+          ${menuOpen && html`<div class="dp-shell-menu">
+            <button class="dp-shell-menu-item" onClick=${() => { onProfile(); onMenuToggle(); }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="6" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+              Профиль команды
+            </button>
+            <div class="dp-shell-menu-wrap" ref=${themeRef} style="position:relative">
+              <button class="dp-shell-menu-item" onClick=${onThemeToggle}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v1M8 12.5v1M2.5 8h1M12.5 8h1"/></svg>
+                Тема: ${THEMES.find(t => t.id === currentTheme)?.label || 'WB Dark'}
+                <span style="margin-left:auto">▾</span>
+              </button>
+              ${themeOpen && html`<div class="dp-theme-menu" style="position:absolute;top:calc(100%+4px);left:0;right:0">
+                ${THEMES.map(t => html`<button key=${t.id} class=${'dp-theme-option' + (t.id === currentTheme ? ' active' : '')}
+                  onClick=${() => { onThemeSelect(t.id); onMenuToggle(); }}>
+                  <span>${t.label}</span>
+                  <span class="dp-theme-swatch" style=${{background: t.swatch}}/>
+                </button>`)}
+              </div>`}
+            </div>
+            ${(role === 'superadmin' || role === 'admin') && html`
+            <div class="dp-shell-menu-divider"/>
+            <button class="dp-shell-menu-item" onClick=${() => { onAccess(); onMenuToggle(); }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2l1.5 4.5H14l-3.8 2.8 1.4 4.5L8 11.2l-3.6 2.6 1.4-4.5L2 6.5h4.5z"/></svg>
+              Доступы
+            </button>`}
+            <div class="dp-shell-menu-divider"/>
+            <button class="dp-shell-menu-item danger" onClick=${() => { onLogout(); onMenuToggle(); }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M10 8H2M6 5l-3 3 3 3M10 3h3a1 1 0 011 1v8a1 1 0 01-1 1h-3"/></svg>
+              Выйти
+            </button>
+          </div>`}
+        </div>
+      </div>
+    </header>`;
+}
+
+// ── TeamModal ──────────────────────────────────────────────────────────────
+function TeamModal({ open, initTab, role, login, roles, modules, accessMap, userAccessMap, managedUsers,
+    onClose, onSaveAccess, onSaveUser, onCreateUser, showToast }) {
+  const [tab, setTab] = useState(initTab || 'team');
+  const [selRole, setSelRole] = useState(roles[0]?.id || '');
+  const [selUser, setSelUser] = useState('');
+  const [localAccess, setLocalAccess] = useState({});
+  const [userEditUseRole, setUserEditUseRole] = useState(true);
+  const [newLogin, setNewLogin] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [newRole, setNewRole] = useState(roles.find(r => r.id === 'viewer')?.id || roles[0]?.id || '');
+  const [userPass, setUserPass] = useState('');
+  const [editRole, setEditRole] = useState('');
+
+  useEffect(() => { if (open) setTab(initTab || 'team'); }, [open, initTab]);
+  useEffect(() => {
+    if (!selRole && roles.length) setSelRole(roles[0].id);
+  }, [roles]);
+  useEffect(() => {
+    if (!selUser && managedUsers.length) setSelUser(managedUsers[0]?.login || '');
+  }, [managedUsers]);
+  useEffect(() => {
+    const u = managedUsers.find(u => u.login === selUser);
+    const role = u ? (u.role === 'superadmin' ? 'superadmin' : (u.role || 'viewer')) : 'viewer';
+    const cfg = userAccessMap[selUser];
+    setEditRole(role);
+    setUserEditUseRole(cfg?.useRole !== false);
+    setUserPass('');
+  }, [selUser, managedUsers, userAccessMap]);
+
+  function getAllowed(roleId) {
+    const list = (localAccess[roleId] ?? accessMap[roleId]) || [];
+    if (list.includes('*')) {
+      return new Set([...modules.filter(m => !m.explicitAccess).map(m => m.id)]);
+    }
+    return new Set(list);
+  }
+  function getUserAllowed() {
+    if (userEditUseRole) return getAllowedSet(editRole, accessMap, modules);
+    const cfg = userAccessMap[selUser];
+    return new Set(cfg?.access || []);
+  }
+
+  if (!open) return null;
+  const currentUser = login;
+
+  return html`<div class="dp-modal-backdrop" onClick=${e => e.target === e.currentTarget && onClose()}>
+    <div class="dp-modal">
+      <div class="dp-modal-head">
+        <div class="dp-modal-head-text">
+          <h2 class="dp-modal-title">Команда и доступы</h2>
+          <div class="dp-modal-note">Состав, роли и права доступа к модулям</div>
+        </div>
+        <button class="dp-modal-close" onClick=${onClose}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="dp-modal-tabs">
+        ${[
+          { id: 'team', label: 'Команда', icon: 'M2 13c0-3.3 2.7-6 6-6s6 2.7 6 6', count: managedUsers.length },
+          { id: 'roles', label: 'Роли', icon: null },
+          { id: 'users', label: 'Пользователи', icon: null },
+        ].map(t => html`<button key=${t.id} class=${'dp-modal-tab' + (tab === t.id ? ' active' : '')} onClick=${() => setTab(t.id)}>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            ${t.id === 'team' && html`<circle cx="5" cy="5" r="2.5"/><path d="M1 14c0-3 2-4.5 4-4.5s4 1.5 4 4.5"/><circle cx="11.5" cy="5" r="2"/><path d="M13.5 14c0-2.5-1.2-4-2.5-4.5"/>`}
+            ${t.id === 'roles' && html`<path d="M8 2l1.5 4.5H14l-3.8 2.8 1.4 4.5L8 11.2l-3.6 2.6 1.4-4.5L2 6.5h4.5z"/>`}
+            ${t.id === 'users' && html`<circle cx="8" cy="5.5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M11 2l1.5 1.5M12.5 2L11 3.5" stroke-width="1.2"/>`}
+          </svg>
+          ${t.label}
+          ${t.count != null && html`<span class="dp-tab-count">${t.count}</span>`}
+        </button>`)}
+      </div>
+      <div class="dp-modal-body">
+
+        ${tab === 'team' && html`<div class="dp-modal-pane">
+          <div class="dp-team-table-wrap">
+            <table class="dp-team-table">
+              <thead><tr>
+                <th>Участник</th><th>Роль</th><th>Модулей</th><th>Доступы</th>
+              </tr></thead>
+              <tbody>
+                ${managedUsers.map(u => {
+                  const rId = u.login === 'Nightlays' ? 'superadmin' : (u.role || 'viewer');
+                  const rLabel = roles.find(r => r.id === rId)?.label || rId;
+                  const allowed = resolveAllowedForUser(u.login, rId, accessMap, userAccessMap, modules);
+                  const mods = modules.filter(m => allowed.has(m.id));
+                  const isCurrent = u.login === currentUser;
+                  return html`<tr key=${u.login} class=${isCurrent ? 'current' : ''}>
+                    <td><div class="dp-tt-name">${u.login}${isCurrent && html`<span class="dp-tt-you">Текущий</span>`}</div></td>
+                    <td><span class="dp-role-badge" data-role=${rId}>${rLabel}</span></td>
+                    <td><strong>${mods.length === modules.length ? 'Все' : mods.length}</strong></td>
+                    <td><div class="dp-tt-modules">${mods.map(m => html`<span key=${m.id} class="dp-tt-tag">${m.label}</span>`)}</div></td>
+                  </tr>`;
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div class="dp-table-footer">${managedUsers.length} участников</div>
+        </div>`}
+
+        ${tab === 'roles' && html`<div class="dp-modal-pane">
+          <div class="dp-roles-layout">
+            <div class="dp-col-side">
+              <div class="dp-col-head" style="background:inherit">Роли</div>
+              <div class="dp-col-list">
+                ${roles.map(r => {
+                  const list = (localAccess[r.id] ?? accessMap[r.id]) || [];
+                  const cnt = list.includes('*') ? 'Все' : list.length;
+                  return html`<button key=${r.id} class=${'dp-role-btn' + (selRole === r.id ? ' active' : '')}
+                    onClick=${() => setSelRole(r.id)}>
+                    <span>${r.label}</span>
+                    <span class="dp-role-count">${cnt}</span>
+                  </button>`;
+                })}
+              </div>
+            </div>
+            <div class="dp-col-main">
+              <div class="dp-col-head">
+                <span>${roles.find(r => r.id === selRole)?.label || 'Роль'}</span>
+                <div class="dp-col-actions">
+                  <button class="dp-btn dp-btn-secondary dp-btn-sm" onClick=${() => setLocalAccess(p => ({...p,[selRole]:['*']}))}>Все</button>
+                  <button class="dp-btn dp-btn-secondary dp-btn-sm" onClick=${() => setLocalAccess(p => ({...p,[selRole]:[] }))}>Сброс</button>
+                </div>
+              </div>
+              <div class="dp-module-grid">
+                ${modules.map(m => {
+                  const allowed = getAllowed(selRole);
+                  const checked = allowed.has(m.id);
+                  return html`<label key=${m.id} class="dp-access-item">
+                    <input type="checkbox" checked=${checked} onChange=${e => {
+                      const cur = [...(getAllowed(selRole))];
+                      const next = e.target.checked ? [...cur, m.id] : cur.filter(x => x !== m.id);
+                      setLocalAccess(p => ({...p,[selRole]:next}));
+                    }} />
+                    <span>${m.label}</span>
+                  </label>`;
+                })}
+              </div>
+              <div class="dp-save-row">
+                <button class="dp-btn dp-btn-primary" onClick=${async () => {
+                  const next = {...accessMap};
+                  Object.keys(localAccess).forEach(k => { next[k] = localAccess[k]; });
+                  await onSaveAccess(next);
+                  setLocalAccess({});
+                  showToast('Доступы сохранены', 'success', { title: 'RBAC' });
+                }}>Сохранить доступы роли</button>
+              </div>
+            </div>
+          </div>
+        </div>`}
+
+        ${tab === 'users' && html`<div class="dp-modal-pane">
+          <div class="dp-create-strip">
+            <div class="dp-create-strip-head">Создать пользователя</div>
+            <div class="dp-create-grid">
+              <div class="dp-field"><label>Никнейм</label>
+                <input value=${newLogin} onInput=${e => setNewLogin(e.target.value)} placeholder="Artem" autocomplete="off"/>
+              </div>
+              <div class="dp-field"><label>Пароль</label>
+                <input type="password" value=${newPass} onInput=${e => setNewPass(e.target.value)} placeholder="Пароль" autocomplete="new-password"/>
+              </div>
+              <div class="dp-field"><label>Роль</label>
+                <select value=${newRole} onChange=${e => setNewRole(e.target.value)}>
+                  ${roles.filter(r => r.id !== 'superadmin').map(r => html`<option key=${r.id} value=${r.id}>${r.label}</option>`)}
+                </select>
+              </div>
+              <button class="dp-btn dp-btn-primary" style="height:38px" onClick=${async () => {
+                if (!newLogin.trim() || !newPass.trim()) { showToast('Заполните никнейм и пароль', 'warning'); return; }
+                await onCreateUser({ login: newLogin.trim(), pass: newPass.trim(), role: newRole });
+                setNewLogin(''); setNewPass('');
+                showToast('Пользователь создан', 'success', { title: 'Пользователи' });
+              }}>Создать</button>
+            </div>
+          </div>
+          <div class="dp-users-layout">
+            <div class="dp-col-side" style="display:flex;flex-direction:column">
+              <div class="dp-col-head" style="background:inherit">Участники</div>
+              <div class="dp-col-list">
+                ${managedUsers.map(u => {
+                  const rId = u.login === 'Nightlays' ? 'superadmin' : (u.role || 'viewer');
+                  const rLabel = roles.find(r => r.id === rId)?.label || rId;
+                  return html`<button key=${u.login} class=${'dp-user-btn' + (selUser === u.login ? ' active' : '')}
+                    onClick=${() => setSelUser(u.login)}>
+                    <span>${u.login}</span>
+                    <span class="dp-user-rolebadge">${rLabel}</span>
+                  </button>`;
+                })}
+              </div>
+            </div>
+            <div class="dp-edit-col">
+              <div class="dp-col-head">Настройки участника</div>
+              <div class="dp-edit-section">
+                <div class="dp-field"><label>Роль</label>
+                  <select value=${editRole} disabled=${selUser === 'Nightlays'}
+                    onChange=${e => setEditRole(e.target.value)}>
+                    ${selUser === 'Nightlays'
+                      ? html`<option value="superadmin">Суперадмин</option>`
+                      : roles.filter(r => r.id !== 'superadmin').map(r => html`<option key=${r.id} value=${r.id}>${r.label}</option>`)
+                    }
+                  </select>
+                </div>
+                <div class="dp-field"><label>Новый пароль</label>
+                  <input type="password" value=${userPass} onInput=${e => setUserPass(e.target.value)} placeholder="Оставьте пустым"/>
+                </div>
+                <label class="dp-toggle-row">
+                  <input type="checkbox" checked=${userEditUseRole} disabled=${selUser === 'Nightlays'}
+                    onChange=${e => setUserEditUseRole(e.target.checked)}/>
+                  Использовать доступы роли
+                </label>
+                <div class="dp-module-grid">
+                  ${modules.map(m => {
+                    const allowed = getUserAllowed();
+                    const checked = allowed.has(m.id);
+                    const disabled = selUser === 'Nightlays' || userEditUseRole;
+                    return html`<label key=${m.id} class="dp-access-item">
+                      <input type="checkbox" checked=${checked} disabled=${disabled}
+                        onChange=${e => {/* handled via save */}}/>
+                      <span>${m.label}</span>
+                    </label>`;
+                  })}
+                </div>
+                <div class="dp-save-row" style="margin:0 -14px -14px;padding:12px 14px">
+                  <button class="dp-btn dp-btn-primary" onClick=${async () => {
+                    if (!selUser) return;
+                    const checkboxes = document.querySelectorAll('.dp-edit-section .dp-access-item input[type=checkbox]');
+                    const access = Array.from(checkboxes).filter(c => c.checked && !c.disabled).map(c => {
+                      const label = c.closest('label')?.querySelector('span')?.textContent;
+                      return modules.find(m => m.label === label)?.id;
+                    }).filter(Boolean);
+                    await onSaveUser(selUser, { role: editRole, pass: userPass || null, useRole: userEditUseRole, access });
+                    showToast('Пользователь сохранён', 'success', { title: 'Пользователи' });
+                  }}>Сохранить участника</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`}
+
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── AuthScreen ─────────────────────────────────────────────────────────────
+function AuthScreen({ onAuth }) {
+  const [loginVal, setLoginVal] = useState('');
+  const [passVal, setPassVal] = useState('');
+  const [err, setErr] = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const doAuth = (users) => {
+      const l = loginVal.trim(), p = passVal.trim();
+      const found = (users || []).find(u => u.login === l && u.pass === p);
+      if (!found) { setErr('Неверный логин или пароль'); return; }
+      setErr('');
+      // Replicate original role logic: only Nightlays gets superadmin
+      let r = found.role || 'viewer';
+      if (l === 'Nightlays') r = 'superadmin';
+      else if (r === 'superadmin') r = 'admin';
+      localStorage.setItem('rb_auth_ok_v1', '1');
+      localStorage.setItem('rb_user_v1', found.login);
+      localStorage.setItem('rb_role_v1', r);
+      onAuth(found.login, r);
+    };
+    // Use already-loaded RB_CONFIG first (synchronous), fall back to loadRbConfig()
+    if (Array.isArray(window.RB_CONFIG?.users) && window.RB_CONFIG.users.length) {
+      doAuth(window.RB_CONFIG.users);
+    } else if (typeof window.loadRbConfig === 'function') {
+      window.loadRbConfig().then(cfg => doAuth(cfg?.users));
+    } else {
+      setErr('Конфигурация не загружена');
+    }
+  }
+
+  return html`<div class="dp-auth">
+    <form class="dp-auth-card" onSubmit=${handleSubmit} autocomplete="off">
+      <div class="dp-auth-title">Вход</div>
+      <div class="dp-auth-note">Доступ к дашборду по логину и паролю</div>
+      <div class="dp-auth-field">
+        <label>Логин</label>
+        <input value=${loginVal} onInput=${e => setLoginVal(e.target.value)} placeholder="Введите логин" autocomplete="username"/>
+      </div>
+      <div class="dp-auth-field">
+        <label>Пароль</label>
+        <input type="password" value=${passVal} onInput=${e => setPassVal(e.target.value)} placeholder="Введите пароль" autocomplete="current-password"/>
+      </div>
+      <div class="dp-auth-error">${err}</div>
+      <button type="submit" class="dp-auth-btn">Войти</button>
+    </form>
+  </div>`;
+}
+
+// ── App ────────────────────────────────────────────────────────────────────
+function App() {
+  const [authed, setAuthed] = useState(() => localStorage.getItem(AUTH_KEY) === '1');
+  const [role, setRole] = useState(() => localStorage.getItem(ROLE_KEY) || 'viewer');
+  const [login, setLogin] = useState(() => localStorage.getItem(USER_KEY) || '');
+  const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || 'theme-wb-dark');
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1');
+  const [navOpen, setNavOpen] = useState(false);
+  const [activeModule, setActiveModule] = useState('dashboard_run_module.html');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const [modal, setModal] = useState(null); // null | { tab: 'team'|'roles'|'users' }
+  const [rbac, setRbac] = useState({ roles: [], users: [], accessMap: {}, userAccessMap: {} });
+  const [proxyConfig, setProxyConfig] = useState(() => loadRuntimeProxy());
+  const [toast, showToast] = useToast();
+  const iframeRef = useRef(null);
+
+  // Load RBAC on mount
+  useEffect(() => {
+    const load = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
+    load.then(cfg => {
+      const roles = Array.isArray(cfg?.roles) && cfg.roles.length ? cfg.roles : [
+        { id: 'superadmin', label: 'Суперадмин' },
+        { id: 'admin', label: 'Администратор' },
+        { id: 'manager', label: 'Менеджер' },
+        { id: 'analyst', label: 'Аналитик' },
+        { id: 'viewer', label: 'Наблюдатель' },
+      ];
+      const users = Array.isArray(cfg?.users) ? cfg.users : [];
+      const defAccess = getDefaultAccess(MODULES);
+      const accessMap = { ...defAccess, ...(cfg?.roleAccess || {}) };
+      try { const local = JSON.parse(localStorage.getItem(ACCESS_KEY) || '{}'); Object.assign(accessMap, local); } catch {}
+      const userAccessMap = { ...(cfg?.userAccess || {}) };
+      try { const local = JSON.parse(localStorage.getItem(USER_ACCESS_KEY) || '{}'); Object.assign(userAccessMap, local); } catch {}
+      setRbac({ roles, users, accessMap, userAccessMap });
+    });
+
+    // Listen for role change events from auth script
+    const handler = e => {
+      const r = e.detail?.role || 'viewer';
+      const u = e.detail?.user || '';
+      setRole(r); setLogin(u);
+      document.body.dataset.role = r;
+      document.body.classList.toggle('role-admin', r === 'admin');
+      document.body.classList.toggle('role-superadmin', r === 'superadmin');
+    };
+    const usersHandler = () => {
+      const load = window.loadRbConfig ? window.loadRbConfig() : Promise.resolve({});
+      load.then(cfg => {
+        setRbac(prev => ({
+          ...prev,
+          users: Array.isArray(cfg?.users) ? cfg.users : prev.users,
+        }));
+      });
+    };
+    window.addEventListener('rb-role-changed', handler);
+    window.addEventListener('rb-users-updated', usersHandler);
+    return () => { window.removeEventListener('rb-role-changed', handler); window.removeEventListener('rb-users-updated', usersHandler); };
+  }, []);
+
+  // Apply theme
+  useEffect(() => {
+    THEME_IDS.forEach(id => document.body.classList.remove(id));
+    document.body.classList.add(theme);
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
+
+  // Sidebar collapse
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
+  }, [collapsed]);
+
+  // Apply role classes
+  useEffect(() => {
+    document.body.dataset.role = role;
+    document.body.classList.toggle('role-admin', role === 'admin');
+    document.body.classList.toggle('role-superadmin', role === 'superadmin');
+    document.body.classList.toggle('authed', authed);
+    document.body.classList.toggle('rb-locked', !authed);
+  }, [role, authed]);
+
+  // Module URL update
+  useEffect(() => {
+    if (!iframeRef.current || !activeModule) return;
+    const url = buildProxyUrl(activeModule, proxyConfig);
+    if (iframeRef.current.src !== url) iframeRef.current.src = url;
+    try {
+      const u = new URL(location.href);
+      u.searchParams.set('module', activeModule);
+      window.history.replaceState({}, '', u.toString());
+    } catch {}
+  }, [activeModule, proxyConfig]);
+
+  // Init active module from URL
+  useEffect(() => {
+    const param = new URLSearchParams(location.search).get('module');
+    if (param && MODULES.find(m => m.id === param)) setActiveModule(param);
+  }, []);
+
+  // Fallback to the first accessible module if the current one was removed or hidden by access rules.
+  useEffect(() => {
+    if (!authed) return;
+    const allowed = resolveAllowedForUser(login, role, rbac.accessMap, rbac.userAccessMap, MODULES);
+    const current = MODULES.find(m => m.id === activeModule);
+    const currentAllowed = current && allowed.has(current.id) && isModuleAllowed(current.id, role);
+    if (currentAllowed) return;
+    const fallback = MODULES.find(m => allowed.has(m.id) && isModuleAllowed(m.id, role) && !m.openNewTab)
+      || MODULES.find(m => allowed.has(m.id) && isModuleAllowed(m.id, role));
+    if (fallback && fallback.id !== activeModule) setActiveModule(fallback.id);
+  }, [authed, activeModule, login, role, rbac.accessMap, rbac.userAccessMap]);
+
+  // Expose showToast globally for backwards compat
+  useEffect(() => { window.__dpShowToast = showToast; }, [showToast]);
+
+  function handleActivate(item) {
+    if (!item?.id) return;
+    if (item.openNewTab) { window.open(new URL(item.id, location.href).toString(), '_blank', 'noopener'); return; }
+    const allowed = resolveAllowedForUser(login, role, rbac.accessMap, rbac.userAccessMap, MODULES);
+    if (!allowed.has(item.id)) { showToast('Модуль недоступен', 'warning', { title: 'Доступ' }); return; }
+    if (!isModuleAllowed(item.id, role)) { showToast('Требуются права суперадмина', 'warning', { title: 'Доступ' }); return; }
+    setActiveModule(item.id);
+    setNavOpen(false);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(ROLE_KEY);
+    localStorage.removeItem(USER_KEY);
+    setAuthed(false); setRole('viewer'); setLogin('');
+    document.body.classList.remove('authed'); document.body.classList.add('rb-locked');
+  }
+
+  function handleAuth(u, r) { setAuthed(true); setLogin(u); setRole(r); }
+
+  async function handleSaveAccess(newAccessMap) {
+    setRbac(prev => ({ ...prev, accessMap: newAccessMap }));
+    localStorage.setItem(ACCESS_KEY, JSON.stringify(newAccessMap));
+    if (typeof window.saveRbConfigSource === 'function') {
+      try { await window.saveRbConfigSource({ roles: rbac.roles, users: rbac.users, roleAccess: newAccessMap, userAccess: rbac.userAccessMap }); } catch (e) { showToast(e.message, 'warning'); }
+    }
+  }
+
+  async function handleSaveUser(userLogin, data) {
+    const { role: newRole, pass, useRole, access } = data;
+    // Update role
+    const users = rbac.users.map(u => u.login === userLogin ? { ...u, role: newRole } : u);
+    const userAccessMap = { ...rbac.userAccessMap, [userLogin]: { useRole, access: access || [] } };
+    setRbac(prev => ({ ...prev, users, userAccessMap }));
+    localStorage.setItem(USER_ACCESS_KEY, JSON.stringify(userAccessMap));
+    if (typeof window.saveRbConfigSource === 'function') {
+      try { await window.saveRbConfigSource({ roles: rbac.roles, users, roleAccess: rbac.accessMap, userAccess: userAccessMap }); } catch (e) { showToast(e.message, 'warning'); }
+    }
+  }
+
+  async function handleCreateUser(data) {
+    if (typeof window.addRbCustomUser === 'function') window.addRbCustomUser(data);
+    setRbac(prev => ({ ...prev, users: [...prev.users, data] }));
+  }
+
+  const managedUsers = rbac.users.filter(u => u.login && u.pass);
+  const roleLabel = rbac.roles.find(r => r.id === role)?.label || role;
+
+  if (!authed) return html`<${AuthScreen} onAuth=${handleAuth}/>`;
+
+  return html`<div>
+    <${TopBar}
+      role=${role} roleLabel=${roleLabel}
+      menuOpen=${menuOpen} themeOpen=${themeOpen} currentTheme=${theme}
+      onMenuToggle=${() => { setMenuOpen(p => !p); if (!menuOpen) setThemeOpen(false); }}
+      onThemeToggle=${() => setThemeOpen(p => !p)}
+      onThemeSelect=${t => { setTheme(t); setThemeOpen(false); }}
+      onProfile=${() => setModal({ tab: 'team' })}
+      onAccess=${() => setModal({ tab: role === 'superadmin' ? 'roles' : 'users' })}
+      onLogout=${handleLogout}
+      onNavToggle=${() => setNavOpen(p => !p)}
+    />
+    <div class=${'dp-shell' + (collapsed ? ' collapsed' : '') + (navOpen ? ' nav-open' : '')}>
+      <${Sidebar}
+        collapsed=${collapsed} role=${role} login=${login}
+        activeModule=${activeModule}
+        accessMap=${rbac.accessMap} userAccessMap=${rbac.userAccessMap}
+        onActivate=${handleActivate}
+        onToggle=${() => { if (window.innerWidth <= 980) setNavOpen(false); else setCollapsed(p => !p); }}
+      />
+      <div class="dp-content">
+        <iframe ref=${iframeRef} class="dp-iframe" id="rbModuleFrame" title="Модуль" src=${activeModule}/>
+      </div>
+    </div>
+    ${modal && html`<${TeamModal}
+      open=${true} initTab=${modal.tab}
+      role=${role} login=${login}
+      roles=${rbac.roles} modules=${MODULES}
+      accessMap=${rbac.accessMap} userAccessMap=${rbac.userAccessMap}
+      managedUsers=${managedUsers}
+      onClose=${() => setModal(null)}
+      onSaveAccess=${handleSaveAccess}
+      onSaveUser=${handleSaveUser}
+      onCreateUser=${handleCreateUser}
+      showToast=${showToast}
+    />`}
+    <div class=${'dp-toast' + (toast.show ? ' show' : '')}>
+      <div class="dp-toast-kind">${toast.kind}</div>
+      <div>
+        <div class="dp-toast-title">${toast.title}</div>
+        <div class="dp-toast-msg">${toast.msg}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Mount ──────────────────────────────────────────────────────────────────
+preactRender(html`<${App}/>`, document.getElementById('root'));
+
+</script>
 
 </body>
 </html>
