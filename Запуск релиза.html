@@ -402,6 +402,8 @@
       const LS_MAJOR_PUSH_ANDROID_ROOT_ANCHOR_KEY = 'wb_release_launch_major_push_android_root_anchor_v1';
       const LS_AUTOMATION_PLAN_KEY = 'wb_release_launch_automation_plan_v1';
       const LS_STEP_SCHEDULES_KEY = 'wb_release_launch_step_schedules_v1';
+      const LS_RUN_MODE_KEY = 'wb_release_launch_run_mode_v1';
+      const LS_MAJOR_VIEW_KEY = 'wb_release_launch_major_view_v1';
       const DEPLOY_LAB_BASE_URL = 'https://deploy-lab-api.wb.ru';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
       const PROXY_BASE = 'http://localhost:8787';
@@ -905,10 +907,18 @@
         if(majorReleaseSection) majorReleaseSection.style.display = isMajor && majorView === 'release' ? '' : 'none';
       }
 
+      function saveUiState(){
+        try{
+          localStorage.setItem(LS_RUN_MODE_KEY, String(appState.currentMode || ''));
+          localStorage.setItem(LS_MAJOR_VIEW_KEY, String(appState.majorView || ''));
+        }catch(_){ }
+      }
+
       function setMajorView(view){
         const value = ['collection', 'message', 'push', 'release'].includes(view) ? view : '';
         const prevView = appState.majorView;
         appState.majorView = value;
+        saveUiState();
         syncMajorViewState();
         if(value === 'release' && prevView !== 'release'){
           initMajorPushTab();
@@ -944,6 +954,7 @@
           else syncMajorViewState();
         }else{
           appState.majorView = '';
+          saveUiState();
           syncMajorViewState();
         }
 
@@ -975,6 +986,7 @@
 
         refreshModeControls();
         schedulePreviewRefresh();
+        saveUiState();
       }
 
       function runCreatorClearError(){
@@ -1893,6 +1905,26 @@
         return appState.stepScheduleDrafts[key];
       }
 
+      function buildStepScheduleDraftFromPlan(plan, fallbackDraft){
+        const base = fallbackDraft && typeof fallbackDraft === 'object'
+          ? { ...fallbackDraft }
+          : makeDefaultStepScheduleDraft();
+        const targetMs = Number(plan && plan.targetMs);
+        if(Number.isFinite(targetMs)){
+          base.date = formatMskDateInputValue(targetMs);
+          base.time = formatMskTimeInputValue(targetMs);
+        }
+        if(plan && Number.isFinite(Number(plan.delayMinutes)) && Number(plan.delayMinutes) > 0){
+          base.delayMinutes = String(Math.max(1, Math.round(Number(plan.delayMinutes))));
+        }
+        return base;
+      }
+
+      function syncStepScheduleDraftFromPlan(key, plan){
+        if(!key || !plan) return;
+        appState.stepScheduleDrafts[key] = buildStepScheduleDraftFromPlan(plan, appState.stepScheduleDrafts[key]);
+      }
+
       function saveStepSchedules(){
         try{
           localStorage.setItem(LS_STEP_SCHEDULES_KEY, JSON.stringify(appState.stepSchedules || {}));
@@ -1917,6 +1949,8 @@
               platform,
               stepIdx,
               targetMs,
+              triggerMode: value.triggerMode === 'delay' ? 'delay' : 'schedule',
+              delayMinutes: Number(value.delayMinutes) > 0 ? Math.max(1, Math.round(Number(value.delayMinutes))) : null,
               note: String(value.note || '').trim(),
               createdAt: Number(value.createdAt) || Date.now()
             };
@@ -2061,6 +2095,8 @@
           platform: scope === 'push' ? platform : '',
           stepIdx: Number(stepIdx),
           targetMs,
+          triggerMode,
+          delayMinutes: triggerMode === 'delay' ? Math.max(1, Number(draft.delayMinutes) || 0) : null,
           note: '',
           createdAt: Date.now()
         };
@@ -2079,6 +2115,7 @@
         const key = String(plan.key || getStepScheduleKey(plan.scope, plan.platform, plan.stepIdx));
         plan.key = key;
         appState.stepSchedules[key] = plan;
+        syncStepScheduleDraftFromPlan(key, plan);
         saveStepSchedules();
         clearStepScheduleTimer(key);
         const delayMs = Math.max(0, Number(plan.targetMs) - Date.now());
@@ -2605,8 +2642,11 @@
         if(pingCollapseText) pingCollapseText.textContent = collapsed ? 'Показать' : 'Скрыть';
       }
 
-      function resetWorkflowState(){
-        cancelStepSchedulesByScope('major');
+      function resetWorkflowState(options){
+        const preserveSchedules = !!(options && options.preserveSchedules);
+        if(!preserveSchedules){
+          cancelStepSchedulesByScope('major');
+        }
         appState.workflowCurrentIndex = 0;
         appState.workflowStatuses = WORKFLOW_STEPS.map(() => 'pending');
         appState.workflowRunning = false;
@@ -5630,9 +5670,12 @@
         el.scrollTop = el.scrollHeight;
       }
 
-      function resetPushWorkflow(platform){
+      function resetPushWorkflow(platform, options){
+        const preserveSchedules = !!(options && options.preserveSchedules);
         if(!platform || platform === 'ios'){
-          cancelStepSchedulesByScope('push', 'ios');
+          if(!preserveSchedules){
+            cancelStepSchedulesByScope('push', 'ios');
+          }
           stopComponentsTimer('ios');
           if(appState.pushIosSyncTimerId){
             clearTimeout(appState.pushIosSyncTimerId);
@@ -5645,7 +5688,9 @@
           appState.pushIosRunning = false;
         }
         if(!platform || platform === 'android'){
-          cancelStepSchedulesByScope('push', 'android');
+          if(!preserveSchedules){
+            cancelStepSchedulesByScope('push', 'android');
+          }
           stopComponentsTimer('android');
           if(appState.pushAndSyncTimerId){
             clearTimeout(appState.pushAndSyncTimerId);
@@ -6655,7 +6700,16 @@
         const defaultAutomationMs = buildDefaultAutomationScheduleMs(Date.now());
         if(automationDateInput) automationDateInput.value = formatMskDateInputValue(defaultAutomationMs);
         if(automationTimeInput) automationTimeInput.value = formatMskTimeInputValue(defaultAutomationMs);
-        setRunMode('');
+        const savedRunMode = (() => {
+          try{ return String(localStorage.getItem(LS_RUN_MODE_KEY) || ''); }catch(_){ return ''; }
+        })();
+        const savedMajorView = (() => {
+          try{ return String(localStorage.getItem(LS_MAJOR_VIEW_KEY) || ''); }catch(_){ return ''; }
+        })();
+        setRunMode(savedRunMode);
+        if(savedRunMode === RUN_MODE_MAJOR && savedMajorView){
+          setMajorView(savedMajorView);
+        }
 
         for(const key of SETTINGS_FIELDS){
           const el = $(key);
@@ -6698,7 +6752,8 @@
         const windowInfo = buildSinceWindow();
         baseInfo.textContent = `База выборки сообщений: ${formatMskHuman(windowInfo.baseUtcDate)}`;
 
-        resetWorkflowState();
+        resetWorkflowState({ preserveSchedules: true });
+        resetPushWorkflow(undefined, { preserveSchedules: true });
         renderCandidates({ android: new Set(), ios: new Set() });
         renderIds();
         refreshButtons();
