@@ -166,7 +166,7 @@
     .dot.bad{background:var(--bad)}
 
     .composer{
-      border:1px solid rgba(255,255,255,.08);
+      border:1px solid rgba(138, 32, 32, 0.08);
       background:rgba(5,10,16,.34);
       border-radius:22px;
       padding:12px;
@@ -1538,6 +1538,410 @@
     .toast.warn{border-color:rgba(255,185,95,.28);color:#ffd8a0}
     .toast.err{border-color:rgba(255,127,143,.28);color:#ffd0d8}
 
+    /* WB light theme overrides */
+    :root{
+      color-scheme:light;
+      --bg:#faf5ff;
+      --bg-soft:#f8f7ff;
+      --panel:#ffffff;
+      --panel-2:#fcfbff;
+      --panel-3:#f7f5ff;
+      --stroke:#efe5f4;
+      --stroke-strong:#e5daf2;
+      --text:#111827;
+      --muted:#667085;
+      --muted-2:#7c7f8c;
+      --accent:#9b5cff;
+      --accent-2:#ff5ac8;
+      --accent-3:#7c3aed;
+      --good:#22c55e;
+      --warn:#f59e0b;
+      --bad:#f43f5e;
+      --shadow:0 16px 40px rgba(31,41,55,.08);
+      --radius:22px;
+      --radius-sm:18px;
+      --radius-xs:14px;
+      --sans:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,"Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    body{
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 0% -10%, rgba(155,92,255,.14), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(255,90,200,.10), transparent 55%),
+        var(--bg);
+    }
+
+    .hero,
+    .panel,
+    .modal-panel,
+    .drawer-panel{
+      border:1px solid var(--stroke);
+      background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(252,251,255,.96));
+      box-shadow:var(--shadow);
+    }
+
+    .hero{
+      border-radius:26px;
+      padding:16px 18px;
+    }
+
+    .hero::after{
+      inset:auto -10% -46% 36%;
+      height:320px;
+      background:
+        radial-gradient(circle, rgba(155,92,255,.18), transparent 56%),
+        radial-gradient(circle at 72% 35%, rgba(255,90,200,.16), transparent 24%);
+    }
+
+    .eyebrow{
+      color:var(--accent-3);
+    }
+
+    .eyebrow::before{
+      background:linear-gradient(90deg, var(--accent), var(--accent-2));
+      box-shadow:0 0 0 4px rgba(155,92,255,.14);
+    }
+
+    .hero-copy,
+    .panel-desc,
+    .reading-item p,
+    .source-card p,
+    .citation-card p,
+    .section-card p,
+    .plan-copy,
+    .info-copy,
+    .pipeline-detail,
+    .minimal-copy,
+    .section-fold p,
+    .portal-link small,
+    .portal-section-head p,
+    .source-selector-item small{
+      color:var(--muted);
+    }
+
+    .composer,
+    .portal-link,
+    .portal-section,
+    .note,
+    .source-card,
+    .citation-card,
+    .section-card,
+    .stat-card,
+    .step-card,
+    .answer-summary,
+    .diff-stat,
+    .diff-block,
+    .inspector-top,
+    .accordion-item,
+    .settings-card,
+    .source-selector-item{
+      border:1px solid var(--stroke);
+      background:var(--panel-2);
+      box-shadow:none;
+    }
+
+    .query-input,
+    .input,
+    .field input,
+    .select{
+      border:1px solid var(--stroke);
+      background:#fff;
+      color:var(--text);
+    }
+
+    .query-input::placeholder,
+    .input::placeholder,
+    .field input::placeholder{
+      color:rgba(76,29,149,.55);
+    }
+
+    .query-input:focus,
+    .field input:focus,
+    .select:focus{
+      border-color:#c4b5fd;
+      box-shadow:0 0 0 4px rgba(155,92,255,.12);
+      background:#fff;
+    }
+
+    .btn,
+    .chip,
+    .toggle,
+    .tab-btn,
+    .source-link,
+    .plan-meta,
+    .tag,
+    .pill,
+    .panel-meta,
+    .answer-status,
+    .score{
+      border-color:var(--stroke);
+      background:var(--panel-3);
+      color:#4c1d95;
+    }
+
+    .btn:hover,
+    .chip:hover,
+    .tab-btn:hover,
+    .source-link:hover{
+      background:#f3efff;
+      border-color:#e4d7f2;
+      color:#4c1d95;
+    }
+
+    .btn.primary{
+      background:linear-gradient(90deg, var(--accent), var(--accent-2));
+      color:#fff;
+      box-shadow:0 10px 30px rgba(155,92,255,.24);
+    }
+
+    .btn.primary:hover{
+      filter:saturate(1.05);
+    }
+
+    .btn.ghost{
+      background:transparent;
+      color:#4c1d95;
+      border-color:var(--stroke);
+    }
+
+    .toggle input{
+      accent-color:var(--accent-3);
+    }
+
+    .dot{
+      background:#c4b5fd;
+    }
+
+    .dot.good{background:var(--good)}
+    .dot.warn{background:var(--warn)}
+    .dot.bad{background:var(--bad)}
+
+    .portal-link:hover,
+    .reading-item:hover,
+    .source-card:hover,
+    .source-selector-item:hover{
+      border-color:#e4d7f2;
+      background:#f7f5ff;
+    }
+
+    .portal-link.active,
+    .source-card.active,
+    .source-selector-item.active,
+    .tab-btn.active{
+      border-color:rgba(155,92,255,.24);
+      background:rgba(155,92,255,.10);
+      color:#5b21b6;
+      box-shadow:none;
+    }
+
+    .portal-link-index,
+    .portal-section-index,
+    .reading-index,
+    .step-index{
+      border-color:#dac6ff;
+      background:rgba(155,92,255,.10);
+      color:#5b21b6;
+    }
+
+    .reading-item,
+    .info-item,
+    .plan-item,
+    .pipeline-step,
+    .minimal-row,
+    .section-fold{
+      border-bottom-color:#efe8f6;
+    }
+
+    .pipeline-dot{
+      background:#fff;
+      border-color:#d8c9ec;
+    }
+
+    .pipeline-step.done .pipeline-dot{
+      background:rgba(34,197,94,.14);
+      border-color:rgba(34,197,94,.26);
+      box-shadow:0 0 0 4px rgba(34,197,94,.08);
+    }
+
+    .pipeline-step.running .pipeline-dot{
+      background:rgba(245,158,11,.14);
+      border-color:rgba(245,158,11,.26);
+      box-shadow:0 0 0 4px rgba(245,158,11,.08);
+    }
+
+    .pipeline-step.error .pipeline-dot{
+      background:rgba(244,63,94,.12);
+      border-color:rgba(244,63,94,.24);
+      box-shadow:0 0 0 4px rgba(244,63,94,.08);
+    }
+
+    .answer-status.good,
+    .score.good,
+    .tag.good{
+      border-color:rgba(34,197,94,.22);
+      background:rgba(34,197,94,.10);
+      color:#15803d;
+    }
+
+    .answer-status.warn,
+    .score.warn,
+    .tag.warn{
+      border-color:rgba(245,158,11,.24);
+      background:rgba(245,158,11,.10);
+      color:#b45309;
+    }
+
+    .answer-status.bad{
+      border-color:rgba(244,63,94,.22);
+      background:rgba(244,63,94,.09);
+      color:#be123c;
+    }
+
+    .answer-summary{
+      border-color:#eadcff;
+      background:
+        radial-gradient(circle at top right, rgba(255,90,200,.08), transparent 26%),
+        linear-gradient(180deg, rgba(155,92,255,.08), rgba(255,255,255,.98));
+    }
+
+    .markdown{
+      color:#374151;
+    }
+
+    .markdown h2,
+    .markdown h3,
+    .markdown h4,
+    .markdown strong,
+    .minimal-value,
+    .step-card p,
+    .diff-inline,
+    .diff-block h3,
+    .source-card h3,
+    .reading-item h3,
+    .inspector-title,
+    .panel-head h2,
+    .section-card h4,
+    .portal-section-head h3,
+    .info-title,
+    .plan-title,
+    .stat-value{
+      color:var(--text);
+    }
+
+    .markdown a{
+      color:var(--accent-3);
+    }
+
+    .markdown code{
+      background:#f3efff;
+      color:#5b21b6;
+    }
+
+    .markdown pre{
+      background:#f7f5ff;
+      border-color:var(--stroke);
+    }
+
+    .markdown pre code{
+      color:var(--text);
+    }
+
+    .markdown blockquote{
+      border-left-color:rgba(155,92,255,.34);
+      background:rgba(155,92,255,.08);
+      color:#4b5563;
+    }
+
+    .markdown hr{
+      border-top-color:#ece4f2;
+    }
+
+    mark{
+      background:rgba(155,92,255,.14);
+      color:#4c1d95;
+    }
+
+    .source-meta,
+    .mini-meta,
+    .field label,
+    .input-label,
+    .panel-kicker,
+    .stat-label,
+    .info-label,
+    .plan-label,
+    .minimal-term{
+      color:var(--muted-2);
+    }
+
+    .diff-inline del{
+      background:rgba(244,63,94,.12);
+      color:#be123c;
+    }
+
+    .diff-inline ins{
+      background:rgba(34,197,94,.12);
+      color:#15803d;
+    }
+
+    .source-type{
+      border-color:var(--stroke);
+      background:#f7f5ff;
+      color:#4c1d95;
+    }
+
+    .source-type.wiki{
+      border-color:rgba(59,130,246,.20);
+      background:rgba(59,130,246,.08);
+      color:#1d4ed8;
+    }
+
+    .source-type.issue{
+      border-color:rgba(245,158,11,.22);
+      background:rgba(245,158,11,.10);
+      color:#b45309;
+    }
+
+    .source-type.gitlab{
+      border-color:rgba(244,63,94,.20);
+      background:rgba(244,63,94,.08);
+      color:#be123c;
+    }
+
+    .drawer-backdrop,
+    .modal-backdrop{
+      background:rgba(15,23,42,.28);
+      backdrop-filter:blur(8px);
+    }
+
+    .drawer-panel{
+      background:linear-gradient(180deg, rgba(255,255,255,.99), rgba(252,251,255,.98));
+    }
+
+    .accordion-item[open]{
+      background:#f8f5ff;
+      border-color:#e4d7f2;
+    }
+
+    .accordion-body{
+      border-top-color:#ece4f2;
+    }
+
+    .toast{
+      border-color:var(--stroke);
+      background:#fff;
+      color:#4c1d95;
+      box-shadow:0 12px 30px rgba(31,41,55,.10);
+    }
+
+    .toast.ok{border-color:rgba(34,197,94,.22);color:#15803d}
+    .toast.warn{border-color:rgba(245,158,11,.24);color:#b45309}
+    .toast.err{border-color:rgba(244,63,94,.22);color:#be123c}
+
+    ::-webkit-scrollbar-thumb{
+      background:rgba(155,92,255,.22);
+    }
+
     .skeleton{
       display:flex;
       flex-direction:column;
@@ -1858,7 +2262,7 @@
             </div>
             <div class="field">
               <label for="proxyBaseInput">Proxy base</label>
-              <input id="proxyBaseInput" type="text" value="http://localhost:8787" />
+              <input id="proxyBaseInput" type="text" value="http://127.0.0.1:8787" />
             </div>
             <div class="field">
               <label for="limitInput">Top K</label>
@@ -1904,11 +2308,11 @@
           <div class="field-grid">
             <div class="field">
               <label for="llmBaseUrlInput">Base URL</label>
-              <input id="llmBaseUrlInput" type="text" value="http://127.0.0.1:8789/v1" />
+              <input id="llmBaseUrlInput" type="text" value="https://api.openai.com/v1" />
             </div>
             <div class="field">
               <label for="llmModelInput">Model</label>
-              <input id="llmModelInput" type="text" value="glm-4.7" />
+              <input id="llmModelInput" type="text" value="gpt-4o-mini" />
             </div>
             <div class="field" style="grid-column:1 / -1">
               <label for="llmApiKeyInput">API key</label>
@@ -1932,8 +2336,8 @@
               <input id="gitlabProjectInput" type="text" placeholder="group/project" />
             </div>
             <div class="field">
-              <label for="gitlabTokenInput">PRIVATE-TOKEN</label>
-              <input id="gitlabTokenInput" type="password" placeholder="glpat-..." />
+              <label for="gitlabTokenInput">Personal access token</label>
+              <input id="gitlabTokenInput" type="password" placeholder="gitlab-... / glpat-... / PRIVATE-TOKEN ..." />
             </div>
             <div class="field">
               <label for="gitlabCodeInput">Code search</label>
@@ -1953,16 +2357,22 @@
 
   <script>
     const YT_BASE = "https://youtrack.wildberries.ru";
-    const DEFAULT_PROXY = "http://localhost:8787";
-    const DEFAULT_LOCAL_LLM_BASE = "http://127.0.0.1:8789/v1";
+    const DEFAULT_PROXY = "http://127.0.0.1:8787";
     const STORAGE_KEY = "wiki_intelligence_v4_state";
     const EXTERNAL_WIKI_STATUS = "active";
     const EXTERNAL_WIKI_PAGE_SIZE = 12;
     const EXTERNAL_WIKI_SCAN_PAGE_SIZE = 100;
     const EXTERNAL_WIKI_SCAN_MAX_PAGES = 80;
     const EXTERNAL_WIKI_FILTER_TERM_LIMIT = 12;
-    const EXTERNAL_WIKI_DEFAULT_SPACE_IDS = ["308"];
     const EXTERNAL_WIKI_RERANK_LIMIT = 24;
+    const EXTERNAL_WIKI_SEARCH_SORT_FIELD = "article_title";
+    const EXTERNAL_WIKI_SEARCH_SORT_DIRECTION = "asc";
+    const WIKI_PRE_HYDRATION_POOL_LIMIT = 30;
+    const WIKI_HYDRATE_LIMIT = 18;
+    const EVIDENCE_PER_SOURCE_LIMIT = 6;
+    const EVIDENCE_GLOBAL_LIMIT = 18;
+    const EVIDENCE_CHUNK_SIZE = 680;
+    const EVIDENCE_CHUNK_OVERLAP = 140;
     const SEARCH_FIELDS = "id,idReadable,summary,content,updated,created,project(name,shortName),tags(name),updatedBy(login,name,fullName),createdBy(login,name,fullName)";
     const ARTICLE_FIELDS = "id,idReadable,summary,content,updated,created,project(name,shortName),tags(name),updatedBy(login,name,fullName),createdBy(login,name,fullName)";
     const ISSUE_FIELDS = "id,idReadable,summary,description,updated,created,project(name,shortName),reporter(login,name,fullName),assignee(login,name,fullName),tags(name)";
@@ -2077,6 +2487,7 @@
       proxyHealth: null
     };
     const externalWikiCatalogCache = new Map();
+    const externalWikiArticleCache = new Map();
 
     function createDefaultPipeline() {
       return [
@@ -2111,7 +2522,7 @@
     }
 
     function normalizeGitlabToken(raw) {
-      return normalizeRawToken(raw);
+      return String(raw || "").trim().replace(/^(Bearer|PRIVATE-TOKEN)\s+/i, "").trim();
     }
 
     function buildYouTrackAuthVariants(raw) {
@@ -2139,143 +2550,40 @@
       };
     }
 
-    function buildGitlabHeaders() {
-      const token = normalizeGitlabToken(ui.gitlabTokenInput.value);
-      if (!token) return null;
-      return {
+    function buildGitlabHeaderVariants(raw) {
+      const original = String(raw || "").trim();
+      const token = normalizeGitlabToken(original);
+      if (!token) return [];
+      const bearerHeaders = {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json"
+      };
+      const privateTokenHeaders = {
         "PRIVATE-TOKEN": token,
         Accept: "application/json"
       };
-    }
-
-    function isLocalHostname(hostname) {
-      return ["127.0.0.1", "localhost", "::1"].includes(String(hostname || "").trim().toLowerCase());
-    }
-
-    function getBrowserOrigin() {
-      try {
-        if (!window?.location?.origin || !/^https?:$/i.test(window.location.protocol)) return "";
-        return String(window.location.origin || "").replace(/\/+$/, "");
-      } catch {
-        return "";
-      }
-    }
-
-    function isHostedMode() {
-      try {
-        return Boolean(getBrowserOrigin()) && !isLocalHostname(window.location.hostname);
-      } catch {
-        return false;
-      }
-    }
-
-    function getDefaultProxyBase() {
-      return isHostedMode() ? getBrowserOrigin() : DEFAULT_PROXY;
-    }
-
-    function getDefaultLlmBase(modelRaw = ui?.llmModelInput?.value || "") {
-      if (!shouldUseCoreAdapter(modelRaw)) return "https://api.openai.com/v1";
-      return isHostedMode() ? `${getBrowserOrigin()}/llm/v1` : DEFAULT_LOCAL_LLM_BASE;
+      if (/^bearer\s+/i.test(original)) return [bearerHeaders, privateTokenHeaders];
+      if (/^private-token\s+/i.test(original)) return [privateTokenHeaders, bearerHeaders];
+      return [privateTokenHeaders, bearerHeaders];
     }
 
     function normalizeProxyBase(raw) {
-      const fallback = getDefaultProxyBase();
+      const value = String(raw || "").trim().replace(/\/+$/, "") || DEFAULT_PROXY;
+      try {
+        const url = new URL(value);
+        const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
+        if (url.hostname === "localhost" && port === 8787) {
+          url.hostname = "127.0.0.1";
+          return url.toString().replace(/\/+$/, "");
+        }
+      } catch {}
+      return value;
+    }
+
+    function normalizeLlmBaseUrl(raw) {
       const value = String(raw || "").trim().replace(/\/+$/, "");
-      if (!value) return fallback;
-      try {
-        const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-        const url = new URL(candidate);
-        return url.toString().replace(/\/+$/, "");
-      } catch {
-        return fallback;
-      }
-    }
-
-    function isLocalLlmAdapterBase(value) {
-      try {
-        const url = new URL(String(value || ""));
-        return ["127.0.0.1", "localhost", "::1"].includes(url.hostname) && String(url.port || "80") === "8789";
-      } catch {
-        return false;
-      }
-    }
-
-    function isCoreLlmBase(value) {
-      try {
-        return new URL(String(value || "")).hostname === "corellm.wb.ru";
-      } catch {
-        return false;
-      }
-    }
-
-    function shouldUseCoreAdapter(modelRaw) {
-      const model = normalizeLlmModel(modelRaw || "");
-      return /^(glm|qwen)/i.test(model);
-    }
-
-    function normalizeLlmBaseUrl(raw, modelRaw = ui?.llmModelInput?.value || "") {
-      const fallback = getDefaultLlmBase(modelRaw);
-      const value = String(raw || "").trim().replace(/\/+$/, "");
-      if (!value) return fallback;
-      try {
-        const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-        const url = new URL(candidate);
-        if (isCoreLlmBase(url.toString())) return getDefaultLlmBase(modelRaw);
-        if (isLocalLlmAdapterBase(url.toString())) return DEFAULT_LOCAL_LLM_BASE;
-        return /\/v1$/i.test(url.toString().replace(/\/+$/, "")) ? url.toString().replace(/\/+$/, "") : `${url.toString().replace(/\/+$/, "")}/v1`;
-      } catch {
-        return fallback;
-      }
-    }
-
-    function buildProxyHealthUrlForBase(proxyBaseRaw) {
-      const proxyBase = normalizeProxyBase(proxyBaseRaw);
-      const url = new URL(proxyBase);
-      if (/\/proxy$/i.test(url.pathname)) {
-        url.pathname = url.pathname.replace(/\/proxy$/i, "/health");
-      } else {
-        url.pathname = url.pathname.replace(/\/+$/, "") + "/health";
-      }
-      return url.toString();
-    }
-
-    function buildLlmHealthUrlForBase(llmBaseRaw, modelRaw = ui?.llmModelInput?.value || "") {
-      const base = normalizeLlmBaseUrl(llmBaseRaw, modelRaw);
-      const url = new URL(base);
-      if (/\/v1$/i.test(url.pathname)) {
-        url.pathname = url.pathname.replace(/\/v1$/i, "/health");
-      } else {
-        url.pathname = url.pathname.replace(/\/+$/, "") + "/health";
-      }
-      return url.toString();
-    }
-
-    function syncProxyBaseInput({ silent = false } = {}) {
-      const raw = String(ui.proxyBaseInput.value || "").trim();
-      const normalized = normalizeProxyBase(raw);
-      if (!raw || !normalized) {
-        ui.proxyBaseInput.value = normalized || raw;
-        return normalized;
-      }
-      if (raw !== normalized) {
-        ui.proxyBaseInput.value = normalized;
-        if (!silent) showToast(`Proxy base normalized to ${normalized}`, "warn");
-      }
-      return normalized;
-    }
-
-    function syncLlmBaseUrlInput({ silent = false } = {}) {
-      const raw = String(ui.llmBaseUrlInput.value || "").trim();
-      const normalized = normalizeLlmBaseUrl(raw, ui.llmModelInput.value);
-      if (!raw || !normalized) {
-        ui.llmBaseUrlInput.value = normalized || raw;
-        return normalized;
-      }
-      if (raw !== normalized) {
-        ui.llmBaseUrlInput.value = normalized;
-        if (!silent) showToast(`LLM base normalized to ${normalized}`, "warn");
-      }
-      return normalized;
+      if (!value) return "https://api.openai.com/v1";
+      return /\/v1$/i.test(value) ? value : `${value}/v1`;
     }
 
     function normalizeLlmModel(raw) {
@@ -2302,10 +2610,6 @@
         "gpt-5.2": "gpt-5.2",
         "gpt-5.3": "gpt-5.3",
         "gpt-4o-mini": "gpt-4o-mini",
-        "glm-47": "glm-4.7",
-        "glm4.7": "glm-4.7",
-        "glm-4.7": "glm-4.7",
-        "glm-4-7": "glm-4.7",
         "glm-45-air": "GLM-4.5-Air",
         "glm-4.5-air": "GLM-4.5-Air",
         "glm45-air": "GLM-4.5-Air",
@@ -2326,13 +2630,6 @@
       return compact;
     }
 
-    function normalizeLlmApiKey(raw) {
-      const value = String(raw || "").trim();
-      if (!value) return "";
-      const stripped = value.replace(/^bearer\s+/i, "").trim();
-      return stripped.split(/\s+/)[0]?.trim() || "";
-    }
-
     function syncLlmModelInput({ silent = false } = {}) {
       const raw = String(ui.llmModelInput.value || "").trim();
       const normalized = normalizeLlmModel(raw);
@@ -2340,21 +2637,6 @@
       if (raw !== normalized) {
         ui.llmModelInput.value = normalized;
         if (!silent) showToast(`LLM model normalized to ${normalized}`, "warn");
-      }
-      syncLlmBaseUrlInput({ silent: true });
-      return normalized;
-    }
-
-    function syncLlmApiKeyInput({ silent = false } = {}) {
-      const raw = String(ui.llmApiKeyInput.value || "").trim();
-      const normalized = normalizeLlmApiKey(raw);
-      if (!raw || !normalized) {
-        ui.llmApiKeyInput.value = normalized || raw;
-        return normalized;
-      }
-      if (raw !== normalized) {
-        ui.llmApiKeyInput.value = normalized;
-        if (!silent) showToast("LLM API key sanitized", "warn");
       }
       return normalized;
     }
@@ -2459,7 +2741,14 @@
     }
 
     function buildProxyHealthUrl() {
-      return buildProxyHealthUrlForBase(ui.proxyBaseInput.value);
+      const proxyBase = normalizeProxyBase(ui.proxyBaseInput.value);
+      const url = new URL(proxyBase);
+      if (/\/proxy$/i.test(url.pathname)) {
+        url.pathname = url.pathname.replace(/\/proxy$/i, "/health");
+      } else {
+        url.pathname = url.pathname.replace(/\/+$/, "") + "/health";
+      }
+      return url.toString();
     }
 
     function shouldBypassProxy(targetUrl) {
@@ -2512,18 +2801,15 @@
       return response.json();
     }
 
-    async function fetchJsonWithAuthVariants(targetUrl, authVariants, extraHeaders = {}) {
-      const variants = Array.isArray(authVariants) ? authVariants.filter(Boolean) : [];
+    async function fetchJsonWithHeaderVariants(targetUrl, headerVariants) {
+      const variants = Array.isArray(headerVariants) ? headerVariants.filter(item => item && typeof item === "object") : [];
       if (!variants.length) throw new Error("Auth token is missing");
       let lastError = null;
 
       for (let index = 0; index < variants.length; index += 1) {
         try {
           return await fetchJson(targetUrl, {
-            headers: {
-              ...extraHeaders,
-              ...buildYouTrackHeaders(variants[index])
-            }
+            headers: variants[index]
           });
         } catch (error) {
           lastError = error;
@@ -2534,6 +2820,15 @@
       }
 
       throw lastError || new Error("Auth request failed");
+    }
+
+    async function fetchJsonWithAuthVariants(targetUrl, authVariants, extraHeaders = {}) {
+      const variants = Array.isArray(authVariants) ? authVariants.filter(Boolean) : [];
+      if (!variants.length) throw new Error("Auth token is missing");
+      return fetchJsonWithHeaderVariants(targetUrl, variants.map(authHeader => ({
+        ...extraHeaders,
+        ...buildYouTrackHeaders(authHeader)
+      })));
     }
 
     function buildWikiSearchUrl(query, top) {
@@ -2574,6 +2869,28 @@
       return "";
     }
 
+    function parseWikiArticleRef(raw) {
+      const value = extractWikiArticleRef(raw);
+      if (!value) return null;
+
+      const apiMatch = value.match(/\/api\/v1\/space\/(\d+)\/(?:article|page)\/(\d+)/i);
+      if (apiMatch) {
+        return { raw: value, spaceId: apiMatch[1], articleRef: apiMatch[2] };
+      }
+
+      const uiMatch = value.match(/\/space\/(\d+)\/(?:article|page)\/(\d+)/i);
+      if (uiMatch) {
+        return { raw: value, spaceId: uiMatch[1], articleRef: uiMatch[2] };
+      }
+
+      const compactMatch = value.match(/^(\d+)\/(\d+)$/);
+      if (compactMatch) {
+        return { raw: value, spaceId: compactMatch[1], articleRef: compactMatch[2] };
+      }
+
+      return null;
+    }
+
     function extractWikiSpaceRefs(raw) {
       const value = String(raw || "");
       if (!value.trim()) return [];
@@ -2595,20 +2912,10 @@
     }
 
     function buildWikiArticleApiUrl(ref) {
-      const value = extractWikiArticleRef(ref);
-      if (!value) return "";
+      const parsed = parseWikiArticleRef(ref);
+      if (!parsed?.spaceId || !parsed?.articleRef) return "";
       const wikiBase = normalizeWikiBase(ui.wikiBaseInput.value);
-
-      const apiMatch = value.match(/\/api\/v1\/space\/(\d+)\/(?:article|page)\/(\d+)/i);
-      if (apiMatch) return `${wikiBase}/api/v1/space/${apiMatch[1]}/article/${apiMatch[2]}`;
-
-      const uiMatch = value.match(/\/space\/(\d+)\/(?:article|page)\/(\d+)/i);
-      if (uiMatch) return `${wikiBase}/api/v1/space/${uiMatch[1]}/article/${uiMatch[2]}`;
-
-      const compactMatch = value.match(/^(\d+)\/(\d+)$/);
-      if (compactMatch) return `${wikiBase}/api/v1/space/${compactMatch[1]}/article/${compactMatch[2]}`;
-
-      return "";
+      return `${wikiBase}/api/v1/space/${parsed.spaceId}/article/${parsed.articleRef}`;
     }
 
     function buildWikiSpaceArticlesUrl(spaceId, options = {}) {
@@ -2619,6 +2926,10 @@
       params.set("page", String(Math.max(1, Number(options.page) || 1)));
       if (String(options.filter || "").trim()) params.set("filter", String(options.filter).trim());
       return `${wikiBase}/api/v1/space/${encodeURIComponent(spaceId)}/articles?${params.toString()}`;
+    }
+
+    function buildExternalWikiSearchUrl() {
+      return `${normalizeWikiBase(ui.wikiBaseInput.value)}/api/v1/article_search`;
     }
 
     function composeScopedQuery(raw) {
@@ -3088,15 +3399,35 @@
 
     function extractExternalWikiArticleNumber(item) {
       return String(
+        item?.article_number ||
+        item?.articleNumber ||
         item?.article_id ||
         item?.articleId ||
         item?.id ||
         item?.number ||
         item?.page_id ||
         item?.pageId ||
+        item?.article?.article_number ||
+        item?.article?.articleNumber ||
         item?.article?.id ||
         ""
       ).trim();
+    }
+
+    function matchesExternalWikiArticleRef(item, articleRef) {
+      const normalizedRef = String(articleRef || "").trim();
+      if (!normalizedRef) return false;
+      const candidates = [
+        item?.article_number,
+        item?.articleNumber,
+        item?.article_id,
+        item?.articleId,
+        item?.id,
+        item?.number,
+        item?.page_id,
+        item?.pageId
+      ];
+      return candidates.some(value => String(value || "").trim() === normalizedRef);
     }
 
     function buildExternalWikiArticleApiUrl(spaceId, articleNumber) {
@@ -3123,27 +3454,62 @@
       return [];
     }
 
-    function enrichExternalWikiArticle(article, questionModel, apiUrl, meta = {}) {
-      const content = String(article?.content || article?.article?.content || article?.summary || article?.description || "");
-      const title = article?.title || article?.name || article?.article?.title || `Wiki article ${article?.id || article?.article_id || ""}`.trim();
+    function enrichExternalWikiArticle(articleLike, questionModel, apiUrl, meta = {}) {
+      const payload = articleLike && typeof articleLike === "object" ? articleLike : {};
+      const article = payload?.article || payload?.data?.article || payload?.data || payload;
+      const content = String(
+        article?.markdown ||
+        article?.content ||
+        payload?.markdown ||
+        payload?.content ||
+        article?.article?.markdown ||
+        article?.article?.content ||
+        article?.summary ||
+        article?.description ||
+        ""
+      );
+      const articleNumber = String(
+        extractExternalWikiArticleNumber(article) ||
+        extractExternalWikiArticleNumber(payload) ||
+        apiUrl.match(/article\/(\d+)/i)?.[1] ||
+        "wiki-article"
+      );
+      const title = article?.title || article?.name || article?.article?.title || `Wiki article ${articleNumber}`.trim();
       const sections = extractArticleSections(content);
       const owners = extractOwners(content);
       const plans = extractTestPlans(content);
       const links = extractLinks(content);
-      const articleId = String(extractExternalWikiArticleNumber(article) || apiUrl.match(/article\/(\d+)/i)?.[1] || "wiki-article");
-      const spaceId = String(article?.space_id || apiUrl.match(/space\/(\d+)/i)?.[1] || "");
-      const updatedAt = article?.updated_at || article?.updatedAt || article?.created_at || article?.createdAt || 0;
+      const spaceId = String(article?.space_id || payload?.space_id || apiUrl.match(/space\/(\d+)/i)?.[1] || "");
+      const updatedAt =
+        article?.updated_at ||
+        article?.updatedAt ||
+        payload?.updated_at ||
+        payload?.updatedAt ||
+        article?.created_at ||
+        article?.createdAt ||
+        payload?.created_at ||
+        payload?.createdAt ||
+        0;
       const body = content || article?.summary || article?.description || title;
+      const author =
+        payload?.last_editor_info?.username ||
+        payload?.last_editor_info?.name ||
+        payload?.creator_info?.username ||
+        payload?.creator_info?.name ||
+        article?.author?.name ||
+        article?.updated_by?.name ||
+        article?.created_by?.name ||
+        "—";
 
       return {
-        uid: `wiki:ext:${spaceId || "space"}:${articleId}`,
+        uid: `wiki:ext:${spaceId || "space"}:${articleNumber}`,
         source: "wiki",
         kind: meta.kind || "wiki_external_article",
-        id: spaceId ? `space/${spaceId}/article/${articleId}` : `article/${articleId}`,
-        title: title || `Wiki article ${articleId}`,
-        url: buildExternalWikiArticleUiUrl(spaceId, articleId, article) || apiUrl.replace(/\/api\/v1\//i, "/"),
+        id: spaceId ? `space/${spaceId}/article/${articleNumber}` : `article/${articleNumber}`,
+        title: title || `Wiki article ${articleNumber}`,
+        url: buildExternalWikiArticleUiUrl(spaceId, articleNumber, article) || apiUrl.replace(/\/api\/v1\//i, "/"),
         apiUrl,
-        author: article?.author?.name || article?.updated_by?.name || article?.created_by?.name || "—",
+        author,
         updatedAt,
         updatedLabel: formatDate(updatedAt),
         project: spaceId ? `wiki.wb.ru / space ${spaceId}` : "wiki.wb.ru",
@@ -3170,7 +3536,7 @@
       const articleNumber = extractExternalWikiArticleNumber(item);
       if (!spaceId || !articleNumber) return null;
       const title = String(item?.title || item?.name || item?.article?.title || `Wiki article ${articleNumber}`).trim();
-      const body = String(item?.summary || item?.description || item?.content || item?.excerpt || title);
+      const body = String(item?.snippet || item?.summary || item?.description || item?.content || item?.excerpt || title);
       const apiUrl = buildExternalWikiArticleApiUrl(spaceId, articleNumber);
       return enrichExternalWikiArticle(
         { ...item, id: articleNumber, article_id: articleNumber, space_id: spaceId, content: body, title },
@@ -3261,16 +3627,44 @@
 
       const explicitRef = String(ui.wikiArticleInput.value || "").trim();
       const inlineRef = extractWikiArticleRef(questionModel.raw);
-      const apiUrl = buildWikiArticleApiUrl(explicitRef || inlineRef);
+      const articleRef = explicitRef || inlineRef;
+      const parsedRef = parseWikiArticleRef(articleRef);
+      const apiUrl = buildWikiArticleApiUrl(articleRef);
       if (!apiUrl) return [];
 
       try {
-        const payload = await fetchJson(apiUrl, { headers });
+        const payload = await fetchExternalWikiArticlePayload(apiUrl, headers);
         const article = payload?.article || payload?.data?.article || payload?.data || payload;
-        if (!article || (!article.content && !article.article?.content && !article.title && !article.name)) return [];
-        return [enrichExternalWikiArticle(article, questionModel, apiUrl)];
+        const hasContent = article?.markdown || article?.content || payload?.markdown || payload?.content;
+        if (!article || (!hasContent && !article.title && !article.name)) return [];
+        return [enrichExternalWikiArticle(payload, questionModel, apiUrl)];
       } catch {
-        return [];
+        if (!parsedRef?.spaceId || !parsedRef?.articleRef) return [];
+        try {
+          const catalog = await fetchExternalWikiSpaceCatalog(parsedRef.spaceId, headers);
+          const matched = catalog.find(item => matchesExternalWikiArticleRef(item, parsedRef.articleRef));
+          if (!matched) return [];
+
+          const resolvedArticleNumber = extractExternalWikiArticleNumber(matched);
+          const resolvedApiUrl = buildExternalWikiArticleApiUrl(parsedRef.spaceId, resolvedArticleNumber);
+          if (!resolvedApiUrl) {
+            const fallback = enrichExternalWikiListItem(matched, questionModel, parsedRef.spaceId, {
+              reasons: ["wiki explicit ref", "catalog fallback"],
+              extraTerms: [parsedRef.articleRef],
+              scoreBonus: 24
+            });
+            return fallback ? [fallback] : [];
+          }
+
+          const payload = await fetchExternalWikiArticlePayload(resolvedApiUrl, headers);
+          return [enrichExternalWikiArticle(payload, questionModel, resolvedApiUrl, {
+            reasons: ["wiki explicit ref", "catalog fallback"],
+            extraTerms: [parsedRef.articleRef],
+            scoreBonus: 28
+          })];
+        } catch {
+          return [];
+        }
       }
     }
 
@@ -3295,9 +3689,21 @@
     function collectExternalWikiSpaceIds(questionModel) {
       return uniqueValues([
         ...extractWikiSpaceRefs(ui.wikiArticleInput.value),
-        ...extractWikiSpaceRefs(questionModel?.raw || ""),
-        ...EXTERNAL_WIKI_DEFAULT_SPACE_IDS
+        ...extractWikiSpaceRefs(questionModel?.raw || "")
       ], 8);
+    }
+
+    async function fetchExternalWikiArticlePayload(apiUrl, headers) {
+      const cacheKey = `${normalizeWikiBase(ui.wikiBaseInput.value)}::${apiUrl}`;
+      if (externalWikiArticleCache.has(cacheKey)) {
+        return externalWikiArticleCache.get(cacheKey);
+      }
+      const promise = fetchJson(apiUrl, { headers }).catch(error => {
+        externalWikiArticleCache.delete(cacheKey);
+        throw error;
+      });
+      externalWikiArticleCache.set(cacheKey, promise);
+      return promise;
     }
 
     async function fetchExternalWikiSpaceCatalog(spaceId, headers, maxPages = EXTERNAL_WIKI_SCAN_MAX_PAGES) {
@@ -3330,12 +3736,43 @@
       return promise;
     }
 
+    async function fetchExternalWikiSearchResults(query, spaceIds, headers, options = {}) {
+      const normalizedQuery = normalizeText(query).replace(/\s+/g, " ").trim();
+      if (!normalizedQuery) return [];
+      const normalizedSpaceIds = uniqueValues(spaceIds, 12)
+        .map(value => Number(String(value || "").trim()))
+        .filter(Number.isFinite);
+      const pageSize = clamp(Number(options.pageSize) || EXTERNAL_WIKI_RERANK_LIMIT, 1, 100);
+      const page = Math.max(1, Number(options.page) || 1);
+      const payload = await fetchJson(buildExternalWikiSearchUrl(), {
+        method: "POST",
+        headers: {
+          ...headers,
+          "Content-Type": "application/json;charset=UTF-8"
+        },
+        body: JSON.stringify({
+          query: normalizedQuery,
+          space_ids: normalizedSpaceIds,
+          exact_match: Boolean(options.exactMatch),
+          sort_direction: EXTERNAL_WIKI_SEARCH_SORT_DIRECTION,
+          sort_field: EXTERNAL_WIKI_SEARCH_SORT_FIELD,
+          page,
+          page_size: pageSize
+        })
+      });
+      return extractExternalWikiArticleList(payload)
+        .map(item => ({
+          ...item,
+          space_id: item?.space_id || item?.path?.space_id || item?.path?.spaceId || ""
+        }))
+        .filter(item => item?.space_id && extractExternalWikiArticleNumber(item));
+    }
+
     async function searchExternalWikiSpaces(questionModel, plans) {
       if (!ui.srcWikiInput.checked) return [];
       const headers = buildWikiHeaders();
       if (!headers) return [];
       const spaceIds = collectExternalWikiSpaceIds(questionModel);
-      if (!spaceIds.length) return [];
 
       const topK = clamp(Number(ui.limitInput.value) || 12, 3, 30);
       const terms = buildExternalWikiSearchTerms(questionModel, plans);
@@ -3357,48 +3794,34 @@
         });
       }
 
-      for (const spaceId of spaceIds) {
-        for (const term of terms.slice(0, EXTERNAL_WIKI_FILTER_TERM_LIMIT)) {
-          try {
-            const payload = await fetchJson(buildWikiSpaceArticlesUrl(spaceId, {
-              filter: term,
-              page_size: EXTERNAL_WIKI_PAGE_SIZE
-            }), { headers });
-            const items = extractExternalWikiArticleList(payload);
-            for (const item of items) {
-              const enriched = enrichExternalWikiListItem(item, questionModel, spaceId, {
-                reasons: [`wiki space ${spaceId}`, `filter: ${term}`],
-                extraTerms: terms,
-                scoreBonus: 18
-              });
-              if (enriched) upsert(enriched);
-            }
-          } catch {
-            // keep going and rely on catalog scan fallback
-          }
-        }
-
+      const searchPageSize = Math.max(topK * 2, EXTERNAL_WIKI_RERANK_LIMIT);
+      for (const term of terms.slice(0, EXTERNAL_WIKI_FILTER_TERM_LIMIT)) {
         try {
-          const catalog = await fetchExternalWikiSpaceCatalog(spaceId, headers);
-          const reranked = catalog
-            .map(item => enrichExternalWikiListItem(item, questionModel, spaceId, {
-              reasons: [`wiki space ${spaceId}`, "catalog rerank"],
-              extraTerms: terms,
-              scoreBonus: 8
-            }))
-            .filter(Boolean)
-            .filter(item => item.score >= 52)
-            .sort((a, b) => (b.score - a.score) || (Number(b.updatedAt) - Number(a.updatedAt)))
-            .slice(0, Math.max(topK, EXTERNAL_WIKI_RERANK_LIMIT));
-          reranked.forEach(upsert);
+          const items = await fetchExternalWikiSearchResults(term, spaceIds, headers, {
+            page: 1,
+            pageSize: searchPageSize,
+            exactMatch: false
+          });
+          for (const item of items) {
+            const itemSpaceId = String(item?.space_id || "");
+            const enriched = enrichExternalWikiListItem(item, questionModel, itemSpaceId, {
+              reasons: [
+                spaceIds.length ? `wiki search spaces: ${spaceIds.join(",")}` : "wiki search",
+                `query: ${term}`
+              ],
+              extraTerms: uniqueValues([term, ...(terms || [])], 16),
+              scoreBonus: 20 + Math.min(20, Math.round(Number(item?.rank || 0) * 100))
+            });
+            if (enriched) upsert(enriched);
+          }
         } catch {
-          // catalog is a fallback only
+          // keep going; explicit article refs still use direct/detail fallback
         }
       }
 
       return Array.from(merged.values())
         .sort((a, b) => (b.score - a.score) || (Number(b.updatedAt) - Number(a.updatedAt)))
-        .slice(0, topK);
+        .slice(0, Math.max(topK * 2, EXTERNAL_WIKI_RERANK_LIMIT));
     }
 
     async function searchWiki(questionModel, plans) {
@@ -3454,26 +3877,27 @@
         existing.matchedTerms = uniqueValues([...(existing.matchedTerms || []), ...(item.matchedTerms || [])], 10);
       }
 
+      const preHydrationPool = Math.max(topK * 3, EXTERNAL_WIKI_RERANK_LIMIT, WIKI_PRE_HYDRATION_POOL_LIMIT);
       const ranked = Array.from(merged.values())
         .sort((a, b) => (b.score - a.score) || (Number(b.updatedAt) - Number(a.updatedAt)))
-        .slice(0, topK);
+        .slice(0, preHydrationPool);
 
       const hydrated = await hydrateWikiSources(ranked, questionModel, authVariants);
-      return hydrated
-        .sort((a, b) => (b.score - a.score) || (Number(b.updatedAt) - Number(a.updatedAt)))
+      return rerankSourcesByEvidence(hydrated, questionModel)
         .slice(0, topK);
     }
 
     async function hydrateWikiSources(sources, questionModel, authVariants) {
       const wikiSources = Array.isArray(sources) ? sources : [];
       if (!wikiSources.length) return wikiSources;
+      const hydrateLimit = Math.max(clamp(Number(ui.limitInput.value) || 12, 3, 30), WIKI_HYDRATE_LIMIT);
 
       const youTrackTargets = wikiSources
         .filter(source => source?.kind === "wiki_article" && source?.id)
-        .slice(0, 6);
+        .slice(0, hydrateLimit);
       const externalTargets = wikiSources
         .filter(source => /^wiki_external_article/.test(String(source?.kind || "")) && source?.apiUrl)
-        .slice(0, 8);
+        .slice(0, hydrateLimit);
 
       const hydratedMap = new Map();
       const tasks = [];
@@ -3528,10 +3952,10 @@
         tasks.push(
           Promise.allSettled(
             externalTargets.map(async source => {
-              const payload = await fetchJson(source.apiUrl, { headers: wikiHeaders });
+              const payload = await fetchExternalWikiArticlePayload(source.apiUrl, wikiHeaders);
               const article = payload?.article || payload?.data?.article || payload?.data || payload;
               if (!article) return source;
-              return enrichExternalWikiArticle(article, questionModel, source.apiUrl, {
+              return enrichExternalWikiArticle(payload, questionModel, source.apiUrl, {
                 kind: "wiki_external_article",
                 reasons: source.reasons || ["wiki.wb.ru search"],
                 extraTerms: source.matchedTerms || [],
@@ -3577,18 +4001,18 @@
       const searchText = questionModel.keywords.map(item => item.raw).slice(0, 4).join(" ");
       if (!searchText) return [];
       const encodedProject = encodeURIComponent(project);
-      const headers = buildGitlabHeaders();
-      if (!headers) return [];
+      const headerVariants = buildGitlabHeaderVariants(ui.gitlabTokenInput.value);
+      if (!headerVariants.length) return [];
       const requests = [
-        fetchJson(`${base}/api/v4/projects/${encodedProject}/merge_requests?search=${encodeURIComponent(searchText)}&state=all&per_page=5`, { headers })
+        fetchJsonWithHeaderVariants(`${base}/api/v4/projects/${encodedProject}/merge_requests?search=${encodeURIComponent(searchText)}&state=all&per_page=5`, headerVariants)
           .then(items => (Array.isArray(items) ? items : []).map(item => enrichIssue(item, questionModel, "gitlab_mr"))),
-        fetchJson(`${base}/api/v4/projects/${encodedProject}/issues?search=${encodeURIComponent(searchText)}&per_page=5`, { headers })
+        fetchJsonWithHeaderVariants(`${base}/api/v4/projects/${encodedProject}/issues?search=${encodeURIComponent(searchText)}&per_page=5`, headerVariants)
           .then(items => (Array.isArray(items) ? items : []).map(item => enrichIssue(item, questionModel, "gitlab_issue")))
       ];
 
       if (ui.gitlabCodeInput.checked) {
         requests.push(
-          fetchJson(`${base}/api/v4/projects/${encodedProject}/search?scope=blobs&search=${encodeURIComponent(searchText)}`, { headers })
+          fetchJsonWithHeaderVariants(`${base}/api/v4/projects/${encodedProject}/search?scope=blobs&search=${encodeURIComponent(searchText)}`, headerVariants)
             .then(items => (Array.isArray(items) ? items : []).map(item => enrichGitlabBlob(item, questionModel)))
         );
       }
@@ -3808,7 +4232,7 @@
 
     function buildCitationRegistry(sources) {
       const counters = { wiki: 0, issues: 0, gitlab: 0 };
-      return (sources || []).slice(0, 8).map(source => {
+      return (sources || []).slice(0, 10).map(source => {
         counters[source.source] += 1;
         const prefix = source.source === "wiki" ? "W" : source.source === "issues" ? "I" : "G";
         return { label: `${prefix}${counters[source.source]}`, source };
@@ -3858,6 +4282,223 @@
         if (needle && haystack.includes(needle)) hits += 1;
       }
       return hits;
+    }
+
+    function splitTextIntoEvidenceWindows(text, maxLength = EVIDENCE_CHUNK_SIZE, overlap = EVIDENCE_CHUNK_OVERLAP) {
+      const normalized = String(text || "").replace(/\r/g, "\n").trim();
+      if (!normalized) return [];
+      const blocks = normalized
+        .split(/\n{2,}/)
+        .map(item => normalizeText(item))
+        .filter(Boolean);
+      const windows = [];
+
+      function pushWindow(value) {
+        const candidate = normalizeText(value);
+        if (!candidate || candidate.length < 28) return;
+        windows.push(candidate);
+      }
+
+      function splitLongBlock(block) {
+        const sentences = sentenceSplit(block);
+        if (sentences.length > 1) {
+          let buffer = "";
+          for (const sentence of sentences) {
+            const next = buffer ? `${buffer} ${sentence}` : sentence;
+            if (next.length <= maxLength) {
+              buffer = next;
+              continue;
+            }
+            if (buffer) pushWindow(buffer);
+            if (sentence.length <= maxLength) {
+              buffer = sentence;
+              continue;
+            }
+            const step = Math.max(120, maxLength - overlap);
+            for (let start = 0; start < sentence.length; start += step) {
+              pushWindow(sentence.slice(start, start + maxLength));
+              if (start + maxLength >= sentence.length) break;
+            }
+            buffer = "";
+          }
+          if (buffer) pushWindow(buffer);
+          return;
+        }
+
+        const step = Math.max(120, maxLength - overlap);
+        for (let start = 0; start < block.length; start += step) {
+          pushWindow(block.slice(start, start + maxLength));
+          if (start + maxLength >= block.length) break;
+        }
+      }
+
+      for (const block of (blocks.length ? blocks : [normalizeText(normalized)])) {
+        if (block.length <= maxLength) {
+          pushWindow(block);
+        } else {
+          splitLongBlock(block);
+        }
+      }
+
+      return uniqueValues(windows, 20);
+    }
+
+    function isActionableText(text) {
+      return /^[-*•]\s+/.test(String(text || "").trim())
+        || /^\d+[.)]\s+/.test(String(text || "").trim())
+        || /(открой|перейди|проверь|сверь|запусти|собери|выбери|добавь|нажми|убедись|выполни|зафиксируй|создай|используй|сравни|прогони|найди|обнови|проведи|сними|подтверди|включи|выключи)/i.test(String(text || ""));
+    }
+
+    function getSourceSections(source) {
+      if (Array.isArray(source?.sections) && source.sections.length) return source.sections;
+      const body = String(source?.body || source?.summary || source?.title || "").trim();
+      if (!body) return [];
+      return [{ title: "Overview", lines: [body] }];
+    }
+
+    function buildSourceEvidenceChunks(source, questionModel, options = {}) {
+      if (!source) return [];
+      const perSourceLimit = clamp(Number(options.perSource || EVIDENCE_PER_SOURCE_LIMIT) || EVIDENCE_PER_SOURCE_LIMIT, 1, 12);
+      const minScore = Number(options.minScore || 0);
+      const extras = uniqueValues([...(source.matchedTerms || []), ...(source.reasons || [])], 14);
+      const chunks = [];
+
+      for (const section of getSourceSections(source)) {
+        const sectionTitle = String(section?.title || "Overview").trim() || "Overview";
+        const rawSectionText = getSectionText(section);
+        const windows = splitTextIntoEvidenceWindows(rawSectionText);
+        const candidates = windows.length ? windows : [normalizeText(rawSectionText)];
+
+        for (let index = 0; index < candidates.length; index += 1) {
+          const rawText = normalizeText(candidates[index]);
+          if (!rawText) continue;
+          let score = scoreTextMatchWithExtras(
+            `${source.title || ""}\n${sectionTitle}`,
+            rawText,
+            questionModel,
+            extras,
+            Math.round((Number(source.score) || 0) / 10)
+          );
+          if (countQuestionMatches(sectionTitle, questionModel)) score += 8;
+          if (/(overview|процесс|workflow|runbook|check|чек|инструк|step|шаг|qa|регресс|regress|migration|миграц|owner|ответствен|артефакт)/i.test(sectionTitle)) {
+            score += 6;
+          }
+          if (isActionableText(rawText)) score += questionModel?.needsSteps ? 12 : 6;
+          const matchedSentences = sentenceSplit(rawText).filter(sentence => countQuestionMatches(sentence, questionModel) > 0);
+          if (matchedSentences.length) score += Math.min(10, matchedSentences.length * 3);
+          score = clamp(score, 34, 99);
+          if (score < minScore) continue;
+          chunks.push({
+            uid: `${source.uid}::${sectionTitle}::${index}`,
+            source,
+            sourceUid: source.uid,
+            sectionTitle,
+            rawText,
+            text: summarizeText(rawText, 360),
+            snippet: buildSnippet(`${sectionTitle}. ${rawText}`, questionModel, 240),
+            score,
+            actionable: isActionableText(rawText)
+          });
+        }
+      }
+
+      return chunks
+        .sort((a, b) => (b.score - a.score) || (Number(b.source?.updatedAt) - Number(a.source?.updatedAt)))
+        .filter((chunk, index, array) => array.findIndex(candidate => candidate.sourceUid === chunk.sourceUid && candidate.text.toLowerCase() === chunk.text.toLowerCase()) === index)
+        .slice(0, perSourceLimit);
+    }
+
+    function rankEvidenceChunks(sources, questionModel, options = {}) {
+      const perSource = clamp(Number(options.perSource || EVIDENCE_PER_SOURCE_LIMIT) || EVIDENCE_PER_SOURCE_LIMIT, 1, 12);
+      const globalLimit = clamp(Number(options.limit || EVIDENCE_GLOBAL_LIMIT) || EVIDENCE_GLOBAL_LIMIT, perSource, 48);
+      const minScore = Number(options.minScore || 44);
+      const flat = [];
+
+      for (const source of Array.isArray(sources) ? sources : []) {
+        flat.push(...buildSourceEvidenceChunks(source, questionModel, { perSource, minScore }));
+      }
+
+      return flat
+        .sort((a, b) => (b.score - a.score) || ((Number(b.source?.score) || 0) - (Number(a.source?.score) || 0)) || (Number(b.source?.updatedAt) - Number(a.source?.updatedAt)))
+        .filter((chunk, index, array) => array.findIndex(candidate => candidate.sourceUid === chunk.sourceUid && candidate.text.toLowerCase() === chunk.text.toLowerCase()) === index)
+        .slice(0, globalLimit);
+    }
+
+    function groupEvidenceChunksBySource(chunks) {
+      const map = new Map();
+      for (const chunk of Array.isArray(chunks) ? chunks : []) {
+        if (!chunk?.sourceUid) continue;
+        if (!map.has(chunk.sourceUid)) map.set(chunk.sourceUid, []);
+        map.get(chunk.sourceUid).push(chunk);
+      }
+      return map;
+    }
+
+    function rerankSourcesByEvidence(sources, questionModel) {
+      const sourceList = Array.isArray(sources) ? sources : [];
+      if (!sourceList.length) return [];
+      const evidenceChunks = rankEvidenceChunks(sourceList, questionModel, {
+        perSource: EVIDENCE_PER_SOURCE_LIMIT,
+        limit: Math.max(EVIDENCE_GLOBAL_LIMIT, sourceList.length * 3),
+        minScore: 42
+      });
+      const evidenceBySource = groupEvidenceChunksBySource(evidenceChunks);
+
+      return sourceList
+        .map(source => {
+          const evidence = evidenceBySource.get(source.uid) || [];
+          const best = evidence[0]?.score || 0;
+          const support = evidence.slice(0, 3).reduce((sum, chunk, index) => sum + Math.max(0, chunk.score - 40 - index * 4), 0);
+          const rerankedScore = evidence.length
+            ? Math.round((Number(source.score) || 0) * 0.58 + best * 0.32 + Math.min(16, support / 7))
+            : (Number(source.score) || 0);
+          return {
+            ...source,
+            score: Math.max(Number(source.score) || 0, rerankedScore),
+            snippetHtml: evidence[0]?.snippet || source.snippetHtml,
+            evidencePreview: evidence[0]?.text || "",
+            evidenceChunks: evidence.slice(0, 3)
+          };
+        })
+        .sort((a, b) => (b.score - a.score) || ((b.evidenceChunks?.[0]?.score || 0) - (a.evidenceChunks?.[0]?.score || 0)) || (Number(b.updatedAt) - Number(a.updatedAt)));
+    }
+
+    function buildEvidenceDrivenSteps(evidenceChunks, registry, limit = 6) {
+      const candidates = [];
+      for (const chunk of Array.isArray(evidenceChunks) ? evidenceChunks : []) {
+        const lines = String(chunk?.rawText || chunk?.text || "")
+          .split(/\r?\n/)
+          .map(line => line.trim())
+          .filter(Boolean);
+        const fragments = [];
+        for (const line of lines) {
+          if (/^[-*•]\s+/.test(line) || /^\d+[.)]\s+/.test(line)) {
+            fragments.push(line);
+            continue;
+          }
+          fragments.push(...sentenceSplit(line).slice(0, 3));
+        }
+
+        for (const fragment of fragments) {
+          const cleaned = normalizeText(String(fragment || "").replace(/^[-*•]\s+/, "").replace(/^\d+[.)]\s+/, ""));
+          if (cleaned.length < 24) continue;
+          const actionable = isActionableText(fragment);
+          const sectionBoost = /(step|шаг|check|чек|процесс|process|инструк|workflow|runbook|qa|регресс|regress|migration|миграц)/i.test(chunk.sectionTitle || "") ? 4 : 0;
+          const score = (Number(chunk.score) || 0) + sectionBoost + (actionable ? 12 : 0);
+          if (!actionable && score < 74) continue;
+          const label = getCitationLabel(registry, chunk.source);
+          candidates.push({
+            text: summarizeText(cleaned, 180),
+            markdown: `${summarizeText(cleaned, 180)}${label ? ` [${label}]` : ""}`,
+            score
+          });
+        }
+      }
+
+      return candidates
+        .sort((a, b) => b.score - a.score)
+        .filter((item, index, array) => array.findIndex(candidate => candidate.text.toLowerCase() === item.text.toLowerCase()) === index)
+        .slice(0, limit);
     }
 
     function getSourceRole(source) {
@@ -3915,40 +4556,20 @@
 
     function extractRelevantPassages(source, questionModel, limit = 2) {
       if (!source) return [];
-      const candidates = [];
-
-      for (const section of source.sections || []) {
-        const title = String(section?.title || "Section").trim();
-        const text = getSectionText(section);
-        const summary = summarizeText(text, 190);
-        if (!summary || summary === "Контент пока пустой.") continue;
-        const titleBonus = /(overview|процесс|шаг|check|чек|тест|провер|миграц|данн|rollback|валид)/i.test(title) ? 4 : 0;
-        const score = countQuestionMatches(`${title}\n${text}`, questionModel) * 12 + titleBonus;
-        candidates.push({
-          text: `${title}: ${summary}`,
-          score
-        });
-
-        for (const sentence of sentenceSplit(text).slice(0, 4)) {
-          const sentenceScore = countQuestionMatches(sentence, questionModel) * 10 + titleBonus;
-          if (!sentenceScore) continue;
-          candidates.push({
-            text: sentence,
-            score: sentenceScore
-          });
-        }
+      const evidence = buildSourceEvidenceChunks(source, questionModel, {
+        perSource: Math.max(2, limit * 2),
+        minScore: 42
+      });
+      if (evidence.length) {
+        return evidence
+          .slice(0, limit)
+          .map(item => `${item.sectionTitle}: ${item.text}`);
       }
-
-      if (!candidates.length) {
+      if (!source.sections?.length) {
         const fallback = summarizeText(source.body || source.summary || source.title, 190);
         return fallback ? [fallback] : [];
       }
-
-      return candidates
-        .sort((a, b) => b.score - a.score)
-        .map(item => item.text)
-        .filter((text, index, array) => array.findIndex(candidate => candidate.toLowerCase() === text.toLowerCase()) === index)
-        .slice(0, limit);
+      return [];
     }
 
     function formatSourceMarkdown(source) {
@@ -3979,6 +4600,17 @@
       const cite = source => {
         const label = source ? getCitationLabel(registry, source) : "";
         return label ? `[${label}]` : "";
+      };
+      const evidenceChunks = rankEvidenceChunks(sources, questionModel, {
+        perSource: 3,
+        limit: Math.max(EVIDENCE_GLOBAL_LIMIT, registry.length * 3),
+        minScore: 44
+      });
+      const evidenceBySource = groupEvidenceChunksBySource(evidenceChunks);
+      const evidenceSteps = buildEvidenceDrivenSteps(evidenceChunks, registry, questionModel.needsSteps ? 7 : 5);
+      const explainSource = source => {
+        if (!source) return "";
+        return evidenceBySource.get(source.uid)?.[0]?.text || describeSourcePurpose(source);
       };
 
       const paragraphs = [];
@@ -4013,25 +4645,28 @@
 
       const answerSummary = [];
       if (foundationSource) {
-        answerSummary.push(`Сначала возьми ${formatSourceMarkdown(foundationSource)}: эта статья даёт общий процесс и рамки миграции ${cite(foundationSource)}.`);
+        answerSummary.push(`Сначала возьми ${formatSourceMarkdown(foundationSource)}: ${explainSource(foundationSource)} ${cite(foundationSource)}.`);
       }
       if (dataSource) {
-        answerSummary.push(`Для проверки результата миграции опирайся на ${formatSourceMarkdown(dataSource)}: здесь лежит контекст по данным, структуре или просмотру состояния базы ${cite(dataSource)}.`);
+        answerSummary.push(`Для проверки результата опирайся на ${formatSourceMarkdown(dataSource)}: ${explainSource(dataSource)} ${cite(dataSource)}.`);
       }
       if (procedureSource) {
-        answerSummary.push(`После этого прогоняй прикладные сценарии по ${formatSourceMarkdown(procedureSource)}: статья отвечает за то, как проверять поведение фич после изменений ${cite(procedureSource)}.`);
+        answerSummary.push(`После этого прогоняй прикладные сценарии по ${formatSourceMarkdown(procedureSource)}: ${explainSource(procedureSource)} ${cite(procedureSource)}.`);
       }
       if (!answerSummary.length && topWiki) {
-        answerSummary.push(`Основной ответ пока опирается на ${formatSourceMarkdown(topWiki)}, потому что это самый релевантный wiki-источник по текущему вопросу ${cite(topWiki)}.`);
+        answerSummary.push(`Основной ответ сейчас опирается на ${formatSourceMarkdown(topWiki)}: ${explainSource(topWiki)} ${cite(topWiki)}.`);
       }
       if (!answerSummary.length && topIssue) {
-        answerSummary.push(`Wiki-контекст слабый, поэтому ответ собран по связанной задаче ${formatSourceMarkdown(topIssue)} ${cite(topIssue)}.`);
+        answerSummary.push(`Wiki-контекст слабый, поэтому ответ собран по связанной задаче ${formatSourceMarkdown(topIssue)}: ${explainSource(topIssue)} ${cite(topIssue)}.`);
       }
       if (!answerSummary.length && topGitlab) {
-        answerSummary.push(`Основной инженерный контекст сейчас лежит в ${formatSourceMarkdown(topGitlab)} ${cite(topGitlab)}.`);
+        answerSummary.push(`Основной инженерный контекст сейчас лежит в ${formatSourceMarkdown(topGitlab)}: ${explainSource(topGitlab)} ${cite(topGitlab)}.`);
       }
       if (questionModel.needsIncident && riskSource) {
-        answerSummary.push(`Если во время проверки появляются ошибки или спорные состояния, добери контекст из ${formatSourceMarkdown(riskSource)} ${cite(riskSource)}.`);
+        answerSummary.push(`Если во время проверки появляются ошибки или спорные состояния, добери контекст из ${formatSourceMarkdown(riskSource)}: ${explainSource(riskSource)} ${cite(riskSource)}.`);
+      }
+      if (!answerSummary.length && evidenceChunks[0]) {
+        answerSummary.push(`Самый сильный фрагмент сейчас найден в ${formatSourceMarkdown(evidenceChunks[0].source)}: ${evidenceChunks[0].text} ${cite(evidenceChunks[0].source)}.`);
       }
 
       paragraphs.push("## Короткий ответ");
@@ -4185,20 +4820,23 @@
       ];
 
       const finalSteps = uniqueValues([
+        ...evidenceSteps.map(item => item.text),
         ...stepEntries.map(item => item.text),
         ...fallbackChecklist
-      ], 6);
+      ], 7);
 
       if (openingOrder.length) {
         paragraphs.push("## Что открыть сначала");
         openingOrder.forEach((source, index) => {
-          const passages = extractRelevantPassages(source, questionModel, 1);
-          const explanation = passages[0] || describeSourcePurpose(source);
+          const explanation = explainSource(source) || extractRelevantPassages(source, questionModel, 1)[0] || describeSourcePurpose(source);
           paragraphs.push(`${index + 1}. ${formatSourceMarkdown(source)} — ${explanation} ${cite(source)}`);
         });
       }
 
-      if (stepEntries.length) {
+      if (evidenceSteps.length >= 4) {
+        paragraphs.push("## Пошаговый план");
+        evidenceSteps.forEach((item, index) => paragraphs.push(`${index + 1}. ${item.markdown}`));
+      } else if (stepEntries.length) {
         paragraphs.push("## Пошаговый план");
         stepEntries.forEach(item => paragraphs.push(item.markdown));
       } else if (finalSteps.length) {
@@ -4206,21 +4844,10 @@
         finalSteps.forEach((step, index) => paragraphs.push(`${index + 1}. ${step}`));
       }
 
-      const evidenceSources = uniqueValues([
-        foundationSource?.uid,
-        dataSource?.uid,
-        procedureSource?.uid,
-        riskSource?.uid
-      ].filter(Boolean), 4)
-        .map(uid => state.combinedSources.find(source => source.uid === uid))
-        .filter(Boolean);
-
-      if (evidenceSources.length) {
+      if (evidenceChunks.length) {
         paragraphs.push("## На чём основан ответ");
-        evidenceSources.forEach(source => {
-          extractRelevantPassages(source, questionModel, 2).forEach(passage => {
-            paragraphs.push(`- ${passage} ${cite(source)}`);
-          });
+        evidenceChunks.slice(0, 8).forEach(chunk => {
+          paragraphs.push(`- ${chunk.sectionTitle}: ${chunk.text} ${cite(chunk.source)}`);
         });
       }
 
@@ -4237,16 +4864,34 @@
       return {
         markdown: paragraphs.join("\n\n"),
         steps: finalSteps,
-        citations: registry.slice(0, 6)
+        citations: extractUsedCitations(paragraphs.join("\n\n"), registry).slice(0, 6)
       };
     }
 
     function buildLlmContext(questionModel, registry) {
+      const evidenceChunks = rankEvidenceChunks(
+        registry.map(item => item.source),
+        questionModel,
+        {
+          perSource: 3,
+          limit: Math.max(EVIDENCE_GLOBAL_LIMIT, registry.length * 3),
+          minScore: 44
+        }
+      );
+      const evidenceBySource = groupEvidenceChunksBySource(evidenceChunks);
+      const topEvidenceSummary = evidenceChunks.length
+        ? evidenceChunks
+          .slice(0, 10)
+          .map((chunk, index) => `${index + 1}. ${getCitationLabel(registry, chunk.source)} | ${chunk.sectionTitle}: ${chunk.text}`)
+          .join("\n")
+        : "Top evidence fragments not available.";
       const sourceBlocks = registry.map(item => {
         const source = item.source;
-        const sectionText = source.sections && source.sections.length
-          ? source.sections.slice(0, 3).map(section => `### ${section.title}\n${summarizeText(getSectionText(section), 420)}`).join("\n")
-          : summarizeText(source.body || source.summary || "", 520);
+        const sectionText = (evidenceBySource.get(source.uid) || []).length
+          ? evidenceBySource.get(source.uid).slice(0, 3).map(chunk => `### ${chunk.sectionTitle}\n${chunk.text}`).join("\n")
+          : source.sections && source.sections.length
+            ? source.sections.slice(0, 3).map(section => `### ${section.title}\n${summarizeText(getSectionText(section), 420)}`).join("\n")
+            : summarizeText(source.body || source.summary || "", 520);
 
         return [
           `[${item.label}] ${source.id} — ${source.title}`,
@@ -4283,7 +4928,7 @@
         "Не превращай ответ в summary по документам. Делай operational runbook.",
         "После краткого ответа добавь разделы строго в таком порядке: Что открыть сначала, Пошаговый план, На чем основан ответ.",
         "Ссылайся на источники метками вида [W1], [I1], [G1] в конце смысловых абзацев.",
-        "Делай выводы из секций статей, а не просто перечисляй названия документов.",
+        "Делай выводы из секций и evidence fragments, а не просто перечисляй названия документов.",
         "Не вставляй длинные цитаты внутрь шагов. Подробные основания выноси в отдельный раздел.",
         "Не придумывай URL и не ссылайся на материалы, которых нет в контексте."
       ].join(" ");
@@ -4292,12 +4937,13 @@
         `Вопрос: ${questionModel.raw}`,
         `Primary intent: ${questionModel.primary}`,
         `Intents: ${questionModel.intents.join(", ")}`,
-        `Entities: ${questionModel.entities.join(", ") || "—"}`,
-        `Reading order:\n${readingOrder}`,
-        `Diff summary:\n${diffSummary}`,
-        `Черновик пошагового плана:\n${draftSteps}`,
-        "Контекст:",
-        sourceBlocks
+          `Entities: ${questionModel.entities.join(", ") || "—"}`,
+          `Reading order:\n${readingOrder}`,
+          `Diff summary:\n${diffSummary}`,
+          `Черновик пошагового плана:\n${draftSteps}`,
+          `Top evidence fragments:\n${topEvidenceSummary}`,
+          "Контекст:",
+          sourceBlocks
       ].join("\n\n");
 
       return { system, user };
@@ -4366,16 +5012,13 @@
     }
 
     async function requestLlmNonStreaming(prompt, apiKey, model) {
-      const baseUrl = normalizeLlmBaseUrl(ui.llmBaseUrlInput.value, model);
-      const url = `${baseUrl}/chat/completions`;
-      const headers = {
-        "Content-Type": "application/json"
-      };
-      const safeApiKey = normalizeLlmApiKey(apiKey);
-      if (safeApiKey) headers.Authorization = `Bearer ${safeApiKey}`;
+      const url = `${normalizeLlmBaseUrl(ui.llmBaseUrlInput.value)}/chat/completions`;
       const response = await fetchWithRouting(url, {
         method: "POST",
-        headers,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`
+        },
         body: JSON.stringify({
           model,
           stream: false,
@@ -4393,19 +5036,13 @@
     }
 
     async function streamLlmAnswer(questionModel) {
-      const apiKey = normalizeLlmApiKey(ui.llmApiKeyInput.value);
-      if (ui.llmApiKeyInput.value.trim() && apiKey !== ui.llmApiKeyInput.value.trim()) {
-        ui.llmApiKeyInput.value = apiKey;
-      }
+      const apiKey = String(ui.llmApiKeyInput.value || "").trim();
       const rawModel = String(ui.llmModelInput.value || "").trim();
       const model = normalizeLlmModel(rawModel);
-      const baseUrl = normalizeLlmBaseUrl(ui.llmBaseUrlInput.value, model);
-      const usesLocalAdapter = isLocalLlmAdapterBase(baseUrl);
-      if ((!apiKey && !usesLocalAdapter) || !model) {
+      if (!apiKey || !model) {
         setPipelineStep("synthesis", "done", "LLM не настроен, оставляю локальную выжимку.");
         return;
       }
-      ui.llmBaseUrlInput.value = baseUrl;
       if (rawModel && rawModel !== model) {
         ui.llmModelInput.value = model;
         showToast(`LLM model normalized to ${model}`, "warn");
@@ -4415,7 +5052,7 @@
       state.llmContextRegistry = registry;
       state.llmError = "";
       const prompt = buildLlmContext(questionModel, registry);
-      const url = `${baseUrl}/chat/completions`;
+      const url = `${normalizeLlmBaseUrl(ui.llmBaseUrlInput.value)}/chat/completions`;
       const controller = new AbortController();
       state.streamAbortController = controller;
       state.answerMode = "streaming";
@@ -4424,14 +5061,13 @@
 
       try {
         setPipelineStep("synthesis", "running", "Стримлю LLM поверх отобранного контекста.");
-        const headers = {
-          "Content-Type": "application/json"
-        };
-        if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
         const response = await fetchWithRouting(url, {
           method: "POST",
           signal: controller.signal,
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`
+          },
           body: JSON.stringify({
             model,
             stream: true,
@@ -5017,8 +5653,7 @@
       const hasToken = Boolean(normalizeRawToken(ui.tokenInput.value));
       const wikiReady = Boolean(normalizeRawToken(ui.wikiTokenInput.value));
       const normalizedLlmModel = normalizeLlmModel(ui.llmModelInput.value);
-      const normalizedLlmBase = normalizeLlmBaseUrl(ui.llmBaseUrlInput.value, normalizedLlmModel);
-      const llmReady = Boolean((normalizeLlmApiKey(ui.llmApiKeyInput.value) || isLocalLlmAdapterBase(normalizedLlmBase)) && normalizedLlmModel);
+      const llmReady = Boolean(ui.llmApiKeyInput.value.trim() && normalizedLlmModel);
       const gitlabReady = Boolean(ui.gitlabBaseInput.value.trim() && ui.gitlabProjectInput.value.trim() && normalizeGitlabToken(ui.gitlabTokenInput.value));
 
       ui.tokenDot.className = `dot ${hasToken ? "good" : "bad"}`;
@@ -5089,7 +5724,6 @@
     }
 
     async function checkConnections() {
-      await autoConfigureHostedBackends();
       renderStatus();
       if (!ui.useProxyInput.checked) {
         state.proxyHealth = "disabled";
@@ -5107,79 +5741,6 @@
       }
       renderStatus();
       showToast("Статусы подключений обновлены", state.proxyHealth === "healthy" ? "ok" : "warn");
-    }
-
-    async function probeHealth(url, { timeoutMs = 2200 } = {}) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(url, {
-          cache: "no-store",
-          signal: controller.signal
-        });
-        if (!response.ok) return { ok: false, status: response.status };
-        const payload = await response.json().catch(() => ({}));
-        return {
-          ok: payload?.ok === true || payload?.status === "ok",
-          status: response.status,
-          payload
-        };
-      } catch (error) {
-        return { ok: false, error: String(error?.message || error) };
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-
-    async function autoConfigureHostedBackends() {
-      if (!isHostedMode()) return;
-      const origin = getBrowserOrigin();
-      if (!origin) return;
-
-      const hostedProxyBase = origin;
-      const localProxyBase = DEFAULT_PROXY;
-      const model = normalizeLlmModel(ui.llmModelInput.value);
-      const hostedLlmBase = `${origin}/llm/v1`;
-      const localLlmBase = DEFAULT_LOCAL_LLM_BASE;
-
-      const currentProxy = normalizeProxyBase(ui.proxyBaseInput.value);
-      const currentLlm = normalizeLlmBaseUrl(ui.llmBaseUrlInput.value, model);
-
-      const proxyLooksHosted = !currentProxy || currentProxy === hostedProxyBase;
-      const llmLooksHosted = shouldUseCoreAdapter(model) && (!currentLlm || currentLlm === hostedLlmBase);
-
-      const [hostedProxyHealth, hostedLlmHealth] = await Promise.all([
-        probeHealth(buildProxyHealthUrlForBase(hostedProxyBase)),
-        llmLooksHosted ? probeHealth(buildLlmHealthUrlForBase(hostedLlmBase, model)) : Promise.resolve({ ok: false })
-      ]);
-
-      let changed = false;
-
-      if (proxyLooksHosted && !hostedProxyHealth.ok) {
-        ui.proxyBaseInput.value = localProxyBase;
-        changed = true;
-      } else if (!currentProxy && hostedProxyHealth.ok) {
-        ui.proxyBaseInput.value = hostedProxyBase;
-        changed = true;
-      }
-
-      if (llmLooksHosted) {
-        if (!hostedLlmHealth.ok) {
-          ui.llmBaseUrlInput.value = localLlmBase;
-          changed = true;
-        } else if (!currentLlm && hostedLlmHealth.ok) {
-          ui.llmBaseUrlInput.value = hostedLlmBase;
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        syncProxyBaseInput({ silent: true });
-        syncLlmBaseUrlInput({ silent: true });
-        saveState();
-        renderAll();
-        showToast("На хосте не найден backend. Переключено на локальные proxy / LLM.", "warn");
-      }
     }
 
     function openSettings() {
@@ -5224,9 +5785,7 @@
     }
 
     function saveState() {
-      const normalizedLlmBaseUrl = normalizeLlmBaseUrl(ui.llmBaseUrlInput.value, ui.llmModelInput.value);
       const normalizedLlmModel = normalizeLlmModel(ui.llmModelInput.value);
-      const normalizedLlmApiKey = normalizeLlmApiKey(ui.llmApiKeyInput.value);
       const payload = {
         query: ui.queryInput.value || "",
         token: ui.tokenInput.value || "",
@@ -5238,9 +5797,9 @@
         wikiToken: ui.wikiTokenInput.value || "",
         wikiArticle: ui.wikiArticleInput.value || "",
         useProxy: ui.useProxyInput.checked,
-        llmBaseUrl: normalizedLlmBaseUrl || ui.llmBaseUrlInput.value || "",
+        llmBaseUrl: ui.llmBaseUrlInput.value || "",
         llmModel: normalizedLlmModel || ui.llmModelInput.value || "",
-        llmApiKey: normalizedLlmApiKey || ui.llmApiKeyInput.value || "",
+        llmApiKey: ui.llmApiKeyInput.value || "",
         gitlabBase: ui.gitlabBaseInput.value || "",
         gitlabProject: ui.gitlabProjectInput.value || "",
         gitlabToken: ui.gitlabTokenInput.value || "",
@@ -5262,7 +5821,7 @@
         if (typeof payload.query === "string") ui.queryInput.value = payload.query;
         if (typeof payload.token === "string") ui.tokenInput.value = payload.token;
         if (typeof payload.project === "string" && payload.project) ui.projectInput.value = payload.project;
-        if (typeof payload.proxyBase === "string" && payload.proxyBase) ui.proxyBaseInput.value = payload.proxyBase;
+        if (typeof payload.proxyBase === "string" && payload.proxyBase) ui.proxyBaseInput.value = normalizeProxyBase(payload.proxyBase);
         if (typeof payload.limit === "string" && payload.limit) ui.limitInput.value = payload.limit;
         if (typeof payload.focusArticle === "string") ui.focusArticleInput.value = payload.focusArticle;
         if (typeof payload.wikiBase === "string" && payload.wikiBase) ui.wikiBaseInput.value = payload.wikiBase;
@@ -5271,7 +5830,7 @@
         if (typeof payload.useProxy === "boolean") ui.useProxyInput.checked = payload.useProxy;
         if (typeof payload.llmBaseUrl === "string" && payload.llmBaseUrl) ui.llmBaseUrlInput.value = payload.llmBaseUrl;
         if (typeof payload.llmModel === "string" && payload.llmModel) ui.llmModelInput.value = payload.llmModel;
-        if (typeof payload.llmApiKey === "string") ui.llmApiKeyInput.value = normalizeLlmApiKey(payload.llmApiKey);
+        if (typeof payload.llmApiKey === "string") ui.llmApiKeyInput.value = payload.llmApiKey;
         if (typeof payload.gitlabBase === "string") ui.gitlabBaseInput.value = payload.gitlabBase;
         if (typeof payload.gitlabProject === "string") ui.gitlabProjectInput.value = payload.gitlabProject;
         if (typeof payload.gitlabToken === "string") ui.gitlabTokenInput.value = payload.gitlabToken;
@@ -5281,18 +5840,6 @@
         if (typeof payload.srcGitlab === "boolean") ui.srcGitlabInput.checked = payload.srcGitlab;
         if (typeof payload.autoLlm === "boolean") ui.autoLlmInput.checked = payload.autoLlm;
         if (typeof payload.sourceFilter === "string") state.sourceFilter = payload.sourceFilter;
-        ui.proxyBaseInput.value = normalizeProxyBase(ui.proxyBaseInput.value);
-        ui.llmBaseUrlInput.value = normalizeLlmBaseUrl(ui.llmBaseUrlInput.value, ui.llmModelInput.value);
-        if (isLocalLlmAdapterBase(ui.llmBaseUrlInput.value)
-          && /^(GLM-4\.5-Air|glm-45-air|glm-4\.5-air)$/i.test(String(ui.llmModelInput.value || "").trim())) {
-          ui.llmModelInput.value = "glm-4.7";
-        }
-        if (shouldUseCoreAdapter(ui.llmModelInput.value) && !ui.llmBaseUrlInput.value.trim()) {
-          ui.llmBaseUrlInput.value = getDefaultLlmBase(ui.llmModelInput.value);
-        }
-        syncProxyBaseInput({ silent: true });
-        syncLlmBaseUrlInput({ silent: true });
-        syncLlmApiKeyInput({ silent: true });
         syncLlmModelInput({ silent: true });
       } catch {}
     }
@@ -5374,30 +5921,6 @@
       });
       ui.llmModelInput.addEventListener("blur", () => {
         syncLlmModelInput();
-        renderAll();
-      });
-      ui.llmBaseUrlInput.addEventListener("change", () => {
-        syncLlmBaseUrlInput();
-        renderAll();
-      });
-      ui.llmBaseUrlInput.addEventListener("blur", () => {
-        syncLlmBaseUrlInput();
-        renderAll();
-      });
-      ui.proxyBaseInput.addEventListener("change", () => {
-        syncProxyBaseInput();
-        renderAll();
-      });
-      ui.proxyBaseInput.addEventListener("blur", () => {
-        syncProxyBaseInput();
-        renderAll();
-      });
-      ui.llmApiKeyInput.addEventListener("change", () => {
-        syncLlmApiKeyInput();
-        renderAll();
-      });
-      ui.llmApiKeyInput.addEventListener("blur", () => {
-        syncLlmApiKeyInput();
         renderAll();
       });
 
@@ -5484,12 +6007,9 @@
     restoreState();
     bindEvents();
     renderAll();
-    (async () => {
-      await autoConfigureHostedBackends().catch(() => {});
-      if ((ui.tokenInput.value.trim() || ui.wikiTokenInput.value.trim()) && ui.queryInput.value.trim()) {
-        runResearch({ forceLocal: true });
-      }
-    })();
+    if ((ui.tokenInput.value.trim() || ui.wikiTokenInput.value.trim()) && ui.queryInput.value.trim()) {
+      runResearch({ forceLocal: true });
+    }
   </script>
 </body>
 </html>

@@ -6,19 +6,43 @@ const { Readable } = require("node:stream");
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
 
-function setCors(res) {
+function setCors(req, res) {
+  const defaults = [
+    "Origin",
+    "X-Requested-With",
+    "Content-Type",
+    "Accept",
+    "Authorization",
+    "authorization-deploy-lab",
+    "X-Authorization",
+    "X-Proxy-Cookie",
+    "X-Proxy-Token",
+    "X-Proxy-Key",
+    "PRIVATE-TOKEN",
+    "X-Client-Request-Id"
+  ];
+  const requested = String(req?.headers?.["access-control-request-headers"] || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const merged = [];
+  const seen = new Set();
+  for (const value of [...defaults, ...requested]) {
+    const key = String(value || "").toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(value);
+  }
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Authorization, X-Proxy-Cookie, X-Proxy-Token, X-Proxy-Key, PRIVATE-TOKEN, X-Client-Request-Id"
-  );
+  res.setHeader("Access-Control-Allow-Headers", merged.join(", "));
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Vary", "Origin, Access-Control-Request-Headers");
 }
 
-function json(res, status, payload) {
+function json(req, res, status, payload) {
   const body = JSON.stringify(payload);
-  setCors(res);
+  setCors(req, res);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(body)
@@ -50,6 +74,7 @@ async function readBody(req) {
 
 function buildUpstreamHeaders(req) {
   const headers = {};
+  const proxyCookie = req?.headers?.["x-proxy-cookie"];
   for (const [name, value] of Object.entries(req.headers || {})) {
     if (value == null) continue;
     const lower = String(name).toLowerCase();
@@ -59,11 +84,15 @@ function buildUpstreamHeaders(req) {
       "content-length",
       "accept-encoding",
       "origin",
-      "referer"
+      "referer",
+      "x-proxy-cookie"
     ].includes(lower)) {
       continue;
     }
     headers[name] = Array.isArray(value) ? value.join(", ") : String(value);
+  }
+  if (proxyCookie && !headers.Cookie && !headers.cookie) {
+    headers.Cookie = Array.isArray(proxyCookie) ? proxyCookie.join("; ") : String(proxyCookie);
   }
   return headers;
 }
@@ -71,14 +100,14 @@ function buildUpstreamHeaders(req) {
 async function proxyRequest(req, res) {
   const targetUrl = getTargetUrl(req.url, req.headers.host);
   if (!targetUrl) {
-    json(res, 400, {
+    json(req, res, 400, {
       ok: false,
       error: "Missing ?url=<target> query parameter"
     });
     return;
   }
   if (!isAllowedTarget(targetUrl)) {
-    json(res, 400, {
+    json(req, res, 400, {
       ok: false,
       error: "Only http(s) upstream targets are allowed"
     });
@@ -93,7 +122,7 @@ async function proxyRequest(req, res) {
     redirect: "follow"
   });
 
-  setCors(res);
+  setCors(req, res);
   res.statusCode = upstream.status;
 
   for (const [name, value] of upstream.headers.entries()) {
@@ -116,14 +145,14 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `${HOST}:${PORT}`}`);
 
   if (req.method === "OPTIONS") {
-    setCors(res);
+    setCors(req, res);
     res.writeHead(204);
     res.end();
     return;
   }
 
   if (req.method === "GET" && url.pathname === "/health") {
-    json(res, 200, {
+    json(req, res, 200, {
       ok: true,
       status: "ok",
       proxy: "standalone",
@@ -137,7 +166,7 @@ const server = http.createServer(async (req, res) => {
     try {
       await proxyRequest(req, res);
     } catch (error) {
-      json(res, 502, {
+      json(req, res, 502, {
         ok: false,
         error: String(error && error.message ? error.message : error)
       });
@@ -145,7 +174,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  json(res, 404, {
+  json(req, res, 404, {
     ok: false,
     error: `Not found: ${url.pathname}`
   });

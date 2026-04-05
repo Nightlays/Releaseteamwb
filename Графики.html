@@ -11,7 +11,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
-  <script src="./ml/catboost_release_risk.bundle.js"></script>
+  <script src="./catboost_release_risk.bundle.js"></script>
 
   <!-- Все кастомные стили вынесены в style.css -->
   <link rel="stylesheet" href="./style.css" />
@@ -24,8 +24,8 @@
         <div>
           <div class="flex items-center gap-2">
             <div class="font-extrabold leading-tight">WB All Table</div>
-            <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
-              <span aria-hidden="true">🏷️</span><span>v0.2.27</span>
+              <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
+              <span aria-hidden="true">🏷️</span><span>v0.2.28</span>
             </span>
             <div class="pdf-export-dropdown" id="pdfExportDropdown">
               <button type="button" id="pdfExportTrigger"
@@ -57,63 +57,49 @@
       <section class="card p-5 space-y-3">
         <div>
           <h2 class="text-lg font-semibold">Параметры запуска</h2>
-          <div class="hint">Заполни параметры и нажми «Запустить сбор».</div>
+          <div class="hint">Укажи диапазон релизов, а ключи и base URL открой через «Настройки».</div>
         </div>
 
         <form class="w-full" onsubmit="return false;">
           <div class="border border-[#ecebff] rounded-2xl bg-white p-4">
             <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-              <div class="md:col-span-4">
+              <div class="md:col-span-7 lg:col-span-8">
                 <label class="block text-xs font-semibold text-[#111827] mb-1">Версия релиза</label>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input class="input" id="releaseFrom" type="text" inputmode="numeric" placeholder="От, напр. 7.3.5000" />
                   <input class="input" id="releaseTo" type="text" inputmode="numeric" placeholder="До, напр. 7.3.8000" />
                 </div>
+                <div class="mt-2 text-xs font-semibold text-slate-500">Токены, cookies, proxy/helper base и LLM-конфиг скрыты в настройках.</div>
               </div>
-
-              <div class="md:col-span-6">
-                <label class="block text-xs font-semibold text-[#111827] mb-1">API токен Allure</label>
-                <input class="input" id="allureToken" type="password" autocomplete="off" placeholder="Вставьте токен Allure" />
-              </div>
-
-              <div class="md:col-span-2">
-                <button id="startBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
-                <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Остановить сбор</button>
-                <button id="proxyBtn" type="button" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
-                  Проверить прокси
-                </button>
-              </div>
-
-              <div class="md:col-span-6">
-                <label class="block text-xs font-semibold text-[#111827] mb-1">Deploy-lab token</label>
-                <input class="input" id="deployToken" type="password" autocomplete="off" placeholder="Вставьте Deploy-lab token" />
-              </div>
-              <div class="md:col-span-6">
-                <div class="flex items-center justify-between gap-3 mb-1">
-                  <label class="block text-xs font-semibold text-[#111827]">YouTrack token</label>
-                  <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 whitespace-nowrap">
-                    <input type="checkbox" id="ytRequestsEnabled" checked />
-                    Запросы в YT
-                  </label>
-                </div>
-                <input class="input" id="ytToken" type="password" autocomplete="off" placeholder="Вставьте YouTrack token" />
-              </div>
-              <div class="md:col-span-6">
-                <label class="block text-xs font-semibold text-[#111827] mb-1">Куки GitLab</label>
-                <input class="input" id="gitlabCookie" type="password" autocomplete="off" placeholder="known_sign_in=...; _gitlab_session=..." />
-              </div>
-              <div class="md:col-span-6">
-                <label class="block text-xs font-semibold text-[#111827] mb-1">Wiki Bearer token</label>
-                <input class="input" id="wikiToken" type="password" autocomplete="off" placeholder="Вставьте Bearer token wiki" />
-              </div>
-              <div class="md:col-span-6">
-                <label class="block text-xs font-semibold text-[#111827] mb-1">Band Cookies (чтение)</label>
-                <input class="input" id="bandCookiesRead" type="password" autocomplete="off" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
+              <div class="md:col-span-5 lg:col-span-4">
+                <button id="settingsBtn" type="button" class="btn btn-ghost w-full">Настройки</button>
+                <button id="startBtn" type="button" class="btn btn-grad w-full mt-2">Запустить сбор</button>
+                <button id="stopBtn" type="button" class="btn btn-danger w-full mt-2" style="display:none;">Остановить сбор</button>
               </div>
             </div>
 
           </div>
         </form>
+      </section>
+
+      <section class="card p-5 space-y-4" id="aiSummaryCard" data-export-card>
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">AI Summary — вывод и рекомендации</h2>
+            <div class="hint">LLM анализирует собранные метрики, ML-риск, аномалии, downtime, стримы и типы задач. Base URL, model и API key находятся в настройках.</div>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+              <input type="checkbox" id="aiAutoSummary" />
+              Авто после сбора
+            </label>
+            <button type="button" class="btn btn-ghost" id="aiGenerateBtn">Сформировать AI Summary</button>
+          </div>
+        </div>
+        <div id="aiSummaryMeta" class="text-xs font-semibold text-slate-500">Нажмите «Сформировать AI Summary» после сбора данных.</div>
+        <div id="aiSummaryBody" class="rounded-2xl border border-[#ecebff] bg-white/80 p-4 text-sm leading-6 text-slate-700">
+          LLM подготовит короткий вывод, риски и рекомендации по текущему релизу.
+        </div>
       </section>
 
       <!-- ===== ML Summary ===== -->
@@ -980,6 +966,102 @@
       </section>
 
 
+      <div id="settingsOverlay" class="overlay" style="display:none;padding:24px 16px;align-items:flex-start;overflow-y:auto;" aria-hidden="true">
+        <div class="w-full max-w-4xl mx-auto rounded-[28px] bg-white shadow-2xl ring-1 ring-[#ecebff] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+          <div class="flex items-start justify-between gap-4 px-5 py-4 border-b border-[#ecebff] bg-[#fcfbff]">
+            <div>
+              <h2 id="settingsTitle" class="text-lg font-semibold text-slate-900">Настройки</h2>
+              <div class="hint">Ключи, cookies и base URL сохраняются локально в браузере и применяются для текущей страницы.</div>
+            </div>
+            <button type="button" id="closeSettingsBtn" class="btn btn-ghost shrink-0">Закрыть</button>
+          </div>
+
+          <div class="p-5 space-y-4 overflow-y-auto max-h-[calc(88vh-92px)]">
+            <section class="border border-[#ecebff] rounded-2xl bg-white p-4 space-y-3">
+              <div>
+                <div class="text-sm font-semibold text-slate-900">Доступы</div>
+                <div class="hint">Токены и cookies для Allure, Deploy-lab, YouTrack, GitLab, Wiki и Band.</div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div class="md:col-span-6">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1">API токен Allure</label>
+                  <input class="input" id="allureToken" type="password" autocomplete="off" placeholder="Вставьте токен Allure" />
+                </div>
+                <div class="md:col-span-6">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1">Deploy-lab token</label>
+                  <input class="input" id="deployToken" type="password" autocomplete="off" placeholder="Вставьте Deploy-lab token" />
+                </div>
+                <div class="md:col-span-6">
+                  <div class="flex items-center justify-between gap-3 mb-1">
+                    <label class="block text-xs font-semibold text-[#111827]">YouTrack token</label>
+                    <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 whitespace-nowrap">
+                      <input type="checkbox" id="ytRequestsEnabled" checked />
+                      Запросы в YT
+                    </label>
+                  </div>
+                  <input class="input" id="ytToken" type="password" autocomplete="off" placeholder="Вставьте YouTrack token" />
+                </div>
+                <div class="md:col-span-6">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1">GitLab PAT / cookies</label>
+                  <input class="input" id="gitlabCookie" type="password" autocomplete="off" placeholder="gitlab-... / glpat-... / known_sign_in=...; _gitlab_session=..." />
+                </div>
+                <div class="md:col-span-6">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1">Wiki Bearer token</label>
+                  <input class="input" id="wikiToken" type="password" autocomplete="off" placeholder="Вставьте Bearer token wiki" />
+                </div>
+                <div class="md:col-span-6">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1">Band Cookies (чтение)</label>
+                  <input class="input" id="bandCookiesRead" type="password" autocomplete="off" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
+                </div>
+              </div>
+            </section>
+
+            <section class="border border-[#ecebff] rounded-2xl bg-white p-4 space-y-3">
+              <div>
+                <div class="text-sm font-semibold text-slate-900">Runtime Base URL</div>
+                <div class="hint">Proxy и ML helper применяются сразу, без перезагрузки страницы.</div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div class="md:col-span-5">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1" for="proxyBaseInput">Proxy Base URL</label>
+                  <input class="input mono text-xs" id="proxyBaseInput" type="text" placeholder="http://127.0.0.1:8787" />
+                </div>
+                <div class="md:col-span-5">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1" for="mlHelperBaseInput">ML Helper Base URL</label>
+                  <input class="input mono text-xs" id="mlHelperBaseInput" type="text" placeholder="http://127.0.0.1:8788" />
+                </div>
+                <div class="md:col-span-2">
+                  <button id="proxyBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
+                    Проверить прокси
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="border border-[#ecebff] rounded-2xl bg-white p-4 space-y-3">
+              <div>
+                <div class="text-sm font-semibold text-slate-900">AI Summary</div>
+                <div class="hint">Base URL, model и API key для LLM-суммаризации.</div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div class="md:col-span-4">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1" for="aiLlmBaseUrl">Base URL</label>
+                  <input class="input mono text-xs" id="aiLlmBaseUrl" type="text" value="https://api.openai.com/v1" placeholder="https://api.openai.com/v1" />
+                </div>
+                <div class="md:col-span-4">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1" for="aiLlmModel">Model</label>
+                  <input class="input mono text-xs" id="aiLlmModel" type="text" value="gpt-4o-mini" placeholder="gpt-4o-mini" />
+                </div>
+                <div class="md:col-span-4">
+                  <label class="block text-xs font-semibold text-[#111827] mb-1" for="aiLlmApiKey">API key</label>
+                  <input class="input" id="aiLlmApiKey" type="password" autocomplete="off" placeholder="sk-... или пусто для локального endpoint" />
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
       <script>
         (function(){
           const BASE_URL = 'https://allure-testops.wb.ru';
@@ -1006,7 +1088,7 @@
                 if (parsed && parsed.base) return String(parsed.base).trim();
               }
             } catch (e) {}
-            return 'http://localhost:8787';
+            return 'http://127.0.0.1:8787';
           }
           function readMlHelperBase(){
             try {
@@ -1023,8 +1105,8 @@
             } catch (e) {}
             return 'http://127.0.0.1:8788';
           }
-          const PROXY_BASE = readRuntimeProxyBase().replace(/\/+$/, '');
-          const ML_HELPER_BASE = readMlHelperBase().replace(/\/+$/, '');
+          let PROXY_BASE = readRuntimeProxyBase().replace(/\/+$/, '');
+          let ML_HELPER_BASE = readMlHelperBase().replace(/\/+$/, '');
           const LS_COLLAPSE_KEY = 'wb_all_table_collapsed';
           const WIKI_DEV_OUTAGES_URL = 'https://wiki.wb.ru/api/v1/space/308/article/6157';
           const BAND_ANDROID_DEV_FAILURES_CHANNEL_ID = 'csbuypwc93yozfazeqkkncboch';
@@ -1063,11 +1145,18 @@
           const LS_GITLAB_COOKIE_KEY = 'wb_all_table_gitlab_cookie';
           const LS_WIKI_TOKEN_KEY = 'wb_all_table_wiki_token';
           const LS_BAND_READ_COOKIES_KEY = 'wb_all_table_band_read_cookies';
+          const LS_AI_LLM_BASE_URL_KEY = 'wb_graphs_ai_llm_base_url';
+          const LS_AI_LLM_MODEL_KEY = 'wb_graphs_ai_llm_model';
+          const LS_AI_LLM_API_KEY = 'wb_graphs_ai_llm_api_key';
+          const LS_AI_LLM_AUTO_KEY = 'wb_graphs_ai_llm_auto';
           const YT_BASE_URL = 'https://youtrack.wildberries.ru';
 
           const startBtn = document.getElementById('startBtn');
           const stopBtn  = document.getElementById('stopBtn');
           const proxyBtn = document.getElementById('proxyBtn');
+          const settingsBtn = document.getElementById('settingsBtn');
+          const settingsOverlay = document.getElementById('settingsOverlay');
+          const closeSettingsBtn = document.getElementById('closeSettingsBtn');
           let mlTooltip = document.getElementById('mlTooltip');
           if(!mlTooltip && document.body){
             mlTooltip = document.createElement('div');
@@ -1087,6 +1176,8 @@
           const inpGitlabCookie = document.getElementById('gitlabCookie');
           const inpWikiToken = document.getElementById('wikiToken');
           const inpBandCookiesRead = document.getElementById('bandCookiesRead');
+          const proxyBaseInput = document.getElementById('proxyBaseInput');
+          const mlHelperBaseInput = document.getElementById('mlHelperBaseInput');
           const mlSummaryBody = document.getElementById('mlSummaryBody');
           const mlSaveBtn = document.getElementById('mlSaveBtn');
           const mlLabelOkBtn = document.getElementById('mlLabelOk');
@@ -1094,6 +1185,13 @@
           const mlHelperStatusBtn = document.getElementById('mlHelperStatusBtn');
           const mlDriveModelStatusBtn = document.getElementById('mlDriveModelStatusBtn');
           const mlRetrainBtn = document.getElementById('mlRetrainBtn');
+          const aiSummaryMeta = document.getElementById('aiSummaryMeta');
+          const aiSummaryBody = document.getElementById('aiSummaryBody');
+          const aiGenerateBtn = document.getElementById('aiGenerateBtn');
+          const aiAutoSummary = document.getElementById('aiAutoSummary');
+          const aiLlmBaseUrlInput = document.getElementById('aiLlmBaseUrl');
+          const aiLlmModelInput = document.getElementById('aiLlmModel');
+          const aiLlmApiKeyInput = document.getElementById('aiLlmApiKey');
 
           if(window.Chart){
             Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
@@ -2314,6 +2412,15 @@
           version: '',
           error: ''
         };
+        let aiSummaryState = {
+          busy: false,
+          text: '',
+          error: '',
+          generatedAt: '',
+          contextKey: '',
+          model: '',
+          staleReason: ''
+        };
         const FEATURE_KEYS = [
           'tc_total','tc_total_delta','tc_total_delta_pct',
           'tc_volatility','tc_slope_pct',
@@ -3190,7 +3297,7 @@
         function baselineStats(series, mode = 'mean'){
           const data = (Array.isArray(series) ? series : []).map(v => Number(v)).filter(v => Number.isFinite(v));
           if(data.length < 2){
-            return { last: data[data.length-1] || 0, base: null, n: 0, mode };
+            return { last: data.length ? data[data.length - 1] : null, base: null, n: 0, mode };
           }
           const last = data[data.length - 1];
           if(mode === 'prev'){
@@ -5786,8 +5893,16 @@
             return raw.replace(/^Bearer\s+/i, '').trim();
           }
 
+          function normalizeAllureToken(value){
+            return String(value || '').trim().replace(/^(Api-Token|Bearer)\s+/i, '').trim();
+          }
+
+          function getAllureToken(){
+            return normalizeAllureToken(inpAllureToken?.value || '');
+          }
+
           function authHeaders(){
-            const tok = (inpAllureToken?.value || '').trim();
+            const tok = getAllureToken();
             return {
               'Accept': 'application/json',
               'Authorization': `Api-Token ${tok}`
@@ -5805,9 +5920,7 @@
             return {
               'accept': '*/*',
               'accept-language': 'ru,en;q=0.9',
-              'authorization-deploy-lab': bearer,
-              'Authorization': bearer,
-              'X-Authorization': bearer
+              'authorization-deploy-lab': bearer
             };
           }
 
@@ -5834,12 +5947,13 @@
             return {
               'Accept': '*/*',
               'accept-language': 'ru,en;q=0.9',
+              'x-page-load-context': 'page_load',
               'x-requested-with': 'XMLHttpRequest',
               [PROXY_COOKIE_HEADER]: cookies
             };
           }
 
-          function getGitlabCookie(){
+          function getGitlabAuthRaw(){
             return String(inpGitlabCookie?.value || '').trim();
           }
 
@@ -5847,14 +5961,43 @@
             return inpYtRequestsEnabled ? !!inpYtRequestsEnabled.checked : true;
           }
 
-          function gitlabHeaders(cookie = getGitlabCookie()){
-            const raw = String(cookie || '').trim();
-            if(!raw) return null;
-            return {
-              'accept': 'application/json, text/plain, */*',
-              'x-requested-with': 'XMLHttpRequest',
-              'X-Proxy-Cookie': raw
-            };
+          function normalizeGitlabToken(value){
+            return String(value || '').trim().replace(/^(Bearer|PRIVATE-TOKEN)\s+/i, '').trim();
+          }
+
+          function isGitlabCookieAuth(value){
+            const raw = String(value || '').trim();
+            if(!raw) return false;
+            if(/^(gitlab-|glpat-|Bearer\s+|PRIVATE-TOKEN\s+)/i.test(raw)) return false;
+            return /[A-Za-z0-9_.-]+=/.test(raw);
+          }
+
+          function buildGitlabHeaderVariants(raw = getGitlabAuthRaw()){
+            const value = String(raw || '').trim();
+            if(!value) return [];
+            if(isGitlabCookieAuth(value)){
+              return [{
+                'accept': 'application/json',
+                'x-requested-with': 'XMLHttpRequest',
+                [PROXY_COOKIE_HEADER]: value
+              }];
+            }
+            const token = normalizeGitlabToken(value);
+            if(!token) return [];
+            return [
+              {
+                'accept': 'application/json',
+                'PRIVATE-TOKEN': token
+              },
+              {
+                'accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+              }
+            ];
+          }
+
+          function hasGitlabAuth(){
+            return buildGitlabHeaderVariants().length > 0;
           }
 
           function showToast(msg, ok=true){
@@ -5930,6 +6073,25 @@
             });
           }
 
+          async function proxyGetJsonWithHeaderVariants(targetUrl, headerVariants, signal){
+            const variants = Array.isArray(headerVariants)
+              ? headerVariants.filter(item => item && typeof item === 'object')
+              : [];
+            if(!variants.length) throw new Error('GitLab auth is missing');
+            let lastError = null;
+            for(let index = 0; index < variants.length; index += 1){
+              try{
+                return await proxyGetJson(targetUrl, variants[index], signal);
+              }catch(error){
+                lastError = error;
+                const message = String(error?.message || error);
+                const shouldRetry = /^Proxy HTTP 401\b/i.test(message) && index < variants.length - 1;
+                if(!shouldRetry) throw error;
+              }
+            }
+            throw lastError || new Error('GitLab auth request failed');
+          }
+
           async function fetchJsonWithFallback(targetUrl, headers, signal){
             try{
               return await proxyGetJson(targetUrl, headers, signal);
@@ -5954,8 +6116,10 @@
           }
 
           function buildGitlabPipelinesUrl(config, release, page = 1){
-            const url = new URL(config.pipelinesUrl);
-            url.searchParams.set('scope', config.scope);
+            const url = new URL(`${GITLAB_BASE_URL}/api/v4/projects/${encodeURIComponent(config.fullPath)}/pipelines`);
+            if(config.scope && String(config.scope).toLowerCase() !== 'all'){
+              url.searchParams.set('scope', config.scope);
+            }
             url.searchParams.set('page', String(page));
             url.searchParams.set('ref', `release/${release}`);
             url.searchParams.set('per_page', String(GITLAB_PIPELINE_PAGE_SIZE));
@@ -5987,13 +6151,13 @@
           }
 
           async function fetchGitlabOldestPipeline(config, release, signal){
-            const headers = gitlabHeaders();
-            if(!headers) return null;
+            const headerVariants = buildGitlabHeaderVariants();
+            if(!headerVariants.length) return null;
 
             let oldest = null;
             for(let page = 1; page <= 50; page += 1){
               const url = buildGitlabPipelinesUrl(config, release, page);
-              const data = await proxyGetJson(url, headers, signal);
+              const data = await proxyGetJsonWithHeaderVariants(url, headerVariants, signal);
               const pipelines = Array.isArray(data?.pipelines)
                 ? data.pipelines
                 : (Array.isArray(data) ? data : []);
@@ -6020,13 +6184,13 @@
           }
 
           async function fetchGitlabPipelineJobFinishedAt(config, iid, signal){
-            const headers = gitlabHeaders();
-            if(!headers || !iid) return null;
+            const headerVariants = buildGitlabHeaderVariants();
+            if(!headerVariants.length || !iid) return null;
 
             let after = null;
             for(let page = 0; page < 30; page += 1){
               const url = buildGitlabPipelineJobsUrl(config, iid, after);
-              const data = await proxyGetJson(url, headers, signal);
+              const data = await proxyGetJsonWithHeaderVariants(url, headerVariants, signal);
               const jobs = data?.data?.project?.pipeline?.jobs;
               const nodes = Array.isArray(jobs?.nodes) ? jobs.nodes : [];
               const target = nodes.find(node => String(node?.name || '').trim() === config.jobName);
@@ -6041,8 +6205,7 @@
           }
 
           async function fetchRegressionStartPoint(platformKey, release, signal){
-            const cookie = getGitlabCookie();
-            if(!cookie) return null;
+            if(!hasGitlabAuth()) return null;
 
             const config = GITLAB_PIPELINE_CONFIG[platformKey];
             if(!config) return null;
@@ -8692,6 +8855,25 @@
             if(andTypesContent) andTypesContent.style.display = 'none';
           }
 
+          function normalizeRuntimeBase(value, fallback){
+            const raw = String(value || '').trim().replace(/\/+$/, '');
+            return raw || fallback;
+          }
+
+          function syncRuntimeBaseSettings(){
+            PROXY_BASE = normalizeRuntimeBase(proxyBaseInput?.value || PROXY_BASE, 'http://127.0.0.1:8787');
+            ML_HELPER_BASE = normalizeRuntimeBase(mlHelperBaseInput?.value || ML_HELPER_BASE, 'http://127.0.0.1:8788');
+            if(proxyBaseInput) proxyBaseInput.value = PROXY_BASE;
+            if(mlHelperBaseInput) mlHelperBaseInput.value = ML_HELPER_BASE;
+          }
+
+          function setSettingsOpen(open){
+            if(!settingsOverlay) return;
+            settingsOverlay.style.display = open ? 'flex' : 'none';
+            settingsOverlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+            document.body.style.overflow = open ? 'hidden' : '';
+          }
+
           function setRunning(running){
             if(running){
               startBtn.style.display = 'none';
@@ -8723,6 +8905,7 @@
           }
 
           function saveInputs(){
+            syncRuntimeBaseSettings();
             try{ localStorage.setItem(LS_TOKEN_KEY, inpAllureToken.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_DEPLOY_KEY, inpDeployToken.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_YT_TOKEN_KEY, inpYtToken.value || ''); }catch(e){}
@@ -8730,10 +8913,18 @@
             try{ localStorage.setItem(LS_GITLAB_COOKIE_KEY, inpGitlabCookie.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_WIKI_TOKEN_KEY, inpWikiToken.value || ''); }catch(e){}
             try{ localStorage.setItem(LS_BAND_READ_COOKIES_KEY, inpBandCookiesRead.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_PROXY_RUNTIME_KEY, JSON.stringify({ base: PROXY_BASE })); }catch(e){}
+            try{ localStorage.setItem(LS_ML_HELPER_RUNTIME_KEY, JSON.stringify({ base: ML_HELPER_BASE })); }catch(e){}
+            try{ localStorage.setItem(LS_AI_LLM_BASE_URL_KEY, aiLlmBaseUrlInput?.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_AI_LLM_MODEL_KEY, aiLlmModelInput?.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_AI_LLM_API_KEY, aiLlmApiKeyInput?.value || ''); }catch(e){}
+            try{ localStorage.setItem(LS_AI_LLM_AUTO_KEY, String(!!aiAutoSummary?.checked)); }catch(e){}
             try{ localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: inpFrom.value || '', to: inpTo.value || '' })); }catch(e){}
           }
 
           function restoreInputs(){
+            if(proxyBaseInput) proxyBaseInput.value = PROXY_BASE;
+            if(mlHelperBaseInput) mlHelperBaseInput.value = ML_HELPER_BASE;
             try{
               const tok = localStorage.getItem(LS_TOKEN_KEY) || '';
               if(inpAllureToken) inpAllureToken.value = tok;
@@ -8763,6 +8954,22 @@
               if(inpBandCookiesRead) inpBandCookiesRead.value = bandCookies;
             }catch(e){}
             try{
+              const llmBaseUrl = localStorage.getItem(LS_AI_LLM_BASE_URL_KEY);
+              if(aiLlmBaseUrlInput && llmBaseUrl) aiLlmBaseUrlInput.value = llmBaseUrl;
+            }catch(e){}
+            try{
+              const llmModel = localStorage.getItem(LS_AI_LLM_MODEL_KEY);
+              if(aiLlmModelInput && llmModel) aiLlmModelInput.value = llmModel;
+            }catch(e){}
+            try{
+              const llmApiKey = localStorage.getItem(LS_AI_LLM_API_KEY);
+              if(aiLlmApiKeyInput && llmApiKey != null) aiLlmApiKeyInput.value = llmApiKey;
+            }catch(e){}
+            try{
+              const auto = localStorage.getItem(LS_AI_LLM_AUTO_KEY);
+              if(aiAutoSummary) aiAutoSummary.checked = auto === 'true';
+            }catch(e){}
+            try{
               const raw = localStorage.getItem(LS_RANGE_KEY);
               if(raw){
                 const obj = JSON.parse(raw);
@@ -8770,12 +8977,700 @@
                 if(inpTo) inpTo.value = obj?.to || '';
               }
             }catch(e){}
+            syncRuntimeBaseSettings();
+          }
+
+          function escapeHtml(value){
+            return String(value ?? '')
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
+          }
+
+          function normalizeLlmBaseUrl(raw){
+            const value = String(raw || '').trim().replace(/\/+$/, '');
+            if(!value) return 'https://api.openai.com/v1';
+            return /\/v1$/i.test(value) ? value : `${value}/v1`;
+          }
+
+          function normalizeLlmModel(raw){
+            const original = String(raw || '').trim();
+            if(!original) return '';
+            const compact = original
+              .toLowerCase()
+              .replace(/[ _]+/g, '-')
+              .replace(/-+/g, '-')
+              .trim();
+            const aliasMap = {
+              'gpt-5.2-instant': 'gpt-5.2-chat-latest',
+              'gpt-5-2-instant': 'gpt-5.2-chat-latest',
+              'gpt5.2-instant': 'gpt-5.2-chat-latest',
+              'gpt-5.2-chat': 'gpt-5.2-chat-latest',
+              'gpt-5-2-chat': 'gpt-5.2-chat-latest',
+              'gpt-5.3-instant': 'gpt-5.3-chat-latest',
+              'gpt-5-3-instant': 'gpt-5.3-chat-latest',
+              'gpt5.3-instant': 'gpt-5.3-chat-latest',
+              'gpt-5.3-chat': 'gpt-5.3-chat-latest',
+              'gpt-5-3-chat': 'gpt-5.3-chat-latest',
+              'gpt-4o-mini': 'gpt-4o-mini',
+              'glm-45-air': 'GLM-4.5-Air',
+              'glm-4.5-air': 'GLM-4.5-Air',
+              'glm45-air': 'GLM-4.5-Air',
+              'glm-5': 'glm-5',
+              'qwen2-5-32b-instruct': 'Qwen2.5-32B-Instruct',
+              'qwen2.5-32b-instruct': 'Qwen2.5-32B-Instruct'
+            };
+            if(aliasMap[compact]) return aliasMap[compact];
+            if(/^gpt-5\.\d+-instant$/i.test(compact)) return compact.replace(/-instant$/i, '-chat-latest');
+            if(/^gpt-5\.\d+-chat$/i.test(compact)) return `${compact}-latest`;
+            return compact;
+          }
+
+          function syncAiLlmModelInput(){
+            if(!aiLlmModelInput) return '';
+            const normalized = normalizeLlmModel(aiLlmModelInput.value);
+            if(normalized && aiLlmModelInput.value.trim() !== normalized){
+              aiLlmModelInput.value = normalized;
+            }
+            return normalized;
+          }
+
+          function aiSummaryHasData(){
+            return Array.isArray(window.__releaseRangeAll) && window.__releaseRangeAll.length > 0;
+          }
+
+          function buildAiSummaryContextKey(){
+            return JSON.stringify({
+              compareMode: comparePrevOnly?.checked ? 'prev' : 'mean',
+              releases: Array.isArray(window.__releaseRangeAll) ? window.__releaseRangeAll.slice() : [],
+              tc: (window.__tcRowsAll || []).length,
+              cov: (window.__covRowsAll || []).length,
+              sel: (window.__selRowsAll || []).length,
+              avg: (window.__avgRowsAll || []).length,
+              chp: (window.__chpRowsAll || []).length,
+              iosTypes: (window.__iosTypesRowsAll || []).length,
+              andTypes: (window.__andTypesRowsAll || []).length,
+              devDowntime: (window.__devDowntimeRowsAll || []).length,
+              androidDevDowntime: (window.__androidDevDowntimeRowsAll || []).length,
+              streamFrom: window.__streamInsightData?.from || '',
+              streamTo: window.__streamInsightData?.to || ''
+            });
+          }
+
+          function formatAiGeneratedAt(value){
+            if(!value) return '';
+            try{
+              return new Date(value).toLocaleString('ru-RU');
+            }catch(e){
+              return String(value);
+            }
+          }
+
+          function resetAiSummaryState(){
+            aiSummaryState.busy = false;
+            aiSummaryState.text = '';
+            aiSummaryState.error = '';
+            aiSummaryState.generatedAt = '';
+            aiSummaryState.contextKey = '';
+            aiSummaryState.model = '';
+            aiSummaryState.staleReason = '';
+            renderAiSummary();
+          }
+
+          function markAiSummaryDirty(reason = 'Данные изменились, обновите AI Summary.'){
+            if(aiSummaryState.busy) return;
+            aiSummaryState.staleReason = reason;
+            renderAiSummary();
+          }
+
+          function shouldBypassProxyForUrl(targetUrl){
+            try{
+              const url = new URL(targetUrl);
+              return ['127.0.0.1', 'localhost', '::1'].includes(url.hostname);
+            }catch(e){
+              return false;
+            }
+          }
+
+          async function fetchWithProxyRouting(targetUrl, options = {}){
+            const attempts = [];
+            if(!shouldBypassProxyForUrl(targetUrl)){
+              attempts.push({ url: buildProxyRequestUrl(targetUrl), viaProxy: true });
+            }
+            attempts.push({ url: targetUrl, viaProxy: false });
+            let lastError = null;
+
+            for(const attempt of attempts){
+              try{
+                const response = await fetch(attempt.url, {
+                  cache: 'no-store',
+                  ...options
+                });
+                if(!response.ok){
+                  const preview = String(await response.text().catch(() => '') || '').trim().slice(0, 220);
+                  lastError = new Error(`HTTP ${response.status}${preview ? `: ${preview}` : ''}`);
+                  continue;
+                }
+                return response;
+              }catch(e){
+                lastError = e;
+              }
+            }
+            throw lastError || new Error('Network request failed');
+          }
+
+          function llmContentToText(content){
+            if(typeof content === 'string') return content.trim();
+            if(Array.isArray(content)){
+              return content.map(part => {
+                if(typeof part === 'string') return part;
+                if(part && typeof part === 'object'){
+                  if(typeof part.text === 'string') return part.text;
+                  if(typeof part.content === 'string') return part.content;
+                }
+                return '';
+              }).join('').trim();
+            }
+            return '';
+          }
+
+          function extractLlmTextFromPayload(payload){
+            if(typeof payload?.output_text === 'string' && payload.output_text.trim()){
+              return payload.output_text.trim();
+            }
+            const choices = Array.isArray(payload?.choices) ? payload.choices : [];
+            for(const choice of choices){
+              const text = llmContentToText(choice?.message?.content) || llmContentToText(choice?.delta?.content);
+              if(text) return text;
+            }
+            return '';
+          }
+
+          function roundAiNumber(value, digits = 2){
+            const n = Number(value);
+            return Number.isFinite(n) ? Number(n.toFixed(digits)) : null;
+          }
+
+          function formatAiClockMinutes(value){
+            const minutes = Number(value);
+            if(!Number.isFinite(minutes)) return '—';
+            const total = Math.max(0, Math.round(minutes));
+            const hh = String(Math.floor(total / 60)).padStart(2, '0');
+            const mm = String(total % 60).padStart(2, '0');
+            return `${hh}:${mm}`;
+          }
+
+          function formatAiMetricValue(kind, value, digits = 0){
+            const n = Number(value);
+            if(!Number.isFinite(n)) return '—';
+            if(kind === 'clock') return formatAiClockMinutes(n);
+            if(kind === 'minutes') return `${n.toFixed(digits)} мин`;
+            if(kind === 'percent') return `${n.toFixed(digits)}%`;
+            return Math.round(n).toLocaleString('ru-RU');
+          }
+
+          function buildAiMetricSnapshot(label, series, options = {}){
+            const values = (Array.isArray(series) ? series : []).map(v => Number(v)).filter(v => Number.isFinite(v));
+            if(!values.length){
+              return {
+                label,
+                current: '—',
+                currentRaw: null,
+                base: '—',
+                baseRaw: null,
+                delta: null,
+                deltaPct: null,
+                better: options.better || '',
+                note: options.note || ''
+              };
+            }
+            const compareMode = comparePrevOnly?.checked ? 'prev' : 'mean';
+            const stat = baselineStats(values, compareMode);
+            const diff = diffToBase(stat);
+            return {
+              label,
+              current: formatAiMetricValue(options.kind || 'count', stat.last, Number(options.digits || 0)),
+              currentRaw: roundAiNumber(stat.last, Number(options.rawDigits ?? options.digits ?? 2)),
+              base: Number.isFinite(stat.base) ? formatAiMetricValue(options.kind || 'count', stat.base, Number(options.digits || 0)) : '—',
+              baseRaw: Number.isFinite(stat.base) ? roundAiNumber(stat.base, Number(options.rawDigits ?? options.digits ?? 2)) : null,
+              delta: Number.isFinite(diff.delta) ? roundAiNumber(diff.delta, Number(options.rawDigits ?? options.digits ?? 2)) : null,
+              deltaPct: Number.isFinite(diff.deltaPct) ? roundAiNumber(diff.deltaPct, 2) : null,
+              better: options.better || '',
+              note: options.note || ''
+            };
+          }
+
+          function buildAiRecentRows(rows, mapper, limit = 4){
+            return (Array.isArray(rows) ? rows.slice(-limit) : []).map(mapper).filter(Boolean);
+          }
+
+          function buildAiTopCounts(counts, limit = 6){
+            return Object.entries(counts || {})
+              .map(([name, count]) => ({ name, count: Number(count || 0) }))
+              .filter(item => item.count > 0)
+              .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+              .slice(0, limit);
+          }
+
+          function buildAiTypeSnapshot(rows, platform){
+            const list = Array.isArray(rows) ? rows : [];
+            const last = list.length ? list[list.length - 1] : null;
+            if(!last) return null;
+            return {
+              platform,
+              release: last.release || '',
+              topTypes: buildAiTopCounts(last.counts || {}, 8)
+            };
+          }
+
+          function buildAiChpTypeSnapshot(rows, platform){
+            const list = Array.isArray(rows) ? rows : [];
+            const last = list.length ? list[list.length - 1] : null;
+            if(!last) return null;
+            return {
+              platform,
+              release: last.release || '',
+              topTypes: buildAiTopCounts({
+                product: last.product,
+                vlet: last.vlet,
+                bug: last.bug,
+                crash: last.crash
+              }, 8)
+            };
+          }
+
+          function buildAiStreamDeltaSnapshot(summary){
+            if(!summary) return null;
+            return {
+              from: summary.from || '',
+              to: summary.to || '',
+              unit: summary.unitLabel || '',
+              added: (summary.added || []).map(item => ({
+                stream: item.stream,
+                delta: Number(item.delta || 0),
+                before: Number(item.before || 0),
+                after: Number(item.after || 0),
+                external: !!item.external
+              })),
+              removed: (summary.removed || []).map(item => ({
+                stream: item.stream,
+                delta: Number(item.delta || 0),
+                before: Number(item.before || 0),
+                after: Number(item.after || 0),
+                external: !!item.external
+              }))
+            };
+          }
+
+          function buildAiRecentTimingRows(releaseRange, limit = 4){
+            const releases = (Array.isArray(releaseRange) ? releaseRange : []).slice(-limit);
+            if(!releases.length) return [];
+            const fullRange = Array.isArray(window.__releaseRangeAll) ? window.__releaseRangeAll : [];
+            const offset = Math.max(0, fullRange.length - releases.length);
+            const storeIosSeries = getCutSeriesByLabel('ios store');
+            const storeAndSeries = getCutSeriesByLabel('android store');
+            const cutIosSeries = getCutSeriesByLabel('ios cutoff');
+            const cutAndSeries = getCutSeriesByLabel('android cutoff');
+            const regressionIosSeries = getRegressionSeriesByLabel('ios');
+            const regressionAndSeries = getRegressionSeriesByLabel('android');
+            const lagIosSeries = buildLagSeries(storeIosSeries, cutIosSeries);
+            const lagAndSeries = buildLagSeries(storeAndSeries, cutAndSeries);
+            return releases.map((release, index) => {
+              const i = offset + index;
+              return {
+                release,
+                iosCutoff: formatAiMetricValue('clock', cutIosSeries[i]),
+                androidCutoff: formatAiMetricValue('clock', cutAndSeries[i]),
+                iosRegressionStart: formatAiMetricValue('clock', regressionIosSeries[i]),
+                androidRegressionStart: formatAiMetricValue('clock', regressionAndSeries[i]),
+                iosStore: formatAiMetricValue('clock', storeIosSeries[i]),
+                androidStore: formatAiMetricValue('clock', storeAndSeries[i]),
+                iosLag: formatAiMetricValue('minutes', lagIosSeries[i], 1),
+                androidLag: formatAiMetricValue('minutes', lagAndSeries[i], 1)
+              };
+            });
+          }
+
+          async function buildAiSummaryContext(){
+            const releaseRange = Array.isArray(window.__releaseRangeAll) ? window.__releaseRangeAll.slice() : [];
+            if(!releaseRange.length) return null;
+
+            const compareMode = comparePrevOnly?.checked ? 'prev' : 'mean';
+            const currentRelease = releaseRange[releaseRange.length - 1] || '';
+            const previousRelease = releaseRange.length > 1 ? releaseRange[releaseRange.length - 2] : '';
+            const baseReleases = compareMode === 'prev'
+              ? (previousRelease ? [previousRelease] : [])
+              : releaseRange.slice(0, -1);
+
+            const tcSeries = findDataset(tcChart, 'всего')?.data || [];
+            const autoSeries = findDataset(tcChart, 'авто')?.data || [];
+            const covSwatSeries = findDataset(covChart, 'swat')?.data || [];
+            const covStreamSeries = findDataset(covChart, 'stream')?.data || [];
+            const covSeries = sumSeries(covSwatSeries, covStreamSeries);
+            const selSeries = sumSeries(
+              findDataset(selChart, 'swat')?.data || [],
+              findDataset(selChart, 'stream')?.data || []
+            );
+            const avgSeries = findDataset(avgChart, 'общее')?.data || [];
+            const avgWeightedSeries = buildSeriesFromRows(window.__avgRowsAll || [], r => (Number(r.totalWeighted || 0) / 60000));
+            const chpSeries = findDataset(chpChart, 'всего')?.data || [];
+            const chpIosSeries = findDataset(chpChart, 'ios')?.data || [];
+            const chpAndSeries = findDataset(chpChart, 'android')?.data || [];
+            const storeIosSeries = getCutSeriesByLabel('ios store');
+            const storeAndSeries = getCutSeriesByLabel('android store');
+            const cutIosSeries = getCutSeriesByLabel('ios cutoff');
+            const cutAndSeries = getCutSeriesByLabel('android cutoff');
+            const regressionIosSeries = getRegressionSeriesByLabel('ios');
+            const regressionAndSeries = getRegressionSeriesByLabel('android');
+            const lagIosSeries = buildLagSeries(storeIosSeries, cutIosSeries);
+            const lagAndSeries = buildLagSeries(storeAndSeries, cutAndSeries);
+
+            const features = computeMlFeatures();
+            const anomalies = mlLastAnomalies || computeAnomalies();
+            const dataset = getMlDataset();
+            const labeledCount = (dataset || []).filter(item => item && (item.label === 'ok' || item.label === 'fail')).length;
+            const linearModel = trainMlModel(dataset);
+            const linearProb = features ? predictMl(features, linearModel) : null;
+            let catboostProb = null;
+            try{
+              if(features){
+                catboostProb = await runCatboostPrediction(features);
+              }
+            }catch(e){}
+            const activeProb = catboostProb != null ? catboostProb : linearProb;
+            const activeEngine = catboostProb != null
+              ? `CatBoost ${mlRemoteModelState.applied ? 'Drive' : 'Local'}`
+              : (linearProb != null ? 'Линейный fallback' : 'Нет модели');
+
+            const devOptions = {
+              releaseRange,
+              currentRelease,
+              compareMode,
+              previousRelease,
+              baseReleases
+            };
+            const iosDowntime = buildDevDowntimePlatformSummary(window.__devDowntimeRowsAll || [], 'iOS', devOptions);
+            const androidDowntime = buildDevDowntimePlatformSummary(window.__androidDevDowntimeRowsAll || [], 'Android', devOptions);
+            const combinedDowntime = buildDevDowntimeComparisonSummary(iosDowntime, androidDowntime, {
+              currentRelease,
+              compareMode
+            });
+
+            return {
+              releaseWindow: {
+                from: releaseRange[0] || '',
+                to: currentRelease,
+                count: releaseRange.length,
+                releases: releaseRange,
+                currentRelease,
+                previousRelease,
+                compareMode: compareMode === 'prev' ? 'previous_release' : 'mean_history',
+                baseReleases
+              },
+              mlRisk: {
+                engine: activeEngine,
+                regressionProbabilityPct: activeProb != null ? roundAiNumber(activeProb * 100, 1) : null,
+                linearProbabilityPct: linearProb != null ? roundAiNumber(linearProb * 100, 1) : null,
+                catboostProbabilityPct: catboostProb != null ? roundAiNumber(catboostProb * 100, 1) : null,
+                labeledSamples: labeledCount,
+                features: Object.fromEntries(Object.entries(features || {}).map(([key, value]) => [key, roundAiNumber(value, 2)]))
+              },
+              keyMetrics: {
+                regress: [
+                  buildAiMetricSnapshot('Объем регресса', tcSeries, { kind: 'count', better: 'down' }),
+                  buildAiMetricSnapshot('АТ в регрессе', autoSeries, { kind: 'count', better: 'up' }),
+                  buildAiMetricSnapshot('Критичные проверки SWAT + Stream', covSeries, { kind: 'count', better: 'up' }),
+                  buildAiMetricSnapshot('Селективные проверки', selSeries, { kind: 'count', better: 'down' }),
+                  buildAiMetricSnapshot('Среднее время прохождения', avgSeries, { kind: 'minutes', digits: 2, better: 'down' }),
+                  buildAiMetricSnapshot('Среднее время на кейс', avgWeightedSeries, { kind: 'minutes', digits: 2, better: 'down' })
+                ],
+                release: [
+                  buildAiMetricSnapshot('ЧП всего', chpSeries, { kind: 'count', better: 'down' }),
+                  buildAiMetricSnapshot('ЧП iOS', chpIosSeries, { kind: 'count', better: 'down' }),
+                  buildAiMetricSnapshot('ЧП Android', chpAndSeries, { kind: 'count', better: 'down' })
+                ],
+                timings: [
+                  buildAiMetricSnapshot('Cutoff iOS', cutIosSeries, { kind: 'clock', better: 'down' }),
+                  buildAiMetricSnapshot('Cutoff Android', cutAndSeries, { kind: 'clock', better: 'down' }),
+                  buildAiMetricSnapshot('Старт регресса iOS', regressionIosSeries, { kind: 'clock', better: 'down' }),
+                  buildAiMetricSnapshot('Старт регресса Android', regressionAndSeries, { kind: 'clock', better: 'down' }),
+                  buildAiMetricSnapshot('Store iOS', storeIosSeries, { kind: 'clock', better: 'down' }),
+                  buildAiMetricSnapshot('Store Android', storeAndSeries, { kind: 'clock', better: 'down' }),
+                  buildAiMetricSnapshot('Lag iOS', lagIosSeries, { kind: 'minutes', digits: 1, better: 'down' }),
+                  buildAiMetricSnapshot('Lag Android', lagAndSeries, { kind: 'minutes', digits: 1, better: 'down' })
+                ]
+              },
+              anomalies: {
+                release: (anomalies?.release?.list || []).map(item => ({
+                  label: item.label,
+                  delta: roundAiNumber(item.delta, 2),
+                  deltaPct: roundAiNumber(item.deltaPct, 2),
+                  z: roundAiNumber(item.z, 2),
+                  last: roundAiNumber(item.last, 2),
+                  prev: roundAiNumber(item.prev, 2)
+                })),
+                type: (anomalies?.type?.list || []).map(item => ({
+                  label: item.label,
+                  delta: roundAiNumber(item.delta, 2),
+                  deltaPct: roundAiNumber(item.deltaPct, 2),
+                  last: roundAiNumber(item.last, 2),
+                  prev: roundAiNumber(item.prev, 2)
+                })),
+                platform: (anomalies?.platform?.list || []).map(item => ({
+                  label: item.label,
+                  delta: roundAiNumber(item.delta, 2),
+                  deltaPct: roundAiNumber(item.deltaPct, 2),
+                  last: roundAiNumber(item.last, 2),
+                  prev: roundAiNumber(item.prev, 2)
+                }))
+              },
+              streams: {
+                hb: buildAiStreamDeltaSnapshot(window.__streamInsightData?.hb || null),
+                selective: buildAiStreamDeltaSnapshot(window.__streamInsightData?.selective || null),
+                uwu: buildAiStreamDeltaSnapshot(window.__streamInsightData?.uwu || null),
+                internalStreams: (window.__streamInsightData?.internalStreams || []).slice(0, 20),
+                externalStreams: (window.__streamInsightData?.externalStreams || []).slice(0, 20)
+              },
+              taskTypes: {
+                ios: buildAiTypeSnapshot(window.__iosTypesRowsAll || [], 'iOS'),
+                android: buildAiTypeSnapshot(window.__andTypesRowsAll || [], 'Android'),
+                chpAll: buildAiChpTypeSnapshot(window.__chpTypesRowsAll || [], 'ЧП'),
+                chpIos: buildAiChpTypeSnapshot(window.__chpTypesRowsIosAll || [], 'ЧП iOS'),
+                chpAndroid: buildAiChpTypeSnapshot(window.__chpTypesRowsAndAll || [], 'ЧП Android')
+              },
+              downtime: {
+                ios: {
+                  tone: iosDowntime?.tone || 'neutral',
+                  stats: iosDowntime?.stats || [],
+                  lines: iosDowntime?.lines || []
+                },
+                android: {
+                  tone: androidDowntime?.tone || 'neutral',
+                  stats: androidDowntime?.stats || [],
+                  lines: androidDowntime?.lines || []
+                },
+                combined: {
+                  tone: combinedDowntime?.tone || 'neutral',
+                  stats: combinedDowntime?.stats || [],
+                  lines: combinedDowntime?.lines || []
+                }
+              },
+              recentReleases: {
+                testCases: buildAiRecentRows(window.__tcRowsAll || [], row => ({
+                  release: row.release,
+                  manual: Number(row.manual || 0),
+                  auto: Number(row.auto || 0),
+                  total: Number(row.total || 0)
+                })),
+                coverage: buildAiRecentRows(window.__covRowsAll || [], row => ({
+                  release: row.release,
+                  swat: Number(row.swatCount || 0),
+                  stream: Number(row.streamCount || 0),
+                  total: Number(row.swatCount || 0) + Number(row.streamCount || 0)
+                })),
+                selective: buildAiRecentRows(window.__selRowsAll || [], row => ({
+                  release: row.release,
+                  swat: Number(row.swatCount || 0),
+                  stream: Number(row.streamCount || 0),
+                  total: Number(row.swatCount || 0) + Number(row.streamCount || 0)
+                })),
+                avgMinutes: buildAiRecentRows(window.__avgRowsAll || [], row => ({
+                  release: row.release,
+                  total: roundAiNumber(Number(row.total || 0) / 60000, 2),
+                  weighted: roundAiNumber(Number(row.totalWeighted || 0) / 60000, 2)
+                })),
+                chp: buildAiRecentRows(window.__chpRowsAll || [], row => ({
+                  release: row.release,
+                  total: Number(row.total || 0),
+                  ios: Number(row.ios || 0),
+                  android: Number(row.android || 0)
+                })),
+                timings: buildAiRecentTimingRows(releaseRange, 4)
+              }
+            };
+          }
+
+          function buildAiSummaryPrompt(context){
+            return {
+              system: [
+                'Ты senior release analyst по мобильным релизам WB.',
+                'Анализируй только факты из переданного JSON.',
+                'Не придумывай причины, которых нет в данных.',
+                'Пиши только на русском, коротко и конкретно.',
+                'Не используй markdown-таблицы.',
+                'Структура ответа строго такая:',
+                'Короткий вывод',
+                '- пункт',
+                'Главные риски',
+                '- пункт',
+                'Рекомендации на следующий релиз',
+                '- пункт',
+                'Что проверить вручную',
+                '- пункт',
+                'В каждом разделе 2-5 коротких пунктов.'
+              ].join('\n'),
+              user: [
+                `Сделай аналитический вывод по текущему релизу ${context?.releaseWindow?.currentRelease || '—'}.`,
+                'Ниже агрегированный JSON из вкладки "Графики".',
+                JSON.stringify(context, null, 2)
+              ].join('\n\n')
+            };
+          }
+
+          async function requestAiSummaryFromLlm(context){
+            const model = syncAiLlmModelInput();
+            if(!model) throw new Error('Укажите модель LLM');
+            const apiKey = String(aiLlmApiKeyInput?.value || '').trim();
+            const prompt = buildAiSummaryPrompt(context);
+            const url = `${normalizeLlmBaseUrl(aiLlmBaseUrlInput?.value || '')}/chat/completions`;
+            const headers = {
+              'Content-Type': 'application/json'
+            };
+            if(apiKey){
+              headers.Authorization = `Bearer ${apiKey}`;
+            }
+            const response = await fetchWithProxyRouting(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                model,
+                stream: false,
+                temperature: 0.2,
+                max_tokens: 1400,
+                messages: [
+                  { role: 'system', content: prompt.system },
+                  { role: 'user', content: prompt.user }
+                ]
+              })
+            });
+            const raw = await response.text();
+            let payload = null;
+            try{
+              payload = JSON.parse(raw);
+            }catch(e){}
+            const text = payload ? extractLlmTextFromPayload(payload) : String(raw || '').trim();
+            if(!text) throw new Error('LLM вернула пустой ответ');
+            return { text: text.trim(), model };
+          }
+
+          async function generateAiSummary({ auto = false, silentIfNotReady = false } = {}){
+            if(aiSummaryState.busy) return null;
+            if(!aiSummaryHasData()){
+              renderAiSummary();
+              if(!silentIfNotReady) showToast('Сначала запустите сбор данных', false);
+              return null;
+            }
+
+            const model = syncAiLlmModelInput();
+            if(!model){
+              renderAiSummary();
+              if(!silentIfNotReady) showToast('Укажите модель LLM', false);
+              return null;
+            }
+
+            saveInputs();
+            aiSummaryState.busy = true;
+            aiSummaryState.error = '';
+            aiSummaryState.text = '';
+            aiSummaryState.staleReason = '';
+            renderAiSummary();
+
+            try{
+              const context = await buildAiSummaryContext();
+              if(!context) throw new Error('Нет данных для AI Summary');
+              const result = await requestAiSummaryFromLlm(context);
+              aiSummaryState.busy = false;
+              aiSummaryState.text = result.text;
+              aiSummaryState.error = '';
+              aiSummaryState.generatedAt = new Date().toISOString();
+              aiSummaryState.contextKey = buildAiSummaryContextKey();
+              aiSummaryState.model = result.model;
+              aiSummaryState.staleReason = '';
+              renderAiSummary();
+              showToast(auto ? 'AI Summary обновлён автоматически' : 'AI Summary готов', true);
+              return result;
+            }catch(e){
+              aiSummaryState.busy = false;
+              aiSummaryState.text = '';
+              aiSummaryState.error = e?.message || String(e);
+              aiSummaryState.generatedAt = '';
+              aiSummaryState.model = '';
+              aiSummaryState.contextKey = '';
+              renderAiSummary();
+              if(!silentIfNotReady || !auto){
+                showToast(`AI Summary: ${aiSummaryState.error}`, false);
+              }
+              return null;
+            }
+          }
+
+          async function maybeAutoGenerateAiSummary(){
+            if(!aiAutoSummary?.checked) return null;
+            return generateAiSummary({ auto: true, silentIfNotReady: true });
+          }
+
+          function renderAiSummary(){
+            if(!aiSummaryBody) return;
+            const hasData = aiSummaryHasData();
+            const model = normalizeLlmModel(aiLlmModelInput?.value || '');
+            const currentKey = hasData ? buildAiSummaryContextKey() : '';
+            const isStale = Boolean(aiSummaryState.text && aiSummaryState.contextKey && aiSummaryState.contextKey !== currentKey);
+
+            if(aiGenerateBtn){
+              aiGenerateBtn.disabled = aiSummaryState.busy || !hasData || !model;
+              aiGenerateBtn.textContent = aiSummaryState.busy ? 'Генерирую...' : 'Сформировать AI Summary';
+            }
+
+            if(aiSummaryMeta){
+              if(!hasData){
+                aiSummaryMeta.textContent = 'Нет данных для анализа. Сначала выполните сбор.';
+              }else if(!model){
+                aiSummaryMeta.textContent = 'Укажите модель LLM. API key можно оставить пустым для локального OpenAI-compatible endpoint.';
+              }else if(aiSummaryState.busy){
+                aiSummaryMeta.textContent = `LLM ${model} анализирует текущий релиз и рекомендации...`;
+              }else if(aiSummaryState.error){
+                aiSummaryMeta.textContent = `Ошибка LLM: ${aiSummaryState.error}`;
+              }else if(aiSummaryState.text){
+                const freshness = isStale ? 'Сводка устарела' : 'Сводка актуальна';
+                const modelLabel = aiSummaryState.model || model;
+                const generatedAt = formatAiGeneratedAt(aiSummaryState.generatedAt);
+                aiSummaryMeta.textContent = `${freshness} · ${modelLabel}${generatedAt ? ` · ${generatedAt}` : ''}`;
+              }else if(aiAutoSummary?.checked){
+                aiSummaryMeta.textContent = `Автогенерация включена. После сбора данные уйдут в LLM ${model}.`;
+              }else{
+                aiSummaryMeta.textContent = `Нажмите «Сформировать AI Summary». Будет использована модель ${model}.`;
+              }
+            }
+
+            if(!hasData){
+              aiSummaryBody.innerHTML = '<div class="text-slate-500 text-sm">Нет данных для анализа. Сначала запустите сбор.</div>';
+              return;
+            }
+            if(aiSummaryState.busy){
+              aiSummaryBody.innerHTML = '<div class="text-slate-500 text-sm">LLM готовит короткий вывод, риски и рекомендации по текущему релизу...</div>';
+              return;
+            }
+            if(aiSummaryState.error){
+              aiSummaryBody.innerHTML = `<div class="text-rose-700 text-sm">${escapeHtml(aiSummaryState.error)}</div>`;
+              return;
+            }
+            if(aiSummaryState.text){
+              const staleHtml = isStale
+                ? `<div class="mb-3 rounded-xl bg-amber-50 ring-1 ring-amber-200 px-3 py-2 text-xs font-semibold text-amber-700">${escapeHtml(aiSummaryState.staleReason || 'Данные или режим сравнения изменились. Обновите AI Summary.')}</div>`
+                : '';
+              aiSummaryBody.innerHTML = `${staleHtml}<div class="whitespace-pre-wrap text-sm leading-6 text-slate-700">${escapeHtml(aiSummaryState.text)}</div>`;
+              return;
+            }
+            aiSummaryBody.innerHTML = '<div class="text-slate-500 text-sm">LLM подготовит управленческий вывод по регрессу, покрытию, ЧП, cutoff/store, downtime, стримам и типам задач.</div>';
           }
 
           function clear(){
             tbody.innerHTML = '';
             if(tcStreamDeltaTbody) tcStreamDeltaTbody.innerHTML = '';
             setStreamCatalog('');
+            resetAiSummaryState();
             window.__streamInsightData = null;
             window.__chpQuarterStats = null;
             // Reset global release filter
@@ -8891,6 +9786,7 @@
             if(regressionEmpty) regressionEmpty.style.display = '';
             window.__releaseRangeAll = [];
             window.__releaseTimelineByRelease = {};
+            renderAiSummary();
           }
 
           async function fetchSwatLogins(release, signal){
@@ -11515,7 +12411,7 @@
               if(iosRows?.length) renderDevDowntimeData(iosRows);
             };
 
-            const tok = (inpAllureToken?.value || '').trim();
+            const tok = getAllureToken();
             if(!tok){
               showEmpty('Вставьте API токен Allure');
               await ensureStandaloneDowntimeCharts();
@@ -11550,10 +12446,10 @@
             showCutContent();
             showDevDowntimeContent();
             showAndroidDevDowntimeContent();
-            if(getGitlabCookie()){
+            if(hasGitlabAuth()){
               showRegressionContent();
             }else{
-              showRegressionEmpty('Вставьте куки GitLab');
+              showRegressionEmpty('Вставьте GitLab PAT или cookies');
             }
             showIosTypesContent();
             showAndTypesContent();
@@ -11932,7 +12828,7 @@
               // Дата старта регресса = начало «календаря релиза» для окна поломанного дева
               if(iosRegressionStart?.msLocal) collectReleaseMarker(releaseMarkersMap, rel, iosRegressionStart.msLocal, 'regression');
               if(andRegressionStart?.msLocal) collectReleaseMarker(releaseMarkersMap, rel, andRegressionStart.msLocal, 'regression');
-              if(getGitlabCookie()){
+              if(hasGitlabAuth()){
                 showRegressionContent();
               }
 
@@ -12269,6 +13165,7 @@
             snapshotChartsFull();
             renderGlobalReleaseFilter();
             renderMlSummary();
+            await maybeAutoGenerateAiSummary();
           }
 
           // init
@@ -12280,6 +13177,7 @@
           showCovEmpty('Данные появятся после получения из источника');
           showSelEmpty('Данные появятся после получения из источника');
           renderMlSummary();
+          renderAiSummary();
           showAvgEmpty('Данные появятся после получения из источника');
           showChpEmpty('Данные появятся после получения из источника');
           showChpTypesEmpty('Данные появятся после получения из источника');
@@ -12329,6 +13227,49 @@
             androidDevDowntimeReleaseFilter.addEventListener('change', applyAndroidDevDowntimeReleaseFilter);
           }
           setChpTypesPlatforms(true);
+
+          settingsBtn?.addEventListener('click', () => {
+            setSettingsOpen(true);
+          });
+          closeSettingsBtn?.addEventListener('click', () => {
+            setSettingsOpen(false);
+          });
+          settingsOverlay?.addEventListener('click', (event) => {
+            if(event.target === settingsOverlay) setSettingsOpen(false);
+          });
+          document.addEventListener('keydown', (event) => {
+            if(event.key === 'Escape' && settingsOverlay?.style.display !== 'none'){
+              setSettingsOpen(false);
+            }
+          });
+
+          [
+            inpAllureToken,
+            inpDeployToken,
+            inpYtToken,
+            inpGitlabCookie,
+            inpWikiToken,
+            inpBandCookiesRead
+          ].forEach(input => {
+            input?.addEventListener('input', () => {
+              saveInputs();
+            });
+          });
+          inpYtRequestsEnabled?.addEventListener('change', () => {
+            saveInputs();
+          });
+          [proxyBaseInput, mlHelperBaseInput].forEach(input => {
+            input?.addEventListener('input', () => {
+              syncRuntimeBaseSettings();
+              saveInputs();
+            });
+          });
+          mlHelperBaseInput?.addEventListener('blur', () => {
+            syncRuntimeBaseSettings();
+            saveInputs();
+            setMlHelperIndicatorState();
+            checkMlHelperHealth({ silent: true }).catch(() => null);
+          });
 
           proxyBtn?.addEventListener('click', async () => {
             try{
@@ -12396,6 +13337,24 @@
           });
           mlRetrainBtn?.addEventListener('click', async () => {
             await retrainMlCatboostViaHelper();
+          });
+          aiGenerateBtn?.addEventListener('click', async () => {
+            await generateAiSummary();
+          });
+          aiAutoSummary?.addEventListener('change', () => {
+            saveInputs();
+            renderAiSummary();
+          });
+          [aiLlmBaseUrlInput, aiLlmModelInput, aiLlmApiKeyInput].forEach(input => {
+            input?.addEventListener('input', () => {
+              saveInputs();
+              renderAiSummary();
+            });
+          });
+          aiLlmModelInput?.addEventListener('blur', () => {
+            syncAiLlmModelInput();
+            saveInputs();
+            renderAiSummary();
           });
 
           // custom tooltip for data-tip
@@ -12475,7 +13434,10 @@
               showToast(`${syncPrefix} как Регресс, но CatBoost не переобучен. Запусти ${result.helperHint}`, false);
             }
           });
-          comparePrevOnly?.addEventListener('change', renderMlSummary);
+          comparePrevOnly?.addEventListener('change', () => {
+            renderMlSummary();
+            markAiSummaryDirty('Изменён режим сравнения. Обновите AI Summary для нового baseline.');
+          });
           setMlRetrainButtonState();
           setMlHelperIndicatorState();
           setMlDriveModelIndicatorState();
