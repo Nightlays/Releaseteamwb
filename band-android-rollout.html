@@ -918,6 +918,8 @@
             <button id="exportExcelBtn" class="btn-secondary" type="button">Excel</button>
             <button id="exportPdfBtn" class="btn-secondary" type="button">PDF</button>
             <div class="mini-chip"><span id="resultsCount">0</span> строк</div>
+            <button id="uploadDiskBtn" class="btn-secondary" type="button" disabled>Выгрузить в Disk</button>
+            <button id="openDiskBtn" class="btn-secondary" type="button">Открыть Disk</button>
           </div>
         </div>
         <div id="results" class="release-list">
@@ -990,13 +992,21 @@
   <script>
     const LS_PREFIX = 'band_android_rollout_v1';
     const LS_PROXY_BASE = LS_PREFIX + '_proxy_base';
-    const LS_BAND_COOKIES = LS_PREFIX + '_band_cookies';
+    const LS_BAND_COOKIES = 'wb_all_table_band_read_cookies';
+    const LS_BAND_COOKIES_LEGACY = LS_PREFIX + '_band_cookies';
     const LS_LOOKBACK_DAYS = LS_PREFIX + '_lookback_days';
     const LS_RELEASE_FROM = LS_PREFIX + '_release_from';
     const LS_RELEASE_TO = LS_PREFIX + '_release_to';
     const LS_RELEASE_FILTER = LS_PREFIX + '_release_filter';
     const LS_ACTIVE_PLATFORM = LS_PREFIX + '_active_platform';
     const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
+    const DISK_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby3HoKkxtLw6Dtw9EWG8cic0EjX4cfH0xQgPoBKwXVNSm5WVFYUpPWcEHO6EC4kptdgjw/exec';
+    const DISK_SPREADSHEET_ID = '1to6NsQ4bj7l266OobbK0yDH_ha0A1HFs-wsrr1pbvEQ';
+    const DISK_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DISK_SPREADSHEET_ID}/edit`;
+    const DISK_SHEET_NAMES = {
+      android: 'Android 2026',
+      ios: 'iOS 2026'
+    };
     const DEFAULT_PROXY_BASE = 'http://localhost:8787';
     const DEFAULT_LOOKBACK_DAYS = 180;
     const MSK_TIMEZONE = 'Europe/Moscow';
@@ -1063,8 +1073,14 @@
 
     const state = {
       loading: false,
+      diskUploading: false,
       abortController: null,
       activePlatform: 'android',
+      diskSheetUrls: {
+        android: null,
+        ios: null
+      },
+      allGroups: [],
       groups: [],
       events: []
     };
@@ -1121,6 +1137,8 @@
       exportCsvBtn: document.getElementById('exportCsvBtn'),
       exportExcelBtn: document.getElementById('exportExcelBtn'),
       exportPdfBtn: document.getElementById('exportPdfBtn'),
+      uploadDiskBtn: document.getElementById('uploadDiskBtn'),
+      openDiskBtn: document.getElementById('openDiskBtn'),
       settingsLogicFacts: document.getElementById('settingsLogicFacts'),
       settingsRulesTitle: document.getElementById('settingsRulesTitle'),
       settingsRulesIntro: document.getElementById('settingsRulesIntro'),
@@ -1178,6 +1196,7 @@
     }
 
     function resetComputedData(){
+      state.allGroups = [];
       state.groups = [];
       state.events = [];
       ui.results.innerHTML = '<div class="empty-state">Пока пусто. Заполни настройки и нажми «Загрузить релизы».</div>';
@@ -1280,6 +1299,7 @@
       try{
         localStorage.setItem(LS_PROXY_BASE, settings.proxyBase);
         localStorage.setItem(LS_BAND_COOKIES, settings.bandCookies);
+        localStorage.setItem(LS_BAND_COOKIES_LEGACY, settings.bandCookies);
         localStorage.setItem(LS_LOOKBACK_DAYS, String(settings.lookbackDays));
         localStorage.setItem(LS_RELEASE_FROM, settings.releaseFrom);
         localStorage.setItem(LS_RELEASE_TO, settings.releaseTo);
@@ -1288,9 +1308,13 @@
 
     function restoreSettings(){
       const storedPlatform = localStorage.getItem(LS_ACTIVE_PLATFORM);
+      const storedBandCookies = localStorage.getItem(LS_BAND_COOKIES) || localStorage.getItem(LS_BAND_COOKIES_LEGACY) || '';
       state.activePlatform = storedPlatform === 'ios' ? 'ios' : 'android';
       ui.proxyBaseInput.value = localStorage.getItem(LS_PROXY_BASE) || DEFAULT_PROXY_BASE;
-      ui.bandCookiesInput.value = localStorage.getItem(LS_BAND_COOKIES) || '';
+      ui.bandCookiesInput.value = storedBandCookies;
+      if(storedBandCookies && !localStorage.getItem(LS_BAND_COOKIES)){
+        localStorage.setItem(LS_BAND_COOKIES, storedBandCookies);
+      }
       ui.lookbackDaysInput.value = localStorage.getItem(LS_LOOKBACK_DAYS) || String(DEFAULT_LOOKBACK_DAYS);
       ui.releaseFromInput.value = localStorage.getItem(LS_RELEASE_FROM) || localStorage.getItem(LS_RELEASE_FILTER) || '';
       ui.releaseToInput.value = localStorage.getItem(LS_RELEASE_TO) || '';
@@ -1541,8 +1565,14 @@
       const raw = String(value || '').trim();
       if(!raw) return '';
 
-      const full = parseReleaseVersion(raw);
-      if(full){
+      const fullMatch = raw.match(/^(\d+)\.(\d+)\.(\d{1,4})$/);
+      if(fullMatch){
+        const major = Number(fullMatch[1]);
+        const minor = Number(fullMatch[2]);
+        const buildRaw = String(fullMatch[3] || '');
+        if(buildRaw.length < 4){
+          return `${major}.${minor}.${buildRaw.padEnd(4, '0')}`;
+        }
         return buildReleaseFamily(raw);
       }
 
@@ -1982,11 +2012,40 @@
       ui.summaryAppGallery.textContent = String(groupsWithAppGallery);
     }
 
+    function getFilteredGroupsForCurrentSettings(){
+      const sourceGroups = Array.isArray(state.allGroups) && state.allGroups.length
+        ? state.allGroups
+        : state.groups;
+      const settings = readSettings();
+      return filterGroupsByRange(sourceGroups, settings.releaseFrom, settings.releaseTo);
+    }
+
+    function applyCurrentRangeFilters(options){
+      const cfg = options && typeof options === 'object' ? options : {};
+      const platform = getActivePlatformConfig();
+      const groups = getFilteredGroupsForCurrentSettings();
+      state.groups = groups;
+      renderSummary(groups, state.events, platform.id);
+      renderGroups(groups, platform.id);
+      if(cfg.updateStatus){
+        setStatus(
+          ui.dataStatus,
+          groups.length ? `Готово: ${groups.length} релизов` : 'Готово, но совпадений нет',
+          groups.length ? 'status-ok' : 'status-warn'
+        );
+      }
+      return groups;
+    }
+
     function updateExportButtons(){
-      const disabled = state.loading || !Array.isArray(state.groups) || !state.groups.length;
+      const disabled = state.loading || state.diskUploading || !Array.isArray(state.groups) || !state.groups.length;
       if(ui.exportCsvBtn) ui.exportCsvBtn.disabled = disabled;
       if(ui.exportExcelBtn) ui.exportExcelBtn.disabled = disabled;
       if(ui.exportPdfBtn) ui.exportPdfBtn.disabled = disabled;
+      if(ui.uploadDiskBtn){
+        ui.uploadDiskBtn.disabled = disabled;
+        ui.uploadDiskBtn.textContent = state.diskUploading ? 'Выгружаю в Disk…' : 'Выгрузить в Disk';
+      }
     }
 
     function buildExportRows(groups, platformId){
@@ -2054,6 +2113,41 @@
       });
     }
 
+    function sortExportRowsByReleaseFamilyDesc(rows){
+      return (Array.isArray(rows) ? rows.slice() : []).sort((a, b) => {
+        return compareVersionsDesc(
+          String(a && a.release_family || ''),
+          String(b && b.release_family || '')
+        );
+      });
+    }
+
+    function normalizeExportCell(value){
+      return String(value ?? '')
+        .replace(/\r/g, '\n')
+        .replace(/^\s*#{1,6}\s*/gm, '')
+        .replace(/\s*\n+\s*/g, ' ')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim();
+    }
+
+    function getExportDataset(){
+      const rows = sortExportRowsByReleaseFamilyDesc(
+        buildExportRows(getFilteredGroupsForCurrentSettings(), state.activePlatform)
+      );
+      if(!rows.length){
+        return null;
+      }
+      const columns = Object.keys(rows[0]);
+      const values = rows.map((row) => columns.map((column) => normalizeExportCell(row[column])));
+      return {
+        rows,
+        columns,
+        values,
+        filename: buildExportFilename('csv')
+      };
+    }
+
     function buildExportFilename(ext){
       const settings = readSettings();
       const platform = getActivePlatformConfig();
@@ -2085,32 +2179,29 @@
     }
 
     function exportCsv(){
-      const rows = buildExportRows(state.groups, state.activePlatform);
-      if(!rows.length){
+      const dataset = getExportDataset();
+      if(!dataset){
         log('CSV export пропущен: нет данных.');
         return;
       }
-      const columns = Object.keys(rows[0]);
       const lines = [
-        columns.join(';'),
-        ...rows.map((row) => columns.map((column) => escapeCsvCell(row[column])).join(';'))
+        dataset.columns.join(';'),
+        ...dataset.values.map((row) => row.map((value) => escapeCsvCell(value)).join(';'))
       ];
       const blob = new Blob(["\uFEFF" + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-      const filename = buildExportFilename('csv');
-      downloadBlob(filename, blob);
-      log(`Экспортирован CSV: ${filename}`);
+      downloadBlob(dataset.filename, blob);
+      log(`Экспортирован CSV: ${dataset.filename}`);
     }
 
     function exportExcel(){
-      const rows = buildExportRows(state.groups, state.activePlatform);
-      if(!rows.length){
+      const dataset = getExportDataset();
+      if(!dataset){
         log('Excel export пропущен: нет данных.');
         return;
       }
-      const columns = Object.keys(rows[0]);
-      const headerHtml = columns.map((column) => `<th>${escHtml(column)}</th>`).join('');
-      const bodyHtml = rows.map((row) => `
-        <tr>${columns.map((column) => `<td>${escHtml(row[column])}</td>`).join('')}</tr>
+      const headerHtml = dataset.columns.map((column) => `<th>${escHtml(column)}</th>`).join('');
+      const bodyHtml = dataset.values.map((row) => `
+        <tr>${row.map((value) => `<td>${escHtml(value)}</td>`).join('')}</tr>
       `).join('');
       const closeBodyTag = '</' + 'body>';
       const closeHtmlTag = '</' + 'html>';
@@ -2136,6 +2227,93 @@ ${closeHtmlTag}`;
       const filename = buildExportFilename('xls');
       downloadBlob(filename, blob);
       log(`Экспортирован Excel: ${filename}`);
+    }
+
+    function getDiskSheetName(platformId){
+      return DISK_SHEET_NAMES[platformId === 'ios' ? 'ios' : 'android'] || DISK_SHEET_NAMES.android;
+    }
+
+    function setDiskLinkForPlatform(platformId, url){
+      const key = platformId === 'ios' ? 'ios' : 'android';
+      state.diskSheetUrls[key] = String(url || '').trim() || null;
+    }
+
+    function getDiskLinkForPlatform(platformId){
+      const key = platformId === 'ios' ? 'ios' : 'android';
+      return state.diskSheetUrls[key] || DISK_SPREADSHEET_URL;
+    }
+
+    function buildDiskExportPayload(dataset){
+      const platform = getActivePlatformConfig();
+      const settings = readSettings();
+      return {
+        spreadsheetId: DISK_SPREADSHEET_ID,
+        spreadsheetUrl: DISK_SPREADSHEET_URL,
+        source: 'band-rollout-report',
+        reportName: `${platform.label} rollout report`,
+        platform: platform.id,
+        platformLabel: platform.label,
+        sheetName: getDiskSheetName(platform.id),
+        fileName: dataset.filename,
+        generatedAt: new Date().toISOString(),
+        filters: {
+          releaseFrom: settings.releaseFrom,
+          releaseTo: settings.releaseTo,
+          lookbackDays: settings.lookbackDays
+        },
+        columns: dataset.columns.slice(),
+        rows: dataset.values.map((row) => row.slice())
+      };
+    }
+
+    async function uploadToDisk(){
+      const dataset = getExportDataset();
+      if(!dataset){
+        log('Disk export пропущен: нет данных.');
+        return;
+      }
+      if(!String(DISK_APPS_SCRIPT_URL || '').trim()){
+        log('Disk export не настроен: Apps Script endpoint ещё не задан.');
+        setStatus(ui.dataStatus, 'Нужен Apps Script endpoint для выгрузки в Disk', 'status-error');
+        return;
+      }
+
+      const platform = getActivePlatformConfig();
+      const sheetName = getDiskSheetName(platform.id);
+      state.diskUploading = true;
+      updateExportButtons();
+
+      try{
+        log(`Старт выгрузки в Disk: platform=${platform.label}, sheet=${sheetName}, rows=${dataset.values.length}.`);
+        setStatus(ui.dataStatus, `Выгружаю в Disk · ${sheetName}`, 'status-warn');
+
+        const response = await proxyRequestJson(
+          'POST',
+          DISK_APPS_SCRIPT_URL,
+          { 'Content-Type': 'application/json' },
+          { payload: buildDiskExportPayload(dataset) }
+        );
+
+        if(!response || response.ok !== true){
+          throw new Error((response && (response.error || response.message || response.details)) || 'Пустой/невалидный ответ Apps Script');
+        }
+
+        const sheetUrl = response.sheetUrl || response.spreadsheetUrl || DISK_SPREADSHEET_URL;
+        setDiskLinkForPlatform(platform.id, sheetUrl);
+        log(`Disk OK: sheet=${sheetName}, rows=${response.rowsWritten || dataset.values.length}.`);
+        setStatus(ui.dataStatus, `Выгружено в Disk · ${sheetName}`, 'status-ok');
+      }catch(error){
+        const message = error && error.message ? error.message : String(error);
+        log(`Disk error: ${message}`);
+        setStatus(ui.dataStatus, message, 'status-error');
+      }finally{
+        state.diskUploading = false;
+        updateExportButtons();
+      }
+    }
+
+    function openDisk(){
+      window.open(getDiskLinkForPlatform(state.activePlatform), '_blank', 'noopener');
     }
 
     function buildPrintableResultsTable(groups, platformId){
@@ -2312,6 +2490,7 @@ ${closeHtmlTag}`;
       }
 
       const allGroups = groupEvents(events, platform.id);
+      state.allGroups = allGroups;
       const groups = filterGroupsByRange(allGroups, settings.releaseFrom, settings.releaseTo);
       log(`После группировки и диапазона осталось ${groups.length} release-строк.`);
 
@@ -2367,6 +2546,8 @@ ${closeHtmlTag}`;
       ui.exportCsvBtn.addEventListener('click', exportCsv);
       ui.exportExcelBtn.addEventListener('click', exportExcel);
       ui.exportPdfBtn.addEventListener('click', exportPdf);
+      ui.uploadDiskBtn.addEventListener('click', uploadToDisk);
+      ui.openDiskBtn.addEventListener('click', openDisk);
       [
         ui.proxyBaseInput,
         ui.bandCookiesInput,
@@ -2376,6 +2557,19 @@ ${closeHtmlTag}`;
       ].forEach((node) => {
         node.addEventListener('input', persistSettings);
         node.addEventListener('change', persistSettings);
+      });
+      [ui.releaseFromInput, ui.releaseToInput].forEach((node) => {
+        node.addEventListener('change', () => {
+          if(!Array.isArray(state.allGroups) || !state.allGroups.length) return;
+          try{
+            applyCurrentRangeFilters({ updateStatus: true });
+            log(`Диапазон обновлён: from=${ui.releaseFromInput.value.trim() || '—'}, to=${ui.releaseToInput.value.trim() || '—'}.`);
+          }catch(error){
+            const message = error && error.message ? error.message : String(error);
+            setStatus(ui.dataStatus, message, 'status-error');
+            log(`Ошибка диапазона: ${message}`);
+          }
+        });
       });
       document.addEventListener('keydown', (event) => {
         if(event.key === 'Escape' && !ui.settingsModal.classList.contains('is-hidden')){
