@@ -72,7 +72,7 @@
               <input id="ytTokenInput" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="Вставьте токен" />
             </label>
 
-            <label class="release-launch-field release-launch-run-release-field">
+            <label id="deployLabTokenField" class="release-launch-field release-launch-run-release-field" style="display:none;">
               <span class="release-launch-label">Deploy Lab token (authorization-deploy-lab)</span>
               <input id="deployLabTokenInput" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="Вставьте токен" />
             </label>
@@ -145,8 +145,6 @@
         <section class="card p-3 space-y-3">
           <div class="release-launch-mode-tabs release-launch-major-view-tabs" role="group" aria-label="Раздел мажорного релиза">
             <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="collection" aria-pressed="false">Сбор дежурных</button>
-            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="message" aria-pressed="false">Сообщение</button>
-            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="push" aria-pressed="false">Пуш</button>
             <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="release" aria-pressed="false">Релиз</button>
           </div>
           <div id="majorReleaseEmptyState" class="release-launch-status release-launch-status-muted">Выбери раздел мажорного релиза</div>
@@ -237,20 +235,6 @@
           <section class="card p-5 space-y-3">
             <h2 class="text-lg font-semibold">Логи</h2>
             <div id="logs" class="release-launch-log"></div>
-          </section>
-        </div>
-
-        <div id="majorMessageSection" class="space-y-4" style="display:none;">
-          <section class="card p-5 space-y-3">
-            <h2 class="text-lg font-semibold">Сообщение</h2>
-            <div class="release-launch-status release-launch-status-muted">Пока пусто</div>
-          </section>
-        </div>
-
-        <div id="majorPushSection" class="space-y-4" style="display:none;">
-          <section class="card p-5 space-y-3">
-            <h2 class="text-lg font-semibold">Пуш</h2>
-            <div class="release-launch-status release-launch-status-muted">Пока пусто</div>
           </section>
         </div>
 
@@ -438,8 +422,10 @@
       const RUN_CREATOR_BASE_URL = 'https://allure-testops.wb.ru';
       const RUN_TAG_ANDROID = 4115;
       const RUN_TAG_IOS = 1711;
+      const RUN_TAG_REGRESSION = 278;
       const RUN_TP_CP_ANDROID = 1998;
       const RUN_TP_CP_IOS = 3258;
+      const RUN_TP_MAJOR_READINESS = 3918;
       const RUN_TP_NAPI_BASE = 1036;
       const RUN_TP_NAPI_IOS = 1869;
       const RUN_TP_NAPI_ANDROID = 1871;
@@ -509,8 +495,6 @@
       const majorReleaseLayout = $('majorReleaseLayout');
       const majorReleaseEmptyState = $('majorReleaseEmptyState');
       const majorCollectionSection = $('majorCollectionSection');
-      const majorMessageSection = $('majorMessageSection');
-      const majorPushSection = $('majorPushSection');
       const majorReleaseSection = $('majorReleaseSection');
       const majorViewButtons = Array.from(document.querySelectorAll('.release-launch-major-view-tab[data-major-view]'));
       const runCreateLayout = $('runCreateLayout');
@@ -518,6 +502,7 @@
       const runPublishControls = $('runPublishControls');
       const runModeSelect = $('runModeSelect');
       const runModeButtons = Array.from(document.querySelectorAll('.release-launch-mode-tab[data-run-mode]'));
+      const deployLabTokenField = $('deployLabTokenField');
       const runReleaseInput = $('runReleaseInput');
       const runBuildField = $('runBuildField');
       const runBuildInput = $('runBuildInput');
@@ -550,6 +535,7 @@
       const automationScheduleBtn = $('automationScheduleBtn');
       const automationCancelBtn = $('automationCancelBtn');
       const ytTokenInput = $('ytTokenInput');
+      const deployLabTokenInput = $('deployLabTokenInput');
 
       const resultsEmpty = $('resultsEmpty');
       const resultsWrap = $('resultsWrap');
@@ -856,6 +842,12 @@
         return `${major}.${minor}.${buildNorm}`;
       }
 
+      function normalizeMajorView(view){
+        const value = String(view || '').trim().toLowerCase();
+        if(value === 'message' || value === 'push') return 'collection';
+        return ['collection', 'release'].includes(value) ? value : '';
+      }
+
       function getMajorPingText(){
         return String(appState.majorPingText || '').trim();
       }
@@ -891,7 +883,7 @@
 
       function syncMajorViewState(){
         const isMajor = appState.currentMode === RUN_MODE_MAJOR;
-        const majorView = isMajor ? String(appState.majorView || '') : '';
+        const majorView = isMajor ? normalizeMajorView(appState.majorView) : '';
 
         for(const btn of majorViewButtons){
           const view = String(btn.getAttribute('data-major-view') || '');
@@ -902,8 +894,6 @@
 
         if(majorReleaseEmptyState) majorReleaseEmptyState.style.display = isMajor && !majorView ? '' : 'none';
         if(majorCollectionSection) majorCollectionSection.style.display = isMajor && majorView === 'collection' ? '' : 'none';
-        if(majorMessageSection) majorMessageSection.style.display = isMajor && majorView === 'message' ? '' : 'none';
-        if(majorPushSection) majorPushSection.style.display = isMajor && majorView === 'push' ? '' : 'none';
         if(majorReleaseSection) majorReleaseSection.style.display = isMajor && majorView === 'release' ? '' : 'none';
       }
 
@@ -915,7 +905,7 @@
       }
 
       function setMajorView(view){
-        const value = ['collection', 'message', 'push', 'release'].includes(view) ? view : '';
+        const value = normalizeMajorView(view);
         const prevView = appState.majorView;
         appState.majorView = value;
         saveUiState();
@@ -946,6 +936,7 @@
         syncRunModeTabs();
         if(runExtraControls) runExtraControls.style.display = isNonMajor ? '' : 'none';
         if(runBuildField) runBuildField.style.display = isBuildMode ? '' : 'none';
+        if(deployLabTokenField) deployLabTokenField.style.display = isMajor ? '' : 'none';
         if(runPublishControls) runPublishControls.style.display = isNonMajor ? '' : 'none';
         if(majorReleaseLayout) majorReleaseLayout.style.display = isMajor ? '' : 'none';
         if(runCreateLayout) runCreateLayout.style.display = isNonMajor ? '' : 'none';
@@ -1153,6 +1144,19 @@
         const existingLaunch = await runCreatorFindExistingLaunchByName(launchName, signal);
         if(existingLaunch && existingLaunch.id){
           runCreatorInfo(`Найден существующий ран, переиспользую: id=${existingLaunch.id}`, { kind: 'ok' });
+          return Object.assign({}, existingLaunch, { reused: true });
+        }
+        const payload = { launchName, tags: tagIds.map((id) => ({ id })) };
+        const data = await runCreatorPostJson(`/testplan/${tpId}/run`, payload, signal);
+        if(!data || typeof data !== 'object' || !('id' in data)){
+          throw new Error(`Тест-план ${tpId} запустился не как ожидалось. Ответ: ${JSON.stringify(data)}`);
+        }
+        return Object.assign({}, data, { reused: false });
+      }
+
+      async function runCreatorRunTestplanQuiet(tpId, launchName, tagIds, signal){
+        const existingLaunch = await runCreatorFindExistingLaunchByName(launchName, signal);
+        if(existingLaunch && existingLaunch.id){
           return Object.assign({}, existingLaunch, { reused: true });
         }
         const payload = { launchName, tags: tagIds.map((id) => ({ id })) };
@@ -4869,6 +4873,7 @@
         }
         if(startBtn) startBtn.disabled = locked || !hasMode;
         if(checkProxyBtn) checkProxyBtn.disabled = locked;
+        if(deployLabTokenInput) deployLabTokenInput.disabled = locked || !isMajor;
         if(runReleaseInput) runReleaseInput.disabled = locked || isMajor || !hasMode;
         if(runBuildInput) runBuildInput.disabled = locked || !isBuildMode || !hasMode;
         if(swatLeadViktor) swatLeadViktor.disabled = locked || !isNonMajor;
@@ -5324,7 +5329,8 @@
         { code: '3', title: 'Отправить опрос в тред', action: 'publishPollIos' },
         { code: '4', title: 'Напоминание @qadutyios', action: 'publishAtReminderIos' },
         { code: '5', title: 'Опубликовать компоненты', action: 'publishComponentsIos', hasTimer: true },
-        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsIos' }
+        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsIos' },
+        { code: '7', title: 'Создание рана готовности (оки)', action: 'createReadinessRunIos' }
       ];
       const PUSH_AND_STEPS = [
         { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishAndroid' },
@@ -5332,7 +5338,8 @@
         { code: '3', title: 'Отправить опрос в тред', action: 'publishPollAnd' },
         { code: '4', title: 'Напоминание @qadutyandr', action: 'publishAtReminderAnd' },
         { code: '5', title: 'Опубликовать компоненты', action: 'publishComponentsAnd', hasTimer: true },
-        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsAnd' }
+        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsAnd' },
+        { code: '7', title: 'Создание рана готовности (оки)', action: 'createReadinessRunAnd' }
       ];
 
       function getNextTuesdayMsk(){
@@ -5374,6 +5381,113 @@
           '',
           'Дежурные:'
         ].join('\n');
+      }
+
+      function buildRunCreatorLaunchUrl(launchId){
+        const base = RUN_CREATOR_BASE_URL.replace(/\/+$/, '');
+        return `${base}/launch/${launchId}`;
+      }
+
+      function buildMajorReadinessLaunchName(platform, release){
+        const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
+        return `[ALL][${platformLabel}] Готовность к релизу ${release}`;
+      }
+
+      function buildMajorReadinessReleaseTagName(release){
+        const digits = String(release || '').replace(/\D+/g, '');
+        const shortTag = digits.slice(0, 3);
+        if(shortTag.length < 3){
+          throw new Error('Не удалось собрать короткий тег релиза для рана готовности.');
+        }
+        return shortTag;
+      }
+
+      async function findMajorReadinessRun(platform, release, signal){
+        return runCreatorFindExistingLaunchByName(buildMajorReadinessLaunchName(platform, release), signal);
+      }
+
+      function replaceMajorReleaseLine(text, lineLabel, lineValue){
+        const source = String(text || '');
+        const label = String(lineLabel || '').trim();
+        const value = String(lineValue || '').trim();
+        if(!label) return source;
+        const pattern = new RegExp(`^(${escapeRegExp(label)})(?:[ \\t]*[^\\n]*)?$`, 'm');
+        if(pattern.test(source)){
+          return source.replace(pattern, value ? `$1 ${value}` : '$1');
+        }
+        if(!source.trim()) return value ? `${label} ${value}` : label;
+        return `${source.replace(/\s*$/, '')}\n${value ? `${label} ${value}` : label}`;
+      }
+
+      async function updateMajorReadinessRunInThread(platform, run){
+        const isIos = platform === 'ios';
+        const label = isIos ? 'iOS' : 'Android';
+        const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${label}.`);
+        if(!textarea) throw new Error('Не найдено поле текста сообщения.');
+
+        const runName = String((run && run.name) || buildMajorReadinessLaunchName(platform, release)).trim();
+        const runUrl = buildRunCreatorLaunchUrl(run && run.id);
+        const finalRunValue = `[${runName}](${runUrl})`;
+        textarea.value = replaceMajorReleaseLine(textarea.value, 'Финальный ран:', finalRunValue);
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+        const userIds = collectBandAuthorUserIds(cfg);
+        const rootPost = await findReleaseFeedRootPost(platform, release, cfg);
+        const rootId = String(rootPost.id || '').trim();
+        logMajorPush(`[${label}] Тред найден в ленте: ${rootId}`, 'ok');
+
+        const threadPosts = await bandFetchThreadPosts(rootId, cfg, null);
+        const mainPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
+        if(!mainPost) throw new Error('Основное сообщение в треде не найдено — сначала выполни шаг 1.');
+        logMajorPush(`[${label}] Найден пост для обновления: ${mainPost.id} (создан: ${new Date(mainPost.create_at).toLocaleTimeString('ru-RU')})`, 'ok');
+
+        const newText = normalizeBandMessageText(String(textarea.value || ''));
+        const existingText = normalizeBandMessageText(mainPost.message);
+        if(existingText === newText){
+          logMajorPush(`[${label}] Финальный ран уже актуален в треде.`, 'ok');
+          return 'unchanged';
+        }
+
+        await bandPatchPost(mainPost, newText, cfg, null);
+        logMajorPush(`[${label}] Финальный ран обновлён в треде (patch ${mainPost.id}).`, 'ok');
+        return 'updated';
+      }
+
+      async function createMajorReadinessRun(platform, signal){
+        const isIos = platform === 'ios';
+        const label = isIos ? 'iOS' : 'Android';
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${label}.`);
+
+        const launchName = buildMajorReadinessLaunchName(platform, release);
+        const releaseTagName = buildMajorReadinessReleaseTagName(release);
+        const platformTagId = isIos ? RUN_TAG_IOS : RUN_TAG_ANDROID;
+
+        logMajorPush(`[${label}] Синхронизирую тест-план ${RUN_TP_MAJOR_READINESS}...`);
+        await runCreatorSyncTestplan(RUN_TP_MAJOR_READINESS, signal);
+        await sleep(300);
+
+        logMajorPush(`[${label}] Подготавливаю теги: ${releaseTagName}, Регресс, ${label}...`);
+        const releaseTagId = await runCreatorCreateTag(releaseTagName, signal);
+        const run = await runCreatorRunTestplanQuiet(
+          RUN_TP_MAJOR_READINESS,
+          launchName,
+          [releaseTagId, RUN_TAG_REGRESSION, platformTagId],
+          signal
+        );
+        const runUrl = buildRunCreatorLaunchUrl(run.id);
+        if(run.reused){
+          logMajorPush(`[${label}] Найден существующий ран готовности: ${runUrl}`, 'ok');
+        }else{
+          logMajorPush(`[${label}] Ран готовности создан: ${runUrl}`, 'ok');
+        }
+        const threadStatus = await updateMajorReadinessRunInThread(platform, run);
+        return Object.assign({}, run, { threadStatus });
       }
 
       // Replaces the content between sectionHeader and nextSectionHeader with the given lines.
@@ -5854,6 +5968,7 @@
         const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
         const release = verInput ? String(verInput.value || '').trim() : '';
         const baselineStatuses = (isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS).map(() => 'pending');
+        let readinessRunExists = false;
 
         appState[seqKey] += 1;
         const syncSeq = appState[seqKey];
@@ -5864,6 +5979,13 @@
           if(!release){
             applyResolvedPushWorkflowState(platform, baselineStatuses);
             return;
+          }
+
+          try{
+            const readinessRun = await findMajorReadinessRun(platform, release, null);
+            readinessRunExists = !!(readinessRun && readinessRun.id);
+          }catch(error){
+            console.warn(`[Release workflow sync] ${label} readiness run check failed`, error);
           }
 
           const cfg = collectSettings();
@@ -5907,6 +6029,8 @@
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.startsWith('Компоненты:')) ? 'done' : 'pending',
             (hbLines.length && normalLines.length) ? 'done' : 'pending'
           ];
+          const earlierDone = statuses.every((status) => status === 'done');
+          statuses.push(earlierDone && readinessRunExists ? 'done' : 'pending');
 
           applyResolvedPushWorkflowState(platform, statuses);
           console.info(`[Release workflow sync] ${label}`, {
@@ -6179,6 +6303,18 @@
         if(action === 'fillRunsAnd'){
           await fillRunsInThreadText('android');
           showToast('Раны Allure Android вставлены');
+          return;
+        }
+        if(action === 'createReadinessRunIos'){
+          const run = await createMajorReadinessRun('ios', null);
+          const status = run && run.threadStatus === 'updated' ? 'тред обновлён' : 'тред актуален';
+          showToast(run && run.reused ? `Ран готовности iOS уже существует, ${status}` : `Ран готовности iOS создан, ${status}`);
+          return;
+        }
+        if(action === 'createReadinessRunAnd'){
+          const run = await createMajorReadinessRun('android', null);
+          const status = run && run.threadStatus === 'updated' ? 'тред обновлён' : 'тред актуален';
+          showToast(run && run.reused ? `Ран готовности Android уже существует, ${status}` : `Ран готовности Android создан, ${status}`);
           return;
         }
         if(action === 'publishComponentsIos'){
@@ -6669,7 +6805,6 @@
         if(ytTokenInput){
           ytTokenInput.value = getYtTokenFromStorage();
         }
-        const deployLabTokenInput = $('deployLabTokenInput');
         if(deployLabTokenInput){
           try{
             deployLabTokenInput.value = normalizeDeployLabToken(localStorage.getItem(LS_DEPLOY_LAB_TOKEN_KEY) || '');
