@@ -4240,8 +4240,7 @@
         const mainPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
         const mainText = normalizeBandMessageText(mainPost && mainPost.message);
         const dutyLines = getTextSectionLines(mainText, 'Дежурные:');
-        const hbLines = getTextSectionLines(mainText, 'Blocker + High', 'Normal');
-        const normalLines = getTextSectionLines(mainText, 'Normal', 'Дежурные:');
+        const runsData = getRunsSectionData(mainText);
         let score = 0;
 
         if(mainPost) score += 10;
@@ -4250,7 +4249,7 @@
         if(hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (_, post) => isBandPollPost(post))) score += 30;
         if(hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.includes(reminderNeedle))) score += 15;
         if(hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.startsWith('Компоненты:'))) score += 40;
-        if(hbLines.length && normalLines.length) score += 25;
+        if(runsData.blockerHigh.length || runsData.selective.length) score += 25;
 
         return score;
       }
@@ -5379,13 +5378,9 @@
           `Ответственный разработчик: ${devDuty}`,
           '',
           '',
-          'Ссылки на прогоны+ дежурные:',
-          'Blocker + High',
-          '',
-          '',
-          'Normal',
-          '',
-          '',
+          'Ссылки на прогоны:',
+          '| Стрим | HB | Selective |',
+          '| --- | --- | --- |',
           'Дежурные:'
         ].join('\n');
       }
@@ -5520,6 +5515,100 @@
         return text.slice(0, contentStart) + newContent + text.slice(endIdx);
       }
 
+      function escapeRunsTableCell(value){
+        return String(value || '').replace(/\|/g, '\\|').trim() || '—';
+      }
+
+      function buildRunsTableLinkCell(run){
+        if(!run || !run.url) return '—';
+        return `[Ран](${run.url})`;
+      }
+
+      function buildRunsTableLines(blockerHighRuns, selectiveRuns){
+        const hb = Array.isArray(blockerHighRuns) ? blockerHighRuns.filter(Boolean) : [];
+        const sel = Array.isArray(selectiveRuns) ? selectiveRuns.filter(Boolean) : [];
+        const groups = new Map();
+        const order = [];
+
+        const ensureGroup = (label) => {
+          const normalizedLabel = String(label || '').trim() || 'Ран';
+          if(!groups.has(normalizedLabel)){
+            groups.set(normalizedLabel, { blockerHigh: [], selective: [] });
+            order.push(normalizedLabel);
+          }
+          return groups.get(normalizedLabel);
+        };
+
+        hb.forEach((run) => {
+          const label = buildPublishedRunLabel(run && run.name);
+          ensureGroup(label).blockerHigh.push(run);
+        });
+        sel.forEach((run) => {
+          const label = buildPublishedRunLabel(run && run.name);
+          ensureGroup(label).selective.push(run);
+        });
+
+        const lines = [
+          '| Стрим | HB | Selective |',
+          '| --- | --- | --- |'
+        ];
+        for(const label of order){
+          const group = groups.get(label) || { blockerHigh: [], selective: [] };
+          const rowCount = Math.max(group.blockerHigh.length, group.selective.length, 1);
+          for(let idx = 0; idx < rowCount; idx += 1){
+            lines.push(`| ${escapeRunsTableCell(label)} | ${buildRunsTableLinkCell(group.blockerHigh[idx])} | ${buildRunsTableLinkCell(group.selective[idx])} |`);
+          }
+        }
+        return lines;
+      }
+
+      function normalizeRunsSectionHeader(text){
+        return String(text || '').replace(/^Ссылки на прогоны\+ дежурные:$/m, 'Ссылки на прогоны:');
+      }
+
+      function parseRunsTableLines(lines){
+        const blockerHigh = [];
+        const selective = [];
+        for(const rawLine of Array.isArray(lines) ? lines : []){
+          const line = String(rawLine || '').trim();
+          if(!line.startsWith('|')) continue;
+          const tripleMatch = line.match(/^\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|$/);
+          if(tripleMatch){
+            const stream = String(tripleMatch[1] || '').trim();
+            const hbCell = String(tripleMatch[2] || '').trim();
+            const selCell = String(tripleMatch[3] || '').trim();
+            if(/^стрим$/i.test(stream) && /^(?:hb|high\s*\+\s*blocker)$/i.test(hbCell) && /^selective$/i.test(selCell)) continue;
+            if(/^[-: ]+$/.test(stream) && /^[-: ]+$/.test(hbCell) && /^[-: ]+$/.test(selCell)) continue;
+            if(hbCell && hbCell !== '—') blockerHigh.push(hbCell);
+            if(selCell && selCell !== '—') selective.push(selCell);
+            continue;
+          }
+
+          const doubleMatch = line.match(/^\|\s*(.*?)\s*\|\s*(.*?)\s*\|$/);
+          if(!doubleMatch) continue;
+          const left = String(doubleMatch[1] || '').trim();
+          const right = String(doubleMatch[2] || '').trim();
+          if(/^high\s*\+\s*blocker$/i.test(left) && /^selective$/i.test(right)) continue;
+          if(/^[-: ]+$/.test(left) && /^[-: ]+$/.test(right)) continue;
+          if(left && left !== '—') blockerHigh.push(left);
+          if(right && right !== '—') selective.push(right);
+        }
+        return { blockerHigh, selective };
+      }
+
+      function getRunsSectionData(text){
+        const normalizedText = normalizeRunsSectionHeader(text);
+        const tableLines = getTextSectionLines(normalizedText, 'Ссылки на прогоны:', 'Дежурные:');
+        const parsedTable = parseRunsTableLines(tableLines);
+        if(parsedTable.blockerHigh.length || parsedTable.selective.length){
+          return parsedTable;
+        }
+        return {
+          blockerHigh: getTextSectionLines(text, 'Blocker + High', 'Normal'),
+          selective: getTextSectionLines(text, 'Normal', 'Дежурные:')
+        };
+      }
+
       function allureB64Query(filters){
         return btoa(unescape(encodeURIComponent(JSON.stringify(filters))));
       }
@@ -5592,21 +5681,15 @@
         const mainPost = findEarliestOwnThreadPost(threadPosts, rootId, userId);
         if(!mainPost) throw new Error('Основное сообщение в треде не найдено.');
 
-        const baseText = normalizeBandMessageText(mainPost.message);
-        const hbLines = blockerHigh.map((r) => `[${buildPublishedRunLabel(r.name)}](${r.url})`);
-        const selLines = selective.map((r) => `[${buildPublishedRunLabel(r.name)}](${r.url})`);
+        const baseText = normalizeRunsSectionHeader(normalizeBandMessageText(mainPost.message));
+        const runsTableLines = buildRunsTableLines(blockerHigh, selective);
+        const textWithRuns = fillTextSection(baseText, 'Ссылки на прогоны:', 'Дежурные:', runsTableLines);
 
-        const textWithHB = fillTextSection(baseText, 'Blocker + High', 'Normal', hbLines);
-        logMajorPush(`[${label}] Патч 1/2: Blocker+High (${hbLines.length} ранов, ${textWithHB.length} симв.)...`);
-        await bandPatchPost(mainPost, textWithHB, cfg, null);
-        logMajorPush(`[${label}] Патч 1 OK.`, 'ok');
-
-        const textWithSel = fillTextSection(textWithHB, 'Normal', 'Дежурные:', selLines);
-        logMajorPush(`[${label}] Патч 2/2: Normal/Selective (${selLines.length} ранов, ${textWithSel.length} симв.)...`);
-        await bandPatchPost(mainPost, textWithSel, cfg, null);
+        logMajorPush(`[${label}] Патч прогонов: High + Blocker (${blockerHigh.length}), Selective (${selective.length}), ${textWithRuns.length} симв....`);
+        await bandPatchPost(mainPost, textWithRuns, cfg, null);
         const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
-        if(textarea) textarea.value = textWithSel;
-        logMajorPush(`[${label}] Патч 2 OK — раны вставлены.`, 'ok');
+        if(textarea) textarea.value = textWithRuns;
+        logMajorPush(`[${label}] Таблица прогонов обновлена.`, 'ok');
       }
 
       async function ensureDutyCollectionForPushStep(platform){
@@ -6060,8 +6143,7 @@
             textarea.value = mainText;
           }
           const dutyLines = getTextSectionLines(mainText, 'Дежурные:');
-          const hbLines = getTextSectionLines(mainText, 'Blocker + High', 'Normal');
-          const normalLines = getTextSectionLines(mainText, 'Normal', 'Дежурные:');
+          const runsData = getRunsSectionData(mainText);
           const finalRunValue = getMajorReleaseLineValue(mainText, 'Финальный ран:');
           const readinessRunExists = !!(readinessRun && readinessRun.id);
           const hasFinalRun = hasExpectedMajorReadinessReference(finalRunValue, platform, release, readinessRun);
@@ -6073,7 +6155,7 @@
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (_, post) => isBandPollPost(post)) ? 'done' : 'pending',
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.includes(reminderNeedle)) ? 'done' : 'pending',
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.startsWith('Компоненты:')) ? 'done' : 'pending',
-            (hbLines.length || normalLines.length) ? 'done' : 'pending'
+            (runsData.blockerHigh.length || runsData.selective.length) ? 'done' : 'pending'
           ];
           statuses.push((readinessRunExists && hasFinalRun) ? 'done' : 'pending');
 
