@@ -5,42 +5,14 @@
   <title>Сбор ЧП v1.0.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./style.css" />
 
   <style>
-    :root{
-      --wb-bg:#faf5ff; --wb-bg-2:#f8f7ff;
-      --wb-primary:#9b5cff; --wb-secondary:#ff5ac8; --wb-deep:#7c3aed;
-      --green:#22c55e; --red:#f43f5e; --amber:#f59e0b;
-      --ring: 0 10px 30px rgba(155,92,255,.25);
-      --card: 0 12px 36px rgba(31,41,55,.08);
-      --r-xl:22px;
-    }
-    body{
-      background:
-        radial-gradient(1200px 600px at 0% -10%, rgba(155,92,255,.14), transparent 60%),
-        radial-gradient(900px 580px at 100% 0%, rgba(255,90,200,.10), transparent 55%),
-        var(--wb-bg);
-      color:#0f172a;
-      overflow-x:hidden;
-    }
-    .brand-badge{display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;border-radius:999px;background:linear-gradient(180deg,#fff,#f8f7ff);box-shadow:var(--card)}
-    .brand-dot{width:14px;height:14px;border-radius:999px;background:radial-gradient(55% 55% at 35% 35%, #fff 0%, #ffd6f2 30%, var(--wb-primary) 100%);box-shadow:0 0 0 6px rgba(155,92,255,.15), 0 8px 22px rgba(155,92,255,.45) inset}
-    .card{background:linear-gradient(180deg,#fff 0%, #fbfbff 100%);border-radius:var(--r-xl);box-shadow:var(--card);border:1px solid #eeeeff}
-    .input{width:100%;padding:.7rem .9rem;border-radius:14px;background:#fff;border:1px solid #ecebff;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 20px rgba(124,58,237,.06);transition:.15s}
-    .input:focus{outline:0;border-color:#d8d6ff;box-shadow:0 0 0 4px rgba(155,92,255,.12)}
-    .btn{border:none;border-radius:16px;padding:.65rem 1rem;font-weight:700;transition:.15s}
-    .btn-soft{background:#fff;border:1px solid #ede9fe;box-shadow:0 8px 22px rgba(124,58,237,.08);color:#6d28d9}
-    .btn-grad{background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));color:#fff;box-shadow:var(--ring)}
-    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-    .hint{font-size:.85rem;color:#7c7f8c}
-    .bar{height:8px;background:#eae6ff;border-radius:999px;overflow:hidden}
-    .bar>div{height:100%;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));width:0%}
+    .chp-collect #status.ok{color:var(--green)}
+    .chp-collect #status.err{color:var(--red)}
+    .chp-collect #status.warn{color:#f59e0b}
 
-    #status.ok{color:var(--green)}
-    #status.err{color:var(--red)}
-    #status.warn{color:var(--amber)}
-
-    .log{
+    .chp-collect .log{
       white-space:pre-wrap;
       background:#fff;
       border-radius:16px;
@@ -53,110 +25,302 @@
       font-size:12px;
       line-height:1.35;
     }
-    #logs .ok{color:var(--green)}
-    #logs .err{color:var(--red)}
-    #logs .warn{color:var(--amber)}
+    .chp-collect #logs .ok{color:var(--green)}
+    .chp-collect #logs .err{color:var(--red)}
+    .chp-collect #logs .warn{color:#f59e0b}
 
-    .platform-title{font-weight:800;color:#4c1d95;margin:10px 0 8px}
-    .table-wrap{overflow:auto;border:1px solid #ecebff;border-radius:18px;background:#fff}
-    .table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;table-layout:auto}
-    .table thead th{background:#f7f5ff;border-bottom:1px solid #ecebff;padding:.65rem .75rem;font-weight:800;color:#5b21b6;position:sticky;top:0;z-index:1;white-space:nowrap}
-    .table tbody td{border-bottom:1px dashed #eeeef8;padding:.55rem .7rem;vertical-align:top;white-space:nowrap}
-    .table tbody tr:hover td{background:#faf9ff}
-    .table td:first-child, .table th:first-child{position:sticky;left:0;background:inherit;z-index:2}
-    .qhdr{background:#f3f0ff !important;color:#4c1d95 !important;text-align:center}
-    .relhdr{text-align:center}
-    .subhdr{background:#fbfaff !important;color:#64748b !important;font-weight:600 !important}
-    .itogo-hdr{background:#f3f0ff !important}
-    .itogo{background:#fcfbff}
-    .num{text-align:right;font-variant-numeric:tabular-nums}
-
-    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.75rem 1rem;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s;z-index:50}
-    .toast.show{opacity:1;transform:translateY(0)}
+    .chp-collect .platform-title{font-weight:800;color:#4c1d95;margin:10px 0 8px}
+    .chp-collect .table-wrap{overflow:auto;border:1px solid #ecebff;border-radius:18px;background:#fff}
+    .chp-collect .table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;table-layout:auto}
+    .chp-collect .table thead th{background:#f7f5ff;border-bottom:1px solid #ecebff;padding:.65rem .75rem;font-weight:800;color:#5b21b6;position:sticky;top:0;z-index:1;white-space:nowrap}
+    .chp-collect .table tbody td{border-bottom:1px dashed #eeeef8;padding:.55rem .7rem;vertical-align:top;white-space:nowrap}
+    .chp-collect .table tbody tr:hover td{background:#faf9ff}
+    .chp-collect .table td:first-child,
+    .chp-collect .table th:first-child{position:sticky;left:0;background:inherit;z-index:2}
+    .chp-collect .qhdr{background:#f3f0ff !important;color:#4c1d95 !important;text-align:center}
+    .chp-collect .relhdr{text-align:center}
+    .chp-collect .subhdr{background:#fbfaff !important;color:#64748b !important;font-weight:600 !important}
+    .chp-collect .itogo-hdr{background:#f3f0ff !important}
+    .chp-collect .itogo{background:#fcfbff}
+    .chp-collect .num{text-align:right;font-variant-numeric:tabular-nums}
+    .chp-collect #totalsBox{
+      margin:0;
+      color:#fff;
+      background:#0f0f10;
+      border-radius:12px;
+      padding:12px;
+    }
+    .chp-collect .composition-panel{
+      border:1px solid #ecebff;
+      border-radius:18px;
+      background:linear-gradient(180deg,#fff 0%,#fbfbff 100%);
+      padding:16px;
+    }
+    .chp-collect .composition-panel[hidden]{
+      display:none !important;
+    }
+    .chp-collect .composition-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    .chp-collect .composition-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      border:1px solid #ecebff;
+      background:#f7f5ff;
+      color:#5b21b6;
+    }
+    .chp-collect .composition-badge--ok{
+      border-color:rgba(34,197,94,.28);
+      background:rgba(34,197,94,.10);
+      color:#15803d;
+    }
+    .chp-collect .composition-badge--warn{
+      border-color:rgba(245,158,11,.30);
+      background:rgba(245,158,11,.12);
+      color:#b45309;
+    }
+    .chp-collect .composition-badge--err{
+      border-color:rgba(244,63,94,.24);
+      background:rgba(244,63,94,.08);
+      color:#be123c;
+    }
+    .chp-collect .composition-summary{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+      gap:10px;
+      margin-bottom:14px;
+    }
+    .chp-collect .composition-kpi{
+      border:1px solid #ecebff;
+      border-radius:14px;
+      background:#fff;
+      padding:12px 14px;
+    }
+    .chp-collect .composition-kpi-label{
+      font-size:12px;
+      font-weight:700;
+      color:#64748b;
+      margin-bottom:4px;
+    }
+    .chp-collect .composition-kpi-value{
+      font-size:18px;
+      font-weight:800;
+      color:#111827;
+      line-height:1.2;
+    }
+    .chp-collect .composition-columns{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+      gap:12px;
+    }
+    .chp-collect .composition-card{
+      border:1px solid #ecebff;
+      border-radius:16px;
+      background:#fff;
+      padding:14px;
+    }
+    .chp-collect .composition-card--good{
+      border-color:rgba(34,197,94,.22);
+      background:linear-gradient(180deg,rgba(34,197,94,.08),rgba(255,255,255,1));
+    }
+    .chp-collect .composition-card--warn{
+      border-color:rgba(245,158,11,.24);
+      background:linear-gradient(180deg,rgba(245,158,11,.08),rgba(255,255,255,1));
+    }
+    .chp-collect .composition-card--bad{
+      border-color:rgba(244,63,94,.22);
+      background:linear-gradient(180deg,rgba(244,63,94,.07),rgba(255,255,255,1));
+    }
+    .chp-collect .composition-card--neutral{
+      background:linear-gradient(180deg,#f8fafc 0%,#fff 100%);
+    }
+    .chp-collect .composition-card-title{
+      font-size:14px;
+      font-weight:800;
+      color:#111827;
+      margin-bottom:8px;
+    }
+    .chp-collect .composition-empty{
+      font-size:13px;
+      color:#64748b;
+      line-height:1.5;
+    }
+    .chp-collect .composition-list{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin:0;
+      padding:0;
+      list-style:none;
+    }
+    .chp-collect .composition-item{
+      border:1px solid #ecebff;
+      border-radius:12px;
+      background:#fff;
+      padding:10px 12px;
+    }
+    .chp-collect .composition-item-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:6px;
+    }
+    .chp-collect .composition-key{
+      font-size:13px;
+      font-weight:800;
+      color:#111827;
+    }
+    .chp-collect .composition-meta{
+      font-size:12px;
+      color:#64748b;
+      line-height:1.5;
+    }
+    .chp-collect .composition-entry + .composition-entry{
+      margin-top:10px;
+      padding-top:10px;
+      border-top:1px dashed #e2e8f0;
+    }
+    .chp-collect .composition-item a{
+      color:#4c1d95;
+      font-weight:700;
+      text-decoration:none;
+    }
+    .chp-collect .composition-item a:hover{
+      text-decoration:underline;
+    }
+    .chp-collect .composition-inline-list{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:6px;
+    }
+    .chp-collect .composition-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:3px 8px;
+      border-radius:999px;
+      background:#f8fafc;
+      border:1px solid #e2e8f0;
+      font-size:12px;
+      color:#475569;
+    }
   </style>
 </head>
 
-<body>
-  <div class="max-w-none mx-auto p-6 space-y-6">
-    <div class="flex items-center gap-3">
-      <div class="brand-badge"><span class="brand-dot"></span><strong>WB</strong></div>
-      <div class="min-w-0">
-        <div class="flex items-baseline gap-2 flex-wrap">
-          <h1 class="text-2xl font-semibold">Сбор ЧП</h1>
-          <span class="text-xs text-slate-500">v1.0.3</span>
-        </div>
-      </div>
-    </div>
-
-    <section class="grid lg:grid-cols-3 gap-6 items-start">
-      <!-- Настройки -->
-      <div class="card p-5 space-y-4 lg:col-span-1">
-        <div class="flex items-center justify-between">
-          <h3 class="font-semibold">Настройки</h3>
-          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold text-white"
-                style="background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary))">
-            Черепики
-          </span>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <label class="block text-sm col-span-1">
-            Начальный релиз
-            <input id="startRel" class="input mt-1" placeholder="7.3.3000" value="7.3.3000">
-          </label>
-          <label class="block text-sm col-span-1">
-            Конечный релиз
-            <input id="endRel" class="input mt-1" placeholder="7.3.4000" value="7.3.4000">
-          </label>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="col-span-1">
-            <div class="text-sm leading-5 min-h-[40px] flex items-end">
-              DeployLab токен (без «Bearer»)
-            </div>
-            <input id="dlToken" type="password" class="input mt-1" placeholder="•••••••••">
-          </div>
-          <div class="col-span-1">
-            <div class="text-sm leading-5 min-h-[40px] flex items-end">
-              YouTrack токен (без «Bearer»)
-            </div>
-            <input id="ytToken" type="password" class="input mt-1" placeholder="•••••••••">
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button id="runBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
-          <button id="checkProxy" type="button" class="btn btn-soft whitespace-nowrap">Проверить прокси</button>
-        </div>
-
-        <div class="bar mt-3"><div id="progressBar"></div></div>
-        <div id="status" class="text-sm text-slate-500 mt-1">Готов.</div>
-
+<body class="min-h-screen chp-collect">
+  <div class="max-w-screen-2xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="brand-badge">
+        <span class="brand-dot"></span>
         <div>
-          <div class="text-xs font-semibold text-slate-500 mb-1">Логи</div>
-          <div id="logs" class="log"></div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="font-extrabold leading-tight">Сбор ЧП</div>
+            <span class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
+              <span>v1.0.3</span>
+            </span>
+          </div>
+          <div class="hint">Черепики</div>
         </div>
       </div>
+    </header>
 
-      <!-- Результаты -->
-      <div class="card p-5 space-y-4 lg:col-span-2">
-        <div class="flex items-center gap-3">
-          <h3 class="font-semibold">Итоги</h3>
-          <div class="ml-auto flex items-center gap-2">
+    <main class="mt-5 grid grid-cols-1 gap-4">
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Параметры запуска</h2>
+            <div class="hint">Заполни релизы, добавь токены и запусти сбор.</div>
+          </div>
+          <span class="chip">Черепики</span>
+        </div>
+
+        <form class="w-full" onsubmit="return false;">
+          <div class="border border-[#ecebff] rounded-2xl bg-white p-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Версия релиза</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input id="startRel" class="input" placeholder="От, напр. 7.3.3000" value="7.3.3000">
+                  <input id="endRel" class="input" placeholder="До, напр. 7.3.4000" value="7.3.4000">
+                </div>
+              </div>
+
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">DeployLab токен</label>
+                <input id="dlToken" type="password" class="input" autocomplete="off" placeholder="Без Bearer">
+              </div>
+
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">YouTrack токен</label>
+                <input id="ytToken" type="password" class="input" autocomplete="off" placeholder="Без Bearer">
+              </div>
+
+              <div class="md:col-span-6">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">GitLab token</label>
+                <input id="gitlabToken" type="password" class="input" autocomplete="off" placeholder="Только для проверки состава ЧП" />
+              </div>
+
+              <div class="md:col-span-3">
+                <button id="runBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
+              </div>
+
+              <div class="md:col-span-3">
+                <button id="checkProxy" type="button" class="btn btn-soft w-full">Проверить прокси</button>
+              </div>
+
+              <div class="md:col-span-6">
+                <div class="flex items-center justify-between gap-3 mb-1">
+                  <div class="text-xs font-semibold text-[#111827]">Прогресс</div>
+                  <div id="status" class="text-sm text-slate-500">Готов.</div>
+                </div>
+                <div class="bar"><div id="progressBar"></div></div>
+              </div>
+
+              <div class="md:col-span-12">
+                <div class="flex items-center justify-between gap-3 mb-1">
+                  <div class="text-xs font-semibold text-[#111827]">Логи</div>
+                  <div class="hint">Последние события по запросам и сборке</div>
+                </div>
+                <div id="logs" class="log"></div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Итоги</h2>
+            <div class="hint">Сводка по платформам и итоговая выгрузка по черепикам.</div>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="checkCompositionBtn" type="button" class="btn btn-soft text-xs px-3 py-2">Проверить состав ЧП</button>
             <button id="uploadDriveBtn" type="button" class="btn btn-soft text-xs px-3 py-2" disabled>Выгрузить в Google Disk</button>
-            <button id="openDriveBtn" type="button" class="btn btn-soft text-xs px-3 py-2" disabled>Открыть Google Disk</button>
+            <button id="openDriveBtn" type="button" class="btn btn-soft text-xs px-3 py-2">Открыть Google Disk</button>
           </div>
         </div>
 
-        <div class="border border-[#ecebff] rounded-2xl bg-white p-3">
-          <pre id="totalsBox" class="mono text-xs text-slate-700">—</pre>
+        <div class="border border-[#ecebff] rounded-2xl bg-white p-4">
+          <pre id="totalsBox" class="mono text-xs">—</pre>
         </div>
 
-        <div id="tableAndroid" class="space-y-2"></div>
-        <div id="tableIOS" class="space-y-2"></div>
-      </div>
-    </section>
+        <div id="compositionResult" class="composition-panel" hidden></div>
+      </section>
+    </main>
   </div>
 
   <div id="toastBox" class="toast" role="status" aria-live="polite"></div>
@@ -214,6 +378,7 @@ function saveToStorage(){
       endRel: $('endRel').value || '',
       dlToken: $('dlToken').value || '',
       ytToken: $('ytToken').value || '',
+      gitlabToken: $('gitlabToken').value || '',
       savedAt: Date.now()
     };
     localStorage.setItem(STORAGE_KEY_WRITE, JSON.stringify(data));
@@ -238,11 +403,12 @@ function loadFromStorage(){
     if(data.endRel) $('endRel').value = data.endRel;
     if(typeof data.dlToken === 'string') $('dlToken').value = data.dlToken;
     if(typeof data.ytToken === 'string') $('ytToken').value = data.ytToken;
+    if(typeof data.gitlabToken === 'string') $('gitlabToken').value = data.gitlabToken;
   }catch(_){}
 }
 
 loadFromStorage();
-['startRel','endRel','dlToken','ytToken'].forEach(id=>{
+['startRel','endRel','dlToken','ytToken','gitlabToken'].forEach(id=>{
   $(id).addEventListener('input', scheduleSave);
   $(id).addEventListener('change', saveToStorage);
 });
@@ -250,8 +416,179 @@ loadFromStorage();
 /* === Константы (захардкожены) === */
 const DL_BASE = 'https://deploy-lab-api.wb.ru';
 const YT_BASE = 'https://youtrack.wildberries.ru';
+const GITLAB_BASE_URL = 'https://gitlab.wildberries.ru';
 const PROXY_BASE = 'http://localhost:8787';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyeF_6k6bag74Np_GdHUS17xT7AJLIsDG2gP8JfP3iNtne4MlM1O9jQ__TOl3YYI6v/exec';
+const GOOGLE_DRIVE_URL = 'https://drive.google.com/drive/home';
+const GITLAB_MR_PAGE_SIZE = 100;
+const GITLAB_PROJECTS = [
+  { platform:'Android', fullPath:'mobile/androidnative/androidnative' },
+  { platform:'iOS', fullPath:'mobile/ios/marketplace' }
+];
+const ISSUE_KEY_PREFIX_MAP = {
+  'ANDR':'ANDR',
+  'IOS':'IOS'
+};
+const YT_RELEASE_FIELD_BY_PLATFORM = {
+  'Android':['{Версия релиза (ex. Sprint) Android}', 'Версия релиза Android', 'Версия релиза'],
+  'iOS':['{Версия релиза (ex. Sprint) iOS}', 'Версия релиза iOS', 'Версия релиза']
+};
+
+function escapeHtml(value){
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeGitlabToken(raw){
+  return String(raw || '')
+    .replace(/^PRIVATE-TOKEN\s*:\s*/i, '')
+    .trim();
+}
+
+function formatDateTime(value){
+  if(!value) return '—';
+  const d = new Date(value);
+  if(Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString('ru-RU');
+}
+
+function normalizePlatformLabel(raw){
+  const value = String(raw || '').trim().toLowerCase();
+  if(['android','andr'].includes(value)) return 'Android';
+  if(['ios'].includes(value)) return 'iOS';
+  return String(raw || '').trim();
+}
+
+function normalizeIssueKey(raw){
+  const m = String(raw || '').trim().match(/^([A-Za-z][A-Za-z0-9]*)-(\d+)$/);
+  if(!m) return '';
+  const prefix = String(m[1] || '').trim().toUpperCase();
+  const number = String(m[2] || '').trim();
+  const canonicalPrefix = ISSUE_KEY_PREFIX_MAP[prefix] || prefix;
+  if(!canonicalPrefix || !number) return '';
+  return `${canonicalPrefix}-${number}`;
+}
+
+function extractReleaseIssueKeysFromTitle(title){
+  const out = new Set();
+  const src = String(title || '');
+  const re = /\b((?:ANDR|IOS)-\d+)\b/ig;
+  let m;
+  while((m = re.exec(src))){
+    const normalized = normalizeIssueKey(m[1]);
+    if(normalized) out.add(normalized);
+  }
+  return Array.from(out);
+}
+
+function isReleaseTargetMR(mr){
+  return /^release\/\d+\.\d+\.\d+$/i.test(String(mr?.target_branch || '').trim());
+}
+
+function youTrackIssueUrl(key){
+  const normalized = normalizeIssueKey(key);
+  if(!normalized) return '';
+  return `${YT_BASE.replace(/\/+$/,'')}/issue/${encodeURIComponent(normalized)}/`;
+}
+
+function normalizeReleaseForCompare(raw){
+  const text = String(raw || '').trim();
+  if(!text) return '';
+  const match = text.match(/(\d+\.\d+\.\d{1,4})/);
+  if(!match) return '';
+  const parsed = parseRelease(match[1]);
+  if(!parsed) return '';
+  return `${parsed[0]}.${parsed[1]}.${String(parsed[2]).padStart(4,'0')}`;
+}
+
+function issueFieldName(field){
+  return String(field?.name || field?.projectCustomField?.field?.name || '').trim();
+}
+
+function extractFieldText(value){
+  if(typeof value === 'string') return value;
+  if(!value) return '';
+  if(Array.isArray(value)){
+    return value.map((item)=>extractFieldText(item)).filter(Boolean).join(' ');
+  }
+  if(typeof value.text === 'string') return value.text;
+  if(typeof value.markdownText === 'string') return value.markdownText;
+  if(typeof value.name === 'string') return value.name;
+  if(typeof value.localizedName === 'string') return value.localizedName;
+  if(typeof value.presentation === 'string') return value.presentation;
+  return '';
+}
+
+function pickFieldTexts(issue, targets){
+  const targetSet = new Set((Array.isArray(targets) ? targets : [targets]).map((it)=>String(it || '').trim()).filter(Boolean));
+  if(!targetSet.size) return [];
+  const out = [];
+  const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+  for(const field of fields){
+    if(!targetSet.has(issueFieldName(field))) continue;
+    const text = extractFieldText(field?.value).trim();
+    if(text) out.push(text);
+  }
+  return out;
+}
+
+function platformByIssueKey(key, fallback=''){
+  const normalized = normalizeIssueKey(key);
+  if(normalized.startsWith('ANDR-')) return 'Android';
+  if(normalized.startsWith('IOS-')) return 'iOS';
+  return fallback || '';
+}
+
+function readIssueReleaseVersions(issue, platform){
+  const fieldNames = YT_RELEASE_FIELD_BY_PLATFORM[platform] || [];
+  const targetSet = new Set(fieldNames.map((it)=>String(it || '').trim()).filter(Boolean));
+  const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+  const versions = [];
+
+  for(const field of fields){
+    if(!targetSet.has(issueFieldName(field))) continue;
+    const values = Array.isArray(field?.value) ? field.value : [field?.value];
+    for(const value of values){
+      const normalized = normalizeReleaseForCompare(value?.name);
+      if(normalized) versions.push(normalized);
+    }
+  }
+
+  return Array.from(new Set(versions));
+}
+
+async function enrichGitlabOnlyWithYtReasons(items, targetBranch){
+  if(!Array.isArray(items) || !items.length) return items;
+  if(!$('ytToken').value.trim()) return items;
+
+  const targetRelease = normalizeReleaseForCompare(String(targetBranch || '').replace(/^release\//i, ''));
+
+  const enriched = await withPool(items, 6, async (item)=>{
+    const firstEntry = item?.entries?.[0] || {};
+    const platform = platformByIssueKey(item?.key, firstEntry.platform);
+    const issue = await fetchIssueBrief(item?.key);
+    const hasIssueData = Boolean(issue?.idReadable || (Array.isArray(issue?.fields) && issue.fields.length));
+    const ytReleases = readIssueReleaseVersions(issue, platform);
+    let reason = '';
+
+    if(hasIssueData && !ytReleases.length){
+      reason = 'Не найдена версия релиза в задаче';
+    }else if(hasIssueData && targetRelease && !ytReleases.includes(targetRelease)){
+      reason = 'Версия релиза в YT не равна ветке в гите';
+    }
+
+    return {
+      ...item,
+      reason
+    };
+  });
+
+  return enriched.filter(Boolean);
+}
 
 /* Диапазон релизов */
 function parseRelease(s){
@@ -295,6 +632,11 @@ const toKey = (rel)=>{
   const p=String(rel).split('.');
   return p.length===3 ? displayRelease(rel) : String(rel);
 };
+const compareReleaseLabels = (a,b)=>{
+  const pa=String(a).split('.').map(Number);
+  const pb=String(b).split('.').map(Number);
+  return (pa[0]||0)-(pb[0]||0) || (pa[1]||0)-(pb[1]||0) || (pa[2]||0)-(pb[2]||0);
+};
 
 /* Proxy/HTTP */
 function proxify(url){
@@ -310,13 +652,14 @@ function shortenBody(text, max=2000){
 async function safeReadText(resp){
   try{ return await resp.text(); }catch{ return ''; }
 }
-function svcName({dl, yt}){
+function svcName({dl, yt, service}){
+  if(service) return service;
   if(dl) return 'deploy-lab';
   if(yt) return 'youtrack';
   return 'unknown';
 }
 
-async function httpJSON(url, {headers={}, method='GET', yt=false, dl=false}={}){
+async function httpJSON(url, {headers={}, method='GET', yt=false, dl=false, service=''}={}){
   const h=new Headers(headers||{});
   if(dl){
     const t = $('dlToken').value.trim();
@@ -333,11 +676,11 @@ async function httpJSON(url, {headers={}, method='GET', yt=false, dl=false}={}){
   const final = proxify(url);
   const r = await fetch(final, {method, headers:h});
 
-  const service = svcName({dl, yt});
+  const serviceName = svcName({dl, yt, service});
   if(r.ok){
-    logLine(`Запрос ${service} [${r.status} OK]`, 'ok');
+    logLine(`Запрос ${serviceName} [${r.status} OK]`, 'ok');
   }else{
-    logLine(`Запрос ${service} [${r.status} ${r.statusText}]`, 'err');
+    logLine(`Запрос ${serviceName} [${r.status} ${r.statusText}]`, 'err');
     const body = await safeReadText(r);
     if(body) logLine('Тело ответа: ' + shortenBody(body), 'err');
     throw new Error(`${r.status} ${r.statusText}`);
@@ -349,6 +692,95 @@ async function httpJSON(url, {headers={}, method='GET', yt=false, dl=false}={}){
   const tx = await safeReadText(r);
   try{ return JSON.parse(tx); }
   catch{ throw new Error(`HTML вместо JSON: ${shortenBody(tx, 200)}`); }
+}
+
+function gitlabHeaders(){
+  const token = normalizeGitlabToken($('gitlabToken').value);
+  if(!token) throw new Error('Пустой GitLab token');
+  return {
+    'PRIVATE-TOKEN': token,
+    'Accept': 'application/json'
+  };
+}
+
+function gitlabMergeRequestsURL(fullPath, targetBranch, page=1){
+  const base = GITLAB_BASE_URL.replace(/\/+$/,'');
+  const url = new URL(`${base}/api/v4/projects/${encodeURIComponent(fullPath)}/merge_requests`);
+  url.searchParams.set('state', 'merged');
+  url.searchParams.set('target_branch', targetBranch);
+  url.searchParams.set('scope', 'all');
+  url.searchParams.set('per_page', String(GITLAB_MR_PAGE_SIZE));
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('order_by', 'updated_at');
+  url.searchParams.set('sort', 'desc');
+  return url.toString();
+}
+
+function normalizeGitlabMR(project, mr){
+  const keys = extractReleaseIssueKeysFromTitle(mr?.title);
+  return {
+    platform: normalizePlatformLabel(project.platform),
+    fullPath: project.fullPath,
+    iid: Number(mr?.iid || 0) || null,
+    title: String(mr?.title || '').trim(),
+    sourceBranch: String(mr?.source_branch || '').trim(),
+    targetBranch: String(mr?.target_branch || '').trim(),
+    webUrl: String(mr?.web_url || '').trim(),
+    mergedAt: String(mr?.merged_at || mr?.updated_at || mr?.created_at || '').trim(),
+    mergedBy: String(mr?.merge_user?.name || mr?.merged_by?.name || mr?.author?.name || '').trim(),
+    keys
+  };
+}
+
+async function fetchGitlabMergedMRs(project, targetBranch){
+  const headers = gitlabHeaders();
+  const out = [];
+  for(let page=1; page<=20; page++){
+    const items = await httpJSON(gitlabMergeRequestsURL(project.fullPath, targetBranch, page), {
+      headers,
+      service:'gitlab'
+    });
+    const list = Array.isArray(items) ? items : [];
+    out.push(...list);
+    if(list.length < GITLAB_MR_PAGE_SIZE) break;
+  }
+  return out;
+}
+
+function addDeployKey(map, key, platform, release){
+  const norm = normalizeIssueKey(String(key || '').trim()) || String(key || '').trim().toUpperCase();
+  if(!norm) return;
+  if(!map.has(norm)){
+    map.set(norm, {
+      key:norm,
+      platforms:new Set(),
+      releases:new Set()
+    });
+  }
+  const entry = map.get(norm);
+  entry.platforms.add(normalizePlatformLabel(platform));
+  entry.releases.add(release);
+}
+
+function buildDeployCompositionCache(releases, androidIssueKeysByRelease={}, iosIssueKeysByRelease={}, onlyRelease=''){
+  const relKeys = onlyRelease ? [toKey(onlyRelease)] : releases.map(toKey);
+  const map = new Map();
+  for(const relKey of relKeys){
+    for(const key of (androidIssueKeysByRelease[relKey] || [])){
+      addDeployKey(map, key, 'Android', relKey);
+    }
+    for(const key of (iosIssueKeysByRelease[relKey] || [])){
+      addDeployKey(map, key, 'iOS', relKey);
+    }
+  }
+  return {
+    rangeKey: onlyRelease ? `last:${toKey(onlyRelease)}` : releases.join('|'),
+    relKeys,
+    map,
+    androidIssueKeysByRelease,
+    iosIssueKeysByRelease,
+    onlyRelease: onlyRelease ? toKey(onlyRelease) : ''
+  };
 }
 
 /* DeployLab */
@@ -389,7 +821,7 @@ async function fetchDeployIssueKeys(platform, rel){
     if(Array.isArray(list)){
       for (const it of list){
         if (it && it.merged_after_cutoff===true){
-          const k=String(it.key||'').trim();
+          const k = normalizeIssueKey(String(it.key || '').trim()) || String(it.key || '').trim().toUpperCase();
           if(k) keys.push(k.toUpperCase());
         }
       }
@@ -404,15 +836,26 @@ async function fetchDeployIssueKeys(platform, rel){
 /* YouTrack */
 function ytIssueURL(key){
   const base = YT_BASE.replace(/\/+$/,'');
-  const fields = ['idReadable','summary','tags(name)','fields(projectCustomField(field(name)),value(name,$type),$type)'].join(',');
+  const fields = ['idReadable','summary','tags(name)','fields(projectCustomField(field(name)),value(name,localizedName,text,markdownText,presentation,$type),$type)'].join(',');
   return `${base}/api/issues/${encodeURIComponent(key)}?fields=${encodeURIComponent(fields)}&$top=-1`;
 }
 async function fetchIssueBrief(key){
+  window.__chp_issueBriefCache = window.__chp_issueBriefCache || new Map();
+  const cacheKey = normalizeIssueKey(key) || String(key || '').trim();
+  if(window.__chp_issueBriefCache.has(cacheKey)){
+    return window.__chp_issueBriefCache.get(cacheKey);
+  }
   try{
-    return await httpJSON(ytIssueURL(key), {yt:true});
+    const issue = await httpJSON(ytIssueURL(key), {yt:true});
+    window.__chp_issueBriefCache.set(cacheKey, issue || {});
+    return issue || {};
   }catch(e){
-    if(/404/.test(e.message)) return {};
+    if(/404/.test(e.message)){
+      window.__chp_issueBriefCache.set(cacheKey, {});
+      return {};
+    }
     logLine(`[err] YT ${key}: ${e.message}`,'err');
+    window.__chp_issueBriefCache.set(cacheKey, {});
     return {};
   }
 }
@@ -486,7 +929,7 @@ async function withPool(items, limit, worker){
 async function computeReleaseCounts(platform, rel){
   const cutoff = await fetchReleaseCutoff(platform, rel);
   const keys = await fetchDeployIssueKeys(platform, rel);
-  if (!keys.length) return {row_counts:{}, total:0, cutoff};
+  if (!keys.length) return {row_counts:{}, total:0, cutoff, issue_keys:[]};
   const uniq=[...new Set(keys)];
   const rows={};
   const results = await withPool(uniq, 8, async (k)=>{
@@ -502,19 +945,21 @@ async function computeReleaseCounts(platform, rel){
     rows[rk]=(rows[rk]||0)+1;
   }
   const total = Object.values(rows).reduce((s,v)=>s+v,0);
-  return {row_counts:rows, total, cutoff};
+  return {row_counts:rows, total, cutoff, issue_keys:uniq};
 }
 
 async function buildCountsForPlatform(platform, releases){
   const counts={};
   const totalsByRelease={};
   const cutoffs={};
+  const issueKeysByRelease={};
   await Promise.all(releases.map(async rel=>{
     try{
       const res=await computeReleaseCounts(platform, rel);
       const key=toKey(rel);
       totalsByRelease[key]=Number(res.total||0);
       cutoffs[key]=res.cutoff||null;
+      issueKeysByRelease[key]=Array.isArray(res.issue_keys) ? res.issue_keys.slice() : [];
       for (const [rowKey,n] of Object.entries(res.row_counts||{})){
         counts[rowKey]=counts[rowKey]||{};
         counts[rowKey][key]=(counts[rowKey][key]||0)+Number(n||0);
@@ -523,7 +968,7 @@ async function buildCountsForPlatform(platform, releases){
       logLine(`[err] compute ${platform} ${rel}: ${e.message}`,'err');
     }
   }));
-  return {counts, totalsByRelease, cutoffs};
+  return {counts, totalsByRelease, cutoffs, issueKeysByRelease};
 }
 
 /* ====== План колонок и рендер таблиц (без изменений) ====== */
@@ -699,14 +1144,284 @@ function renderPlatformTable(targetId, title, releases, counts, cutoffs){
   target.innerHTML = html;
 }
 
+async function fetchDeployIssueKeysForRange(platform, releases){
+  const out = {};
+  await Promise.all(releases.map(async (rel)=>{
+    const relKey = toKey(rel);
+    out[relKey] = await fetchDeployIssueKeys(platform, rel);
+  }));
+  return out;
+}
+
+async function getDeployCompositionForRelease(release){
+  const relKey = toKey(release);
+  const rangeKey = `last:${relKey}`;
+  if(window.__chp_deployCompositionCache?.rangeKey === rangeKey){
+    return window.__chp_deployCompositionCache;
+  }
+  const [androidIssueKeysByRelease, iosIssueKeysByRelease] = await Promise.all([
+    fetchDeployIssueKeysForRange('Android', [release]),
+    fetchDeployIssueKeysForRange('iOS', [release])
+  ]);
+  const cache = buildDeployCompositionCache([release], androidIssueKeysByRelease, iosIssueKeysByRelease, release);
+  window.__chp_deployCompositionCache = cache;
+  return cache;
+}
+
+async function collectGitlabComposition(targetBranch){
+  const all = await Promise.all(GITLAB_PROJECTS.map(async (project)=>{
+    const items = await fetchGitlabMergedMRs(project, targetBranch);
+    return items
+      .filter(isReleaseTargetMR)
+      .map((mr)=>normalizeGitlabMR(project, mr));
+  }));
+
+  const entries = all.flat();
+  const keyMap = new Map();
+  const withoutKeys = [];
+
+  for(const entry of entries){
+    if(!entry.keys.length){
+      withoutKeys.push(entry);
+      continue;
+    }
+    for(const key of entry.keys){
+      if(!keyMap.has(key)){
+        keyMap.set(key, { key, entries:[] });
+      }
+      keyMap.get(key).entries.push(entry);
+    }
+  }
+
+  for(const group of keyMap.values()){
+    group.entries.sort((a,b)=> String(b.mergedAt).localeCompare(String(a.mergedAt)));
+  }
+
+  withoutKeys.sort((a,b)=> String(b.mergedAt).localeCompare(String(a.mergedAt)));
+
+  return {
+    keyMap,
+    entries,
+    withoutKeys
+  };
+}
+
+function compareComposition(deployComposition, gitlabComposition, targetBranch, lastRelease){
+  const deployMap = deployComposition.map || new Map();
+  const gitlabMap = gitlabComposition.keyMap || new Map();
+  const withoutKeys = gitlabComposition.withoutKeys || [];
+
+  const deployOnly = Array.from(deployMap.values())
+    .filter((item)=> !gitlabMap.has(item.key))
+    .sort((a,b)=> a.key.localeCompare(b.key));
+
+  const gitlabOnly = Array.from(gitlabMap.values())
+    .filter((item)=> !deployMap.has(item.key))
+    .filter((item)=>{
+      const latestEntry = Array.isArray(item.entries) ? item.entries[0] : null;
+      return !isRevertGitlabEntry(latestEntry);
+    })
+    .sort((a,b)=> a.key.localeCompare(b.key));
+
+  const matchedCount = Array.from(gitlabMap.keys()).filter((key)=> deployMap.has(key)).length;
+  const hasDiff = deployOnly.length > 0 || gitlabOnly.length > 0 || withoutKeys.length > 0;
+  const releaseLabel = lastRelease ? displayRelease(lastRelease) : '—';
+
+  return {
+    branch: targetBranch,
+    releaseLabel,
+    deployUniqueCount: deployMap.size,
+    gitlabUniqueCount: gitlabMap.size,
+    matchedCount,
+    deployOnly,
+    gitlabOnly,
+    withoutKeys,
+    hasDiff
+  };
+}
+
+function renderMrLink(entry){
+  const mrLabel = entry.iid ? `${entry.platform} !${entry.iid}` : `${entry.platform} MR`;
+  if(entry.webUrl){
+    return `<a href="${escapeHtml(entry.webUrl)}" target="_blank" rel="noreferrer">${escapeHtml(mrLabel)}</a>`;
+  }
+  return `<span>${escapeHtml(mrLabel)}</span>`;
+}
+
+function renderIssueLink(key){
+  const url = youTrackIssueUrl(key);
+  if(url){
+    return `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(key)}</a>`;
+  }
+  return `<span>${escapeHtml(key)}</span>`;
+}
+
+function isRevertGitlabEntry(entry){
+  const sourceBranch = String(entry?.sourceBranch || '').trim();
+  const title = String(entry?.title || '').trim();
+  return /revert/i.test(sourceBranch) || /^\s*revert\b/i.test(title);
+}
+
+function renderGitlabOnlyItems(items){
+  if(!items.length){
+    return '<div class="composition-empty">Дополнительных MR в релизной ветке вне DeployLab не найдено.</div>';
+  }
+  return `<ul class="composition-list">${
+    items.map((item)=>{
+      const entries = item.entries
+        .filter((entry)=> !isRevertGitlabEntry(entry))
+        .map((entry)=>`
+        <div class="composition-entry composition-meta">
+          МР: ${renderMrLink(entry)}<br/>
+          Задача: ${renderIssueLink(item.key)}
+        </div>
+      `).join('');
+      const reason = item.reason === 'Не найдена версия релиза в задаче' || item.reason === 'Версия релиза в YT не равна ветке в гите'
+        ? `<div class="composition-meta">Причина: ${escapeHtml(item.reason)}</div>`
+        : '';
+      return `
+        <li class="composition-item">
+          ${reason}
+          ${entries}
+        </li>`;
+    }).join('')
+  }</ul>`;
+}
+
+function renderDeployOnlyItems(items){
+  if(!items.length){
+    return '<div class="composition-empty">Все ключи из DeployLab нашлись среди merged MR в релизной ветке.</div>';
+  }
+  return `<ul class="composition-list">${
+    items.map((item)=>{
+      const releases = Array.from(item.releases || []).sort(compareReleaseLabels);
+      const platforms = Array.from(item.platforms || []).sort((a,b)=> a.localeCompare(b));
+      return `
+        <li class="composition-item">
+          <div class="composition-meta">
+            Задача: ${renderIssueLink(item.key)}<br/>
+            release: ${escapeHtml(releases.join(', ') || '—')}<br/>
+            platform: ${escapeHtml(platforms.join(', ') || '—')}
+          </div>
+        </li>`;
+    }).join('')
+  }</ul>`;
+}
+
+function renderWithoutKeysItems(items){
+  if(!items.length){
+    return '<div class="composition-empty">Все MR в релизной ветке удалось привязать к ANDR-/IOS-ключам из title.</div>';
+  }
+  return `<ul class="composition-list">${
+    items.map((entry)=>{
+      return `
+        <li class="composition-item">
+          <div class="composition-meta">
+            МР: ${renderMrLink(entry)}<br/>
+            ${entry.title ? `title: ${escapeHtml(entry.title)}` : 'title: —'}
+          </div>
+        </li>`;
+    }).join('')
+  }</ul>`;
+}
+
+function renderCompositionResult(model){
+  const box = $('compositionResult');
+  if(!box) return;
+  if(!model){
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+
+  box.hidden = false;
+
+  if(model.state === 'loading'){
+    box.innerHTML = `
+      <div class="composition-head">
+        <div>
+          <div class="text-sm font-semibold text-slate-900">Проверка состава ЧП</div>
+          <div class="hint">Собираю merged MR в ${escapeHtml(model.branch || 'release/*')} и сравниваю с DeployLab.</div>
+        </div>
+        <span class="composition-badge">в работе</span>
+      </div>
+      <div class="composition-empty">Запросы к GitLab и DeployLab выполняются. Результат появится здесь.</div>
+    `;
+    return;
+  }
+
+  if(model.state === 'error'){
+    box.innerHTML = `
+      <div class="composition-head">
+        <div>
+          <div class="text-sm font-semibold text-slate-900">Проверка состава ЧП</div>
+          <div class="hint">Не удалось собрать сравнение состава.</div>
+        </div>
+        <span class="composition-badge composition-badge--err">ошибка</span>
+      </div>
+      <div class="composition-card composition-card--bad">
+        <div class="composition-card-title">Что пошло не так</div>
+        <div class="composition-empty">${escapeHtml(model.message || 'Неизвестная ошибка')}</div>
+      </div>
+    `;
+    return;
+  }
+
+  const summaryBadgeClass = model.hasDiff ? 'composition-badge composition-badge--warn' : 'composition-badge composition-badge--ok';
+  const summaryBadgeText = model.hasDiff ? 'есть расхождения' : 'состав сходится';
+
+  box.innerHTML = `
+    <div class="composition-head">
+      <div>
+        <div class="text-sm font-semibold text-slate-900">Проверка состава ЧП</div>
+        <div class="hint">Сравнение merged MR в ветке <span class="mono">${escapeHtml(model.branch)}</span> с составом DeployLab только для релиза <span class="mono">${escapeHtml(model.releaseLabel)}</span>. Ключ задачи ищется только в title MR по шаблону <span class="mono">ANDR-12345</span> или <span class="mono">IOS-12345</span>.</div>
+      </div>
+      <span class="${summaryBadgeClass}">${summaryBadgeText}</span>
+    </div>
+
+    <div class="composition-summary">
+      <div class="composition-kpi">
+        <div class="composition-kpi-label">Ветка проверки</div>
+        <div class="composition-kpi-value mono">${escapeHtml(model.branch)}</div>
+      </div>
+      <div class="composition-kpi">
+        <div class="composition-kpi-label">Уникальных ключей в GitLab</div>
+        <div class="composition-kpi-value">${escapeHtml(model.gitlabUniqueCount)}</div>
+      </div>
+      <div class="composition-kpi">
+        <div class="composition-kpi-label">Уникальных ключей в DeployLab</div>
+        <div class="composition-kpi-value">${escapeHtml(model.deployUniqueCount)}</div>
+      </div>
+      <div class="composition-kpi">
+        <div class="composition-kpi-label">Совпало ключей</div>
+        <div class="composition-kpi-value">${escapeHtml(model.matchedCount)}</div>
+      </div>
+    </div>
+
+    <div class="composition-columns">
+      <section class="composition-card ${model.gitlabOnly.length ? 'composition-card--bad' : 'composition-card--good'}">
+        <div class="composition-card-title">Есть в GitLab, но нет в DeployLab</div>
+        ${renderGitlabOnlyItems(model.gitlabOnly)}
+      </section>
+
+      <section class="composition-card ${model.deployOnly.length ? 'composition-card--warn' : 'composition-card--good'}">
+        <div class="composition-card-title">Есть в DeployLab, но не найдены в GitLab MR релизной ветки</div>
+        ${renderDeployOnlyItems(model.deployOnly)}
+      </section>
+
+      <section class="composition-card composition-card--neutral">
+        <div class="composition-card-title">MR релизной ветки без ANDR-/IOS-ключа в title</div>
+        ${renderWithoutKeysItems(model.withoutKeys)}
+      </section>
+    </div>
+  `;
+}
+
 /* ====== Google Disk upload ====== */
 let __lastSheetUrl = null;
 
 function setDriveLink(url){
   __lastSheetUrl = url || null;
-  const btn = $('openDriveBtn');
-  if(!btn) return;
-  btn.disabled = !__lastSheetUrl;
 }
 
 async function uploadToGoogleDisk(){
@@ -760,11 +1475,74 @@ async function uploadToGoogleDisk(){
   }
 }
 
+async function checkCompositionAgainstGitlab(){
+  const btn = $('checkCompositionBtn');
+  const prevText = btn.textContent;
+
+  try{
+    saveToStorage();
+
+    const start = $('startRel').value.trim();
+    const end = $('endRel').value.trim();
+    const releases = expandReleaseRange(start, end);
+    const lastRelease = releases[releases.length - 1];
+    const targetBranch = `release/${lastRelease}`;
+
+    if(!$('dlToken').value.trim()){
+      throw new Error('Для проверки состава ЧП заполните DeployLab токен');
+    }
+    if(!normalizeGitlabToken($('gitlabToken').value)){
+      throw new Error('Для проверки состава ЧП заполните GitLab token');
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Проверяю состав…';
+    setStatus('Проверяю состав ЧП…');
+    setProgress(15);
+    renderCompositionResult({ state:'loading', branch:targetBranch });
+
+    const [deployComposition, gitlabComposition] = await Promise.all([
+      getDeployCompositionForRelease(lastRelease),
+      collectGitlabComposition(targetBranch)
+    ]);
+
+    setProgress(85);
+
+    const result = compareComposition(deployComposition, gitlabComposition, targetBranch, lastRelease);
+    if(result.gitlabOnly.length){
+      result.gitlabOnly = await enrichGitlabOnlyWithYtReasons(result.gitlabOnly, targetBranch);
+    }
+    renderCompositionResult(result);
+
+    if(result.hasDiff){
+      setStatus('Есть расхождения состава', 'warn');
+      logLine(`Проверка состава: GitLab-only ${result.gitlabOnly.length}, Deploy-only ${result.deployOnly.length}, без ключа ${result.withoutKeys.length}`, 'warn');
+      showToast('Есть расхождения состава');
+    }else{
+      setStatus('Состав ЧП совпадает', 'ok');
+      logLine(`Проверка состава: совпало ${result.matchedCount} ключей`, 'ok');
+      showToast('Состав ЧП совпадает');
+    }
+
+    setProgress(100);
+  }catch(e){
+    renderCompositionResult({ state:'error', message:e.message || String(e) });
+    setStatus('Ошибка проверки состава', 'err');
+    logLine(`Проверка состава ERR: ${e.message || e}`, 'err');
+    showToast('Ошибка проверки состава');
+  }finally{
+    btn.textContent = prevText;
+    btn.disabled = false;
+  }
+}
+
 /* ====== Events ====== */
 $('uploadDriveBtn').addEventListener('click', uploadToGoogleDisk);
 
+$('checkCompositionBtn').addEventListener('click', checkCompositionAgainstGitlab);
+
 $('openDriveBtn').addEventListener('click', ()=>{
-  if(__lastSheetUrl) window.open(__lastSheetUrl, '_blank');
+  window.open(__lastSheetUrl || GOOGLE_DRIVE_URL, '_blank');
 });
 
 $('checkProxy').addEventListener('click', async ()=>{
@@ -796,6 +1574,7 @@ $('runBtn').addEventListener('click', async ()=>{
   try{
     saveToStorage();
     setDriveLink(null);
+    renderCompositionResult(null);
 
     setProgress(8);
     runBtn.disabled = true;
@@ -852,19 +1631,20 @@ $('runBtn').addEventListener('click', async ()=>{
       lines.push( r.map((v,i)=>padCell(v,i)).join(' | ') );
     }
     $('totalsBox').textContent = lines.join('\n');
-
     const relKeys = releases.map(toKey);
-    renderPlatformTable('tableAndroid', 'Android', relKeys, A.counts, A.cutoffs);
-    renderPlatformTable('tableIOS', 'iOS', relKeys, I.counts, I.cutoffs);
+    const lastRelease = releases[releases.length - 1];
+    window.__chp_deployCompositionCache = buildDeployCompositionCache(releases, A.issueKeysByRelease, I.issueKeysByRelease, lastRelease);
 
     window.__chp_drive_payload = {
       releases: relKeys,
       and_counts: A.counts,
       and_totals: A.totalsByRelease,
       and_cutoffs: A.cutoffs,
+      and_issue_keys: A.issueKeysByRelease,
       ios_counts: I.counts,
       ios_totals: I.totalsByRelease,
-      ios_cutoffs: I.cutoffs
+      ios_cutoffs: I.cutoffs,
+      ios_issue_keys: I.issueKeysByRelease
     };
     uploadDriveBtn.disabled = false;
 

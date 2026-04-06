@@ -44,7 +44,11 @@
 .ml-drive-model-status--checking{border-color:#ecebff;background:#fff;color:#4c1d95}
 .ml-drive-model-status--checking:hover{background:#f7f5ff}
 .btn-grad{color:#fff;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));box-shadow:var(--ring)}
-.btn-grad:hover{filter:saturate(1.05);transform:translateY(-1px)}
+.btn-grad:hover{
+  background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+  filter:saturate(1.05);
+  transform:translateY(-1px);
+}
 .btn-grad,
 .btn-grad:hover,
 .btn-grad:focus{
@@ -515,7 +519,11 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
     .btn-ghost{background:transparent;border-color:#ecebff;color:#4c1d95}
     .btn-ghost:hover{background:#f7f5ff}
     .btn-grad{color:#fff;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));box-shadow:var(--ring)}
-    .btn-grad:hover{filter:saturate(1.05);transform:translateY(-1px)}
+    .btn-grad:hover{
+      background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+      filter:saturate(1.05);
+      transform:translateY(-1px);
+    }
     .btn-circle{width:34px;height:34px;padding:0;border-radius:999px;background:#f7f5ff;border:1px solid #ecebff;color:#4c1d95}
     .btn-circle:hover{background:#f3efff}
     .tabs{display:inline-flex;border:1px solid #ecebff;background:#faf9ff;border-radius:999px;overflow:hidden}
