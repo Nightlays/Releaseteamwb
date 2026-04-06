@@ -155,7 +155,9 @@ function doPost(e) {
     const sheet = getOrCreateSheet_(spreadsheet, sheetName);
 
     sheet.clear();
-    sheet.getRange(1, 1, rowCount, columnCount).setValues(matrix);
+    const targetRange = sheet.getRange(1, 1, rowCount, columnCount);
+    targetRange.setNumberFormat('@');
+    targetRange.setValues(matrix);
     formatSheet_(sheet, rowCount, columnCount);
 
     return jsonOut_({
