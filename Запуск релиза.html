@@ -72,7 +72,7 @@
               <input id="ytTokenInput" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="Вставьте токен" />
             </label>
 
-            <label class="release-launch-field release-launch-run-release-field">
+            <label id="deployLabTokenField" class="release-launch-field release-launch-run-release-field" style="display:none;">
               <span class="release-launch-label">Deploy Lab token (authorization-deploy-lab)</span>
               <input id="deployLabTokenInput" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="Вставьте токен" />
             </label>
@@ -145,8 +145,6 @@
         <section class="card p-3 space-y-3">
           <div class="release-launch-mode-tabs release-launch-major-view-tabs" role="group" aria-label="Раздел мажорного релиза">
             <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="collection" aria-pressed="false">Сбор дежурных</button>
-            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="message" aria-pressed="false">Сообщение</button>
-            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="push" aria-pressed="false">Пуш</button>
             <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="release" aria-pressed="false">Релиз</button>
           </div>
           <div id="majorReleaseEmptyState" class="release-launch-status release-launch-status-muted">Выбери раздел мажорного релиза</div>
@@ -237,20 +235,6 @@
           <section class="card p-5 space-y-3">
             <h2 class="text-lg font-semibold">Логи</h2>
             <div id="logs" class="release-launch-log"></div>
-          </section>
-        </div>
-
-        <div id="majorMessageSection" class="space-y-4" style="display:none;">
-          <section class="card p-5 space-y-3">
-            <h2 class="text-lg font-semibold">Сообщение</h2>
-            <div class="release-launch-status release-launch-status-muted">Пока пусто</div>
-          </section>
-        </div>
-
-        <div id="majorPushSection" class="space-y-4" style="display:none;">
-          <section class="card p-5 space-y-3">
-            <h2 class="text-lg font-semibold">Пуш</h2>
-            <div class="release-launch-status release-launch-status-muted">Пока пусто</div>
           </section>
         </div>
 
@@ -412,7 +396,7 @@
       const BAND_CHANNEL_ID_FIXED = '6sqki85urpbfbqdkcdfen33owh';
       const NAPI_HOSTS_CHANNEL_ID = 'y14x9xytq7y7uduux8worartmh';
       const SWAT_TEAM_ONLY_CHANNEL_ID = 'nq1amqo347gy9d46oe14zgs44w';
-      const RELEASE_FEED_CHANNEL_ID = 'tdj9ns46eprx8n5neupw8ejw9c';
+      const RELEASE_FEED_CHANNEL_ID = 'xofy3mzmijbxxmongme4pke4bc';
       const RELEASE_FEED_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
       const RELEASE_ANDROID_BOT_USERNAME = 'release-android-bot';
       const RELEASE_ANDROID_BOT_REPLY_DELAY_MS = 10000;
@@ -438,8 +422,10 @@
       const RUN_CREATOR_BASE_URL = 'https://allure-testops.wb.ru';
       const RUN_TAG_ANDROID = 4115;
       const RUN_TAG_IOS = 1711;
+      const RUN_TAG_REGRESSION = 278;
       const RUN_TP_CP_ANDROID = 1998;
       const RUN_TP_CP_IOS = 3258;
+      const RUN_TP_MAJOR_READINESS = 3918;
       const RUN_TP_NAPI_BASE = 1036;
       const RUN_TP_NAPI_IOS = 1869;
       const RUN_TP_NAPI_ANDROID = 1871;
@@ -509,8 +495,6 @@
       const majorReleaseLayout = $('majorReleaseLayout');
       const majorReleaseEmptyState = $('majorReleaseEmptyState');
       const majorCollectionSection = $('majorCollectionSection');
-      const majorMessageSection = $('majorMessageSection');
-      const majorPushSection = $('majorPushSection');
       const majorReleaseSection = $('majorReleaseSection');
       const majorViewButtons = Array.from(document.querySelectorAll('.release-launch-major-view-tab[data-major-view]'));
       const runCreateLayout = $('runCreateLayout');
@@ -518,6 +502,7 @@
       const runPublishControls = $('runPublishControls');
       const runModeSelect = $('runModeSelect');
       const runModeButtons = Array.from(document.querySelectorAll('.release-launch-mode-tab[data-run-mode]'));
+      const deployLabTokenField = $('deployLabTokenField');
       const runReleaseInput = $('runReleaseInput');
       const runBuildField = $('runBuildField');
       const runBuildInput = $('runBuildInput');
@@ -550,6 +535,7 @@
       const automationScheduleBtn = $('automationScheduleBtn');
       const automationCancelBtn = $('automationCancelBtn');
       const ytTokenInput = $('ytTokenInput');
+      const deployLabTokenInput = $('deployLabTokenInput');
 
       const resultsEmpty = $('resultsEmpty');
       const resultsWrap = $('resultsWrap');
@@ -856,6 +842,12 @@
         return `${major}.${minor}.${buildNorm}`;
       }
 
+      function normalizeMajorView(view){
+        const value = String(view || '').trim().toLowerCase();
+        if(value === 'message' || value === 'push') return 'collection';
+        return ['collection', 'release'].includes(value) ? value : '';
+      }
+
       function getMajorPingText(){
         return String(appState.majorPingText || '').trim();
       }
@@ -891,7 +883,7 @@
 
       function syncMajorViewState(){
         const isMajor = appState.currentMode === RUN_MODE_MAJOR;
-        const majorView = isMajor ? String(appState.majorView || '') : '';
+        const majorView = isMajor ? normalizeMajorView(appState.majorView) : '';
 
         for(const btn of majorViewButtons){
           const view = String(btn.getAttribute('data-major-view') || '');
@@ -902,8 +894,6 @@
 
         if(majorReleaseEmptyState) majorReleaseEmptyState.style.display = isMajor && !majorView ? '' : 'none';
         if(majorCollectionSection) majorCollectionSection.style.display = isMajor && majorView === 'collection' ? '' : 'none';
-        if(majorMessageSection) majorMessageSection.style.display = isMajor && majorView === 'message' ? '' : 'none';
-        if(majorPushSection) majorPushSection.style.display = isMajor && majorView === 'push' ? '' : 'none';
         if(majorReleaseSection) majorReleaseSection.style.display = isMajor && majorView === 'release' ? '' : 'none';
       }
 
@@ -915,7 +905,7 @@
       }
 
       function setMajorView(view){
-        const value = ['collection', 'message', 'push', 'release'].includes(view) ? view : '';
+        const value = normalizeMajorView(view);
         const prevView = appState.majorView;
         appState.majorView = value;
         saveUiState();
@@ -946,6 +936,7 @@
         syncRunModeTabs();
         if(runExtraControls) runExtraControls.style.display = isNonMajor ? '' : 'none';
         if(runBuildField) runBuildField.style.display = isBuildMode ? '' : 'none';
+        if(deployLabTokenField) deployLabTokenField.style.display = isMajor ? '' : 'none';
         if(runPublishControls) runPublishControls.style.display = isNonMajor ? '' : 'none';
         if(majorReleaseLayout) majorReleaseLayout.style.display = isMajor ? '' : 'none';
         if(runCreateLayout) runCreateLayout.style.display = isNonMajor ? '' : 'none';
@@ -1153,6 +1144,19 @@
         const existingLaunch = await runCreatorFindExistingLaunchByName(launchName, signal);
         if(existingLaunch && existingLaunch.id){
           runCreatorInfo(`Найден существующий ран, переиспользую: id=${existingLaunch.id}`, { kind: 'ok' });
+          return Object.assign({}, existingLaunch, { reused: true });
+        }
+        const payload = { launchName, tags: tagIds.map((id) => ({ id })) };
+        const data = await runCreatorPostJson(`/testplan/${tpId}/run`, payload, signal);
+        if(!data || typeof data !== 'object' || !('id' in data)){
+          throw new Error(`Тест-план ${tpId} запустился не как ожидалось. Ответ: ${JSON.stringify(data)}`);
+        }
+        return Object.assign({}, data, { reused: false });
+      }
+
+      async function runCreatorRunTestplanQuiet(tpId, launchName, tagIds, signal){
+        const existingLaunch = await runCreatorFindExistingLaunchByName(launchName, signal);
+        if(existingLaunch && existingLaunch.id){
           return Object.assign({}, existingLaunch, { reused: true });
         }
         const payload = { launchName, tags: tagIds.map((id) => ({ id })) };
@@ -2580,6 +2584,9 @@
           const el = $(key);
           cfg[key] = el ? String(el.value || '') : '';
         }
+        if(!String(cfg.bandCookiesRead || '').trim() && String(cfg.bandCookiesAdmin || '').trim()){
+          cfg.bandCookiesRead = String(cfg.bandCookiesAdmin || '');
+        }
         cfg.bandChannelId = BAND_CHANNEL_ID_FIXED;
         return cfg;
       }
@@ -2606,6 +2613,9 @@
         }
         if(!String(saved.bandCookiesRead || '').trim() && String(saved.bandCookiesPost || '').trim()){
           saved.bandCookiesRead = String(saved.bandCookiesPost || '');
+        }
+        if(!String(saved.bandCookiesRead || '').trim() && String(saved.bandCookiesAdmin || '').trim()){
+          saved.bandCookiesRead = String(saved.bandCookiesAdmin || '');
         }
         saved.bandChannelId = BAND_CHANNEL_ID_FIXED;
         delete saved.bandCookiesPost;
@@ -4230,8 +4240,7 @@
         const mainPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
         const mainText = normalizeBandMessageText(mainPost && mainPost.message);
         const dutyLines = getTextSectionLines(mainText, 'Дежурные:');
-        const hbLines = getTextSectionLines(mainText, 'Blocker + High', 'Normal');
-        const normalLines = getTextSectionLines(mainText, 'Normal', 'Дежурные:');
+        const runsData = getRunsSectionData(mainText);
         let score = 0;
 
         if(mainPost) score += 10;
@@ -4240,7 +4249,7 @@
         if(hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (_, post) => isBandPollPost(post))) score += 30;
         if(hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.includes(reminderNeedle))) score += 15;
         if(hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.startsWith('Компоненты:'))) score += 40;
-        if(hbLines.length && normalLines.length) score += 25;
+        if(runsData.blockerHigh.length || runsData.selective.length) score += 25;
 
         return score;
       }
@@ -4869,6 +4878,7 @@
         }
         if(startBtn) startBtn.disabled = locked || !hasMode;
         if(checkProxyBtn) checkProxyBtn.disabled = locked;
+        if(deployLabTokenInput) deployLabTokenInput.disabled = locked || !isMajor;
         if(runReleaseInput) runReleaseInput.disabled = locked || isMajor || !hasMode;
         if(runBuildInput) runBuildInput.disabled = locked || !isBuildMode || !hasMode;
         if(swatLeadViktor) swatLeadViktor.disabled = locked || !isNonMajor;
@@ -5324,7 +5334,8 @@
         { code: '3', title: 'Отправить опрос в тред', action: 'publishPollIos' },
         { code: '4', title: 'Напоминание @qadutyios', action: 'publishAtReminderIos' },
         { code: '5', title: 'Опубликовать компоненты', action: 'publishComponentsIos', hasTimer: true },
-        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsIos' }
+        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsIos' },
+        { code: '7', title: 'Создание рана готовности (оки)', action: 'createReadinessRunIos' }
       ];
       const PUSH_AND_STEPS = [
         { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishAndroid' },
@@ -5332,7 +5343,8 @@
         { code: '3', title: 'Отправить опрос в тред', action: 'publishPollAnd' },
         { code: '4', title: 'Напоминание @qadutyandr', action: 'publishAtReminderAnd' },
         { code: '5', title: 'Опубликовать компоненты', action: 'publishComponentsAnd', hasTimer: true },
-        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsAnd' }
+        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsAnd' },
+        { code: '7', title: 'Создание рана готовности (оки)', action: 'createReadinessRunAnd' }
       ];
 
       function getNextTuesdayMsk(){
@@ -5357,7 +5369,8 @@
           `Сроки выкатки: ${nextTue}`,
           `Ориентировочное время старта регресса: ${today}`,
           `Ожидаемое время окончания проверки: ${nextTue}`,
-          'Время старта регресс: Таблица для стримов: https://docs.google.com/spreadsheets/d/1W7fNhN5BD-ItG03za-U2-uPotvDfiZbt_baiyZXgLpI/edit?gid=557393962#gid=557393962',
+          'Время старта регресс:',
+          'Таблица для стримов: https://docs.google.com/spreadsheets/d/1W7fNhN5BD-ItG03za-U2-uPotvDfiZbt_baiyZXgLpI/edit?gid=557393962#gid=557393962',
           'Сборка: ',
           '',
           'Финальный ран: ',
@@ -5365,15 +5378,127 @@
           `Ответственный разработчик: ${devDuty}`,
           '',
           '',
-          'Ссылки на прогоны+ дежурные:',
-          'Blocker + High',
-          '',
-          '',
-          'Normal',
-          '',
-          '',
+          'Ссылки на прогоны:',
+          '| Стрим | HB | Selective |',
+          '| --- | --- | --- |',
           'Дежурные:'
         ].join('\n');
+      }
+
+      function buildRunCreatorLaunchUrl(launchId){
+        const base = RUN_CREATOR_BASE_URL.replace(/\/+$/, '');
+        return `${base}/launch/${launchId}`;
+      }
+
+      function buildMajorReadinessLaunchName(platform, release){
+        const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
+        return `[ALL][${platformLabel}] Готовность к релизу ${release}`;
+      }
+
+      function buildPublishedRunLabel(runName){
+        const name = String(runName || '').trim();
+        if(!name) return 'Ран';
+        if(/^\[AQA\]/i.test(name)) return 'AQA (Общие автотесты)';
+        const match = name.match(/\[Stream\s+([^\]]+)\]/i);
+        if(match && match[1]) return String(match[1] || '').trim();
+        return name;
+      }
+
+      function buildMajorReadinessReleaseTagName(release){
+        const digits = String(release || '').replace(/\D+/g, '');
+        const shortTag = digits.slice(0, 3);
+        if(shortTag.length < 3){
+          throw new Error('Не удалось собрать короткий тег релиза для рана готовности.');
+        }
+        return shortTag;
+      }
+
+      async function findMajorReadinessRun(platform, release, signal){
+        return runCreatorFindExistingLaunchByName(buildMajorReadinessLaunchName(platform, release), signal);
+      }
+
+      function replaceMajorReleaseLine(text, lineLabel, lineValue){
+        const source = String(text || '');
+        const label = String(lineLabel || '').trim();
+        const value = String(lineValue || '').trim();
+        if(!label) return source;
+        const pattern = new RegExp(`^(${escapeRegExp(label)})(?:[ \\t]*[^\\n]*)?$`, 'm');
+        if(pattern.test(source)){
+          return source.replace(pattern, value ? `$1 ${value}` : '$1');
+        }
+        if(!source.trim()) return value ? `${label} ${value}` : label;
+        return `${source.replace(/\s*$/, '')}\n${value ? `${label} ${value}` : label}`;
+      }
+
+      async function updateMajorReadinessRunInThread(platform, run){
+        const isIos = platform === 'ios';
+        const label = isIos ? 'iOS' : 'Android';
+        const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${label}.`);
+        if(!textarea) throw new Error('Не найдено поле текста сообщения.');
+
+        const runName = String((run && run.name) || buildMajorReadinessLaunchName(platform, release)).trim();
+        const runUrl = buildRunCreatorLaunchUrl(run && run.id);
+        const finalRunValue = `[${buildPublishedRunLabel(runName)}](${runUrl})`;
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+        const userIds = collectBandAuthorUserIds(cfg);
+        const rootPost = await findReleaseFeedRootPost(platform, release, cfg);
+        const rootId = String(rootPost.id || '').trim();
+        logMajorPush(`[${label}] Тред найден в ленте: ${rootId}`, 'ok');
+
+        const threadPosts = await bandFetchThreadPosts(rootId, cfg, null);
+        const mainPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
+        if(!mainPost) throw new Error('Основное сообщение в треде не найдено — сначала выполни шаг 1.');
+        logMajorPush(`[${label}] Найден пост для обновления: ${mainPost.id} (создан: ${new Date(mainPost.create_at).toLocaleTimeString('ru-RU')})`, 'ok');
+
+        const existingText = normalizeBandMessageText(mainPost.message);
+        const newText = replaceMajorReleaseLine(existingText, 'Финальный ран:', finalRunValue);
+        textarea.value = newText;
+        if(existingText === newText){
+          logMajorPush(`[${label}] Финальный ран уже актуален в треде.`, 'ok');
+          return 'unchanged';
+        }
+
+        await bandPatchPost(mainPost, newText, cfg, null);
+        logMajorPush(`[${label}] Финальный ран обновлён в треде (patch ${mainPost.id}).`, 'ok');
+        return 'updated';
+      }
+
+      async function createMajorReadinessRun(platform, signal){
+        const isIos = platform === 'ios';
+        const label = isIos ? 'iOS' : 'Android';
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${label}.`);
+
+        const launchName = buildMajorReadinessLaunchName(platform, release);
+        const releaseTagName = buildMajorReadinessReleaseTagName(release);
+        const platformTagId = isIos ? RUN_TAG_IOS : RUN_TAG_ANDROID;
+
+        logMajorPush(`[${label}] Синхронизирую тест-план ${RUN_TP_MAJOR_READINESS}...`);
+        await runCreatorSyncTestplan(RUN_TP_MAJOR_READINESS, signal);
+        await sleep(300);
+
+        logMajorPush(`[${label}] Подготавливаю теги: ${releaseTagName}, Регресс, ${label}...`);
+        const releaseTagId = await runCreatorCreateTag(releaseTagName, signal);
+        const run = await runCreatorRunTestplanQuiet(
+          RUN_TP_MAJOR_READINESS,
+          launchName,
+          [releaseTagId, RUN_TAG_REGRESSION, platformTagId],
+          signal
+        );
+        const runUrl = buildRunCreatorLaunchUrl(run.id);
+        if(run.reused){
+          logMajorPush(`[${label}] Найден существующий ран готовности: ${runUrl}`, 'ok');
+        }else{
+          logMajorPush(`[${label}] Ран готовности создан: ${runUrl}`, 'ok');
+        }
+        const threadStatus = await updateMajorReadinessRunInThread(platform, run);
+        return Object.assign({}, run, { threadStatus });
       }
 
       // Replaces the content between sectionHeader and nextSectionHeader with the given lines.
@@ -5388,6 +5513,100 @@
         if(endIdx === -1) return text;
         const newContent = lines.length ? lines.join('\n') + '\n' : '';
         return text.slice(0, contentStart) + newContent + text.slice(endIdx);
+      }
+
+      function escapeRunsTableCell(value){
+        return String(value || '').replace(/\|/g, '\\|').trim() || '—';
+      }
+
+      function buildRunsTableLinkCell(run){
+        if(!run || !run.url) return '—';
+        return `[Ран](${run.url})`;
+      }
+
+      function buildRunsTableLines(blockerHighRuns, selectiveRuns){
+        const hb = Array.isArray(blockerHighRuns) ? blockerHighRuns.filter(Boolean) : [];
+        const sel = Array.isArray(selectiveRuns) ? selectiveRuns.filter(Boolean) : [];
+        const groups = new Map();
+        const order = [];
+
+        const ensureGroup = (label) => {
+          const normalizedLabel = String(label || '').trim() || 'Ран';
+          if(!groups.has(normalizedLabel)){
+            groups.set(normalizedLabel, { blockerHigh: [], selective: [] });
+            order.push(normalizedLabel);
+          }
+          return groups.get(normalizedLabel);
+        };
+
+        hb.forEach((run) => {
+          const label = buildPublishedRunLabel(run && run.name);
+          ensureGroup(label).blockerHigh.push(run);
+        });
+        sel.forEach((run) => {
+          const label = buildPublishedRunLabel(run && run.name);
+          ensureGroup(label).selective.push(run);
+        });
+
+        const lines = [
+          '| Стрим | HB | Selective |',
+          '| --- | --- | --- |'
+        ];
+        for(const label of order){
+          const group = groups.get(label) || { blockerHigh: [], selective: [] };
+          const rowCount = Math.max(group.blockerHigh.length, group.selective.length, 1);
+          for(let idx = 0; idx < rowCount; idx += 1){
+            lines.push(`| ${escapeRunsTableCell(label)} | ${buildRunsTableLinkCell(group.blockerHigh[idx])} | ${buildRunsTableLinkCell(group.selective[idx])} |`);
+          }
+        }
+        return lines;
+      }
+
+      function normalizeRunsSectionHeader(text){
+        return String(text || '').replace(/^Ссылки на прогоны\+ дежурные:$/m, 'Ссылки на прогоны:');
+      }
+
+      function parseRunsTableLines(lines){
+        const blockerHigh = [];
+        const selective = [];
+        for(const rawLine of Array.isArray(lines) ? lines : []){
+          const line = String(rawLine || '').trim();
+          if(!line.startsWith('|')) continue;
+          const tripleMatch = line.match(/^\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|$/);
+          if(tripleMatch){
+            const stream = String(tripleMatch[1] || '').trim();
+            const hbCell = String(tripleMatch[2] || '').trim();
+            const selCell = String(tripleMatch[3] || '').trim();
+            if(/^стрим$/i.test(stream) && /^(?:hb|high\s*\+\s*blocker)$/i.test(hbCell) && /^selective$/i.test(selCell)) continue;
+            if(/^[-: ]+$/.test(stream) && /^[-: ]+$/.test(hbCell) && /^[-: ]+$/.test(selCell)) continue;
+            if(hbCell && hbCell !== '—') blockerHigh.push(hbCell);
+            if(selCell && selCell !== '—') selective.push(selCell);
+            continue;
+          }
+
+          const doubleMatch = line.match(/^\|\s*(.*?)\s*\|\s*(.*?)\s*\|$/);
+          if(!doubleMatch) continue;
+          const left = String(doubleMatch[1] || '').trim();
+          const right = String(doubleMatch[2] || '').trim();
+          if(/^high\s*\+\s*blocker$/i.test(left) && /^selective$/i.test(right)) continue;
+          if(/^[-: ]+$/.test(left) && /^[-: ]+$/.test(right)) continue;
+          if(left && left !== '—') blockerHigh.push(left);
+          if(right && right !== '—') selective.push(right);
+        }
+        return { blockerHigh, selective };
+      }
+
+      function getRunsSectionData(text){
+        const normalizedText = normalizeRunsSectionHeader(text);
+        const tableLines = getTextSectionLines(normalizedText, 'Ссылки на прогоны:', 'Дежурные:');
+        const parsedTable = parseRunsTableLines(tableLines);
+        if(parsedTable.blockerHigh.length || parsedTable.selective.length){
+          return parsedTable;
+        }
+        return {
+          blockerHigh: getTextSectionLines(text, 'Blocker + High', 'Normal'),
+          selective: getTextSectionLines(text, 'Normal', 'Дежурные:')
+        };
       }
 
       function allureB64Query(filters){
@@ -5462,19 +5681,34 @@
         const mainPost = findEarliestOwnThreadPost(threadPosts, rootId, userId);
         if(!mainPost) throw new Error('Основное сообщение в треде не найдено.');
 
-        const baseText = normalizeBandMessageText(mainPost.message);
-        const hbLines = blockerHigh.map((r) => `[${r.name}](${r.url})`);
-        const selLines = selective.map((r) => `[${r.name}](${r.url})`);
+        const baseText = normalizeRunsSectionHeader(normalizeBandMessageText(mainPost.message));
+        const runsTableLines = buildRunsTableLines(blockerHigh, selective);
+        const textWithRuns = fillTextSection(baseText, 'Ссылки на прогоны:', 'Дежурные:', runsTableLines);
 
-        const textWithHB = fillTextSection(baseText, 'Blocker + High', 'Normal', hbLines);
-        logMajorPush(`[${label}] Патч 1/2: Blocker+High (${hbLines.length} ранов, ${textWithHB.length} симв.)...`);
-        await bandPatchPost(mainPost, textWithHB, cfg, null);
-        logMajorPush(`[${label}] Патч 1 OK.`, 'ok');
+        logMajorPush(`[${label}] Патч прогонов: High + Blocker (${blockerHigh.length}), Selective (${selective.length}), ${textWithRuns.length} симв....`);
+        await bandPatchPost(mainPost, textWithRuns, cfg, null);
+        const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
+        if(textarea) textarea.value = textWithRuns;
+        logMajorPush(`[${label}] Таблица прогонов обновлена.`, 'ok');
+      }
 
-        const textWithSel = fillTextSection(textWithHB, 'Normal', 'Дежурные:', selLines);
-        logMajorPush(`[${label}] Патч 2/2: Normal/Selective (${selLines.length} ранов, ${textWithSel.length} симв.)...`);
-        await bandPatchPost(mainPost, textWithSel, cfg, null);
-        logMajorPush(`[${label}] Патч 2 OK — раны вставлены.`, 'ok');
+      async function ensureDutyCollectionForPushStep(platform){
+        const isIos = platform === 'ios';
+        const label = isIos ? 'iOS' : 'Android';
+        const existingRows = (appState.lastRun && Array.isArray(appState.lastRun.rows)) ? appState.lastRun.rows : [];
+        if(existingRows.length){
+          logMajorPush(`[${label}] Использую текущий результат сбора дежурных (${existingRows.length} стримов).`, 'ok');
+          return existingRows;
+        }
+
+        logMajorPush(`[${label}] Запускаю автосбор дежурных...`);
+        const ok = await runCollection();
+        const collectedRows = (appState.lastRun && Array.isArray(appState.lastRun.rows)) ? appState.lastRun.rows : [];
+        if(!ok || !collectedRows.length){
+          throw new Error('Не удалось автоматически собрать дежурных.');
+        }
+        logMajorPush(`[${label}] Автосбор дежурных завершён (${collectedRows.length} стримов).`, 'ok');
+        return collectedRows;
       }
 
       async function fillDutyOfficersInThreadText(platform){
@@ -5750,39 +5984,13 @@
           const retryBtn = (status === 'done' || status === 'skipped')
             ? `<button type="button" class="btn btn-soft" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="retry" ${retryDis}>Повторить</button>`
             : '';
+          const showExecuteBtn = !retryBtn;
           const updateComponentsBtn = (isPushComponentsAction(step.action) && status === 'done')
             ? `<button type="button" class="btn btn-soft text-xs" data-push-platform="${platform}" data-push-step="${idx}" data-push-manual-action="update-components-message" ${running ? 'disabled' : ''}>Обновить сообщение</button>`
             : '';
-          const timerKey = isIos ? 'pushIosComponentsTimerId' : 'pushAndComponentsTimerId';
-          const nextKey = isIos ? 'pushIosComponentsNextFireMs' : 'pushAndComponentsNextFireMs';
-          const lastHourKey = isIos ? 'pushIosComponentsLastHour' : 'pushAndComponentsLastHour';
-          let timerBlock = '';
-          if(step.hasTimer && status === 'done'){
-            const activeTimer = !!appState[timerKey];
-            const nextMs = appState[nextKey];
-            const nextHour = nextMs ? new Date(nextMs).getHours() : 0;
-            const nextTimeStr = nextMs ? `${String(nextHour).padStart(2,'0')}:02` : '';
-            const lastHour = appState[lastHourKey] || 0;
-            if(activeTimer){
-              timerBlock = `<div class="mt-2 flex items-center gap-2 flex-wrap">
-                <span class="text-[11px] text-amber-700">Автообновление активно${nextTimeStr ? ` · следующий запуск в ${nextTimeStr}` : ''} · до ${String(lastHour).padStart(2,'0')}:02</span>
-                <button type="button" class="btn btn-soft text-rose-600 text-xs" data-push-platform="${platform}" data-push-timer="stop">Остановить</button>
-              </div>`;
-            }else{
-              const hourOptions = Array.from({ length: 23 }, (_, i) => i + 1)
-                .map((h) => `<option value="${h}"${h === lastHour ? ' selected' : ''}>${String(h).padStart(2,'0')}:02</option>`)
-                .join('');
-              timerBlock = `<div class="mt-2 flex items-center gap-2 flex-wrap">
-                <span class="text-[11px] text-slate-600">Последний час:</span>
-                <select class="text-xs border border-slate-300 rounded px-1 py-0.5" data-push-platform="${platform}" data-push-last-hour>
-                  <option value="0">—</option>
-                  ${hourOptions}
-                </select>
-                <button type="button" class="btn btn-soft text-xs" data-push-platform="${platform}" data-push-timer="start">Запустить таймер</button>
-              </div>`;
-            }
-          }
-          const scheduleBlock = renderStepScheduleControls('push', platform, idx, { busy: running || appState.running || appState.workflowRunning || appState.runCreateRunning || appState.startButtonBusy });
+          const scheduleBlock = status === 'pending'
+            ? renderStepScheduleControls('push', platform, idx, { busy: running || appState.running || appState.workflowRunning || appState.runCreateRunning || appState.startButtonBusy })
+            : '';
           return `
             <div class="rounded-2xl p-3 release-launch-workflow-row ${rowClass}">
               <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -5791,7 +5999,6 @@
                   <div>
                     <div class="text-sm font-semibold text-slate-800">${step.code}. ${escHtml(step.title)}</div>
                     <span class="inline-flex items-center mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ring-1 ${badgeClass}">${text}</span>
-                    ${timerBlock}
                     ${scheduleBlock}
                   </div>
                 </div>
@@ -5799,7 +6006,7 @@
                   ${retryBtn}
                   ${updateComponentsBtn}
                   ${status === 'pending' ? `<button type="button" class="btn btn-soft text-slate-500" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="no" ${skipDis}>Пропустить</button>` : ''}
-                  <button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="yes" ${actionDis}>Выполнить</button>
+                  ${showExecuteBtn ? `<button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="yes" ${actionDis}>Выполнить</button>` : ''}
                 </div>
               </div>
             </div>`;
@@ -5831,11 +6038,41 @@
           .filter(Boolean);
       }
 
+      function getMajorReleaseLineValue(text, lineLabel){
+        const normalized = normalizeBandMessageText(text);
+        const label = String(lineLabel || '').trim();
+        if(!label) return '';
+        const pattern = new RegExp(`^${escapeRegExp(label)}[ \\t]*(.*)$`, 'm');
+        const match = normalized.match(pattern);
+        return match ? String(match[1] || '').trim() : '';
+      }
+
+      function hasExpectedMajorReadinessReference(lineValue, platform, release, readinessRun){
+        const source = String(lineValue || '').trim();
+        if(!source) return false;
+        const expectedName = buildMajorReadinessLaunchName(platform, release);
+        const expectedShortLabel = buildPublishedRunLabel(expectedName);
+        const expectedBracketed = `[${expectedName}]`;
+        const expectedShortBracketed = `[${expectedShortLabel}]`;
+        const expectedUrl = readinessRun && readinessRun.id ? buildRunCreatorLaunchUrl(readinessRun.id) : '';
+        if(expectedUrl && source.includes(expectedUrl)) return true;
+        if(source.includes(expectedBracketed)) return true;
+        if(source.includes(expectedShortBracketed)) return true;
+        if(source === expectedName) return true;
+        if(source === expectedShortLabel) return true;
+        return false;
+      }
+
       function applyResolvedPushWorkflowState(platform, statuses){
         const steps = platform === 'ios' ? PUSH_IOS_STEPS : PUSH_AND_STEPS;
         const nextStatuses = steps.map((_, idx) => (statuses[idx] === 'done' ? 'done' : 'pending'));
         let nextIndex = nextStatuses.findIndex((status) => status !== 'done');
         if(nextIndex === -1) nextIndex = steps.length;
+        nextStatuses.forEach((status, idx) => {
+          if(status !== 'pending'){
+            cancelStepSchedule(getStepScheduleKey('push', platform, idx));
+          }
+        });
 
         if(platform === 'ios'){
           appState.pushIosStatuses = nextStatuses;
@@ -5854,6 +6091,7 @@
         const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
         const release = verInput ? String(verInput.value || '').trim() : '';
         const baselineStatuses = (isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS).map(() => 'pending');
+        let readinessRun = null;
 
         appState[seqKey] += 1;
         const syncSeq = appState[seqKey];
@@ -5864,6 +6102,12 @@
           if(!release){
             applyResolvedPushWorkflowState(platform, baselineStatuses);
             return;
+          }
+
+          try{
+            readinessRun = await findMajorReadinessRun(platform, release, null);
+          }catch(error){
+            console.warn(`[Release workflow sync] ${label} readiness run check failed`, error);
           }
 
           const cfg = collectSettings();
@@ -5894,9 +6138,15 @@
 
           const mainPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
           const mainText = normalizeBandMessageText(mainPost && mainPost.message);
+          const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
+          if(textarea && mainText){
+            textarea.value = mainText;
+          }
           const dutyLines = getTextSectionLines(mainText, 'Дежурные:');
-          const hbLines = getTextSectionLines(mainText, 'Blocker + High', 'Normal');
-          const normalLines = getTextSectionLines(mainText, 'Normal', 'Дежурные:');
+          const runsData = getRunsSectionData(mainText);
+          const finalRunValue = getMajorReleaseLineValue(mainText, 'Финальный ран:');
+          const readinessRunExists = !!(readinessRun && readinessRun.id);
+          const hasFinalRun = hasExpectedMajorReadinessReference(finalRunValue, platform, release, readinessRun);
           const reminderNeedle = isIos ? '@qadutyios - проверка тега' : '@qadutyandr - проверка тега';
 
           const statuses = [
@@ -5905,8 +6155,9 @@
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (_, post) => isBandPollPost(post)) ? 'done' : 'pending',
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.includes(reminderNeedle)) ? 'done' : 'pending',
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.startsWith('Компоненты:')) ? 'done' : 'pending',
-            (hbLines.length && normalLines.length) ? 'done' : 'pending'
+            (runsData.blockerHigh.length || runsData.selective.length) ? 'done' : 'pending'
           ];
+          statuses.push((readinessRunExists && hasFinalRun) ? 'done' : 'pending');
 
           applyResolvedPushWorkflowState(platform, statuses);
           console.info(`[Release workflow sync] ${label}`, {
@@ -5947,59 +6198,18 @@
         const release = verInput ? String(verInput.value || '').trim() : '';
         if(!release) throw new Error(`Заполни версию ${isIos ? 'iOS' : 'Android'} перед загрузкой.`);
 
-        const authHeader = asBearer(getYtTokenFromStorage());
-        if(!authHeader) throw new Error('Не найден YouTrack token.');
-
-        const agileId = isIos ? YT_AGILE_ID_MAJOR_IOS : YT_AGILE_ID_MAJOR_ANDROID;
-        const sprintField = isIos ? YT_SPRINT_FIELD_IOS : YT_SPRINT_FIELD_ANDROID;
-
-        logMajorPush(`Загружаю доску из YT (${agileId}) для релиза ${release}...`);
-        const boardInfo = await fetchBoardInfoForRelease(agileId, release, authHeader, null);
-        const boardUrl = String((boardInfo && boardInfo.url) || '').trim();
+        const mode = isIos ? '2' : '1';
+        logMajorPush(`Загружаю доску из YT для релиза ${release}...`);
+        const boardUrl = String(await fetchReleaseBoardUrl(mode, release, null) || '').trim();
         logMajorPush(`Доска: ${boardUrl}`, 'ok');
 
         logMajorPush('Ищу релизный тикет...');
-        const platformLabel = isIos ? 'IOS' : 'Android';
-        // Точное название тикета: "Релизный тикет IOS 7.5.6000" / "Релизный тикет Android 7.5.6000"
-        const exactSummary = `Релизный тикет ${platformLabel} ${release}`;
-        const exactSummaryNorm = exactSummary.toUpperCase();
         let ticketLine = '';
         try{
-          const releaseEsc = escapeYouTrackQueryPhrase(release);
-          const platformEsc = escapeYouTrackQueryPhrase(platformLabel);
-
-          // Попытка 1: точная фраза summary
-          let issues = await fetchYtIssuesByQuery(
-            `summary: "${escapeYouTrackQueryPhrase(exactSummary)}"`, authHeader, null, 20
-          );
-          let found = issues.find((item) =>
-            String(item && item.summary || '').toUpperCase().includes(exactSummaryNorm)
-          );
-
-          // Попытка 2: по словам summary — платформа + версия
-          if(!found){
-            const q2 = `summary: "Релизный тикет" AND summary: "${platformEsc}" AND summary: "${releaseEsc}"`;
-            issues = await fetchYtIssuesByQuery(q2, authHeader, null, 50);
-            found = issues.find((item) =>
-              String(item && item.summary || '').toUpperCase().includes(exactSummaryNorm)
-            );
-          }
-
-          // Попытка 3: только версия (если доска другая или платформа записана иначе)
-          if(!found){
-            const q3 = `summary: "Релизный тикет" AND summary: "${releaseEsc}"`;
-            issues = await fetchYtIssuesByQuery(q3, authHeader, null, 50);
-            found = issues.find((item) =>
-              String(item && item.summary || '').toUpperCase().includes('РЕЛИЗНЫЙ ТИКЕТ')
-            );
-          }
-
-          if(found && found.idReadable){
-            const key = String(found.idReadable).trim();
-            ticketLine = `[${key}](${issueLink(key)})`;
-            logMajorPush(`Тикет: ${key} — ${found.summary}`, 'ok');
-          }else{
-            logMajorPush(`Тикет "${exactSummary}" не найден — заполни поле вручную`, 'warn');
+          const ticketRef = await fetchReleaseTicketRef(mode, release, null);
+          if(ticketRef && ticketRef.key){
+            ticketLine = `[${ticketRef.key}](${ticketRef.url})`;
+            logMajorPush(`Тикет: ${ticketRef.key} — ${ticketRef.summary}`, 'ok');
           }
         }catch(e){
           logMajorPush(`Ошибка поиска тикета: ${e.message || e}`, 'warn');
@@ -6008,10 +6218,10 @@
         if(textarea){
           let text = String(textarea.value || '');
           if(boardUrl){
-            text = text.replace(/^(Ссылка на доску:)[ \t]*[^\n]*$/m, `$1 ${boardUrl}`);
+            text = replaceMajorReleaseLine(text, 'Ссылка на доску:', boardUrl);
           }
           if(ticketLine){
-            text = text.replace(/^(Ссылка на релизный таск:)[ \t]*[^\n]*$/m, `$1 ${ticketLine}`);
+            text = replaceMajorReleaseLine(text, 'Ссылка на релизный таск:', ticketLine);
           }
           textarea.value = text;
         }
@@ -6162,11 +6372,13 @@
           return;
         }
         if(action === 'fillDutyIos'){
+          await ensureDutyCollectionForPushStep('ios');
           await fillDutyOfficersInThreadText('ios');
           showToast('Дежурные iOS добавлены и тред обновлён');
           return;
         }
         if(action === 'fillDutyAnd'){
+          await ensureDutyCollectionForPushStep('android');
           await fillDutyOfficersInThreadText('android');
           showToast('Дежурные Android добавлены и тред обновлён');
           return;
@@ -6179,6 +6391,18 @@
         if(action === 'fillRunsAnd'){
           await fillRunsInThreadText('android');
           showToast('Раны Allure Android вставлены');
+          return;
+        }
+        if(action === 'createReadinessRunIos'){
+          const run = await createMajorReadinessRun('ios', null);
+          const status = run && run.threadStatus === 'updated' ? 'тред обновлён' : 'тред актуален';
+          showToast(run && run.reused ? `Ран готовности iOS уже существует, ${status}` : `Ран готовности iOS создан, ${status}`);
+          return;
+        }
+        if(action === 'createReadinessRunAnd'){
+          const run = await createMajorReadinessRun('android', null);
+          const status = run && run.threadStatus === 'updated' ? 'тред обновлён' : 'тред актуален';
+          showToast(run && run.reused ? `Ран готовности Android уже существует, ${status}` : `Ран готовности Android создан, ${status}`);
           return;
         }
         if(action === 'publishComponentsIos'){
@@ -6669,7 +6893,6 @@
         if(ytTokenInput){
           ytTokenInput.value = getYtTokenFromStorage();
         }
-        const deployLabTokenInput = $('deployLabTokenInput');
         if(deployLabTokenInput){
           try{
             deployLabTokenInput.value = normalizeDeployLabToken(localStorage.getItem(LS_DEPLOY_LAB_TOKEN_KEY) || '');
@@ -6754,6 +6977,10 @@
 
         resetWorkflowState({ preserveSchedules: true });
         resetPushWorkflow(undefined, { preserveSchedules: true });
+        if(appState.currentMode === RUN_MODE_MAJOR && appState.majorView === 'release'){
+          schedulePushWorkflowSync('ios');
+          schedulePushWorkflowSync('android');
+        }
         renderCandidates({ android: new Set(), ios: new Set() });
         renderIds();
         refreshButtons();
