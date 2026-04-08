@@ -182,6 +182,11 @@ _ONE_HOUR_APPROX = re.compile(
 _THROUGH_HOUR = re.compile(
     r"(?i)\bчерез\s*(часок|часик|час)\b"
 )
+_WITHIN_ONE_HOUR = re.compile(
+    r"(?i)\b(?:в\s+течение|в\s+течении)\s*"
+    r"(?:ближайш(?:ий|его)\s*)?"
+    r"(?:часа|час|часик(?:а)?|часок)\b"
+)
 
 # plain «час» (e.g. «профиль - час») → 1 hour
 _ONE_HOUR_PLAIN = re.compile(r"(?i)\bчас\b")
@@ -686,6 +691,10 @@ def _parse_minutes_like_text(t: str) -> Optional[int]:
 
     # "примерно час"
     if _ONE_HOUR_APPROX.search(t):
+        return 60
+
+    # "в течение часа", "в течении ближайшего часа"
+    if _WITHIN_ONE_HOUR.search(t):
         return 60
 
     # "часик примерно", "Около часика"
