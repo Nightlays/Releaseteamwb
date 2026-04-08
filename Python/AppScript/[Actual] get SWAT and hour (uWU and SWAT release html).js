@@ -30,6 +30,30 @@ function normRu_(s) {
   return String(s || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
 }
 
+function buildNameKeys_(fio) {
+  const parts = normRu_(fio).split(' ').filter(Boolean);
+  if (parts.length < 2) return [];
+
+  const out = new Set();
+  const pushPair = (a, b) => {
+    if (!a || !b || a === b) return;
+    out.add(`${a} ${b}`);
+  };
+
+  // Базовые варианты: первые два слова и их обратный порядок.
+  pushPair(parts[0], parts[1]);
+  pushPair(parts[1], parts[0]);
+
+  // Фолбэк на случай "Имя Отчество Фамилия" или "Фамилия Имя Отчество".
+  if (parts.length >= 3) {
+    const last = parts[parts.length - 1];
+    pushPair(parts[0], last);
+    pushPair(last, parts[0]);
+  }
+
+  return Array.from(out);
+}
+
 function safeJsonParse_(text) {
   try { return { ok: true, data: JSON.parse(text) }; }
   catch (e) { return { ok: false, error: String(e && e.message ? e.message : e) }; }
@@ -190,12 +214,9 @@ function buildNameKeyMaps_(swatRows) {
     const stream = String(r.stream || '').trim();
     if (!login) return;
 
-    const parts = normRu_(full).split(' ').filter(Boolean);
-    if (parts.length >= 2) {
-      const first = parts[0];
-      const last = parts[1];
-      keyToLogin[`${last} ${first}`] = login; // фамилия имя
-    }
+    buildNameKeys_(full).forEach(key => {
+      if (!Object.prototype.hasOwnProperty.call(keyToLogin, key)) keyToLogin[key] = login;
+    });
 
     loginToFull[login] = full || login;
     loginToStream[login] = stream || '';
@@ -204,10 +225,8 @@ function buildNameKeyMaps_(swatRows) {
   return { keyToLogin, loginToFull, loginToStream };
 }
 
-function fioToKey_(fio) {
-  const parts = normRu_(fio).split(' ').filter(Boolean);
-  if (parts.length < 2) return null;
-  return `${parts[0]} ${parts[1]}`; // фамилия имя
+function fioToKeys_(fio) {
+  return buildNameKeys_(fio);
 }
 
 function getCurrentMonthSheet_(ss) {
@@ -330,8 +349,9 @@ function buildHoursMapFromTimesheet_(sheet, keyToLogin, year, monthIndex0) {
     const fio = String(values[i][0] || '').trim();
     if (!fio) continue;
 
-    const key = fioToKey_(fio);
-    const login = key ? keyToLogin[key] : null;
+    const keys = fioToKeys_(fio);
+    const matchedKey = keys.find(key => Object.prototype.hasOwnProperty.call(keyToLogin, key));
+    const login = matchedKey ? keyToLogin[matchedKey] : null;
     if (!login) continue;
 
     for (let c = firstDayCol; c <= lastDayCol; c++) {
