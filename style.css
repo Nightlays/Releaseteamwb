@@ -4207,6 +4207,47 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   line-height:1.4;
   word-break:break-word;
 }
+.release-launch .release-launch-duty-editor-lead-profile{
+  min-width:0;
+  max-width:100%;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.release-launch .release-launch-duty-editor-lead-avatar{
+  position:relative;
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  overflow:visible;
+  background:linear-gradient(135deg,#fb923c,#fde68a);
+  display:grid;
+  place-items:center;
+  color:#fff;
+  font-size:12px;
+  font-weight:800;
+  line-height:1;
+  flex-shrink:0;
+}
+.release-launch .release-launch-duty-editor-lead-avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  border-radius:50%;
+}
+.release-launch .release-launch-duty-editor-lead-avatar .release-launch-duty-editor-search-option-badge{
+  right:-3px;
+  bottom:-3px;
+  width:16px;
+  height:16px;
+  box-shadow:0 0 0 2px #fff;
+}
+.release-launch .release-launch-duty-editor-lead-avatar .release-launch-duty-editor-search-option-badge svg{
+  width:8px;
+  height:8px;
+  stroke-width:2.2;
+}
 .release-launch .release-launch-duty-editor-lead-value-wrap{
   min-width:0;
   display:inline-flex;
@@ -4493,11 +4534,23 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   transform:none;
   pointer-events:none;
 }
+.release-launch .release-launch-duty-editor-icon-btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+  pointer-events:none;
+  transform:none;
+  box-shadow:none;
+}
 .release-launch .release-launch-duty-editor-icon-btn:hover{
   background:linear-gradient(180deg,#f0f0f0,#e7e7e7);
   border-color:#d1d5db;
   color:#4b5563;
   transform:translateY(-1px);
+}
+.release-launch .release-launch-duty-editor-icon-btn:disabled:hover{
+  background:linear-gradient(180deg,#f7f7f7,#efefef);
+  border-color:#e5e7eb;
+  color:#6b7280;
 }
 .release-launch .release-launch-duty-editor-icon-btn.is-confirm{
   border-color:#86efac;
@@ -4519,6 +4572,11 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   background:#ffe4e6;
   border-color:#fda4af;
   color:#b91c1c;
+}
+.release-launch .release-launch-duty-editor-add-btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+  pointer-events:none;
 }
 .release-launch .release-launch-duty-editor-card-body{
   display:grid;
