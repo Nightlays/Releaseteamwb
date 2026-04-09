@@ -64,6 +64,10 @@
                   <span class="release-launch-label">Cookies (admin)</span>
                   <input id="bandCookiesAdmin" class="input release-launch-mono-input" type="password" autocomplete="new-password" spellcheck="false" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=..." />
                 </label>
+                <label class="release-launch-field">
+                  <span class="release-launch-label">Allure token</span>
+                  <input id="allureCookies" class="input release-launch-mono-input" type="password" autocomplete="new-password" spellcheck="false" placeholder="Api-Token ..." />
+                </label>
               </div>
             </div>
 
@@ -146,6 +150,7 @@
           <div class="release-launch-mode-tabs release-launch-major-view-tabs" role="group" aria-label="Раздел мажорного релиза">
             <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="collection" aria-pressed="false">Сбор дежурных</button>
             <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="release" aria-pressed="false">Релиз</button>
+            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="editor" aria-pressed="false">Редактор</button>
           </div>
           <div id="majorReleaseEmptyState" class="release-launch-status release-launch-status-muted">Выбери раздел мажорного релиза</div>
         </section>
@@ -188,38 +193,6 @@
                   <tbody id="resultsTbody"></tbody>
                 </table>
               </div>
-            </div>
-          </section>
-
-          <section class="card p-5 space-y-4">
-            <div class="flex items-center justify-between gap-3 flex-wrap">
-              <h2 class="text-lg font-semibold">Предварительный просмотр</h2>
-              <div class="release-launch-status release-launch-status-muted">Показываем текст, который уйдёт в Band</div>
-            </div>
-            <div class="release-launch-preview-grid">
-              <article class="release-launch-preview-card">
-                <div class="release-launch-preview-title">SWAT Team Only</div>
-                <div class="release-launch-preview-row">
-                  <div class="release-launch-preview-label">Тред</div>
-                  <pre class="release-launch-preview-body is-placeholder" data-preview-kind="swat" data-preview-field="thread">Пока пусто</pre>
-                </div>
-                <div class="release-launch-preview-row">
-                  <div class="release-launch-preview-label">Содержимое треда</div>
-                  <pre class="release-launch-preview-body is-placeholder" data-preview-kind="swat" data-preview-field="content">Пока пусто</pre>
-                </div>
-              </article>
-
-              <article class="release-launch-preview-card">
-                <div class="release-launch-preview-title">Лента релизов</div>
-                <div class="release-launch-preview-row">
-                  <div class="release-launch-preview-label">Тред</div>
-                  <pre class="release-launch-preview-body is-placeholder" data-preview-kind="feed" data-preview-field="thread">Пока пусто</pre>
-                </div>
-                <div class="release-launch-preview-row">
-                  <div class="release-launch-preview-label">Содержимое треда</div>
-                  <pre class="release-launch-preview-body is-placeholder" data-preview-kind="feed" data-preview-field="content">Пока пусто</pre>
-                </div>
-              </article>
             </div>
           </section>
 
@@ -270,9 +243,10 @@
           <section class="card p-5 space-y-3">
             <h2 class="text-lg font-semibold">Опрос по стримам</h2>
             <label class="release-launch-field">
-              <span class="release-launch-label">Текст опроса (можно редактировать)</span>
-              <textarea id="majorPollText" class="input release-launch-mono-input" rows="4" spellcheck="false"></textarea>
+              <span class="release-launch-label">Текст опроса (получаем из Allure / только просмотр)</span>
+              <textarea id="majorPollText" class="input release-launch-mono-input" rows="6" spellcheck="false" readonly></textarea>
             </label>
+            <div id="majorPollStatus" class="release-launch-status release-launch-status-muted">Получаем стримы из Allure...</div>
           </section>
 
           <!-- Пошаговый запуск публикации — iOS и Android рядом -->
@@ -295,6 +269,63 @@
             <h2 class="text-lg font-semibold">Лог публикации</h2>
             <div id="majorPushLogs" class="release-launch-log"></div>
           </section>
+        </div>
+
+        <div id="majorEditorSection" class="space-y-4" style="display:none;">
+          <div id="dutyEditorStatus" hidden></div>
+          <div id="dutyEditorDirtyBadge" hidden></div>
+          <div id="dutyEditorShell" class="release-launch-duty-editor-shell">
+            <div id="dutyEditorLoader" class="release-launch-duty-editor-loader" style="display:none;">
+              <div class="release-launch-duty-editor-spinner" aria-hidden="true"></div>
+            </div>
+            <div id="dutyEditorContent" class="release-launch-duty-editor-content grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <section class="card p-5 space-y-3">
+              <div class="release-launch-duty-editor-block-head">
+                <h3 class="text-base font-semibold">Стримы и их лиды</h3>
+                <div class="release-launch-duty-editor-block-actions">
+                  <a
+                    id="dutyEditorJsonLink"
+                    class="release-launch-duty-editor-link"
+                    href="https://drive.google.com/file/d/1Arzm2ZEix5aVyp0lqAFeZxLnDnkfkkUb/view?usp=sharing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >Ссылка на файл</a>
+                  <button id="dutyEditorLeadsCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
+                    <span id="dutyEditorLeadsCollapseIco" aria-hidden="true">▾</span>
+                    <span id="dutyEditorLeadsCollapseText">Свернуть</span>
+                  </button>
+                </div>
+              </div>
+              <div id="dutyEditorLeadsBody" class="space-y-3">
+                <button id="dutyEditorAddLeadBtn" type="button" class="btn btn-soft release-launch-duty-editor-add-btn" style="display:none;">Добавить</button>
+                <div id="dutyEditorLeadsList" class="release-launch-duty-editor-grid"></div>
+              </div>
+            </section>
+
+            <section class="card p-5 space-y-3">
+              <div class="release-launch-duty-editor-block-head">
+                <h3 class="text-base font-semibold">Группы стримов</h3>
+                <div class="release-launch-duty-editor-block-actions">
+                  <a
+                    id="dutyEditorDocLink"
+                    class="release-launch-duty-editor-link"
+                    href="https://docs.google.com/document/d/1glaEFkdpAzGuRyQZYz1muBzVkFOnKyn85BW-CXLFSFU/edit?tab=t.0"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >Ссылка на файл</a>
+                  <button id="dutyEditorStreamsCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
+                    <span id="dutyEditorStreamsCollapseIco" aria-hidden="true">▾</span>
+                    <span id="dutyEditorStreamsCollapseText">Свернуть</span>
+                  </button>
+                </div>
+              </div>
+              <div id="dutyEditorStreamsBody" class="space-y-3">
+                <button id="dutyEditorAddStreamGroupBtn" type="button" class="btn btn-soft release-launch-duty-editor-add-btn" style="display:none;">Добавить</button>
+                <div id="dutyEditorStreamsList" class="release-launch-duty-editor-grid"></div>
+              </div>
+            </section>
+          </div>
+          </div>
         </div>
       </div>
 
@@ -396,7 +427,7 @@
       const BAND_CHANNEL_ID_FIXED = '6sqki85urpbfbqdkcdfen33owh';
       const NAPI_HOSTS_CHANNEL_ID = 'y14x9xytq7y7uduux8worartmh';
       const SWAT_TEAM_ONLY_CHANNEL_ID = 'nq1amqo347gy9d46oe14zgs44w';
-      const RELEASE_FEED_CHANNEL_ID = 'tdj9ns46eprx8n5neupw8ejw9c';
+      const RELEASE_FEED_CHANNEL_ID = 'xofy3mzmijbxxmongme4pke4bc';
       const RELEASE_FEED_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
       const RELEASE_ANDROID_BOT_USERNAME = 'release-android-bot';
       const RELEASE_ANDROID_BOT_REPLY_DELAY_MS = 10000;
@@ -415,9 +446,23 @@
       const YT_SPRINT_FIELD_ANDROID = '{Версия релиза (ex. Sprint) Android}';
 
       const ALLURE_API_TOKEN = 'c60f6235-440d-4657-983a-51dc71c53cf2';
+      const ALLURE_SHARED_TOKEN_LS_KEY = 'swat_uwu_token';
       const ALLURE_TESTPLAN_LEAF_URL = 'https://allure-testops.wb.ru/api/testplan/3918/tree/leaf?treeId=987&projectId=7&path=7904&sort=name%2Casc&size=100';
+      const DUTY_EDITOR_ALLURE_TREE_ID = 406;
+      const DUTY_EDITOR_ALLURE_SEARCH = 'W3siaWQiOiJjZnYuLTIiLCJ0eXBlIjoibG9uZ0FycmF5IiwidmFsdWUiOls3MDExOV19XQ%3D%3D';
+      const DUTY_EDITOR_ALLURE_STREAMS_URL = `https://allure-testops.wb.ru/api/testcasetree/leaf?projectId=7&treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&path=7904&path=70119&search=${DUTY_EDITOR_ALLURE_SEARCH}&sort=name%2Casc&size=100`;
+      const DUTY_EDITOR_ALLURE_CREATE_URL = `https://allure-testops.wb.ru/api/testcasetree/leaf?projectId=7&treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&path=7904&path=70119`;
+      const DUTY_EDITOR_ALLURE_RENAME_URL = `https://allure-testops.wb.ru/api/testcasetree/leaf/rename?projectId=7&treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&search=${DUTY_EDITOR_ALLURE_SEARCH}`;
+      const DUTY_EDITOR_ALLURE_TESTCASE_BASE_URL = 'https://allure-testops.wb.ru/api/testcase';
+      const DUTY_EDITOR_ALLURE_TAG_ID = 25;
+      const DUTY_EDITOR_ALLURE_STATUS_ID = -3;
+      const DUTY_EDITOR_ALLURE_WORKFLOW_ID = 1;
+      const COLLECTION_ALLURE_SYNC_URL = 'https://allure-testops.wb.ru/api/testplan/3918/sync';
       const ALLURE_LAUNCHES_BASE = 'https://allure-testops.wb.ru/launch';
       const QA_LEADS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxPTT8Gc8rQLKV7tIrtwsUQd_ciUOkESbS7WoQ3JfPEoBtxB0gr6GpOs640uBIaPTCy8A/exec';
+      const DUTY_EDITOR_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby305NTQLS73Dw9CyG_QKkRMMljub5wkkdIlBpvHDuR6S9SntfPLTkR4jiq6uHXwHkoMg/exec';
+      const DUTY_EDITOR_DOC_URL = 'https://docs.google.com/document/d/1glaEFkdpAzGuRyQZYz1muBzVkFOnKyn85BW-CXLFSFU/edit?tab=t.0';
+      const DUTY_EDITOR_JSON_URL = 'https://drive.google.com/file/d/1Arzm2ZEix5aVyp0lqAFeZxLnDnkfkkUb/view?usp=sharing';
       const RUN_MODE_MAJOR = 'major';
       const RUN_CREATOR_BASE_URL = 'https://allure-testops.wb.ru';
       const RUN_TAG_ANDROID = 4115;
@@ -451,7 +496,8 @@
       const DEFAULTS = {
         bandChannelId: BAND_CHANNEL_ID_FIXED,
         bandCookiesRead: '',
-        bandCookiesAdmin: ''
+        bandCookiesAdmin: '',
+        allureCookies: ''
       };
 
       const bandRuntimeCache = {
@@ -496,6 +542,7 @@
       const majorReleaseEmptyState = $('majorReleaseEmptyState');
       const majorCollectionSection = $('majorCollectionSection');
       const majorReleaseSection = $('majorReleaseSection');
+      const majorEditorSection = $('majorEditorSection');
       const majorViewButtons = Array.from(document.querySelectorAll('.release-launch-major-view-tab[data-major-view]'));
       const runCreateLayout = $('runCreateLayout');
       const runExtraControls = $('runExtraControls');
@@ -523,6 +570,27 @@
       const swatScheduleTimeInput = $('swatScheduleTimeInput');
       const swatScheduleSubmitBtn = $('swatScheduleSubmitBtn');
       const swatScheduleModalError = $('swatScheduleModalError');
+      const dutyEditorShell = $('dutyEditorShell');
+      const dutyEditorLoader = $('dutyEditorLoader');
+      const dutyEditorContent = $('dutyEditorContent');
+      const dutyEditorDocLink = $('dutyEditorDocLink');
+      const dutyEditorJsonLink = $('dutyEditorJsonLink');
+      const dutyEditorReloadBtn = $('dutyEditorReloadBtn');
+      const dutyEditorStatus = $('dutyEditorStatus');
+      const dutyEditorDirtyBadge = $('dutyEditorDirtyBadge');
+      const dutyEditorLeadsBody = $('dutyEditorLeadsBody');
+      const dutyEditorLeadsList = $('dutyEditorLeadsList');
+      const dutyEditorLeadsCollapseBtn = $('dutyEditorLeadsCollapseBtn');
+      const dutyEditorLeadsCollapseIco = $('dutyEditorLeadsCollapseIco');
+      const dutyEditorLeadsCollapseText = $('dutyEditorLeadsCollapseText');
+      const dutyEditorStreamsBody = $('dutyEditorStreamsBody');
+      const dutyEditorStreamsList = $('dutyEditorStreamsList');
+      const dutyEditorStreamsCollapseBtn = $('dutyEditorStreamsCollapseBtn');
+      const dutyEditorStreamsCollapseIco = $('dutyEditorStreamsCollapseIco');
+      const dutyEditorStreamsCollapseText = $('dutyEditorStreamsCollapseText');
+      const dutyEditorAddLeadBtn = $('dutyEditorAddLeadBtn');
+      const dutyEditorAddStreamGroupBtn = $('dutyEditorAddStreamGroupBtn');
+      const majorPollStatus = $('majorPollStatus');
       const automationCard = $('automationCard');
       const automationTriggerModeSelect = $('automationTriggerModeSelect');
       const automationDelayField = $('automationDelayField');
@@ -561,6 +629,9 @@
         currentMode: '',
         majorView: '',
         majorPingText: '',
+        majorPollLoading: false,
+        majorPollSeq: 0,
+        majorPollText: '',
         resolvedRunBuildValue: '',
         ytBoardInfoCache: new Map(),
         previewRefreshTimer: 0,
@@ -588,11 +659,30 @@
         stepScheduleTimers: {},
         stepScheduleTickTimerId: 0,
         stepScheduleDrafts: {},
+        dutyEditorLoaded: false,
+        dutyEditorLoading: false,
+        dutyEditorSaving: false,
+        dutyEditorInteractionBusy: false,
+        dutyEditorDirty: false,
+        dutyEditorSnapshot: '',
+        dutyEditorEditState: {},
+        dutyEditorLeadSearchState: {},
+        dutyEditorLeadSearchTimers: {},
+        dutyEditorLeadSearchControllers: {},
+        dutyEditorLeadSearchSeq: 0,
+        dutyEditorLeadAvatarCache: {},
+        dutyEditorLeadNameByHandle: {},
+        dutyEditorLeadProfileByHandle: {},
+        dutyEditorLeadNameLoadingByHandle: {},
+        dutyEditorLeadsCollapsed: false,
+        dutyEditorStreamsCollapsed: false,
+        dutyEditorData: null,
         automationPlan: null,
         automationTimerId: 0,
         automationTickTimerId: 0,
         automationRunning: false,
-        automationLastMessage: ''
+        automationLastMessage: '',
+        dutyEditorNextId: 0
       };
 
       const WORKFLOW_STEPS = [
@@ -662,6 +752,81 @@
           }
         }
         return out;
+      }
+
+      function setMajorPollStatus(message, kind){
+        if(!majorPollStatus) return;
+        const statusKind = ['muted', 'progress', 'ok', 'warn', 'err'].includes(String(kind || '')) ? String(kind) : 'muted';
+        majorPollStatus.className = `release-launch-status release-launch-status-${statusKind}`;
+        majorPollStatus.textContent = String(message || '').trim() || 'Текст опроса пока пуст';
+      }
+
+      function getMajorPollTextarea(){
+        return $('majorPollText');
+      }
+
+      function escapeBandCommandQuotedArg(value){
+        return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      }
+
+      function buildMajorPollOptionLabels(allureLeaves){
+        const excluded = buildHardcodedExcludeSet();
+        const labels = [];
+        for(const leaf of Array.isArray(allureLeaves) ? allureLeaves : []){
+          const rawName = String(leaf && leaf.name || '').trim();
+          if(!rawName) continue;
+          if(excluded.has(norm(rawName))) continue;
+          labels.push(rawName);
+        }
+        return dedupKeepOrder(labels);
+      }
+
+      function buildMajorPollCommandText(optionLabels){
+        const labels = dedupKeepOrder(
+          (Array.isArray(optionLabels) ? optionLabels : [])
+            .map((item) => String(item || '').trim())
+            .filter(Boolean)
+        );
+        if(!labels.length){
+          throw new Error('Allure не вернул ни одного стрима для опроса');
+        }
+        const parts = [
+          `/poll "${escapeBandCommandQuotedArg(MAJOR_POLL_TITLE)}"`,
+          ...labels.map((label) => `"${escapeBandCommandQuotedArg(label)}"`),
+          '--progress',
+          `--votes=${labels.length}`
+        ];
+        return parts.join(' ');
+      }
+
+      async function refreshMajorPollText(signal){
+        const textarea = getMajorPollTextarea();
+        const seq = Number(appState.majorPollSeq || 0) + 1;
+        appState.majorPollSeq = seq;
+        appState.majorPollLoading = true;
+        if(textarea) textarea.value = 'Загружаю стримы из Allure...';
+        setMajorPollStatus('Получаем стримы из Allure...', 'progress');
+
+        try{
+          const allureLeaves = await fetchDutyEditorAllureStreams(signal);
+          const optionLabels = buildMajorPollOptionLabels(allureLeaves);
+          const pollText = buildMajorPollCommandText(optionLabels);
+          if(seq !== appState.majorPollSeq) return '';
+          appState.majorPollText = pollText;
+          if(textarea) textarea.value = pollText;
+          setMajorPollStatus(`Стримов из Allure: ${optionLabels.length}. Текст опроса только для просмотра.`, 'ok');
+          return pollText;
+        }catch(error){
+          if(seq !== appState.majorPollSeq) return '';
+          appState.majorPollText = '';
+          if(textarea) textarea.value = '';
+          setMajorPollStatus(error && error.message ? error.message : String(error || 'Не удалось получить стримы из Allure'), 'err');
+          throw error;
+        }finally{
+          if(seq === appState.majorPollSeq){
+            appState.majorPollLoading = false;
+          }
+        }
       }
 
       function getComponentTextSortBucket(value){
@@ -845,7 +1010,7 @@
       function normalizeMajorView(view){
         const value = String(view || '').trim().toLowerCase();
         if(value === 'message' || value === 'push') return 'collection';
-        return ['collection', 'release'].includes(value) ? value : '';
+        return ['collection', 'release', 'editor'].includes(value) ? value : '';
       }
 
       function getMajorPingText(){
@@ -895,6 +1060,7 @@
         if(majorReleaseEmptyState) majorReleaseEmptyState.style.display = isMajor && !majorView ? '' : 'none';
         if(majorCollectionSection) majorCollectionSection.style.display = isMajor && majorView === 'collection' ? '' : 'none';
         if(majorReleaseSection) majorReleaseSection.style.display = isMajor && majorView === 'release' ? '' : 'none';
+        if(majorEditorSection) majorEditorSection.style.display = isMajor && majorView === 'editor' ? '' : 'none';
       }
 
       function saveUiState(){
@@ -912,6 +1078,13 @@
         syncMajorViewState();
         if(value === 'release' && prevView !== 'release'){
           initMajorPushTab();
+        }
+        if(value === 'editor' && prevView !== 'editor'){
+          ensureDutyEditorLoaded().catch((err) => {
+            const message = err && err.message ? err.message : String(err || 'Не удалось загрузить редактор');
+            setDutyEditorStatus(message, 'err');
+            showToast(message, false);
+          });
         }
       }
 
@@ -941,7 +1114,7 @@
         if(majorReleaseLayout) majorReleaseLayout.style.display = isMajor ? '' : 'none';
         if(runCreateLayout) runCreateLayout.style.display = isNonMajor ? '' : 'none';
         if(isMajor){
-          if(prevMode !== RUN_MODE_MAJOR) setMajorView('');
+          if(prevMode !== RUN_MODE_MAJOR) setMajorView('collection');
           else syncMajorViewState();
         }else{
           appState.majorView = '';
@@ -1037,11 +1210,34 @@
         return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`;
       }
 
+      function getStoredAllureApiToken(){
+        let storedToken = '';
+        try{
+          storedToken = normalizeAllureAuthValue(localStorage.getItem(ALLURE_SHARED_TOKEN_LS_KEY) || '');
+        }catch(_){
+          storedToken = '';
+        }
+        return looksLikeAllureCookieString(storedToken) ? '' : storedToken;
+      }
+
+      function getSharedAllureApiToken(){
+        return getStoredAllureApiToken() || String(ALLURE_API_TOKEN || '').trim();
+      }
+
+      function requireSharedAllureApiToken(){
+        const token = getSharedAllureApiToken();
+        if(!token){
+          throw new Error('Не найден API токен Allure. Заполни его в "Графики".');
+        }
+        return token;
+      }
+
       function runCreatorHeaders(){
+        const token = requireSharedAllureApiToken();
         return {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Api-Token ${ALLURE_API_TOKEN}`
+          'Authorization': `Api-Token ${token}`
         };
       }
 
@@ -1942,8 +2138,9 @@
           const out = {};
           for(const [key, value] of Object.entries(raw)){
             if(!value || typeof value !== 'object') continue;
-            const scope = value.scope === 'push' ? 'push' : 'major';
-            const platform = scope === 'push' ? (value.platform === 'android' ? 'android' : 'ios') : '';
+            const scope = value.scope === 'push' ? 'push' : '';
+            if(scope !== 'push') continue;
+            const platform = value.platform === 'android' ? 'android' : 'ios';
             const stepIdx = Number(value.stepIdx);
             const targetMs = Number(value.targetMs);
             if(!Number.isFinite(stepIdx) || stepIdx < 0) continue;
@@ -2584,6 +2781,10 @@
           const el = $(key);
           cfg[key] = el ? String(el.value || '') : '';
         }
+        cfg.allureCookies = normalizeAllureAuthValue(cfg.allureCookies);
+        if(!cfg.allureCookies){
+          cfg.allureCookies = getStoredAllureApiToken();
+        }
         if(!String(cfg.bandCookiesRead || '').trim() && String(cfg.bandCookiesAdmin || '').trim()){
           cfg.bandCookiesRead = String(cfg.bandCookiesAdmin || '');
         }
@@ -2595,7 +2796,13 @@
         for(const key of SETTINGS_FIELDS){
           const el = $(key);
           if(!el) continue;
-          if(typeof values[key] === 'string') el.value = values[key];
+          if(typeof values[key] === 'string'){
+            if(key === 'allureCookies'){
+              el.value = normalizeAllureAuthValue(values[key]) || getStoredAllureApiToken();
+            }else{
+              el.value = values[key];
+            }
+          }
         }
         const channelInput = $('bandChannelId');
         if(channelInput) channelInput.value = BAND_CHANNEL_ID_FIXED;
@@ -2617,6 +2824,7 @@
         if(!String(saved.bandCookiesRead || '').trim() && String(saved.bandCookiesAdmin || '').trim()){
           saved.bandCookiesRead = String(saved.bandCookiesAdmin || '');
         }
+        saved.allureCookies = normalizeAllureAuthValue(saved.allureCookies) || getStoredAllureApiToken();
         saved.bandChannelId = BAND_CHANNEL_ID_FIXED;
         delete saved.bandCookiesPost;
         delete saved.bandCsrfPost;
@@ -2632,7 +2840,11 @@
 
       function saveSettings(){
         try{
-          localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(collectSettings()));
+          const cfg = collectSettings();
+          if(cfg.allureCookies && !looksLikeAllureCookieString(cfg.allureCookies)){
+            localStorage.setItem(ALLURE_SHARED_TOKEN_LS_KEY, cfg.allureCookies);
+          }
+          localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(cfg));
         }catch(_){ }
       }
 
@@ -2719,7 +2931,6 @@
           const pingFoundComment = (idx === 0 && appState.workflowPingFound)
             ? '<div class="text-[11px] mt-1 text-emerald-700">Сообщение пинг-найдено</div>'
             : '';
-          const scheduleBlock = renderStepScheduleControls('major', '', idx, { busy: appState.running || appState.workflowRunning });
           return `
             <div class="rounded-2xl p-3 release-launch-workflow-row ${rowClass}">
               <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -2730,7 +2941,6 @@
                     <span class="inline-flex items-center mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ring-1 ${statusBadgeClass}">${statusText}</span>
                     ${blockedComment}
                     ${pingFoundComment}
-                    ${scheduleBlock}
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -2868,28 +3078,75 @@
         saveTimer = setTimeout(saveSettings, 220);
       }
 
-      function getMmCsrfFromCookies(cookieStr){
+      function getCookieValue(cookieStr, cookieName){
+        const target = String(cookieName || '').trim();
+        if(!target) return '';
         const parts = String(cookieStr || '').split(';').map((s) => s.trim()).filter(Boolean);
         for(const p of parts){
           const i = p.indexOf('=');
           if(i === -1) continue;
           const k = p.slice(0, i).trim();
           const v = p.slice(i + 1).trim();
-          if(k === 'MMCSRF') return v;
+          if(k === target){
+            try{
+              return decodeURIComponent(v);
+            }catch(_){
+              return v;
+            }
+          }
         }
         return '';
       }
 
+      function getMmCsrfFromCookies(cookieStr){
+        return getCookieValue(cookieStr, 'MMCSRF');
+      }
+
       function getMmUserIdFromCookies(cookieStr){
-        const parts = String(cookieStr || '').split(';').map((s) => s.trim()).filter(Boolean);
-        for(const p of parts){
-          const i = p.indexOf('=');
-          if(i === -1) continue;
-          const k = p.slice(0, i).trim();
-          const v = p.slice(i + 1).trim();
-          if(k === 'MMUSERID') return v;
+        return getCookieValue(cookieStr, 'MMUSERID');
+      }
+
+      function getAllureXsrfFromCookies(cookieStr){
+        return getCookieValue(cookieStr, 'XSRF-TOKEN');
+      }
+
+      function looksLikeAllureCookieString(value){
+        const raw = String(value || '').trim();
+        if(!raw) return false;
+        if(/(?:^|;\s*)(XSRF-TOKEN|ALLURE_TESTOPS_SESSION|ALLURE_TEST_OPS_USER_ID|wbx-validation-key)=/i.test(raw)){
+          return true;
         }
-        return '';
+        return raw.includes(';') && raw.includes('=');
+      }
+
+      function normalizeAllureAuthValue(value){
+        const raw = String(value || '').trim();
+        if(!raw) return '';
+        if(looksLikeAllureCookieString(raw)){
+          return raw;
+        }
+        return raw.replace(/^Api-Token\s+/i, '').trim();
+      }
+
+      function buildAllureSessionHeaders(cookieStr, options){
+        const opts = options || {};
+        const rawAuthValue = normalizeAllureAuthValue(cookieStr);
+        const cookies = looksLikeAllureCookieString(rawAuthValue) ? rawAuthValue : '';
+        const explicitToken = cookies ? '' : rawAuthValue;
+        const token = explicitToken || getSharedAllureApiToken();
+        if(!cookies && !token){
+          throw new Error('Заполни Allure token');
+        }
+        const xsrf = getAllureXsrfFromCookies(cookies);
+        return {
+          ...allureHeaders(token),
+          'Accept': 'application/json',
+          ...(opts.withJsonBody === false ? {} : { 'Content-Type': 'application/json' }),
+          'Origin': 'https://allure-testops.wb.ru',
+          'Referer': String(opts.referer || `https://allure-testops.wb.ru/project/7/test-cases?treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&search=${DUTY_EDITOR_ALLURE_SEARCH}`),
+          ...(xsrf ? { 'x-xsrf-token': xsrf } : {}),
+          ...(cookies ? { [PROXY_COOKIE_HEADER]: cookies } : {})
+        };
       }
 
       function getCurrentBandUserId(cfg){
@@ -3041,12 +3298,13 @@
         return resp.json;
       }
 
-      function allureHeaders(){
+      function allureHeaders(tokenOverride){
+        const token = normalizeAllureAuthValue(tokenOverride) || requireSharedAllureApiToken();
         return {
           'Accept': 'application/json',
-          'Authorization': `Api-Token ${ALLURE_API_TOKEN}`,
-          'X-ALLURE-API-TOKEN': ALLURE_API_TOKEN,
-          'allure-api-token': ALLURE_API_TOKEN
+          'Authorization': `Api-Token ${token}`,
+          'X-ALLURE-API-TOKEN': token,
+          'allure-api-token': token
         };
       }
 
@@ -3058,6 +3316,37 @@
           if(nm) names.push(nm);
         }
         return dedupKeepOrder(names);
+      }
+
+      function parseAllureLeavesFromLeafJson(data){
+        const content = (data && Array.isArray(data.content)) ? data.content : [];
+        const out = [];
+        const seen = new Set();
+        for(const item of content){
+          const id = Number(item && item.id);
+          const name = String(item && item.name || '').trim();
+          if(!Number.isFinite(id) || id <= 0 || !name) continue;
+          const key = `${id}::${norm(name)}`;
+          if(seen.has(key)) continue;
+          seen.add(key);
+          out.push({ id, name });
+        }
+        return out;
+      }
+
+      function normalizeDutyEditorAllureLeaves(raw){
+        const out = [];
+        const seen = new Set();
+        for(const item of Array.isArray(raw) ? raw : []){
+          const id = Number(item && item.id);
+          const name = String(item && item.name || '').trim();
+          if(!Number.isFinite(id) || id <= 0 || !name) continue;
+          const key = `${id}::${norm(name)}`;
+          if(seen.has(key)) continue;
+          seen.add(key);
+          out.push({ id, name });
+        }
+        return out;
       }
 
       async function fetchStreams(signal){
@@ -3088,6 +3377,131 @@
         }
 
         return dedupKeepOrder(allNames.map((x) => String(x || '').trim()).filter(Boolean));
+      }
+
+      async function fetchDutyEditorAllureStreams(signal){
+        let page = 0;
+        let guard = 0;
+        const allLeaves = [];
+
+        while(true){
+          const url = new URL(DUTY_EDITOR_ALLURE_STREAMS_URL);
+          url.searchParams.set('page', String(page));
+
+          const data = await proxyRequestJson('GET', url.toString(), allureHeaders(), undefined, signal);
+          allLeaves.push(...parseAllureLeavesFromLeafJson(data));
+
+          const last = data && data.last === true;
+          const totalPages = data && Number.isInteger(data.totalPages) ? data.totalPages : null;
+          if(last) break;
+          if(totalPages !== null && page >= totalPages - 1) break;
+
+          page += 1;
+          guard += 1;
+          if(guard > 50) break;
+        }
+        return normalizeDutyEditorAllureLeaves(allLeaves);
+      }
+
+      async function createDutyEditorAllureLeaf(streamName, signal){
+        const name = String(streamName || '').trim();
+        if(!name) throw new Error('Заполни название стрима');
+        const cfg = collectSettings();
+        const headers = buildAllureSessionHeaders(cfg.allureCookies, {
+          referer: `https://allure-testops.wb.ru/project/7/test-cases?treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&search=${DUTY_EDITOR_ALLURE_SEARCH}`
+        });
+        return proxyRequestJson('POST', DUTY_EDITOR_ALLURE_CREATE_URL, headers, { name }, signal);
+      }
+
+      async function addDutyEditorAllureLeafTag(leafId, signal){
+        const id = Number(leafId);
+        if(!Number.isFinite(id) || id <= 0) throw new Error('Некорректный leafId для тега Allure');
+        const cfg = collectSettings();
+        const headers = buildAllureSessionHeaders(cfg.allureCookies, {
+          referer: `https://allure-testops.wb.ru/project/7/test-cases/${id}?treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&search=${DUTY_EDITOR_ALLURE_SEARCH}`
+        });
+        return proxyRequestJson('POST', `${DUTY_EDITOR_ALLURE_TESTCASE_BASE_URL}/${encodeURIComponent(String(id))}/tag`, headers, [{ id: DUTY_EDITOR_ALLURE_TAG_ID }], signal);
+      }
+
+      async function patchDutyEditorAllureLeafStatus(leafId, signal){
+        const id = Number(leafId);
+        if(!Number.isFinite(id) || id <= 0) throw new Error('Некорректный leafId для статуса Allure');
+        const cfg = collectSettings();
+        const headers = buildAllureSessionHeaders(cfg.allureCookies, {
+          referer: `https://allure-testops.wb.ru/project/7/test-cases/${id}?treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&search=${DUTY_EDITOR_ALLURE_SEARCH}`
+        });
+        return proxyRequestJson('PATCH', `${DUTY_EDITOR_ALLURE_TESTCASE_BASE_URL}/${encodeURIComponent(String(id))}`, headers, {
+          statusId: DUTY_EDITOR_ALLURE_STATUS_ID,
+          workflowId: DUTY_EDITOR_ALLURE_WORKFLOW_ID
+        }, signal);
+      }
+
+      async function renameDutyEditorAllureLeaf(leafId, streamName, signal){
+        const id = Number(leafId);
+        const name = String(streamName || '').trim();
+        if(!Number.isFinite(id) || id <= 0) throw new Error('Некорректный leafId для rename Allure');
+        if(!name) throw new Error('Заполни название стрима');
+        const cfg = collectSettings();
+        const headers = buildAllureSessionHeaders(cfg.allureCookies, {
+          referer: `https://allure-testops.wb.ru/project/7/test-cases/${id}?treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&search=${DUTY_EDITOR_ALLURE_SEARCH}`
+        });
+        const url = `${DUTY_EDITOR_ALLURE_RENAME_URL}&leafId=${encodeURIComponent(String(id))}`;
+        return proxyRequestJson('POST', url, headers, { name }, signal);
+      }
+
+      async function deleteDutyEditorAllureLeaf(leafId, signal){
+        const id = Number(leafId);
+        if(!Number.isFinite(id) || id <= 0) throw new Error('Некорректный leafId для удаления Allure');
+        const cfg = collectSettings();
+        const headers = buildAllureSessionHeaders(cfg.allureCookies, {
+          referer: `https://allure-testops.wb.ru/project/7/test-cases/${id}?treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&search=${DUTY_EDITOR_ALLURE_SEARCH}`,
+          withJsonBody: false
+        });
+        const url = `${DUTY_EDITOR_ALLURE_TESTCASE_BASE_URL}/${encodeURIComponent(String(id))}?force=false`;
+        return proxyRequestJson('DELETE', url, headers, undefined, signal);
+      }
+
+      async function syncCollectionAllureTestPlan(signal){
+        const cfg = collectSettings();
+        const headers = buildAllureSessionHeaders(cfg.allureCookies, {
+          referer: 'https://allure-testops.wb.ru/testplan/3918',
+          withJsonBody: false
+        });
+        return proxyRequestJson('POST', COLLECTION_ALLURE_SYNC_URL, headers, undefined, signal);
+      }
+
+      async function syncDutyEditorLeadEntryWithAllure(entryId, signal){
+        const entry = findDutyEditorEntry('leads', entryId);
+        if(!entry) throw new Error('Строка стрима не найдена');
+        const normalizedEntry = normalizeDutyEditorEntry(entry);
+        const draft = getDutyEditorEntryDraft('leads', entryId);
+        const currentName = String(normalizedEntry.name || '').trim();
+        const previousName = String(draft && draft.name || '').trim();
+        const isNew = !!(draft && draft.isNew);
+
+        if(!currentName){
+          throw new Error('Заполни название стрима');
+        }
+
+        if(isNew || !normalizedEntry.allureLeafId){
+          const created = await createDutyEditorAllureLeaf(currentName, signal);
+          const createdId = Number(created && created.id);
+          if(!Number.isFinite(createdId) || createdId <= 0){
+            throw new Error('Allure не вернул id нового стрима');
+          }
+          await addDutyEditorAllureLeafTag(createdId, signal);
+          await patchDutyEditorAllureLeafStatus(createdId, signal);
+          normalizedEntry.allureLeafId = createdId;
+          Object.assign(entry, normalizedEntry);
+          return { created: true, renamed: false };
+        }
+
+        if(previousName && previousName !== currentName){
+          await renameDutyEditorAllureLeaf(normalizedEntry.allureLeafId, currentName, signal);
+          return { created: false, renamed: true };
+        }
+
+        return { created: false, renamed: false };
       }
 
       function normalizeLeadsData(raw){
@@ -3150,6 +3564,1945 @@
 
       function buildHardcodedExcludeSet(){
         return new Set(EXCLUDED_STREAMS.map((x) => norm(x)));
+      }
+
+      function normalizeStreamGroupsData(raw){
+        if(!raw || typeof raw !== 'object' || Array.isArray(raw)){
+          throw new Error('JSON стримов должен быть объектом вида {"Core": ["Android", "iOS"]}');
+        }
+
+        const out = {};
+        for(const [key, value] of Object.entries(raw)){
+          if(typeof key !== 'string') continue;
+          const group = key.trim();
+          if(!group) continue;
+
+          if(!Array.isArray(value)){
+            throw new Error(`Для группы "${group}" ожидается массив значений`);
+          }
+
+          out[group] = value.map((item) => String(item || '').trim()).filter(Boolean);
+        }
+        return out;
+      }
+
+      function normalizeDutyEditorTables(raw){
+        if(!Array.isArray(raw)) return [];
+        return raw.map((table, index) => {
+          const rows = Array.isArray(table && table.rows) ? table.rows : [];
+          return {
+            title: String((table && table.title) || `Таблица ${index + 1}`).trim() || `Таблица ${index + 1}`,
+            rows: rows.map((row) => Array.isArray(row) ? row.map((cell) => String(cell == null ? '' : cell)) : [])
+          };
+        });
+      }
+
+      function cloneDutyEditorTables(tables){
+        return normalizeDutyEditorTables(Array.isArray(tables) ? tables : []);
+      }
+
+      function nextDutyEditorEntryId(){
+        appState.dutyEditorNextId = Number(appState.dutyEditorNextId || 0) + 1;
+        return `duty-editor-${appState.dutyEditorNextId}`;
+      }
+
+      function createDutyEditorEntry(name, values, editing, extra){
+        const meta = extra && typeof extra === 'object' ? extra : {};
+        const allureLeafId = Number(meta.allureLeafId);
+        return {
+          id: nextDutyEditorEntryId(),
+          name: String(name || '').trim(),
+          values: Array.isArray(values)
+            ? values.map((item) => String(item || '').trim()).filter(Boolean)
+            : [],
+          editing: !!editing,
+          allureLeafId: Number.isFinite(allureLeafId) && allureLeafId > 0 ? allureLeafId : null
+        };
+      }
+
+      function createDutyEditorEntriesFromMap(raw){
+        const map = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+        return Object.entries(map).map(([name, values]) => createDutyEditorEntry(name, values, false));
+      }
+
+      function createDutyEditorLeadEntriesFromMap(raw){
+        const map = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+        const out = [];
+        for(const [lead, streams] of Object.entries(map)){
+          const streamList = Array.isArray(streams) ? streams : [];
+          if(!streamList.length){
+            out.push(createDutyEditorEntry('', [lead], false));
+            continue;
+          }
+          for(const stream of streamList){
+            out.push(createDutyEditorEntry(stream, [lead], false));
+          }
+        }
+        return out;
+      }
+
+      function mergeLeadsMaps(){
+        const out = {};
+        for(const source of arguments){
+          const map = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
+          for(const [leadRaw, streamsRaw] of Object.entries(map)){
+            const lead = String(leadRaw || '').trim();
+            if(!lead) continue;
+            if(!Array.isArray(out[lead])) out[lead] = [];
+            for(const streamRaw of Array.isArray(streamsRaw) ? streamsRaw : []){
+              const stream = String(streamRaw || '').trim();
+              if(!stream) continue;
+              if(!out[lead].includes(stream)){
+                out[lead].push(stream);
+              }
+            }
+          }
+        }
+        return normalizeLeadsData(out);
+      }
+
+      function buildDutyEditorLeadEntriesFromAllureStreams(raw, allureLeaves){
+        const normalizedLeads = raw && typeof raw === 'object' && !Array.isArray(raw) ? normalizeLeadsData(raw) : {};
+        const sourceLeaves = normalizeDutyEditorAllureLeaves(allureLeaves);
+        const sourceStreamNames = sourceLeaves.map((leaf) => String(leaf.name || '').trim()).filter(Boolean);
+        if(!sourceStreamNames.length){
+          return {
+            entries: createDutyEditorLeadEntriesFromMap(normalizedLeads),
+            hiddenLeadAssignments: {}
+          };
+        }
+
+        const aliases = buildHardcodedAliases();
+        const streamNorm2Canonical = buildStreamNorm2Canonical(sourceStreamNames, aliases);
+        const visibleStreamNorms = new Set(sourceStreamNames.map((stream) => norm(stream)));
+        const leadByVisibleStreamNorm = new Map();
+        const hiddenLeadAssignments = {};
+
+        for(const [leadRaw, streamsRaw] of Object.entries(normalizedLeads)){
+          const lead = String(leadRaw || '').trim();
+          if(!lead) continue;
+          for(const streamRaw of Array.isArray(streamsRaw) ? streamsRaw : []){
+            const stream = String(streamRaw || '').trim();
+            if(!stream) continue;
+            const canonical = streamNorm2Canonical[norm(stream)]
+              || streamNorm2Canonical[normLoose(stream)]
+              || '';
+            const canonicalNorm = canonical ? norm(canonical) : '';
+
+            if(canonical && visibleStreamNorms.has(canonicalNorm) && !leadByVisibleStreamNorm.has(canonicalNorm)){
+              leadByVisibleStreamNorm.set(canonicalNorm, lead);
+              continue;
+            }
+
+            if(!Array.isArray(hiddenLeadAssignments[lead])) hiddenLeadAssignments[lead] = [];
+            if(!hiddenLeadAssignments[lead].includes(stream)){
+              hiddenLeadAssignments[lead].push(stream);
+            }
+          }
+        }
+
+        return {
+          entries: sourceLeaves.map((leaf) => {
+            const mappedLead = String(leadByVisibleStreamNorm.get(norm(leaf.name)) || '').trim();
+            return createDutyEditorEntry(leaf.name, mappedLead ? [mappedLead] : [], false, { allureLeafId: leaf.id });
+          }),
+          hiddenLeadAssignments: normalizeLeadsData(hiddenLeadAssignments)
+        };
+      }
+
+      function getDutyEditorEntries(kind){
+        if(!appState.dutyEditorData) return [];
+        if(kind === 'leads') return Array.isArray(appState.dutyEditorData.leadsEntries) ? appState.dutyEditorData.leadsEntries : [];
+        if(kind === 'streams') return Array.isArray(appState.dutyEditorData.streamEntries) ? appState.dutyEditorData.streamEntries : [];
+        return [];
+      }
+
+      function getDutyEditorSectionTitle(kind){
+        return kind === 'leads' ? 'стрима' : 'группы';
+      }
+
+      function getDutyEditorNameLabel(kind){
+        return kind === 'leads' ? 'Название стрима' : 'Название группы';
+      }
+
+      function getDutyEditorValuesLabel(kind){
+        return kind === 'leads' ? 'Ищем в band по ФИО' : 'Значения';
+      }
+
+      function getDutyEditorListElement(kind){
+        return kind === 'leads' ? dutyEditorLeadsList : dutyEditorStreamsList;
+      }
+
+      function normalizeDutyEditorEntry(entry){
+        if(!entry || typeof entry !== 'object') return createDutyEditorEntry('', [], false);
+        const allureLeafId = Number(entry.allureLeafId);
+        return {
+          id: String(entry.id || nextDutyEditorEntryId()),
+          name: String(entry.name || '').trim(),
+          values: Array.isArray(entry.values)
+            ? entry.values.map((item) => String(item || '').trim()).filter(Boolean)
+            : [],
+          editing: !!entry.editing,
+          allureLeafId: Number.isFinite(allureLeafId) && allureLeafId > 0 ? allureLeafId : null
+        };
+      }
+
+      function setDutyEditorEntries(kind, entries){
+        const list = Array.isArray(entries) ? entries.map((item) => normalizeDutyEditorEntry(item)) : [];
+        if(!appState.dutyEditorData){
+          appState.dutyEditorData = {
+            leadsEntries: [],
+            streamEntries: [],
+            tables: [],
+            meta: {}
+          };
+        }
+        if(kind === 'leads') appState.dutyEditorData.leadsEntries = list;
+        if(kind === 'streams') appState.dutyEditorData.streamEntries = list;
+      }
+
+      function cloneDutyEditorEntries(entries){
+        return (Array.isArray(entries) ? entries : []).map((entry) => {
+          const normalized = normalizeDutyEditorEntry(entry);
+          return {
+            id: normalized.id,
+            name: normalized.name,
+            values: normalized.values.slice(),
+            editing: normalized.editing,
+            allureLeafId: normalized.allureLeafId
+          };
+        });
+      }
+
+      function findDutyEditorEntry(kind, entryId){
+        return getDutyEditorEntries(kind).find((item) => String(item.id || '') === String(entryId || '')) || null;
+      }
+
+      function convertDutyEditorEntriesToMap(entries, kind){
+        if(kind === 'leads'){
+          const out = {};
+          const seenStreams = new Set();
+          for(const rawEntry of Array.isArray(entries) ? entries : []){
+            const entry = normalizeDutyEditorEntry(rawEntry);
+            const streamName = String(entry.name || '').trim();
+            const lead = String(Array.isArray(entry.values) ? (entry.values[0] || '') : '').trim();
+            if(!streamName){
+              throw new Error('Заполни название стрима');
+            }
+            if(!lead){
+              throw new Error(`Заполни лида для стрима "${streamName}"`);
+            }
+
+            const streamKey = norm(streamName);
+            if(seenStreams.has(streamKey)){
+              throw new Error(`Повторяющееся название стрима: ${streamName}`);
+            }
+            seenStreams.add(streamKey);
+
+            if(!lead){
+              continue;
+            }
+
+            if(!Array.isArray(out[lead])) out[lead] = [];
+            out[lead].push(streamName);
+          }
+          return normalizeLeadsData(out);
+        }
+
+        const out = {};
+        const seen = new Set();
+        for(const rawEntry of Array.isArray(entries) ? entries : []){
+          const entry = normalizeDutyEditorEntry(rawEntry);
+          const name = String(entry.name || '').trim();
+          if(!name){
+            throw new Error(`Заполни название ${getDutyEditorSectionTitle(kind)}`);
+          }
+
+          const nameKey = norm(name);
+          if(seen.has(nameKey)){
+            throw new Error(`Повторяющееся название ${getDutyEditorSectionTitle(kind)}: ${name}`);
+          }
+          seen.add(nameKey);
+          out[name] = entry.values.map((value) => String(value || '').trim()).filter(Boolean);
+        }
+        return normalizeStreamGroupsData(out);
+      }
+
+      function syncDutyEditorSourceLinks(){
+        if(dutyEditorDocLink) dutyEditorDocLink.href = DUTY_EDITOR_DOC_URL;
+        if(dutyEditorJsonLink) dutyEditorJsonLink.href = DUTY_EDITOR_JSON_URL;
+      }
+
+      function setDutyEditorStatus(message, kind){
+        if(!dutyEditorStatus) return;
+        const statusKind = ['muted', 'progress', 'ok', 'warn', 'err'].includes(String(kind || '')) ? String(kind) : 'muted';
+        dutyEditorStatus.className = `release-launch-status release-launch-status-${statusKind}`;
+        dutyEditorStatus.textContent = String(message || '').trim() || 'Статус редактора пока пуст';
+      }
+
+      function setDutyEditorDirty(isDirty){
+        appState.dutyEditorDirty = !!isDirty;
+        if(dutyEditorDirtyBadge) dutyEditorDirtyBadge.style.display = appState.dutyEditorDirty ? '' : 'none';
+      }
+
+      function createDutyEditorEntriesSnapshot(entries, kind){
+        return (Array.isArray(entries) ? entries : []).map((entry) => {
+          const normalized = normalizeDutyEditorEntry(entry);
+          if(kind === 'leads'){
+            return {
+              name: String(normalized.name || ''),
+              values: [String(Array.isArray(normalized.values) ? (normalized.values[0] || '') : '')]
+            };
+          }
+          return {
+            name: String(normalized.name || ''),
+            values: normalized.values.map((value) => String(value || ''))
+          };
+        });
+      }
+
+      function createDutyEditorStateSnapshot(data){
+        const source = data && typeof data === 'object' ? data : {};
+        return JSON.stringify({
+          leadsEntries: createDutyEditorEntriesSnapshot(source.leadsEntries, 'leads'),
+          streamEntries: createDutyEditorEntriesSnapshot(source.streamEntries, 'streams'),
+          tables: cloneDutyEditorTables(source.tables)
+        });
+      }
+
+      function createDutyEditorEntryDraft(entry){
+        const normalized = normalizeDutyEditorEntry(entry);
+        return {
+          isNew: false,
+          name: normalized.name,
+          values: normalized.values.slice()
+        };
+      }
+
+      function getDutyEditorEditStateKey(kind, entryId){
+        return `${String(kind || '')}:${String(entryId || '')}`;
+      }
+
+      function rememberDutyEditorEntryDraft(kind, entryId, snapshot){
+        if(!appState.dutyEditorEditState || typeof appState.dutyEditorEditState !== 'object'){
+          appState.dutyEditorEditState = {};
+        }
+        appState.dutyEditorEditState[getDutyEditorEditStateKey(kind, entryId)] = snapshot;
+      }
+
+      function getDutyEditorEntryDraft(kind, entryId){
+        const key = getDutyEditorEditStateKey(kind, entryId);
+        return appState.dutyEditorEditState && Object.prototype.hasOwnProperty.call(appState.dutyEditorEditState, key)
+          ? appState.dutyEditorEditState[key]
+          : null;
+      }
+
+      function clearDutyEditorEntryDraft(kind, entryId){
+        if(!appState.dutyEditorEditState || typeof appState.dutyEditorEditState !== 'object') return;
+        delete appState.dutyEditorEditState[getDutyEditorEditStateKey(kind, entryId)];
+      }
+
+      function refreshDutyEditorDirtyState(){
+        const currentSnapshot = createDutyEditorStateSnapshot(appState.dutyEditorData);
+        setDutyEditorDirty(currentSnapshot !== String(appState.dutyEditorSnapshot || ''));
+      }
+
+      function getDutyEditorPencilIconMarkup(){
+        return `
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 17.25V21h3.75L19.81 7.94l-3.75-3.75z"></path>
+            <path d="M14.06 4.19l3.75 3.75"></path>
+          </svg>
+        `;
+      }
+
+      function getDutyEditorTrashIconMarkup(){
+        return `
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18"></path>
+            <path d="M8 6V4h8v2"></path>
+            <path d="M19 6l-1 14H6L5 6"></path>
+            <path d="M10 10v6"></path>
+            <path d="M14 10v6"></path>
+          </svg>
+        `;
+      }
+
+      function getDutyEditorCopyIconMarkup(){
+        return `
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+            <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        `;
+      }
+
+      function getDutyEditorButtonSpinnerMarkup(){
+        return '<span class="release-launch-duty-editor-inline-spinner" aria-hidden="true"></span>';
+      }
+
+      function getDutyEditorLeadSearchState(entryId){
+        const key = String(entryId || '');
+        if(!key) return null;
+        if(!appState.dutyEditorLeadSearchState || typeof appState.dutyEditorLeadSearchState !== 'object'){
+          appState.dutyEditorLeadSearchState = {};
+        }
+        if(!appState.dutyEditorLeadSearchState[key]){
+          appState.dutyEditorLeadSearchState[key] = {
+            query: '',
+            loading: false,
+            items: [],
+            error: '',
+            open: false,
+            seq: 0
+          };
+        }
+        return appState.dutyEditorLeadSearchState[key];
+      }
+
+      function patchDutyEditorLeadSearchState(entryId, patch){
+        const state = getDutyEditorLeadSearchState(entryId);
+        if(!state) return null;
+        Object.assign(state, patch || {});
+        return state;
+      }
+
+      function clearDutyEditorLeadSearchTimer(entryId){
+        const key = String(entryId || '');
+        if(!key || !appState.dutyEditorLeadSearchTimers) return;
+        const timerId = appState.dutyEditorLeadSearchTimers[key];
+        if(timerId){
+          clearTimeout(timerId);
+        }
+        delete appState.dutyEditorLeadSearchTimers[key];
+      }
+
+      function abortDutyEditorLeadSearch(entryId){
+        const key = String(entryId || '');
+        if(!key || !appState.dutyEditorLeadSearchControllers) return;
+        const ctrl = appState.dutyEditorLeadSearchControllers[key];
+        if(ctrl && typeof ctrl.abort === 'function'){
+          ctrl.abort();
+        }
+        delete appState.dutyEditorLeadSearchControllers[key];
+      }
+
+      function clearDutyEditorLeadSearchState(entryId){
+        const key = String(entryId || '');
+        if(!key) return;
+        clearDutyEditorLeadSearchTimer(key);
+        abortDutyEditorLeadSearch(key);
+        if(appState.dutyEditorLeadSearchState && typeof appState.dutyEditorLeadSearchState === 'object'){
+          delete appState.dutyEditorLeadSearchState[key];
+        }
+      }
+
+      function clearAllDutyEditorLeadSearchState(){
+        for(const key of Object.keys(appState.dutyEditorLeadSearchTimers || {})){
+          clearDutyEditorLeadSearchTimer(key);
+        }
+        for(const key of Object.keys(appState.dutyEditorLeadSearchControllers || {})){
+          abortDutyEditorLeadSearch(key);
+        }
+        appState.dutyEditorLeadSearchState = {};
+      }
+
+      function closeAllDutyEditorLeadSearchPanels(){
+        for(const state of Object.values(appState.dutyEditorLeadSearchState || {})){
+          if(state && typeof state === 'object'){
+            state.open = false;
+          }
+        }
+        syncDutyEditorLeadSearchPanels();
+      }
+
+      function buildDutyEditorBandUserDisplayName(user){
+        const firstName = String(user && user.first_name || '').trim();
+        const lastName = String(user && user.last_name || '').trim();
+        const fullName = [firstName, lastName].filter(Boolean).join(' ').trim()
+          || [lastName, firstName].filter(Boolean).join(' ').trim();
+        const nickname = String(user && user.nickname || '').trim();
+        const username = String(user && user.username || '').trim();
+        return fullName || nickname || username;
+      }
+
+      function buildDutyEditorBandUserTitle(user){
+        return [
+          String(user && user.handle || '').trim(),
+          String(user && user.displayName || '').trim(),
+          String(user && user.position || '').trim()
+        ].filter(Boolean).join(' - ');
+      }
+
+      function buildDutyEditorBandUserSubtitle(user){
+        return String(user && user.email || '').trim() || String(user && user.handle || '').trim();
+      }
+
+      function buildDutyEditorBandUserInitials(user){
+        const source = String(user && user.displayName || '').trim() || String(user && user.username || '').trim();
+        const parts = source.split(/\s+/).filter(Boolean);
+        const initials = parts.slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase();
+        return initials || '@';
+      }
+
+      function normalizeDutyEditorBandUser(user){
+        if(!user || typeof user !== 'object') return null;
+        const username = String(user.username || '').trim().replace(/^@+/, '');
+        if(!username) return null;
+        const handle = `@${username}`;
+        const displayName = buildDutyEditorBandUserDisplayName(user);
+        const position = String(user.position || '').trim();
+        const email = String(user.email || '').trim();
+        return {
+          id: String(user.id || username).trim() || username,
+          username,
+          handle,
+          displayName,
+          position,
+          email,
+          title: buildDutyEditorBandUserTitle({ handle, displayName, position }),
+          subtitle: buildDutyEditorBandUserSubtitle({ email, handle }),
+          initials: buildDutyEditorBandUserInitials({ displayName, username }),
+          avatarStamp: Number(user.last_picture_update || user.update_at || user.create_at || 0) || 0,
+          presence: 'offline'
+        };
+      }
+
+      async function proxyRequestBlob(method, targetUrl, headers, signal){
+        const p = new URL(PROXY_BASE + '/proxy');
+        p.searchParams.set('url', targetUrl);
+
+        let r;
+        try{
+          r = await fetch(p.toString(), { method, headers: headers || {}, signal });
+        }catch(error){
+          const msg = error && error.message ? error.message : String(error);
+          throw new Error(`Сетевой/CORS блок для proxy ${targetUrl}: ${msg}`);
+        }
+
+        if(!r.ok){
+          let rawBody = '';
+          try{ rawBody = await r.text(); }catch(_){}
+          const detail = extractProxyErrorText(rawBody);
+          const err = new Error(detail ? `Proxy HTTP ${r.status}: ${detail}` : `Proxy HTTP ${r.status}`);
+          err.status = r.status;
+          err.body = rawBody;
+          throw err;
+        }
+
+        return r.blob();
+      }
+
+      function getDutyEditorLeadAvatarCacheEntry(userId){
+        const key = String(userId || '').trim();
+        if(!key) return null;
+        if(!appState.dutyEditorLeadAvatarCache || typeof appState.dutyEditorLeadAvatarCache !== 'object'){
+          appState.dutyEditorLeadAvatarCache = {};
+        }
+        if(!appState.dutyEditorLeadAvatarCache[key]){
+          appState.dutyEditorLeadAvatarCache[key] = {
+            requestKey: '',
+            loading: false,
+            url: '',
+            promise: null
+          };
+        }
+        return appState.dutyEditorLeadAvatarCache[key];
+      }
+
+      function getDutyEditorLeadAvatarUrl(user){
+        const entry = getDutyEditorLeadAvatarCacheEntry(user && user.id);
+        return entry && entry.url ? entry.url : '';
+      }
+
+      async function ensureDutyEditorLeadAvatar(user){
+        if(!user || typeof user !== 'object' || !String(user.id || '').trim()){
+          return '';
+        }
+        const cacheEntry = getDutyEditorLeadAvatarCacheEntry(user.id);
+        if(!cacheEntry){
+          return '';
+        }
+
+        const requestKey = `${String(user.id || '').trim()}:${Number(user.avatarStamp || 0)}`;
+        if(cacheEntry.requestKey === requestKey){
+          if(cacheEntry.url){
+            return cacheEntry.url;
+          }
+          if(cacheEntry.promise){
+            return cacheEntry.promise;
+          }
+        }
+
+        if(cacheEntry.url){
+          URL.revokeObjectURL(cacheEntry.url);
+        }
+
+        const cfg = collectSettings();
+        if(!String(cfg.bandCookiesRead || '').trim()){
+          cacheEntry.requestKey = requestKey;
+          cacheEntry.loading = false;
+          cacheEntry.url = '';
+          cacheEntry.promise = null;
+          return '';
+        }
+
+        const avatarUrl = `https://band.wb.ru/api/v4/users/${encodeURIComponent(String(user.id || '').trim())}/image?_=${encodeURIComponent(String(user.avatarStamp || Date.now()))}`;
+        const headers = {
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'X-Requested-With': 'XMLHttpRequest',
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+
+        const promise = proxyRequestBlob('GET', avatarUrl, headers, null)
+          .then((blob) => {
+            const objectUrl = blob && blob.size ? URL.createObjectURL(blob) : '';
+            const currentEntry = getDutyEditorLeadAvatarCacheEntry(user.id);
+            if(!currentEntry) return objectUrl;
+            if(currentEntry.url && currentEntry.url !== objectUrl){
+              URL.revokeObjectURL(currentEntry.url);
+            }
+            currentEntry.requestKey = requestKey;
+            currentEntry.loading = false;
+            currentEntry.url = objectUrl;
+            currentEntry.promise = null;
+            syncDutyEditorLeadSearchPanels();
+            return objectUrl;
+          })
+          .catch(() => {
+            const currentEntry = getDutyEditorLeadAvatarCacheEntry(user.id);
+            if(currentEntry){
+              currentEntry.requestKey = requestKey;
+              currentEntry.loading = false;
+              currentEntry.url = '';
+              currentEntry.promise = null;
+            }
+            syncDutyEditorLeadSearchPanels();
+            return '';
+          });
+
+        cacheEntry.requestKey = requestKey;
+        cacheEntry.loading = true;
+        cacheEntry.url = '';
+        cacheEntry.promise = promise;
+        return promise;
+      }
+
+      function prefetchDutyEditorLeadAvatars(items){
+        for(const item of Array.isArray(items) ? items : []){
+          void ensureDutyEditorLeadAvatar(item);
+        }
+      }
+
+      function normalizeDutyEditorBandPresence(value){
+        const normalized = String(value || '').trim().toLowerCase();
+        if(normalized === 'online' || normalized === 'away' || normalized === 'dnd' || normalized === 'offline'){
+          return normalized;
+        }
+        return 'offline';
+      }
+
+      async function bandGetUsersPresence(userIds, signal){
+        const ids = Array.from(new Set(
+          (Array.isArray(userIds) ? userIds : [])
+            .map((item) => String(item || '').trim())
+            .filter(Boolean)
+        ));
+        if(!ids.length){
+          return [];
+        }
+
+        const cfg = collectSettings();
+        if(!String(cfg.bandCookiesRead || '').trim()){
+          throw new Error('Заполни Cookies (чтение/поиск users и post)');
+        }
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesRead);
+        const headers = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+
+        return proxyRequestJson(
+          'POST',
+          'https://band.wb.ru/api/v4/users/status/ids',
+          headers,
+          ids,
+          signal
+        );
+      }
+
+      async function enrichDutyEditorBandUsersPresence(items, signal){
+        const list = Array.isArray(items) ? items : [];
+        if(!list.length){
+          return [];
+        }
+
+        try{
+          const statuses = await bandGetUsersPresence(list.map((item) => item && item.id), signal);
+          const presenceById = new Map();
+          for(const statusItem of Array.isArray(statuses) ? statuses : []){
+            const userId = String(statusItem && statusItem.user_id || '').trim();
+            if(!userId) continue;
+            presenceById.set(userId, normalizeDutyEditorBandPresence(statusItem.status));
+          }
+          return list.map((item) => ({
+            ...item,
+            presence: presenceById.get(String(item && item.id || '').trim()) || 'offline'
+          }));
+        }catch(_){
+          return list.map((item) => ({
+            ...item,
+            presence: normalizeDutyEditorBandPresence(item && item.presence)
+          }));
+        }
+      }
+
+      function renderDutyEditorLeadPresenceBadge(user){
+        const presence = normalizeDutyEditorBandPresence(user && user.presence);
+        if(presence === 'away'){
+          return `
+            <span class="release-launch-duty-editor-search-option-badge is-away" title="away" aria-label="away">
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <circle cx="8" cy="8" r="5.25"></circle>
+                <path d="M8 4.75v3.35l2.2 1.3"></path>
+              </svg>
+            </span>
+          `;
+        }
+        if(presence === 'dnd'){
+          return `
+            <span class="release-launch-duty-editor-search-option-badge is-dnd" title="dnd" aria-label="dnd">
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M4.2 8h7.6"></path>
+              </svg>
+            </span>
+          `;
+        }
+        if(presence === 'offline'){
+          return '<span class="release-launch-duty-editor-search-option-badge is-offline" title="offline" aria-label="offline"></span>';
+        }
+        return `
+          <span class="release-launch-duty-editor-search-option-badge is-online" title="online" aria-label="online">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path d="M4.7 8.4 7 10.7l4.3-4.4"></path>
+            </svg>
+          </span>
+        `;
+      }
+
+      function normalizeDutyEditorBandHandle(value){
+        const raw = String(value || '').trim();
+        if(!raw || /\s/.test(raw)) return '';
+        const username = raw.replace(/^@+/, '');
+        if(!username || !/^[a-z0-9._-]+$/i.test(username)) return '';
+        return `@${username}`;
+      }
+
+      function getDutyEditorLeadMappedName(value){
+        const raw = String(value || '').trim();
+        const handle = normalizeDutyEditorBandHandle(raw);
+        if(!handle) return raw;
+        const key = handle.toLocaleLowerCase('ru-RU');
+        const cache = appState.dutyEditorLeadNameByHandle && typeof appState.dutyEditorLeadNameByHandle === 'object'
+          ? appState.dutyEditorLeadNameByHandle
+          : {};
+        return String(cache[key] || '').trim() || raw;
+      }
+
+      function getDutyEditorLeadProfile(value){
+        const handle = normalizeDutyEditorBandHandle(value);
+        if(!handle) return null;
+        const key = handle.toLocaleLowerCase('ru-RU');
+        const cache = appState.dutyEditorLeadProfileByHandle && typeof appState.dutyEditorLeadProfileByHandle === 'object'
+          ? appState.dutyEditorLeadProfileByHandle
+          : {};
+        return cache[key] && typeof cache[key] === 'object' ? cache[key] : null;
+      }
+
+      function getSortedDutyEditorLeadEntries(entries){
+        return (Array.isArray(entries) ? entries : [])
+          .map((entry, index) => ({ entry, index }))
+          .sort((leftItem, rightItem) => {
+            const left = leftItem.entry;
+            const right = rightItem.entry;
+            const leftLead = getDutyEditorLeadMappedName(Array.isArray(left && left.values) ? left.values[0] : '');
+            const rightLead = getDutyEditorLeadMappedName(Array.isArray(right && right.values) ? right.values[0] : '');
+            const leadCompare = String(leftLead || '').localeCompare(String(rightLead || ''), 'ru-RU', { sensitivity: 'base' });
+            if(leadCompare !== 0) return leadCompare;
+
+            const leftName = String(left && left.name || '').trim();
+            const rightName = String(right && right.name || '').trim();
+            const nameCompare = leftName.localeCompare(rightName, 'ru-RU', { sensitivity: 'base' });
+            if(nameCompare !== 0) return nameCompare;
+            return leftItem.index - rightItem.index;
+          })
+          .map((item) => item.entry);
+      }
+
+      async function bandGetDutyEditorBandUsersByUsernames(usernames, signal){
+        const requestedUsernames = Array.from(new Set(
+          (Array.isArray(usernames) ? usernames : [])
+            .map((username) => String(username || '').trim().replace(/^@+/, '').toLocaleLowerCase('ru-RU'))
+            .filter(Boolean)
+        ));
+        if(!requestedUsernames.length){
+          return [];
+        }
+
+        const cfg = collectSettings();
+        if(!String(cfg.bandCookiesRead || '').trim()){
+          return [];
+        }
+
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesRead);
+        const headers = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+
+        const data = await proxyRequestJson(
+          'POST',
+          'https://band.wb.ru/api/v4/users/usernames',
+          headers,
+          requestedUsernames,
+          signal
+        );
+
+        return (Array.isArray(data) ? data : [])
+          .map((user) => normalizeDutyEditorBandUser(user))
+          .filter(Boolean);
+      }
+
+      async function warmDutyEditorLeadMappedNames(entries){
+        const list = Array.isArray(entries) ? entries : [];
+        const loadingMap = appState.dutyEditorLeadNameLoadingByHandle && typeof appState.dutyEditorLeadNameLoadingByHandle === 'object'
+          ? appState.dutyEditorLeadNameLoadingByHandle
+          : (appState.dutyEditorLeadNameLoadingByHandle = {});
+        const cache = appState.dutyEditorLeadNameByHandle && typeof appState.dutyEditorLeadNameByHandle === 'object'
+          ? appState.dutyEditorLeadNameByHandle
+          : (appState.dutyEditorLeadNameByHandle = {});
+        const profileCache = appState.dutyEditorLeadProfileByHandle && typeof appState.dutyEditorLeadProfileByHandle === 'object'
+          ? appState.dutyEditorLeadProfileByHandle
+          : (appState.dutyEditorLeadProfileByHandle = {});
+
+        const handles = Array.from(new Set(
+          list
+            .map((entry) => normalizeDutyEditorBandHandle(Array.isArray(entry && entry.values) ? entry.values[0] : ''))
+            .filter(Boolean)
+        )).filter((handle) => {
+          const key = handle.toLocaleLowerCase('ru-RU');
+          return (!String(cache[key] || '').trim() || !profileCache[key]) && !loadingMap[key];
+        });
+
+        if(!handles.length) return;
+
+        const cfg = collectSettings();
+        if(!String(cfg.bandCookiesRead || '').trim()){
+          return;
+        }
+
+        for(const handle of handles){
+          loadingMap[handle.toLocaleLowerCase('ru-RU')] = true;
+        }
+
+        let didUpdate = false;
+        const batchSize = 50;
+
+        try{
+          for(let i = 0; i < handles.length; i += batchSize){
+            const batch = handles.slice(i, i + batchSize);
+            const users = await bandGetDutyEditorBandUsersByUsernames(
+              batch.map((handle) => handle.replace(/^@+/, '')),
+              null
+            );
+            await Promise.allSettled(users.map((user) => ensureDutyEditorLeadAvatar(user)));
+            const displayNameByHandle = new Map();
+            const profileByHandle = new Map();
+            for(const user of users){
+              const key = normalizeDutyEditorBandHandle(user && user.handle);
+              if(!key) continue;
+              const normalizedKey = key.toLocaleLowerCase('ru-RU');
+              const displayName = String(user && user.displayName || '').trim();
+              if(displayName){
+                displayNameByHandle.set(normalizedKey, displayName);
+              }
+              profileByHandle.set(normalizedKey, user);
+            }
+            for(const handle of batch){
+              const key = handle.toLocaleLowerCase('ru-RU');
+              delete loadingMap[key];
+              const displayName = String(displayNameByHandle.get(key) || '').trim();
+              const profile = profileByHandle.get(key) || null;
+              if(displayName){
+                cache[key] = displayName;
+                didUpdate = true;
+              }
+              if(profile){
+                profileCache[key] = profile;
+                didUpdate = true;
+              }
+            }
+          }
+        }finally{
+          for(const handle of handles){
+            delete loadingMap[handle.toLocaleLowerCase('ru-RU')];
+          }
+        }
+
+        if(didUpdate && appState.dutyEditorLoaded){
+          const hasEditing = getDutyEditorEntries('leads').some((entry) => entry && entry.editing);
+          if(!hasEditing){
+            renderDutyEditorSection('leads');
+          }
+        }
+      }
+
+      function renderDutyEditorLeadSuggestions(entryId){
+        const state = getDutyEditorLeadSearchState(entryId);
+        if(!state || !state.open) return '';
+        if(state.loading){
+          return '<div class="release-launch-duty-editor-search-empty">Ищем в Band...</div>';
+        }
+        if(state.error){
+          return `<div class="release-launch-duty-editor-search-empty">${escHtml(state.error)}</div>`;
+        }
+        if(!Array.isArray(state.items) || !state.items.length){
+          return '<div class="release-launch-duty-editor-search-empty">Ничего не найдено</div>';
+        }
+        return state.items.map((item) => `
+          <button
+            type="button"
+            class="release-launch-duty-editor-search-option"
+            data-duty-editor-kind="leads"
+            data-duty-editor-id="${escHtml(entryId)}"
+            data-duty-editor-action="pick-lead-suggestion"
+            data-duty-editor-lead-handle="${escHtml(item.handle)}"
+            aria-label="Выбрать ${escHtml(item.title || item.displayName)} ${escHtml(item.subtitle || item.handle)}"
+          >
+            <span class="release-launch-duty-editor-search-option-avatar">
+              ${getDutyEditorLeadAvatarUrl(item)
+                ? `<img src="${escHtml(getDutyEditorLeadAvatarUrl(item))}" alt="${escHtml(item.displayName)}" loading="lazy" />`
+                : `<span>${escHtml(item.initials || '@')}</span>`}
+              ${renderDutyEditorLeadPresenceBadge(item)}
+            </span>
+            <span class="release-launch-duty-editor-search-option-content">
+              <span class="release-launch-duty-editor-search-option-name">${escHtml(item.title || item.displayName)}</span>
+              <span class="release-launch-duty-editor-search-option-login">${escHtml(item.subtitle || item.handle)}</span>
+            </span>
+          </button>
+        `).join('');
+      }
+
+      function syncDutyEditorLeadSearchPanel(entryId){
+        const key = String(entryId || '');
+        const panel = document.querySelector(`[data-duty-editor-lead-search-panel="${key}"]`);
+        const wrap = document.querySelector(`[data-duty-editor-lead-search-wrap="${key}"]`);
+        const state = getDutyEditorLeadSearchState(entryId);
+        const isOpen = !!(state && state.open);
+        if(wrap) wrap.classList.toggle('is-open', isOpen);
+        if(panel){
+          panel.innerHTML = renderDutyEditorLeadSuggestions(entryId);
+          panel.style.display = isOpen ? '' : 'none';
+        }
+      }
+
+      function syncDutyEditorLeadSearchPanels(){
+        const editingLeadIds = getDutyEditorEntries('leads')
+          .filter((entry) => entry && entry.editing)
+          .map((entry) => String(entry.id || ''))
+          .filter(Boolean);
+
+        for(const entryId of editingLeadIds){
+          syncDutyEditorLeadSearchPanel(entryId);
+        }
+      }
+
+      async function bandSearchUsersByName(term, signal){
+        const cfg = collectSettings();
+        if(!String(cfg.bandCookiesRead || '').trim()){
+          throw new Error('Заполни Cookies (чтение/поиск users и post)');
+        }
+        const mmCsrf = getMmCsrfFromCookies(cfg.bandCookiesRead);
+        const headers = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(mmCsrf ? { 'X-CSRF-Token': mmCsrf } : {}),
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+        const data = await proxyRequestJson(
+          'POST',
+          'https://band.wb.ru/api/v4/users/search',
+          headers,
+          { term: String(term || '').trim(), team_id: '' },
+          signal
+        );
+        const result = [];
+        const seen = new Set();
+        for(const user of Array.isArray(data) ? data : []){
+          const normalized = normalizeDutyEditorBandUser(user);
+          if(!normalized) continue;
+          const key = norm(`${normalized.displayName} ${normalized.handle}`);
+          if(seen.has(key)) continue;
+          seen.add(key);
+          result.push(normalized);
+        }
+        return result;
+      }
+
+      function queueDutyEditorLeadSearch(entryId, term){
+        const query = String(term || '').trim();
+        clearDutyEditorLeadSearchTimer(entryId);
+        abortDutyEditorLeadSearch(entryId);
+
+        if(query.length < 2 || query.startsWith('@')){
+          patchDutyEditorLeadSearchState(entryId, {
+            query,
+            loading: false,
+            items: [],
+            error: '',
+            open: false,
+            seq: 0
+          });
+          syncDutyEditorLeadSearchPanel(entryId);
+          return;
+        }
+
+        const seq = Number(appState.dutyEditorLeadSearchSeq || 0) + 1;
+        appState.dutyEditorLeadSearchSeq = seq;
+        patchDutyEditorLeadSearchState(entryId, {
+          query,
+          loading: true,
+          items: [],
+          error: '',
+          open: true,
+          seq
+        });
+        syncDutyEditorLeadSearchPanel(entryId);
+
+        appState.dutyEditorLeadSearchTimers[String(entryId || '')] = window.setTimeout(async () => {
+          const ctrl = new AbortController();
+          appState.dutyEditorLeadSearchControllers[String(entryId || '')] = ctrl;
+          try{
+            const foundItems = await bandSearchUsersByName(query, ctrl.signal);
+            const items = await enrichDutyEditorBandUsersPresence(foundItems, ctrl.signal);
+            const state = getDutyEditorLeadSearchState(entryId);
+            if(!state || Number(state.seq || 0) !== seq) return;
+            patchDutyEditorLeadSearchState(entryId, {
+              loading: false,
+              items,
+              error: '',
+              open: true
+            });
+            prefetchDutyEditorLeadAvatars(items);
+          }catch(err){
+            if(ctrl.signal.aborted) return;
+            const state = getDutyEditorLeadSearchState(entryId);
+            if(!state || Number(state.seq || 0) !== seq) return;
+            patchDutyEditorLeadSearchState(entryId, {
+              loading: false,
+              items: [],
+              error: err && err.message ? err.message : 'Не удалось найти пользователей в Band',
+              open: true
+            });
+          }finally{
+            delete appState.dutyEditorLeadSearchControllers[String(entryId || '')];
+            syncDutyEditorLeadSearchPanel(entryId);
+          }
+        }, 220);
+      }
+
+      function applyDutyEditorSectionCollapseState(kind){
+        const isLeads = kind === 'leads';
+        const collapsed = isLeads ? !!appState.dutyEditorLeadsCollapsed : !!appState.dutyEditorStreamsCollapsed;
+        const body = isLeads ? dutyEditorLeadsBody : dutyEditorStreamsBody;
+        const btn = isLeads ? dutyEditorLeadsCollapseBtn : dutyEditorStreamsCollapseBtn;
+        const ico = isLeads ? dutyEditorLeadsCollapseIco : dutyEditorStreamsCollapseIco;
+        const text = isLeads ? dutyEditorLeadsCollapseText : dutyEditorStreamsCollapseText;
+        const addBtn = isLeads ? dutyEditorAddLeadBtn : dutyEditorAddStreamGroupBtn;
+        const showBody = (appState.dutyEditorLoaded || appState.dutyEditorLoading) && !collapsed;
+        const showAddButton = !!appState.dutyEditorLoaded && !collapsed;
+
+        if(body) body.style.display = showBody ? '' : 'none';
+        if(addBtn) addBtn.style.display = showAddButton ? '' : 'none';
+        if(btn) btn.setAttribute('aria-expanded', showBody ? 'true' : 'false');
+        if(ico) ico.textContent = showBody ? '▾' : '▸';
+        if(text) text.textContent = showBody ? 'Свернуть' : 'Показать';
+      }
+
+      function getDutyEditorEditingEntryKeys(){
+        const out = [];
+        for(const kind of ['leads', 'streams']){
+          for(const entry of getDutyEditorEntries(kind)){
+            const normalized = normalizeDutyEditorEntry(entry);
+            if(!normalized.editing) continue;
+            out.push(`${kind}:${normalized.id}`);
+          }
+        }
+        return out;
+      }
+
+      function isDutyEditorMutating(){
+        return !!(appState.dutyEditorLoading || appState.dutyEditorSaving || appState.dutyEditorInteractionBusy);
+      }
+
+      function shouldDisableDutyEditorAction(action, kind, entryId){
+        const act = String(action || '');
+        const rowKey = `${String(kind || '')}:${String(entryId || '')}`;
+        const editingKeys = getDutyEditorEditingEntryKeys();
+        const hasEditing = editingKeys.length > 0;
+
+        if(act === 'confirm-edit' || act === 'cancel-edit'){
+          return isDutyEditorMutating();
+        }
+        if(act === 'start-edit' || act === 'remove-entry'){
+          return isDutyEditorMutating() || hasEditing || editingKeys.some((key) => key !== rowKey);
+        }
+        return false;
+      }
+
+      function syncDutyEditorActionAvailability(){
+        const buttons = Array.from(document.querySelectorAll('[data-duty-editor-action]'));
+        for(const button of buttons){
+          const action = String(button.getAttribute('data-duty-editor-action') || '');
+          if(!['start-edit', 'remove-entry', 'confirm-edit', 'cancel-edit'].includes(action)) continue;
+          const kind = String(button.getAttribute('data-duty-editor-kind') || '');
+          const entryId = String(button.getAttribute('data-duty-editor-id') || '');
+          const shouldDisable = shouldDisableDutyEditorAction(action, kind, entryId);
+          button.disabled = shouldDisable || button.classList.contains('is-busy');
+        }
+
+        const disableAdd = isDutyEditorMutating() || getDutyEditorEditingEntryKeys().length > 0;
+        if(dutyEditorAddLeadBtn) dutyEditorAddLeadBtn.disabled = disableAdd;
+        if(dutyEditorAddStreamGroupBtn) dutyEditorAddStreamGroupBtn.disabled = disableAdd;
+      }
+
+      function syncDutyEditorLayout(){
+        const isLoading = !!appState.dutyEditorLoading;
+        const isLoaded = !!appState.dutyEditorLoaded;
+        if(dutyEditorShell) dutyEditorShell.classList.toggle('is-loading', isLoading);
+        if(dutyEditorLoader) dutyEditorLoader.style.display = isLoading ? '' : 'none';
+        if(dutyEditorContent) dutyEditorContent.style.display = (isLoading || isLoaded) ? '' : 'none';
+        applyDutyEditorSectionCollapseState('leads');
+        applyDutyEditorSectionCollapseState('streams');
+        syncDutyEditorActionAvailability();
+      }
+
+      function renderDutyEditorLeadRows(root, entries){
+        void warmDutyEditorLeadMappedNames(entries);
+        const sortedEntries = getSortedDutyEditorLeadEntries(entries);
+        root.innerHTML = `
+          <div class="release-launch-duty-editor-leads">
+            <div class="release-launch-duty-editor-leads-head">
+              <div>Название стрима</div>
+              <div>Лид</div>
+              <div></div>
+            </div>
+            ${sortedEntries.map((entry) => {
+              const name = String(entry.name || '').trim();
+              const lead = String(Array.isArray(entry.values) ? (entry.values[0] || '') : '').trim();
+
+              if(entry.editing){
+                const leadSearchState = getDutyEditorLeadSearchState(entry.id);
+                return `
+                  <div class="release-launch-duty-editor-lead-row is-editing">
+                    <input
+                      class="input"
+                      type="text"
+                      value="${escHtml(name)}"
+                      placeholder="Название стрима"
+                      spellcheck="false"
+                      data-duty-editor-kind="leads"
+                      data-duty-editor-id="${escHtml(entry.id)}"
+                      data-duty-editor-field="name"
+                    />
+                    <div class="release-launch-duty-editor-lead-search ${leadSearchState && leadSearchState.open ? 'is-open' : ''}" data-duty-editor-lead-search-wrap="${escHtml(entry.id)}">
+                      <input
+                        class="input"
+                        type="text"
+                        value="${escHtml(lead)}"
+                        placeholder="Ищем в band по ФИО"
+                        spellcheck="false"
+                        autocomplete="off"
+                        data-duty-editor-kind="leads"
+                        data-duty-editor-id="${escHtml(entry.id)}"
+                        data-duty-editor-field="value"
+                        data-duty-editor-value-index="0"
+                      />
+                      <div class="release-launch-duty-editor-search-panel" data-duty-editor-lead-search-panel="${escHtml(entry.id)}" style="${leadSearchState && leadSearchState.open ? '' : 'display:none;'}">
+                        ${renderDutyEditorLeadSuggestions(entry.id)}
+                      </div>
+                    </div>
+                    <div class="release-launch-duty-editor-row-actions">
+                      <button
+                        type="button"
+                        class="release-launch-duty-editor-icon-btn is-confirm"
+                        data-duty-editor-kind="leads"
+                        data-duty-editor-id="${escHtml(entry.id)}"
+                        data-duty-editor-action="confirm-edit"
+                        aria-label="Сохранить строку"
+                        title="Сохранить строку"
+                      >✓</button>
+                      <button
+                        type="button"
+                        class="release-launch-duty-editor-icon-btn"
+                        data-duty-editor-kind="leads"
+                        data-duty-editor-id="${escHtml(entry.id)}"
+                        data-duty-editor-action="cancel-edit"
+                        aria-label="Отменить изменения"
+                        title="Отменить изменения"
+                      >×</button>
+                    </div>
+                  </div>
+                `;
+              }
+
+              const leadHandle = normalizeDutyEditorBandHandle(lead) || lead;
+              const leadProfile = getDutyEditorLeadProfile(lead);
+              const leadDisplayName = lead ? getDutyEditorLeadMappedName(lead) : '';
+              const leadAvatarUrl = leadProfile ? getDutyEditorLeadAvatarUrl(leadProfile) : '';
+              const leadInitials = buildDutyEditorBandUserInitials({
+                displayName: leadDisplayName,
+                username: String(leadHandle || '').replace(/^@+/, '')
+              });
+              return `
+                <div class="release-launch-duty-editor-lead-row">
+                  <div class="release-launch-duty-editor-lead-cell ${name ? '' : 'is-muted'}">${name ? escHtml(name) : 'Не заполнено'}</div>
+                  <div class="release-launch-duty-editor-lead-cell ${lead ? '' : 'is-muted'}">
+                    ${lead ? `
+                      <div class="release-launch-duty-editor-lead-profile">
+                        <span class="release-launch-duty-editor-lead-avatar">
+                          ${leadAvatarUrl
+                            ? `<img src="${escHtml(leadAvatarUrl)}" alt="${escHtml(leadDisplayName || leadHandle)}" loading="lazy" />`
+                            : `<span>${escHtml(leadInitials || '@')}</span>`}
+                        </span>
+                        <div class="release-launch-duty-editor-lead-value-wrap">
+                          <span class="release-launch-duty-editor-lead-value-text">${escHtml(leadDisplayName)}</span>
+                          <button
+                            type="button"
+                            class="release-launch-duty-editor-icon-btn release-launch-duty-editor-lead-copy-btn"
+                            data-duty-editor-kind="leads"
+                            data-duty-editor-id="${escHtml(entry.id)}"
+                            data-duty-editor-action="copy-lead-handle"
+                            data-duty-editor-lead-handle="${escHtml(leadHandle)}"
+                            aria-label="Скопировать логин Band"
+                            title="Скопировать логин Band"
+                          >${getDutyEditorCopyIconMarkup()}</button>
+                        </div>
+                      </div>
+                    ` : 'Не заполнено'}
+                  </div>
+                  <div class="release-launch-duty-editor-row-actions">
+                    <button
+                      type="button"
+                      class="release-launch-duty-editor-icon-btn"
+                      data-duty-editor-kind="leads"
+                      data-duty-editor-id="${escHtml(entry.id)}"
+                      data-duty-editor-action="start-edit"
+                      aria-label="Редактировать строку"
+                      title="Редактировать строку"
+                    >${getDutyEditorPencilIconMarkup()}</button>
+                    <button
+                      type="button"
+                      class="release-launch-duty-editor-icon-btn is-delete"
+                      data-duty-editor-kind="leads"
+                      data-duty-editor-id="${escHtml(entry.id)}"
+                      data-duty-editor-action="remove-entry"
+                      aria-label="Удалить строку"
+                      title="Удалить строку"
+                    >${getDutyEditorTrashIconMarkup()}</button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      function renderDutyEditorSection(kind){
+        const root = getDutyEditorListElement(kind);
+        if(!root) return;
+
+        const entries = getDutyEditorEntries(kind);
+        if(!entries.length){
+          root.innerHTML = `<div class="release-launch-empty">Пока нет ${kind === 'leads' ? 'лидов' : 'групп стримов'}</div>`;
+          syncDutyEditorActionAvailability();
+          return;
+        }
+
+        if(kind === 'leads'){
+          renderDutyEditorLeadRows(root, entries);
+          syncDutyEditorActionAvailability();
+          return;
+        }
+
+        root.innerHTML = entries.map((entry) => {
+          const name = String(entry.name || '').trim();
+          const values = Array.isArray(entry.values) ? entry.values : [];
+          const valueChips = values.length
+            ? values.map((value) => `<span class="release-launch-duty-editor-chip">${escHtml(value)}</span>`).join('')
+            : '<span class="release-launch-duty-editor-chip release-launch-duty-editor-chip-empty">Пусто</span>';
+          const valueRows = (values.length ? values : ['']).map((value, index) => `
+            <div class="release-launch-duty-editor-value-row">
+              <input
+                class="input"
+                type="text"
+                value="${escHtml(value)}"
+                spellcheck="false"
+                data-duty-editor-kind="${kind}"
+                data-duty-editor-id="${escHtml(entry.id)}"
+                data-duty-editor-field="value"
+                data-duty-editor-value-index="${index}"
+              />
+              <button
+                type="button"
+                class="release-launch-duty-editor-inline-btn"
+                data-duty-editor-kind="${kind}"
+                data-duty-editor-id="${escHtml(entry.id)}"
+                data-duty-editor-action="remove-value"
+                data-duty-editor-value-index="${index}"
+                aria-label="Удалить значение"
+                title="Удалить значение"
+              >×</button>
+            </div>
+          `).join('');
+
+          return `
+            <article class="release-launch-duty-editor-card ${entry.editing ? 'is-editing' : ''}">
+              <div class="release-launch-duty-editor-card-head">
+                <div class="release-launch-duty-editor-card-copy">
+                  <div class="release-launch-duty-editor-card-title">${escHtml(name || (kind === 'leads' ? 'Новый лид' : 'Новая группа'))}</div>
+                  <div class="release-launch-status release-launch-status-muted">Значений: ${values.length}</div>
+                </div>
+                <div class="release-launch-duty-editor-card-head-actions">
+                  <button
+                    type="button"
+                    class="release-launch-duty-editor-icon-btn ${entry.editing ? 'is-confirm' : ''}"
+                  data-duty-editor-kind="${kind}"
+                  data-duty-editor-id="${escHtml(entry.id)}"
+                  data-duty-editor-action="${entry.editing ? 'confirm-edit' : 'start-edit'}"
+                  aria-label="${entry.editing ? 'Сохранить блок' : 'Редактировать блок'}"
+                  title="${entry.editing ? 'Сохранить блок' : 'Редактировать блок'}"
+                  >${entry.editing ? '✓' : getDutyEditorPencilIconMarkup()}</button>
+                  <button
+                    type="button"
+                    class="release-launch-duty-editor-icon-btn ${entry.editing ? '' : 'is-delete'}"
+                    data-duty-editor-kind="${kind}"
+                    data-duty-editor-id="${escHtml(entry.id)}"
+                    data-duty-editor-action="${entry.editing ? 'cancel-edit' : 'remove-entry'}"
+                    aria-label="${entry.editing ? 'Отменить изменения' : 'Удалить блок'}"
+                    title="${entry.editing ? 'Отменить изменения' : 'Удалить блок'}"
+                  >${entry.editing ? '×' : getDutyEditorTrashIconMarkup()}</button>
+                </div>
+              </div>
+              ${entry.editing ? `
+                <div class="release-launch-duty-editor-card-body">
+                  <label class="release-launch-field">
+                    <span class="release-launch-label">${getDutyEditorNameLabel(kind)}</span>
+                    <input
+                      class="input"
+                      type="text"
+                      value="${escHtml(name)}"
+                      spellcheck="false"
+                      data-duty-editor-kind="${kind}"
+                      data-duty-editor-id="${escHtml(entry.id)}"
+                      data-duty-editor-field="name"
+                    />
+                  </label>
+                  <div class="release-launch-duty-editor-values-block">
+                    <div class="release-launch-label">${getDutyEditorValuesLabel(kind)}</div>
+                    <div class="release-launch-duty-editor-card-actions">
+                      <button
+                        type="button"
+                        class="btn btn-soft release-launch-duty-editor-mini-btn"
+                        data-duty-editor-kind="${kind}"
+                        data-duty-editor-id="${escHtml(entry.id)}"
+                        data-duty-editor-action="add-value"
+                      >Добавить значение</button>
+                    </div>
+                    <div class="release-launch-duty-editor-values-list">${valueRows}</div>
+                  </div>
+                </div>
+              ` : `
+                <div class="release-launch-duty-editor-chip-list">${valueChips}</div>
+              `}
+            </article>
+          `;
+        }).join('');
+        syncDutyEditorActionAvailability();
+      }
+
+      function renderDutyEditorCards(){
+        renderDutyEditorSection('leads');
+        renderDutyEditorSection('streams');
+        syncDutyEditorLayout();
+        syncDutyEditorActionAvailability();
+      }
+
+      function addDutyEditorEntry(kind){
+        const entries = getDutyEditorEntries(kind).slice();
+        const entry = createDutyEditorEntry('', [], true);
+        entries.unshift(entry);
+        setDutyEditorEntries(kind, entries);
+        rememberDutyEditorEntryDraft(kind, entry.id, { isNew: true, name: '', values: [] });
+        if(kind === 'leads'){
+          patchDutyEditorLeadSearchState(entry.id, {
+            query: '',
+            loading: false,
+            items: [],
+            error: '',
+            open: false,
+            seq: 0
+          });
+        }
+        renderDutyEditorSection(kind);
+        refreshDutyEditorDirtyState();
+      }
+
+      function setDutyEditorEntryEditing(kind, entryId, isEditing){
+        const entries = getDutyEditorEntries(kind).map((entry) => {
+          const next = normalizeDutyEditorEntry(entry);
+          if(String(entry.id || '') === String(entryId || '')){
+            next.editing = !!isEditing;
+          }
+          return next;
+        });
+        setDutyEditorEntries(kind, entries);
+        renderDutyEditorSection(kind);
+      }
+
+      function startDutyEditorEntryEditing(kind, entryId){
+        const entry = findDutyEditorEntry(kind, entryId);
+        if(!entry) return;
+        if(!getDutyEditorEntryDraft(kind, entryId)){
+          rememberDutyEditorEntryDraft(kind, entryId, createDutyEditorEntryDraft(entry));
+        }
+        if(kind === 'leads'){
+          patchDutyEditorLeadSearchState(entryId, {
+            query: '',
+            loading: false,
+            items: [],
+            error: '',
+            open: false,
+            seq: 0
+          });
+        }
+        setDutyEditorEntryEditing(kind, entryId, true);
+      }
+
+      function cancelDutyEditorEntryEditing(kind, entryId){
+        const draft = getDutyEditorEntryDraft(kind, entryId);
+        clearDutyEditorLeadSearchState(entryId);
+        if(draft && draft.isNew){
+          clearDutyEditorEntryDraft(kind, entryId);
+          removeDutyEditorEntry(kind, entryId);
+          return;
+        }
+
+        const entries = getDutyEditorEntries(kind).map((entry) => {
+          const next = normalizeDutyEditorEntry(entry);
+          if(String(entry.id || '') !== String(entryId || '')) return next;
+          if(draft){
+            next.name = String(draft.name || '');
+            next.values = Array.isArray(draft.values) ? draft.values.map((value) => String(value || '')) : [];
+          }
+          next.editing = false;
+          return next;
+        });
+        clearDutyEditorEntryDraft(kind, entryId);
+        setDutyEditorEntries(kind, entries);
+        renderDutyEditorSection(kind);
+        refreshDutyEditorDirtyState();
+      }
+
+      async function confirmDutyEditorEntry(kind, entryId){
+        try{
+          if(kind === 'leads'){
+            await syncDutyEditorLeadEntryWithAllure(entryId, null);
+          }
+          const didSave = await saveDutyEditorData();
+          if(didSave === false){
+            clearDutyEditorLeadSearchState(entryId);
+            clearDutyEditorEntryDraft(kind, entryId);
+            setDutyEditorEntryEditing(kind, entryId, false);
+            refreshDutyEditorDirtyState();
+          }
+          else{
+            clearDutyEditorLeadSearchState(entryId);
+            clearDutyEditorEntryDraft(kind, entryId);
+          }
+        }catch(err){
+          throw err;
+        }
+      }
+
+      function updateDutyEditorEntryName(kind, entryId, value){
+        const entry = findDutyEditorEntry(kind, entryId);
+        if(!entry) return;
+        entry.name = String(value || '');
+        refreshDutyEditorDirtyState();
+      }
+
+      function updateDutyEditorEntryValue(kind, entryId, valueIndex, value){
+        const entry = findDutyEditorEntry(kind, entryId);
+        if(!entry) return;
+        const index = Number(valueIndex);
+        if(!Number.isInteger(index) || index < 0) return;
+        while(entry.values.length <= index){
+          entry.values.push('');
+        }
+        entry.values[index] = String(value || '');
+        refreshDutyEditorDirtyState();
+        if(kind === 'leads' && index === 0){
+          queueDutyEditorLeadSearch(entryId, value);
+        }
+      }
+
+      function addDutyEditorEntryValue(kind, entryId){
+        const entry = findDutyEditorEntry(kind, entryId);
+        if(!entry) return;
+        entry.values.push('');
+        renderDutyEditorSection(kind);
+        refreshDutyEditorDirtyState();
+      }
+
+      function removeDutyEditorEntryValue(kind, entryId, valueIndex){
+        const entry = findDutyEditorEntry(kind, entryId);
+        if(!entry) return;
+        const index = Number(valueIndex);
+        if(!Number.isInteger(index) || index < 0 || index >= entry.values.length) return;
+        entry.values.splice(index, 1);
+        renderDutyEditorSection(kind);
+        refreshDutyEditorDirtyState();
+      }
+
+      function removeDutyEditorEntry(kind, entryId){
+        const entries = getDutyEditorEntries(kind).filter((entry) => String(entry.id || '') !== String(entryId || ''));
+        setDutyEditorEntries(kind, entries);
+        clearDutyEditorLeadSearchState(entryId);
+        renderDutyEditorSection(kind);
+        refreshDutyEditorDirtyState();
+      }
+
+      async function deleteDutyEditorEntry(kind, entryId){
+        if(kind === 'leads'){
+          const entry = findDutyEditorEntry(kind, entryId);
+          if(!entry) return;
+
+          const normalizedEntry = normalizeDutyEditorEntry(entry);
+          const streamName = String(normalizedEntry.name || '').trim();
+          const lead = String(Array.isArray(normalizedEntry.values) ? (normalizedEntry.values[0] || '') : '').trim();
+          const hasStream = !!streamName;
+          const hasLead = !!lead;
+          const leafId = Number(normalizedEntry.allureLeafId);
+          const canDeleteAllureLeaf = Number.isFinite(leafId) && leafId > 0;
+
+          clearDutyEditorLeadSearchState(entryId);
+          clearDutyEditorEntryDraft(kind, entryId);
+
+          if(!hasStream){
+            removeDutyEditorEntry(kind, entryId);
+            return;
+          }
+
+          if(!hasLead){
+            if(!canDeleteAllureLeaf){
+              removeDutyEditorEntry(kind, entryId);
+              setDutyEditorStatus('У стрима нет testcase id Allure, строка убрана только локально.', 'warn');
+              return;
+            }
+            setDutyEditorStatus(`Удаляю стрим "${streamName}" из Allure...`, 'progress');
+            await deleteDutyEditorAllureLeaf(leafId);
+            const loaded = await reloadDutyEditorDataFromSources();
+            setDutyEditorStatus(`Стрим удалён из Allure. Осталось стримов: ${loaded.allureLeaves.length}.`, 'ok');
+            showToast('Стрим удалён из Allure');
+            return;
+          }
+
+          const previousEntries = cloneDutyEditorEntries(getDutyEditorEntries(kind));
+          const nextEntries = previousEntries.filter((item) => String(item.id || '') !== String(entryId || ''));
+          const nextPayload = buildDutyEditorSavePayload({ leadsEntries: nextEntries });
+          const rollbackPayload = buildDutyEditorSavePayload({ leadsEntries: previousEntries });
+          let jsonSaved = false;
+          appState.dutyEditorSaving = true;
+          syncDutyEditorActionAvailability();
+          try{
+            setDutyEditorStatus(`Удаляю лида у стрима "${streamName}" в JSON...`, 'progress');
+            await persistDutyEditorSavePayload(nextPayload);
+            jsonSaved = true;
+            if(canDeleteAllureLeaf){
+              setDutyEditorStatus(`Удаляю testcase "${streamName}" из Allure...`, 'progress');
+              await deleteDutyEditorAllureLeaf(leafId);
+            }
+            await reloadDutyEditorDataFromSources();
+            setDutyEditorStatus('Стрим и лид удалены.', 'ok');
+            showToast('Стрим и лид удалены');
+          }catch(err){
+            if(jsonSaved){
+              try{
+                await persistDutyEditorSavePayload(rollbackPayload);
+              }catch(rollbackErr){
+                console.warn('Failed to rollback duty editor JSON after Allure delete error', rollbackErr);
+              }
+            }
+            try{
+              await reloadDutyEditorDataFromSources();
+            }catch(_){}
+            throw err;
+          }finally{
+            appState.dutyEditorSaving = false;
+            syncDutyEditorActionAvailability();
+          }
+          return;
+        }
+
+        const previousEntries = cloneDutyEditorEntries(getDutyEditorEntries(kind));
+        const nextEntries = previousEntries.filter((entry) => String(entry.id || '') !== String(entryId || ''));
+        setDutyEditorEntries(kind, nextEntries);
+        clearDutyEditorLeadSearchState(entryId);
+        clearDutyEditorEntryDraft(kind, entryId);
+        refreshDutyEditorDirtyState();
+        try{
+          await saveDutyEditorData();
+        }catch(err){
+          setDutyEditorEntries(kind, previousEntries);
+          renderDutyEditorSection(kind);
+          refreshDutyEditorDirtyState();
+          throw err;
+        }
+      }
+
+      async function handleDutyEditorActionClick(event){
+        const actionBtn = event.target && event.target.closest
+          ? event.target.closest('[data-duty-editor-action][data-duty-editor-kind][data-duty-editor-id]')
+          : null;
+        if(!actionBtn) return false;
+
+        const kind = String(actionBtn.getAttribute('data-duty-editor-kind') || '');
+        const entryId = String(actionBtn.getAttribute('data-duty-editor-id') || '');
+        const action = String(actionBtn.getAttribute('data-duty-editor-action') || '');
+        const valueIndex = Number(actionBtn.getAttribute('data-duty-editor-value-index'));
+
+        if(action === 'start-edit'){
+          startDutyEditorEntryEditing(kind, entryId);
+          return true;
+        }
+        if(action === 'confirm-edit'){
+          await withButtonBusy(actionBtn, '...', () => confirmDutyEditorEntry(kind, entryId));
+          return true;
+        }
+        if(action === 'pick-lead-suggestion'){
+          const handle = String(actionBtn.getAttribute('data-duty-editor-lead-handle') || '').trim();
+          if(handle){
+            updateDutyEditorEntryValue('leads', entryId, 0, handle);
+            patchDutyEditorLeadSearchState(entryId, {
+              query: handle,
+              loading: false,
+              items: [],
+              error: '',
+              open: false,
+              seq: 0
+            });
+            renderDutyEditorSection('leads');
+          }
+          return true;
+        }
+        if(action === 'copy-lead-handle'){
+          const handle = String(actionBtn.getAttribute('data-duty-editor-lead-handle') || '').trim();
+          await copyTextToClipboard(handle, 'Логин Band скопирован', 'Логин Band пуст');
+          return true;
+        }
+        if(action === 'cancel-edit'){
+          cancelDutyEditorEntryEditing(kind, entryId);
+          return true;
+        }
+        if(action === 'add-value'){
+          addDutyEditorEntryValue(kind, entryId);
+          return true;
+        }
+        if(action === 'remove-value'){
+          removeDutyEditorEntryValue(kind, entryId, valueIndex);
+          return true;
+        }
+        if(action === 'remove-entry'){
+          await withButtonBusy(actionBtn, '...', () => deleteDutyEditorEntry(kind, entryId));
+          return true;
+        }
+        return false;
+      }
+
+      function handleDutyEditorFieldInput(event){
+        const field = event.target && event.target.closest
+          ? event.target.closest('[data-duty-editor-field][data-duty-editor-kind][data-duty-editor-id]')
+          : null;
+        if(!field) return false;
+
+        const kind = String(field.getAttribute('data-duty-editor-kind') || '');
+        const entryId = String(field.getAttribute('data-duty-editor-id') || '');
+        const dutyField = String(field.getAttribute('data-duty-editor-field') || '');
+
+        if(dutyField === 'name'){
+          updateDutyEditorEntryName(kind, entryId, field.value);
+          return true;
+        }
+        if(dutyField === 'value'){
+          updateDutyEditorEntryValue(kind, entryId, Number(field.getAttribute('data-duty-editor-value-index')), field.value);
+          return true;
+        }
+        return false;
+      }
+
+      function handleDutyEditorFieldFocus(event){
+        const field = event.target && event.target.closest
+          ? event.target.closest('[data-duty-editor-field][data-duty-editor-kind][data-duty-editor-id]')
+          : null;
+        if(!field) return false;
+
+        const kind = String(field.getAttribute('data-duty-editor-kind') || '');
+        const dutyField = String(field.getAttribute('data-duty-editor-field') || '');
+        const entryId = String(field.getAttribute('data-duty-editor-id') || '');
+        if(kind !== 'leads' || dutyField !== 'value') return false;
+
+        const value = String(field.value || '');
+        const state = getDutyEditorLeadSearchState(entryId);
+        if(state && Array.isArray(state.items) && state.items.length && !String(value || '').trim().startsWith('@')){
+          patchDutyEditorLeadSearchState(entryId, { open: true });
+          syncDutyEditorLeadSearchPanel(entryId);
+          return true;
+        }
+
+        queueDutyEditorLeadSearch(entryId, value);
+        return true;
+      }
+
+      function handleDutyEditorInteractionError(err){
+        const message = err && err.message ? err.message : String(err || 'Не удалось сохранить изменения редактора');
+        setDutyEditorStatus(message, 'err');
+        showToast(message, false);
+      }
+
+      function applyDutyEditorData(data, options){
+        const leads = normalizeLeadsData((data && data.leads) || {});
+        const streamsTree = normalizeStreamGroupsData((data && data.streamsTree) || {});
+        const tables = cloneDutyEditorTables((data && data.tables) || []);
+        const rawMeta = data && typeof data.meta === 'object' && !Array.isArray(data.meta) ? data.meta : {};
+        const sourceAllureLeaves = normalizeDutyEditorAllureLeaves(
+          Array.isArray(options && options.allureLeaves)
+            ? options.allureLeaves
+            : Array.isArray(options && options.allureStreams)
+              ? options.allureStreams
+              : Array.isArray(rawMeta.allureLeaves)
+                ? rawMeta.allureLeaves
+                : Array.isArray(rawMeta.allureStreams)
+                  ? rawMeta.allureStreams
+                  : Array.isArray(appState.dutyEditorData && appState.dutyEditorData.meta && appState.dutyEditorData.meta.allureLeaves)
+                    ? appState.dutyEditorData.meta.allureLeaves
+                    : Array.isArray(appState.dutyEditorData && appState.dutyEditorData.meta && appState.dutyEditorData.meta.allureStreams)
+                      ? appState.dutyEditorData.meta.allureStreams
+                      : []
+        );
+        const leadEditorModel = buildDutyEditorLeadEntriesFromAllureStreams(leads, sourceAllureLeaves);
+        const meta = {
+          ...rawMeta,
+          allureLeaves: sourceAllureLeaves,
+          allureStreams: sourceAllureLeaves,
+          hiddenLeadAssignments: leadEditorModel.hiddenLeadAssignments
+        };
+
+        appState.dutyEditorData = {
+          leadsEntries: leadEditorModel.entries,
+          streamEntries: createDutyEditorEntriesFromMap(streamsTree),
+          tables,
+          meta
+        };
+        appState.dutyEditorLoaded = true;
+        appState.dutyEditorSnapshot = createDutyEditorStateSnapshot(appState.dutyEditorData);
+        appState.dutyEditorEditState = {};
+        clearAllDutyEditorLeadSearchState();
+
+        renderDutyEditorCards();
+        syncDutyEditorSourceLinks();
+        setDutyEditorDirty(false);
+      }
+
+      function normalizeDutyEditorResponse(payload){
+        if(!payload || typeof payload !== 'object'){
+          throw new Error('Apps Script вернул пустой ответ для редактора');
+        }
+        if(payload.ok === false){
+          throw new Error(String(payload.error || 'Apps Script вернул ошибку'));
+        }
+
+        const root = payload.data && typeof payload.data === 'object' ? payload.data : payload;
+        const leadsRaw = root.leads || root.qaLeads || root.leadsJson;
+        const streamsRaw = root.streamsTree || root.streamGroups || root.streams;
+        const tablesRaw = root.tables || root.docTables || [];
+
+        if(!leadsRaw || !streamsRaw){
+          throw new Error('Ответ Apps Script не содержит обязательные поля leads и streamsTree');
+        }
+
+        return {
+          leads: normalizeLeadsData(leadsRaw),
+          streamsTree: normalizeStreamGroupsData(streamsRaw),
+          tables: normalizeDutyEditorTables(tablesRaw),
+          meta: root.meta && typeof root.meta === 'object' && !Array.isArray(root.meta) ? root.meta : {}
+        };
+      }
+
+      async function fetchDutyEditorData(signal){
+        const url = new URL(DUTY_EDITOR_SCRIPT_URL);
+        url.searchParams.set('op', 'read');
+        const resp = await httpRequest(url.toString(), {
+          method: 'GET',
+          signal
+        });
+        return normalizeDutyEditorResponse(resp.json || safeJson(resp.text));
+      }
+
+      async function fetchDutyEditorSources(signal){
+        const [data, allureLeaves] = await Promise.all([
+          fetchDutyEditorData(signal),
+          fetchDutyEditorAllureStreams(signal)
+        ]);
+        return { data, allureLeaves };
+      }
+
+      async function reloadDutyEditorDataFromSources(signal){
+        const loaded = await fetchDutyEditorSources(signal);
+        applyDutyEditorData(loaded.data, { allureLeaves: loaded.allureLeaves });
+        return loaded;
+      }
+
+      async function loadDutyEditorData(force){
+        if(appState.dutyEditorLoading) return;
+        if(appState.dutyEditorLoaded && !force) return;
+
+        appState.dutyEditorLoading = true;
+        syncDutyEditorLayout();
+        setDutyEditorStatus('Загружаю данные редактора...', 'progress');
+        syncDutyEditorSourceLinks();
+
+        try{
+          const loaded = await reloadDutyEditorDataFromSources();
+          setDutyEditorStatus(`Данные загружены: стримов ${loaded.allureLeaves.length}, групп стримов ${Object.keys(loaded.data.streamsTree || {}).length}.`, 'ok');
+        }finally{
+          appState.dutyEditorLoading = false;
+          syncDutyEditorLayout();
+        }
+      }
+
+      async function ensureDutyEditorLoaded(){
+        await loadDutyEditorData(false);
+      }
+
+      async function saveDutyEditorData(){
+        if(appState.dutyEditorSaving) return;
+        if(!appState.dutyEditorData){
+          throw new Error('Сначала загрузите данные редактора');
+        }
+        refreshDutyEditorDirtyState();
+        if(!appState.dutyEditorDirty){
+          setDutyEditorStatus('Изменений нет, сохранять нечего.', 'muted');
+          return false;
+        }
+
+        const payload = buildDutyEditorSavePayload();
+
+        appState.dutyEditorSaving = true;
+        syncDutyEditorActionAvailability();
+        setDutyEditorStatus('Сохраняю изменения...', 'progress');
+        try{
+          const nextData = await persistDutyEditorSavePayload(payload);
+
+          let nextAllureLeaves = normalizeDutyEditorAllureLeaves(
+            appState.dutyEditorData && appState.dutyEditorData.meta && (
+              appState.dutyEditorData.meta.allureLeaves || appState.dutyEditorData.meta.allureStreams
+            )
+          );
+          try{
+            nextAllureLeaves = await fetchDutyEditorAllureStreams();
+          }catch(err){
+            console.warn('Failed to refresh Allure streams after duty editor save', err);
+          }
+
+          applyDutyEditorData(nextData, { allureLeaves: nextAllureLeaves });
+
+          setDutyEditorStatus('Изменения сохранены в Google Doc и JSON-файл.', 'ok');
+          showToast('Редактор сохранён');
+        }finally{
+          appState.dutyEditorSaving = false;
+          syncDutyEditorActionAvailability();
+        }
+      }
+
+      function buildDutyEditorSavePayload(options){
+        const leadsEntries = Array.isArray(options && options.leadsEntries)
+          ? options.leadsEntries
+          : getDutyEditorEntries('leads');
+        const streamEntries = Array.isArray(options && options.streamEntries)
+          ? options.streamEntries
+          : getDutyEditorEntries('streams');
+        const hiddenLeadsSource = options && Object.prototype.hasOwnProperty.call(options, 'hiddenLeadAssignments')
+          ? options.hiddenLeadAssignments
+          : (appState.dutyEditorData && appState.dutyEditorData.meta && appState.dutyEditorData.meta.hiddenLeadAssignments);
+        const currentMeta = appState.dutyEditorData && appState.dutyEditorData.meta && typeof appState.dutyEditorData.meta === 'object'
+          ? appState.dutyEditorData.meta
+          : {};
+        const tables = cloneDutyEditorTables(
+          options && Object.prototype.hasOwnProperty.call(options, 'tables')
+            ? options.tables
+            : (appState.dutyEditorData && appState.dutyEditorData.tables)
+        );
+        const visibleLeads = convertDutyEditorEntriesToMap(leadsEntries, 'leads');
+        const hiddenLeads = normalizeLeadsData(hiddenLeadsSource || {});
+        const leads = mergeLeadsMaps(hiddenLeads, visibleLeads);
+        const streamsTree = convertDutyEditorEntriesToMap(streamEntries, 'streams');
+        const persistedMeta = { ...currentMeta };
+        delete persistedMeta.allureLeaves;
+        delete persistedMeta.allureStreams;
+
+        return {
+          op: 'save',
+          leads,
+          streamsTree,
+          tables,
+          meta: {
+            ...persistedMeta,
+            hiddenLeadAssignments: hiddenLeads
+          }
+        };
+      }
+
+      async function persistDutyEditorSavePayload(payload){
+        const response = await httpRequest(DUTY_EDITOR_SCRIPT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify(payload)
+        });
+        const parsed = response.json || safeJson(response.text);
+        if(parsed && parsed.ok === false){
+          throw new Error(String(parsed.error || 'Apps Script не сохранил изменения'));
+        }
+
+        if(parsed && typeof parsed === 'object' && (parsed.data || parsed.leads || parsed.streamsTree || parsed.tables)){
+          return normalizeDutyEditorResponse(parsed);
+        }
+
+        return {
+          leads: normalizeLeadsData((payload && payload.leads) || {}),
+          streamsTree: normalizeStreamGroupsData((payload && payload.streamsTree) || {}),
+          tables: cloneDutyEditorTables((payload && payload.tables) || []),
+          meta: payload && typeof payload.meta === 'object' && !Array.isArray(payload.meta) ? { ...payload.meta } : {}
+        };
       }
 
       function buildStreamNorm2Canonical(allStreams, streamAliases){
@@ -5009,13 +7362,30 @@
 
       async function withButtonBusy(button, busyText, task){
         const old = button ? button.innerHTML : '';
+        const isDutyEditorIconButton = !!(button && button.classList && button.classList.contains('release-launch-duty-editor-icon-btn'));
+        if(isDutyEditorIconButton){
+          appState.dutyEditorInteractionBusy = true;
+          syncDutyEditorActionAvailability();
+        }
         button.disabled = true;
-        if(busyText) button.textContent = busyText;
+        if(isDutyEditorIconButton && busyText){
+          button.classList.add('is-busy');
+          button.innerHTML = getDutyEditorButtonSpinnerMarkup();
+        }else if(busyText){
+          button.textContent = busyText;
+        }
         try{
           return await task();
         }finally{
+          if(button) button.classList.remove('is-busy');
           button.innerHTML = old;
+          if(isDutyEditorIconButton){
+            appState.dutyEditorInteractionBusy = false;
+          }
           button.disabled = false;
+          if(isDutyEditorIconButton){
+            syncDutyEditorActionAvailability();
+          }
           refreshButtons();
         }
       }
@@ -5042,19 +7412,23 @@
           baseInfo.textContent = baseText;
           log(baseText);
 
-          log('Шаг 1/4: загружаю список стримов из Allure...');
+          log('Шаг 1/5: синхронизирую test plan Allure...');
+          await syncCollectionAllureTestPlan(ctrl.signal);
+          log('Синхронизация test plan завершена.', 'ok');
+
+          log('Шаг 2/5: загружаю список стримов из Allure...');
           const streams = await fetchStreams(ctrl.signal);
           log(`Стримов получено: ${streams.length}`, 'ok');
 
-          log('Шаг 2/4: загружаю лидов QA...');
+          log('Шаг 3/5: загружаю лидов QA...');
           const leadsRaw = await fetchQaLeads(ctrl.signal);
           log(`Лидов загружено: ${Object.keys(leadsRaw).length}`, 'ok');
 
-          log('Шаг 3/4: читаю сообщения из Band...');
+          log('Шаг 4/5: читаю сообщения из Band...');
           const messages = await fetchBandMessagesSince(windowInfo.sinceMs, cfg, ctrl.signal);
           log(`Сообщений получено: ${messages.length}`, 'ok');
 
-          log('Шаг 4/4: парсю дежурных...');
+          log('Шаг 5/5: парсю дежурных...');
           const aliases = buildHardcodedAliases();
           const excludeSet = buildHardcodedExcludeSet();
           const parsed = parseDuties(messages, streams, aliases);
@@ -5181,6 +7555,33 @@
           area.remove();
           showToast('Текст скопирован');
         }
+      }
+
+      async function copyTextToClipboard(text, successMessage, emptyMessage){
+        const value = String(text || '').trim();
+        if(!value){
+          showToast(String(emptyMessage || 'Нечего копировать'), false);
+          return false;
+        }
+
+        try{
+          await navigator.clipboard.writeText(value);
+        }catch(_){
+          const area = document.createElement('textarea');
+          area.value = value;
+          area.setAttribute('readonly', 'readonly');
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          area.style.pointerEvents = 'none';
+          document.body.appendChild(area);
+          area.focus();
+          area.select();
+          document.execCommand('copy');
+          area.remove();
+        }
+
+        showToast(String(successMessage || 'Скопировано'));
+        return true;
       }
 
       async function copyCurrentDutiesMessage(){
@@ -5326,7 +7727,7 @@
         return lines.join('\n');
       }
 
-      const MAJOR_POLL_DEFAULT = '/poll "Облако компонентов" "Core" "Заказы" "Главная и акции" "Поиск и Каталог" "Корзина 1ШК" "Payments" "Карточка товара" "Корзина 2ШК" "Корзина кроссбордер" "Корзина способы доставок" "Отзывы" "Профиль" "Stream Корзина (Преордер)" "Рекомендации" "Кор Кошелька" "Корзина Курьер WB" "Финтех Партнерское кредитование" "Финтех Частями" "Платежи и Переводы" "Открытие счетов" "Финтех оплаты и ценообразование" "Stream Финтех (Инвестпродукты)" "Финтех Карты" "Чаты" "С2С" "Travel.Avia" "Travel.Hotels" "Travel.Главная" "Travel.Туры" "WB Club" "Спецпроекты" "Auth" "Недвижимость" "Страница продавца" "Крипта. Копилка. ЦФТ" "Депозиты и накопления" "Stream Корзина (B2B)" "Трансграничные переводы" "Комиссионные и инвестиционные продукты" "Реклама"  --progress --votes=39';
+      const MAJOR_POLL_TITLE = 'Облако компонентов';
 
       const PUSH_IOS_STEPS = [
         { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishIos' },
@@ -6232,7 +8633,7 @@
         const andVerInput = $('majorAndroidReleaseVersion');
         const iosTextarea = $('majorIosThreadText');
         const andTextarea = $('majorAndroidThreadText');
-        const pollTextarea = $('majorPollText');
+        const pollTextarea = getMajorPollTextarea();
 
         if(iosVerInput && !String(iosVerInput.value || '').trim()){
           iosVerInput.value = loadMajorPushReleaseFromStorage('ios');
@@ -6247,8 +8648,9 @@
         if(andTextarea && !String(andTextarea.value || '').trim()){
           andTextarea.value = buildMajorReleaseThreadMessage('android', String(andVerInput ? andVerInput.value : '').trim() || '[версия]');
         }
-        if(pollTextarea && !String(pollTextarea.value || '').trim()){
-          pollTextarea.value = MAJOR_POLL_DEFAULT;
+        if(pollTextarea) pollTextarea.readOnly = true;
+        if(!String(appState.majorPollText || '').trim()){
+          setMajorPollStatus('Получаем стримы из Allure...', 'progress');
         }
 
         const iosListenerKey = '__majorIosInputListener';
@@ -6281,6 +8683,9 @@
         schedulePushWorkflowSync('ios');
         schedulePushWorkflowSync('android');
         renderPushWorkflow();
+        refreshMajorPollText().catch((error) => {
+          console.warn('[Major poll] failed to refresh from Allure', error);
+        });
       }
 
       async function publishMajorReleaseFeedPost(platform){
@@ -6327,8 +8732,7 @@
 
       async function publishMajorPollToThread(platform, feedPosts, cfg){
         const isIos = platform === 'ios';
-        const pollTextarea = $('majorPollText');
-        const pollText = pollTextarea ? String(pollTextarea.value || '').trim() : '';
+        const pollText = String(await refreshMajorPollText(null) || '').trim();
         if(!pollText) throw new Error('Текст опроса пуст.');
 
         const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
@@ -6957,6 +9361,14 @@
           applyPingCollapseState();
           saveDetailsState();
         });
+        dutyEditorLeadsCollapseBtn?.addEventListener('click', () => {
+          appState.dutyEditorLeadsCollapsed = !appState.dutyEditorLeadsCollapsed;
+          applyDutyEditorSectionCollapseState('leads');
+        });
+        dutyEditorStreamsCollapseBtn?.addEventListener('click', () => {
+          appState.dutyEditorStreamsCollapsed = !appState.dutyEditorStreamsCollapsed;
+          applyDutyEditorSectionCollapseState('streams');
+        });
         workflowResetBtn?.addEventListener('click', () => {
           resetWorkflowState();
           showToast('Шаги сброшены');
@@ -6974,6 +9386,8 @@
 
         const windowInfo = buildSinceWindow();
         baseInfo.textContent = `База выборки сообщений: ${formatMskHuman(windowInfo.baseUtcDate)}`;
+        syncDutyEditorSourceLinks();
+        syncDutyEditorLayout();
 
         resetWorkflowState({ preserveSchedules: true });
         resetPushWorkflow(undefined, { preserveSchedules: true });
@@ -6992,6 +9406,9 @@
             return;
           }
           if(mode === RUN_MODE_MAJOR){
+            if(normalizeMajorView(appState.majorView) !== 'collection'){
+              setMajorView('collection');
+            }
             runCollection().catch((err) => {
               log(`Ошибка запуска: ${err.message || err}`, 'err');
               setStatus('Ошибка запуска', 'release-launch-status-err');
@@ -7035,6 +9452,26 @@
             closeSwatScheduleModal();
           }
         });
+        dutyEditorReloadBtn?.addEventListener('click', () => withButtonBusy(dutyEditorReloadBtn, 'Загружаю...', () => loadDutyEditorData(true)).catch((err) => {
+          const message = err && err.message ? err.message : String(err || 'Не удалось загрузить редактор');
+          setDutyEditorStatus(message, 'err');
+          showToast(message, false);
+        }));
+        dutyEditorAddLeadBtn?.addEventListener('click', () => {
+          addDutyEditorEntry('leads');
+        });
+        dutyEditorAddStreamGroupBtn?.addEventListener('click', () => {
+          addDutyEditorEntry('streams');
+        });
+        dutyEditorLeadsList?.addEventListener('click', (event) => {
+          Promise.resolve(handleDutyEditorActionClick(event)).catch(handleDutyEditorInteractionError);
+        });
+        dutyEditorStreamsList?.addEventListener('click', (event) => {
+          Promise.resolve(handleDutyEditorActionClick(event)).catch(handleDutyEditorInteractionError);
+        });
+        dutyEditorLeadsList?.addEventListener('input', handleDutyEditorFieldInput);
+        dutyEditorStreamsList?.addEventListener('input', handleDutyEditorFieldInput);
+        dutyEditorLeadsList?.addEventListener('focusin', handleDutyEditorFieldFocus);
         swatScheduleSubmitBtn?.addEventListener('click', () => {
           const targetMs = parseMskDateTimeToMs(
             swatScheduleDateInput ? swatScheduleDateInput.value : '',
@@ -7160,10 +9597,18 @@
             closeSwatScheduleMenu();
           }
         });
+        document.addEventListener('click', (event) => {
+          const target = event.target;
+          if(target && target.closest && target.closest('[data-duty-editor-lead-search-wrap]')){
+            return;
+          }
+          closeAllDutyEditorLeadSearchPanels();
+        });
         document.addEventListener('keydown', (event) => {
           if(event.key === 'Escape'){
             closeSwatScheduleMenu();
             closeSwatScheduleModal();
+            closeAllDutyEditorLeadSearchPanels();
           }
         });
         swatLeadViktor?.addEventListener('change', () => {
@@ -7216,6 +9661,7 @@
         $('pushWorkflowResetBtn')?.addEventListener('click', () => resetPushWorkflow());
 
         appState.stepSchedules = loadStepSchedules();
+        saveStepSchedules();
         for(const plan of Object.values(appState.stepSchedules)){
           armStepSchedule(plan);
         }
