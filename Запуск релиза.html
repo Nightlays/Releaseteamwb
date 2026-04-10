@@ -3196,11 +3196,34 @@
         return txt.replace(/\s+/g, ' ').trim().slice(0, 300);
       }
 
+      function sanitizeHeaderValue(rawValue){
+        const normalized = String(rawValue == null ? '' : rawValue)
+          .normalize('NFKC')
+          .replace(/[\u0000-\u0008\u000A-\u001F\u007F]+/g, '')
+          .replace(/[\u1680\u180E\u2000-\u200F\u2028-\u202F\u205F\u2060\u3000\uFEFF]/g, ' ')
+          .trim();
+        return normalized.replace(/[^\u0009\u0020-\u007E\u00A0-\u00FF]/g, '');
+      }
+
+      function buildFetchHeaders(rawHeaders){
+        const out = new Headers();
+        const entries = rawHeaders instanceof Headers
+          ? Array.from(rawHeaders.entries())
+          : Object.entries(rawHeaders || {});
+        for(const [rawName, rawValue] of entries){
+          const name = String(rawName || '').trim();
+          if(!name || rawValue == null) continue;
+          const value = sanitizeHeaderValue(Array.isArray(rawValue) ? rawValue.join(', ') : rawValue);
+          out.set(name, value);
+        }
+        return out;
+      }
+
       async function proxyRequestJson(method, targetUrl, headers, body, signal){
         const p = new URL(PROXY_BASE + '/proxy');
         p.searchParams.set('url', targetUrl);
 
-        const opts = { method, headers: headers || {}, signal };
+        const opts = { method, headers: buildFetchHeaders(headers), signal };
         if(body !== undefined){
           opts.body = (typeof body === 'string') ? body : JSON.stringify(body);
         }
@@ -4088,7 +4111,7 @@
 
         let r;
         try{
-          r = await fetch(p.toString(), { method, headers: headers || {}, signal });
+          r = await fetch(p.toString(), { method, headers: buildFetchHeaders(headers), signal });
         }catch(error){
           const msg = error && error.message ? error.message : String(error);
           throw new Error(`Сетевой/CORS блок для proxy ${targetUrl}: ${msg}`);
