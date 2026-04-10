@@ -510,12 +510,13 @@
 
       const PLATFORM_SEP = '(?:\\s*[-—:–.]+\\s*|\\s+)*';
       const DUTY_WORD = 'Дежурн[\\p{L}\\p{N}_]*';
+      const DUTY_PERSON_CAPTURE = '@([^\\n\\r,;]+?)(?=\\s*(?:[\\n\\r,;]|$))';
       const RE_BLOCK_QUOTED = new RegExp(`${DUTY_WORD}\\s*"([^"]+)"([\\s\\S]*?)(?=${DUTY_WORD}\\s*"|$)`, 'giu');
       const RE_BLOCK_OT = new RegExp(`${DUTY_WORD}\\s+от\\s+([^\\n\\r"]+)\\s*([\\s\\S]*?)(?=${DUTY_WORD}|$)`, 'giu');
       const RE_BLOCK_HEADER = new RegExp(`${DUTY_WORD}\\s+(?!от\\b)([^\\n\\r"@]+?)\\s*[\\r\\n]+([\\s\\S]*?)(?=${DUTY_WORD}|$)`, 'giu');
-      const RE_INLINE_FREE = new RegExp(`${DUTY_WORD}\\s+([^\\n\\r"@]+?)` + PLATFORM_SEP + '@([^\\n\\r,; ]+)', 'giu');
-      const RE_ANDROID = new RegExp('\\b(?:Android|andr)\\b' + PLATFORM_SEP + '@([^\\n\\r,; ]+)', 'iu');
-      const RE_IOS = new RegExp('\\bios\\b' + PLATFORM_SEP + '@([^\\n\\r,; ]+)', 'iu');
+      const RE_INLINE_FREE = new RegExp(`${DUTY_WORD}\\s+([^\\n\\r"@]+?)` + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'giu');
+      const RE_ANDROID = new RegExp('\\b(?:Android|andr)\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
+      const RE_IOS = new RegExp('\\bios\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
 
       const startBtn = $('startBtn');
       const stopBtn = $('stopBtn');
@@ -3674,6 +3675,18 @@
         const aliases = buildHardcodedAliases();
         const streamNorm2Canonical = buildStreamNorm2Canonical(sourceStreamNames, aliases);
         const visibleStreamNorms = new Set(sourceStreamNames.map((stream) => norm(stream)));
+        const visibleStreamByNorm = new Map();
+        const visibleStreamByLooseNorm = new Map();
+        for(const streamName of sourceStreamNames){
+          const streamNorm = norm(streamName);
+          if(streamNorm && !visibleStreamByNorm.has(streamNorm)){
+            visibleStreamByNorm.set(streamNorm, streamName);
+          }
+          const streamLooseNorm = normLoose(streamName);
+          if(streamLooseNorm && !visibleStreamByLooseNorm.has(streamLooseNorm)){
+            visibleStreamByLooseNorm.set(streamLooseNorm, streamName);
+          }
+        }
         const leadByVisibleStreamNorm = new Map();
         const hiddenLeadAssignments = {};
 
@@ -3683,8 +3696,12 @@
           for(const streamRaw of Array.isArray(streamsRaw) ? streamsRaw : []){
             const stream = String(streamRaw || '').trim();
             if(!stream) continue;
-            const canonical = streamNorm2Canonical[norm(stream)]
-              || streamNorm2Canonical[normLoose(stream)]
+            const streamNorm = norm(stream);
+            const streamLooseNorm = normLoose(stream);
+            const canonical = visibleStreamByNorm.get(streamNorm)
+              || visibleStreamByLooseNorm.get(streamLooseNorm)
+              || streamNorm2Canonical[streamNorm]
+              || streamNorm2Canonical[streamLooseNorm]
               || '';
             const canonicalNorm = canonical ? norm(canonical) : '';
 
@@ -5553,13 +5570,59 @@
           if(canonicalRealLoose) out[canonicalRealLoose] = canonicalReal;
           for(const alias of aliases || []){
             const aliasNorm = norm(alias);
-            if(aliasNorm) out[aliasNorm] = canonicalReal;
+            if(aliasNorm && !out[aliasNorm]) out[aliasNorm] = canonicalReal;
             const aliasLoose = normLoose(alias);
-            if(aliasLoose) out[aliasLoose] = canonicalReal;
+            if(aliasLoose && !out[aliasLoose]) out[aliasLoose] = canonicalReal;
           }
         }
 
         return out;
+      }
+
+      function getCoreDutyTargets(allStreams){
+        const targets = {
+          shared: '',
+          ios: '',
+          android: ''
+        };
+
+        for(const rawStream of Array.isArray(allStreams) ? allStreams : []){
+          const stream = String(rawStream || '').trim();
+          if(!stream) continue;
+          const nrm = norm(stream);
+          if(nrm === norm('Core') && !targets.shared){
+            targets.shared = stream;
+            continue;
+          }
+          if(nrm === norm('Core iOS') && !targets.ios){
+            targets.ios = stream;
+            continue;
+          }
+          if(nrm === norm('Core Android') && !targets.android){
+            targets.android = stream;
+          }
+        }
+
+        return targets;
+      }
+
+      function resolveDutyStreamTarget(rawName, platform, streamNorm2Canonical, coreTargets){
+        const cleaned = String(rawName || '').replace(/^[«"'\s]+|[»"'\s]+$/g, '').replace(/\s+/g, ' ').trim();
+        if(!cleaned) return '';
+
+        if(norm(cleaned) === norm('Core')){
+          if(platform === 'iOS' && coreTargets && coreTargets.ios){
+            return coreTargets.ios;
+          }
+          if(platform === 'Android' && coreTargets && coreTargets.android){
+            return coreTargets.android;
+          }
+          if(coreTargets && coreTargets.shared){
+            return coreTargets.shared;
+          }
+        }
+
+        return matchStream(cleaned, streamNorm2Canonical);
       }
 
       function buildLeadIndex(leads, streamNorm2Canonical){
@@ -5598,12 +5661,19 @@
       }
 
       function leadsForStream(streamCanonical, platform, leadIndex){
-        if(norm(streamCanonical) === norm('Core')){
+        const streamNorm = norm(streamCanonical);
+        if(streamNorm === norm('Core')){
           const chosen = platform === 'Android' ? leadIndex.coreAndroid : leadIndex.coreIos;
           return Array.from(chosen).sort();
         }
+        if(streamNorm === norm('Core iOS')){
+          return Array.from(leadIndex.coreIos || []).sort();
+        }
+        if(streamNorm === norm('Core Android')){
+          return Array.from(leadIndex.coreAndroid || []).sort();
+        }
 
-        const values = leadIndex.leadByStreamNorm.get(norm(streamCanonical));
+        const values = leadIndex.leadByStreamNorm.get(streamNorm);
         return values ? Array.from(values).sort() : [];
       }
 
@@ -5755,6 +5825,7 @@
       function parseDuties(messages, allStreams, streamAliases){
         const duties = {};
         const streamNorm2Canonical = buildStreamNorm2Canonical(allStreams, streamAliases);
+        const coreTargets = getCoreDutyTargets(allStreams);
         const unmatchedStreams = new Set();
         let quotedBlocks = 0;
         let otBlocks = 0;
@@ -5771,19 +5842,23 @@
             quotedBlocks += 1;
             const streamRaw = String(m[1] || '').trim();
             const body = String(m[2] || '');
-            const streamName = matchStream(streamRaw, streamNorm2Canonical);
-            if(!streamName){
-              if(RE_ANDROID.test(body) || RE_IOS.test(body)){
+            const ma = body.match(RE_ANDROID);
+            const mi = body.match(RE_IOS);
+            const androidStreamName = ma ? resolveDutyStreamTarget(streamRaw, 'Android', streamNorm2Canonical, coreTargets) : '';
+            const iosStreamName = mi ? resolveDutyStreamTarget(streamRaw, 'iOS', streamNorm2Canonical, coreTargets) : '';
+            if(!androidStreamName && !iosStreamName){
+              if(ma || mi){
                 unmatchedStreams.add(streamRaw);
               }
               continue;
             }
 
-            const row = ensureRow(streamName);
-            const ma = body.match(RE_ANDROID);
-            const mi = body.match(RE_IOS);
-            if(ma) row.Android = toHandle(ma[1]);
-            if(mi) row.iOS = toHandle(mi[1]);
+            if(ma && androidStreamName){
+              ensureRow(androidStreamName).Android = toHandle(ma[1]);
+            }
+            if(mi && iosStreamName){
+              ensureRow(iosStreamName).iOS = toHandle(mi[1]);
+            }
           }
         }
 
@@ -5792,19 +5867,25 @@
             otBlocks += 1;
             const streamRaw = String(m[1] || '').trim();
             const body = String(m[2] || '');
-            const streamName = matchStream(streamRaw, streamNorm2Canonical);
-            if(!streamName){
-              if(RE_ANDROID.test(body) || RE_IOS.test(body)){
+            const ma = body.match(RE_ANDROID);
+            const mi = body.match(RE_IOS);
+            const androidStreamName = ma ? resolveDutyStreamTarget(streamRaw, 'Android', streamNorm2Canonical, coreTargets) : '';
+            const iosStreamName = mi ? resolveDutyStreamTarget(streamRaw, 'iOS', streamNorm2Canonical, coreTargets) : '';
+            if(!androidStreamName && !iosStreamName){
+              if(ma || mi){
                 unmatchedStreams.add(streamRaw);
               }
               continue;
             }
 
-            const row = ensureRow(streamName);
-            const ma = body.match(RE_ANDROID);
-            const mi = body.match(RE_IOS);
-            if(ma && !row.Android) row.Android = toHandle(ma[1]);
-            if(mi && !row.iOS) row.iOS = toHandle(mi[1]);
+            if(ma && androidStreamName){
+              const row = ensureRow(androidStreamName);
+              if(!row.Android) row.Android = toHandle(ma[1]);
+            }
+            if(mi && iosStreamName){
+              const row = ensureRow(iosStreamName);
+              if(!row.iOS) row.iOS = toHandle(mi[1]);
+            }
           }
         }
 
@@ -5813,19 +5894,25 @@
             headerBlocks += 1;
             const header = String(m[1] || '').trim();
             const body = String(m[2] || '');
-            const streamName = matchStream(header, streamNorm2Canonical);
-            if(!streamName){
-              if(RE_ANDROID.test(body) || RE_IOS.test(body)){
+            const ma = body.match(RE_ANDROID);
+            const mi = body.match(RE_IOS);
+            const androidStreamName = ma ? resolveDutyStreamTarget(header, 'Android', streamNorm2Canonical, coreTargets) : '';
+            const iosStreamName = mi ? resolveDutyStreamTarget(header, 'iOS', streamNorm2Canonical, coreTargets) : '';
+            if(!androidStreamName && !iosStreamName){
+              if(ma || mi){
                 unmatchedStreams.add(header);
               }
               continue;
             }
 
-            const row = ensureRow(streamName);
-            const ma = body.match(RE_ANDROID);
-            const mi = body.match(RE_IOS);
-            if(ma && !row.Android) row.Android = toHandle(ma[1]);
-            if(mi && !row.iOS) row.iOS = toHandle(mi[1]);
+            if(ma && androidStreamName){
+              const row = ensureRow(androidStreamName);
+              if(!row.Android) row.Android = toHandle(ma[1]);
+            }
+            if(mi && iosStreamName){
+              const row = ensureRow(iosStreamName);
+              if(!row.iOS) row.iOS = toHandle(mi[1]);
+            }
           }
         }
 
@@ -5848,7 +5935,7 @@
               }
             }
 
-            const streamName = matchStream(baseStream, streamNorm2Canonical);
+            const streamName = resolveDutyStreamTarget(baseStream, platform || '', streamNorm2Canonical, coreTargets);
             if(!streamName){
               unmatchedStreams.add(baseStream);
               continue;
