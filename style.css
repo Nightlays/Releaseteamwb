@@ -3170,6 +3170,30 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   transform:none !important;
   filter:none !important;
 }
+.release-launch .release-launch-workflow-action.is-running,
+.release-launch .release-launch-workflow-action.is-running:hover,
+.release-launch .release-launch-workflow-action.is-running:focus,
+.release-launch .release-launch-workflow-action.is-running:focus-visible{
+  background:linear-gradient(90deg,#f59e0b,#f97316);
+  border-color:rgba(249,115,22,.38);
+  color:#fff;
+  box-shadow:0 10px 24px rgba(249,115,22,.24);
+}
+.release-launch #workflowList .release-launch-workflow-action.is-running:disabled,
+.release-launch #pushIosWorkflowList .release-launch-workflow-action.is-running:disabled,
+.release-launch #pushAndWorkflowList .release-launch-workflow-action.is-running:disabled{
+  background:linear-gradient(90deg,#f59e0b,#f97316) !important;
+  border-color:rgba(249,115,22,.38) !important;
+  color:#fff !important;
+  box-shadow:0 10px 24px rgba(249,115,22,.24) !important;
+  cursor:progress;
+}
+.release-launch #workflowList .release-launch-workflow-action.is-running:disabled:hover,
+.release-launch #pushIosWorkflowList .release-launch-workflow-action.is-running:disabled:hover,
+.release-launch #pushAndWorkflowList .release-launch-workflow-action.is-running:disabled:hover{
+  background:linear-gradient(90deg,#f59e0b,#f97316) !important;
+  color:#fff !important;
+}
 .release-launch #resultsCopyBtn:disabled{
   background:#f1f5f9 !important;
   color:#94a3b8 !important;
@@ -3781,6 +3805,34 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   border-radius:10px;
   font-size:12px;
 }
+.release-launch input[type="date"].input,
+.release-launch input[type="time"].input{
+  min-height:34px;
+  background-color:#fff;
+  color:#334155;
+  -webkit-text-fill-color:#334155;
+  color-scheme:light;
+  font-variant-numeric:tabular-nums;
+}
+.release-launch input[type="date"].input::-webkit-date-and-time-value,
+.release-launch input[type="time"].input::-webkit-date-and-time-value{
+  text-align:left;
+}
+.release-launch input[type="date"].input::-webkit-calendar-picker-indicator,
+.release-launch input[type="time"].input::-webkit-calendar-picker-indicator{
+  opacity:.82;
+}
+.release-launch input[type="date"].input:disabled,
+.release-launch input[type="time"].input:disabled{
+  background:#f8fafc;
+  color:#94a3b8;
+  -webkit-text-fill-color:#94a3b8;
+  cursor:not-allowed;
+}
+.release-launch input[type="date"].input:disabled::-webkit-calendar-picker-indicator,
+.release-launch input[type="time"].input:disabled::-webkit-calendar-picker-indicator{
+  opacity:.42;
+}
 .release-launch .release-launch-check-row{
   display:flex;
   align-items:center;
@@ -3951,6 +4003,15 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
 }
 .release-launch .release-launch-schedule-item:hover{
   background:#f8fafc;
+}
+.release-launch .release-launch-step-schedule-btn.is-active,
+.release-launch .release-launch-step-schedule-btn.is-active:hover,
+.release-launch .release-launch-step-schedule-btn.is-active:focus,
+.release-launch .release-launch-step-schedule-btn.is-active:focus-visible{
+  background:#eff6ff;
+  border-color:#bfdbfe;
+  color:#1d4ed8;
+  box-shadow:inset 0 0 0 1px rgba(59,130,246,.12);
 }
 .release-launch .release-launch-publish-side-meta{
   position:absolute;

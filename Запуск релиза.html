@@ -1659,9 +1659,13 @@
       }
 
       function buildDefaultSwatScheduleMs(nowMs){
-        const parts = getMskParts(Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now());
-        const passedToday = (parts.hours * 60 + parts.minutes) > 10 * 60;
-        return Date.UTC(parts.year, parts.month - 1, parts.day + (passedToday ? 1 : 0), 10, 0, 0, 0) - MSK_OFFSET_MS;
+        const baseMs = Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now();
+        const parts = getMskParts(baseMs);
+        const todayTargetMs = Date.UTC(parts.year, parts.month - 1, parts.day, 10, 0, 0, 0) - MSK_OFFSET_MS;
+        if(baseMs >= todayTargetMs){
+          return Date.UTC(parts.year, parts.month - 1, parts.day + 1, 10, 0, 0, 0) - MSK_OFFSET_MS;
+        }
+        return todayTargetMs;
       }
 
       function parseMskDateTimeToMs(dateValue, timeValue){
@@ -2217,19 +2221,25 @@
 
       function formatStepScheduleStatus(plan){
         const when = formatMskDateTimeHuman(plan.targetMs);
+        const note = String(plan && plan.note || '').trim();
+        if(note){
+          return Date.now() >= plan.targetMs
+            ? `Ожидает выполнения: ${note} · ${when}`
+            : `Повторная попытка ${when} · ${note}`;
+        }
         if(Date.now() >= plan.targetMs){
-          return plan.note
-            ? `Ожидает выполнения: ${plan.note}`
-            : `Время наступило: ${when}`;
+          return `Время наступило: ${when}`;
         }
         return `Запланировано на ${when}`;
       }
 
       function getStepScheduleStatusMeta(plan){
         if(plan){
+          const hasNote = !!String(plan.note || '').trim();
+          const isWaiting = hasNote || Date.now() >= Number(plan.targetMs);
           return {
             text: formatStepScheduleStatus(plan),
-            className: 'text-[11px] text-sky-700'
+            className: isWaiting ? 'text-[11px] text-amber-700' : 'text-[11px] text-sky-700'
           };
         }
         return {
@@ -2259,15 +2269,17 @@
         const plan = appState.stepSchedules[key];
         const busy = !!(options && options.busy);
         const disabled = busy ? 'disabled' : '';
+        const delayActive = !!(plan && plan.triggerMode === 'delay');
+        const scheduleActive = !!(plan && plan.triggerMode === 'schedule');
         return `
           <div class="mt-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] px-3 py-2 space-y-2">
             ${renderStepScheduleStatusNode(key, plan)}
             <div class="flex items-center gap-2 flex-wrap">
               <input id="${ids.delay}" class="input text-xs !px-2 !py-1.5 !w-24" type="number" min="1" step="1" value="${escHtml(draft.delayMinutes || '10')}" data-step-schedule-key="${key}" data-step-schedule-field="delayMinutes" ${disabled} />
-              <button type="button" class="btn btn-soft text-xs" data-step-schedule-action="delay" data-step-schedule-scope="${scope}" data-step-schedule-platform="${platform}" data-step-schedule-step="${stepIdx}" ${disabled}>Таймер</button>
+              <button type="button" class="btn btn-soft text-xs release-launch-step-schedule-btn${delayActive ? ' is-active' : ''}" data-step-schedule-action="delay" data-step-schedule-scope="${scope}" data-step-schedule-platform="${platform}" data-step-schedule-step="${stepIdx}" aria-pressed="${delayActive ? 'true' : 'false'}" ${disabled}>Таймер</button>
               <input id="${ids.date}" class="input text-xs !px-2 !py-1.5 !w-36" type="date" value="${escHtml(draft.date || '')}" data-step-schedule-key="${key}" data-step-schedule-field="date" ${disabled} />
               <input id="${ids.time}" class="input text-xs !px-2 !py-1.5 !w-28" type="time" step="60" value="${escHtml(draft.time || '')}" data-step-schedule-key="${key}" data-step-schedule-field="time" ${disabled} />
-              <button type="button" class="btn btn-soft text-xs" data-step-schedule-action="schedule" data-step-schedule-scope="${scope}" data-step-schedule-platform="${platform}" data-step-schedule-step="${stepIdx}" ${disabled}>По времени</button>
+              <button type="button" class="btn btn-soft text-xs release-launch-step-schedule-btn${scheduleActive ? ' is-active' : ''}" data-step-schedule-action="schedule" data-step-schedule-scope="${scope}" data-step-schedule-platform="${platform}" data-step-schedule-step="${stepIdx}" aria-pressed="${scheduleActive ? 'true' : 'false'}" ${disabled}>По времени</button>
               ${plan ? `<button type="button" class="btn btn-soft text-xs text-rose-600" data-step-schedule-action="cancel" data-step-schedule-key="${key}" ${disabled}>Отменить</button>` : ''}
             </div>
           </div>
@@ -2925,6 +2937,8 @@
           const locked = appState.running || appState.workflowRunning || finished || !isCurrent || status !== 'pending' || isLockedByCollection;
           const yesDisabled = locked ? 'disabled' : '';
           const noDisabled = locked ? 'disabled' : '';
+          const actionLabel = status === 'running' ? 'Выполняется…' : 'Да';
+          const actionBusyAttr = status === 'running' ? 'aria-busy="true"' : '';
           const blockedComment = isLockedByCollection
             ? '<div class="text-[11px] mt-1 text-slate-500">Начните сбор дежурных и дождитесь выполнения</div>'
             : '';
@@ -2944,7 +2958,7 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
-                  <button type="button" class="btn btn-grad release-launch-workflow-yes" data-workflow-step="${idx}" data-workflow-decision="yes" ${yesDisabled}>Да</button>
+                  <button type="button" class="btn btn-grad release-launch-workflow-yes release-launch-workflow-action${status === 'running' ? ' is-running' : ''}" data-workflow-step="${idx}" data-workflow-decision="yes" ${yesDisabled} ${actionBusyAttr}>${actionLabel}</button>
                   <button type="button" class="btn btn-soft" data-workflow-step="${idx}" data-workflow-decision="no" ${noDisabled}>Нет</button>
                 </div>
               </div>
@@ -8386,6 +8400,8 @@
             ? `<button type="button" class="btn btn-soft" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="retry" ${retryDis}>Повторить</button>`
             : '';
           const showExecuteBtn = !retryBtn;
+          const actionLabel = status === 'running' ? 'Выполняется…' : 'Выполнить';
+          const actionBusyAttr = status === 'running' ? 'aria-busy="true"' : '';
           const updateComponentsBtn = (isPushComponentsAction(step.action) && status === 'done')
             ? `<button type="button" class="btn btn-soft text-xs" data-push-platform="${platform}" data-push-step="${idx}" data-push-manual-action="update-components-message" ${running ? 'disabled' : ''}>Обновить сообщение</button>`
             : '';
@@ -8407,7 +8423,7 @@
                   ${retryBtn}
                   ${updateComponentsBtn}
                   ${status === 'pending' ? `<button type="button" class="btn btn-soft text-slate-500" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="no" ${skipDis}>Пропустить</button>` : ''}
-                  ${showExecuteBtn ? `<button type="button" class="btn btn-grad release-launch-workflow-yes" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="yes" ${actionDis}>Выполнить</button>` : ''}
+                  ${showExecuteBtn ? `<button type="button" class="btn btn-grad release-launch-workflow-yes release-launch-workflow-action${status === 'running' ? ' is-running' : ''}" data-push-platform="${platform}" data-push-step="${idx}" data-push-decision="yes" ${actionDis} ${actionBusyAttr}>${actionLabel}</button>` : ''}
                 </div>
               </div>
             </div>`;
