@@ -1,6 +1,15 @@
 const DUTY_EDITOR_DOC_ID = '1glaEFkdpAzGuRyQZYz1muBzVkFOnKyn85BW-CXLFSFU';
 const DUTY_EDITOR_LEADS_FILE_ID = '1Arzm2ZEix5aVyp0lqAFeZxLnDnkfkkUb';
-const DUTY_EDITOR_BUILD = 'duty-editor-2026-04-08-2';
+const DUTY_EDITOR_BUILD = 'duty-editor-2026-04-15-1';
+const RELEASE_STREAMS_SPREADSHEET_ID = '1W7fNhN5BD-ItG03za-U2-uPotvDfiZbt_baiyZXgLpI';
+const RELEASE_STREAMS_TEMPLATE_CODE = '759';
+const RELEASE_STREAMS_SHEET_SUFFIX = 'iOS+Android';
+const RELEASE_STREAMS_MONDAY_HEADER = 'ПОНЕДЕЛЬНИК';
+const RELEASE_STREAMS_TUESDAY_HEADER = 'ВТОРНИК';
+const RELEASE_STREAMS_SECTION_DATA_OFFSET = 3;
+const RELEASE_STREAMS_TIME_COLUMNS_START = 3;
+const RELEASE_STREAMS_TIME_COLUMNS_COUNT = 14;
+const RELEASE_STREAMS_MAX_FORMAT_COLUMN = 27;
 
 const STREAMS_JSON_START_MARKER = 'WB_STREAMS_JSON_START';
 const STREAMS_JSON_END_MARKER = 'WB_STREAMS_JSON_END';
@@ -39,6 +48,22 @@ function doPost(e) {
   try {
     const body = parseJsonBody_(e);
     const op = normalizeOp_(body.op || '');
+
+    if (isReleaseStreamsSheetCheckOp_(op)) {
+      return jsonResponse_({
+        ok: true,
+        build: DUTY_EDITOR_BUILD,
+        data: checkReleaseStreamsSheet_(body)
+      });
+    }
+
+    if (isReleaseStreamsSheetEnsureOp_(op)) {
+      return jsonResponse_({
+        ok: true,
+        build: DUTY_EDITOR_BUILD,
+        data: ensureReleaseStreamsSheet_(body)
+      });
+    }
 
     if (isDutyEditorSaveOp_(op)) {
       return jsonResponse_({
@@ -403,6 +428,271 @@ function normalizeTables_(raw) {
   });
 }
 
+function checkReleaseStreamsSheet_(payload) {
+  const releaseCode = releaseToStreamsSheetCode_(payload && payload.release);
+  const spreadsheet = SpreadsheetApp.openById(RELEASE_STREAMS_SPREADSHEET_ID);
+  const sheet = findReleaseStreamsSheetByCode_(spreadsheet, releaseCode);
+  return buildReleaseStreamsSheetResponse_(spreadsheet, releaseCode, sheet, false);
+}
+
+function ensureReleaseStreamsSheet_(payload) {
+  const releaseCode = releaseToStreamsSheetCode_(payload && payload.release);
+  const expectedFinish = String(payload && payload.expectedFinish || '').trim();
+  const streams = normalizeReleaseStreamsList_(payload && payload.streams);
+  if (!streams.length) {
+    throw new Error('Streams list is empty');
+  }
+
+  const spreadsheet = SpreadsheetApp.openById(RELEASE_STREAMS_SPREADSHEET_ID);
+  const existingSheet = findReleaseStreamsSheetByCode_(spreadsheet, releaseCode);
+  if (existingSheet) {
+    return buildReleaseStreamsSheetResponse_(spreadsheet, releaseCode, existingSheet, false);
+  }
+
+  const templateSheet = findReleaseStreamsTemplateSheet_(spreadsheet);
+  if (!templateSheet) {
+    throw new Error('Template sheet ' + RELEASE_STREAMS_TEMPLATE_CODE + ' was not found');
+  }
+
+  const sheet = templateSheet.copyTo(spreadsheet);
+  sheet.setName(makeReleaseStreamsSheetName_(releaseCode));
+  spreadsheet.setActiveSheet(sheet);
+  spreadsheet.moveActiveSheet(spreadsheet.getNumSheets());
+
+  populateReleaseStreamsSheet_(sheet, releaseCode, expectedFinish, streams);
+  SpreadsheetApp.flush();
+
+  return buildReleaseStreamsSheetResponse_(spreadsheet, releaseCode, sheet, true);
+}
+
+function buildReleaseStreamsSheetResponse_(spreadsheet, releaseCode, sheet, created) {
+  const hasSheet = !!sheet;
+  return {
+    releaseCode: releaseCode,
+    exists: hasSheet,
+    created: !!created,
+    sheetName: hasSheet ? sheet.getName() : '',
+    sheetId: hasSheet ? sheet.getSheetId() : null,
+    sheetUrl: hasSheet ? buildReleaseStreamsSheetUrl_(spreadsheet, sheet) : ''
+  };
+}
+
+function populateReleaseStreamsSheet_(sheet, releaseCode, expectedFinish, streams) {
+  sheet.getRange('C1').setValue(releaseCode + ' (Данные по продуктовым командам)');
+  setReleaseStreamsExpectedFinish_(sheet.getRange('E1'), expectedFinish);
+  rebuildReleaseStreamsDaySection_(sheet, RELEASE_STREAMS_MONDAY_HEADER, streams, RELEASE_STREAMS_TUESDAY_HEADER);
+  rebuildReleaseStreamsDaySection_(sheet, RELEASE_STREAMS_TUESDAY_HEADER, streams, '');
+}
+
+function setReleaseStreamsExpectedFinish_(cell, rawValue) {
+  const parsed = parseReleaseStreamsExpectedFinish_(rawValue);
+  if (parsed) {
+    cell.setValue(parsed.value);
+    if (parsed.hasTime) {
+      cell.setNumberFormat('dd/MM HH:mm');
+    } else {
+      cell.setNumberFormat('dd/MM');
+    }
+    return;
+  }
+  cell.setNumberFormat('@');
+  cell.setValue(String(rawValue || '').trim());
+}
+
+function parseReleaseStreamsExpectedFinish_(value) {
+  const source = String(value || '').trim();
+  if (!source) return null;
+
+  const match = source.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const year = normalizeReleaseStreamsYear_(match[3]);
+  const hours = match[4] == null ? 0 : Number(match[4]);
+  const minutes = match[5] == null ? 0 : Number(match[5]);
+
+  if (!isFinite(day) || !isFinite(month) || !isFinite(year) || !isFinite(hours) || !isFinite(minutes)) {
+    return null;
+  }
+
+  return {
+    value: new Date(year, month, day, hours, minutes, 0, 0),
+    hasTime: match[4] != null
+  };
+}
+
+function normalizeReleaseStreamsYear_(yearText) {
+  const rawYear = Number(yearText);
+  if (!isFinite(rawYear)) return rawYear;
+  if (String(yearText).length === 2) {
+    return rawYear >= 70 ? (1900 + rawYear) : (2000 + rawYear);
+  }
+  return rawYear;
+}
+
+function rebuildReleaseStreamsDaySection_(sheet, sectionHeader, streams, nextSectionHeader) {
+  const sectionHeaderRow = findReleaseStreamsHeaderRow_(sheet, sectionHeader);
+  if (!sectionHeaderRow) {
+    throw new Error('Section header not found: ' + sectionHeader);
+  }
+
+  const dataStartRow = sectionHeaderRow + RELEASE_STREAMS_SECTION_DATA_OFFSET;
+  const nextSectionRow = nextSectionHeader ? findReleaseStreamsHeaderRow_(sheet, nextSectionHeader) : 0;
+  const existingRows = nextSectionRow
+    ? Math.max(0, nextSectionRow - dataStartRow)
+    : Math.max(0, findReleaseStreamsSectionEndRow_(sheet, dataStartRow) - dataStartRow + 1);
+  const targetRows = streams.length * 2;
+
+  if (existingRows < 2 || existingRows % 2 !== 0) {
+    throw new Error('Broken template rows count in section ' + sectionHeader + ': ' + existingRows);
+  }
+
+  if (existingRows < targetRows) {
+    const delta = targetRows - existingRows;
+    if (nextSectionRow) {
+      sheet.insertRowsBefore(nextSectionRow, delta);
+    } else {
+      sheet.insertRowsAfter(dataStartRow + existingRows - 1, delta);
+    }
+  } else if (existingRows > targetRows) {
+    sheet.deleteRows(dataStartRow + targetRows, existingRows - targetRows);
+  }
+
+  applyReleaseStreamsSectionRows_(sheet, dataStartRow, streams);
+}
+
+function applyReleaseStreamsSectionRows_(sheet, dataStartRow, streams) {
+  const targetRows = streams.length * 2;
+  if (!targetRows) return;
+
+  const formatRange = sheet.getRange(dataStartRow, 1, 2, RELEASE_STREAMS_MAX_FORMAT_COLUMN);
+  const iosRowHeight = sheet.getRowHeight(dataStartRow);
+  const androidRowHeight = sheet.getRowHeight(dataStartRow + 1);
+
+  sheet.getRange(dataStartRow, 1, targetRows, 1).breakApart();
+  sheet.getRange(dataStartRow, RELEASE_STREAMS_TIME_COLUMNS_START, targetRows, RELEASE_STREAMS_TIME_COLUMNS_COUNT).clearContent();
+
+  streams.forEach(function(streamName, index) {
+    const row = dataStartRow + (index * 2);
+    formatRange.copyTo(
+      sheet.getRange(row, 1, 2, RELEASE_STREAMS_MAX_FORMAT_COLUMN),
+      SpreadsheetApp.CopyPasteType.PASTE_FORMAT,
+      false
+    );
+    sheet.setRowHeight(row, iosRowHeight);
+    sheet.setRowHeight(row + 1, androidRowHeight);
+    sheet.getRange(row, 1, 2, 1).breakApart();
+    sheet.getRange(row, 2, 2, 1).setValues([['iOS'], ['Android']]);
+    sheet.getRange(row, RELEASE_STREAMS_TIME_COLUMNS_START, 2, RELEASE_STREAMS_TIME_COLUMNS_COUNT).clearContent();
+    sheet.getRange(row, 1, 2, 1).merge();
+    sheet.getRange(row, 1).setValue(streamName);
+  });
+}
+
+function normalizeReleaseStreamsList_(raw) {
+  const out = [];
+  const seen = {};
+
+  (Array.isArray(raw) ? raw : []).forEach(function(item) {
+    const value = String(item || '').trim();
+    const key = value.toLowerCase();
+    if (!value || seen[key]) return;
+    seen[key] = true;
+    out.push(value);
+  });
+
+  return out;
+}
+
+function releaseToStreamsSheetCode_(release) {
+  const source = String(release || '').trim();
+  const match = source.match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) {
+    throw new Error('Invalid release version: ' + source);
+  }
+
+  const major = String(Number(match[1]));
+  const minor = String(Number(match[2]));
+  const patch = Number(match[3]);
+  if (!isFinite(patch)) {
+    throw new Error('Invalid release patch: ' + source);
+  }
+
+  return major + minor + String(Math.floor(patch / 1000));
+}
+
+function makeReleaseStreamsSheetName_(releaseCode) {
+  return String(releaseCode || '').trim() + RELEASE_STREAMS_SHEET_SUFFIX;
+}
+
+function findReleaseStreamsTemplateSheet_(spreadsheet) {
+  return findReleaseStreamsSheetByCode_(spreadsheet, RELEASE_STREAMS_TEMPLATE_CODE);
+}
+
+function findReleaseStreamsSheetByCode_(spreadsheet, releaseCode) {
+  const normalizedCode = String(releaseCode || '').trim();
+  if (!normalizedCode) return null;
+
+  const targetKey = normalizeReleaseStreamsSheetName_(normalizedCode + RELEASE_STREAMS_SHEET_SUFFIX);
+  const sheets = spreadsheet.getSheets();
+  for (var index = 0; index < sheets.length; index += 1) {
+    const sheet = sheets[index];
+    const name = String(sheet.getName() || '');
+    const normalizedName = normalizeReleaseStreamsSheetName_(name);
+    if (normalizedName === targetKey || normalizedName.indexOf(targetKey) === 0) {
+      return sheet;
+    }
+  }
+  return null;
+}
+
+function normalizeReleaseStreamsSheetName_(value) {
+  return String(value || '').toLowerCase().replace(/\s+/g, '');
+}
+
+function buildReleaseStreamsSheetUrl_(spreadsheet, sheet) {
+  return spreadsheet.getUrl().replace(/#gid=\d+$/, '') + '#gid=' + sheet.getSheetId();
+}
+
+function findReleaseStreamsHeaderRow_(sheet, headerText) {
+  const maxRows = Math.min(sheet.getMaxRows(), 200);
+  const values = sheet.getRange(1, 1, maxRows, 1).getDisplayValues();
+  const target = String(headerText || '').trim().toLowerCase();
+
+  for (var index = 0; index < values.length; index += 1) {
+    const cellValue = String(values[index][0] || '').trim().toLowerCase();
+    if (cellValue === target) {
+      return index + 1;
+    }
+  }
+  return 0;
+}
+
+function findReleaseStreamsSectionEndRow_(sheet, startRow) {
+  const maxRows = Math.min(sheet.getMaxRows(), startRow + 400);
+  const values = sheet.getRange(startRow, 1, Math.max(1, maxRows - startRow + 1), 2).getDisplayValues();
+  let lastNonEmptyRow = startRow - 1;
+  let blankRun = 0;
+
+  for (var index = 0; index < values.length; index += 1) {
+    const row = values[index];
+    const hasValue = String(row[0] || '').trim() || String(row[1] || '').trim();
+    if (hasValue) {
+      lastNonEmptyRow = startRow + index;
+      blankRun = 0;
+      continue;
+    }
+
+    blankRun += 1;
+    if (blankRun >= 4 && lastNonEmptyRow >= startRow) {
+      break;
+    }
+  }
+
+  return lastNonEmptyRow;
+}
+
 function parseJsonBody_(e) {
   const text = String(e && e.postData && e.postData.contents || '').trim();
   if (!text) throw new Error('POST body is empty');
@@ -419,6 +709,32 @@ function isDutyEditorReadOp_(op) {
 
 function isDutyEditorSaveOp_(op) {
   return op === 'dutieditorsave' || op === 'editorsave' || op === 'save';
+}
+
+function isReleaseStreamsSheetCheckOp_(op) {
+  return op === 'releasestreamssheetcheck' || op === 'streamssheetcheck';
+}
+
+function isReleaseStreamsSheetEnsureOp_(op) {
+  return op === 'releasestreamssheetensure' || op === 'streamssheetensure';
+}
+
+function authorizeDutyEditorGoogleScopes_() {
+  const doc = DocumentApp.openById(DUTY_EDITOR_DOC_ID);
+  const leadsFile = DriveApp.getFileById(DUTY_EDITOR_LEADS_FILE_ID);
+  const spreadsheet = SpreadsheetApp.openById(RELEASE_STREAMS_SPREADSHEET_ID);
+
+  return {
+    ok: true,
+    docId: doc.getId(),
+    leadsFileId: leadsFile.getId(),
+    spreadsheetId: spreadsheet.getId(),
+    spreadsheetUrl: spreadsheet.getUrl()
+  };
+}
+
+function authorizeDutyEditorGoogleScopes() {
+  return authorizeDutyEditorGoogleScopes_();
 }
 
 function stripBom_(text) {
