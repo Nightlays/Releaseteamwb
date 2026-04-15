@@ -509,6 +509,17 @@ function issueFieldName(field){
   return String(field?.name || field?.projectCustomField?.field?.name || '').trim();
 }
 
+function issueFieldAliases(field){
+  const raw = field?.projectCustomField?.field?.aliases;
+  if(Array.isArray(raw)){
+    return raw.map((it)=>String(it || '').trim()).filter(Boolean);
+  }
+  return String(raw || '')
+    .split(',')
+    .map((it)=>it.trim())
+    .filter(Boolean);
+}
+
 function extractFieldText(value){
   if(typeof value === 'string') return value;
   if(!value) return '';
@@ -523,19 +534,6 @@ function extractFieldText(value){
   return '';
 }
 
-function pickFieldTexts(issue, targets){
-  const targetSet = new Set((Array.isArray(targets) ? targets : [targets]).map((it)=>String(it || '').trim()).filter(Boolean));
-  if(!targetSet.size) return [];
-  const out = [];
-  const fields = Array.isArray(issue?.fields) ? issue.fields : [];
-  for(const field of fields){
-    if(!targetSet.has(issueFieldName(field))) continue;
-    const text = extractFieldText(field?.value).trim();
-    if(text) out.push(text);
-  }
-  return out;
-}
-
 function platformByIssueKey(key, fallback=''){
   const normalized = normalizeIssueKey(key);
   if(normalized.startsWith('ANDR-')) return 'Android';
@@ -543,22 +541,101 @@ function platformByIssueKey(key, fallback=''){
   return fallback || '';
 }
 
-function readIssueReleaseVersions(issue, platform){
-  const fieldNames = YT_RELEASE_FIELD_BY_PLATFORM[platform] || [];
-  const targetSet = new Set(fieldNames.map((it)=>String(it || '').trim()).filter(Boolean));
-  const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+function collectIssueReleaseVersionsFromFields(fields){
   const versions = [];
+  const matchedFieldNames = new Set();
 
   for(const field of fields){
-    if(!targetSet.has(issueFieldName(field))) continue;
+    const fieldName = issueFieldName(field);
+    if(!fieldName) continue;
+    matchedFieldNames.add(fieldName);
     const values = Array.isArray(field?.value) ? field.value : [field?.value];
     for(const value of values){
-      const normalized = normalizeReleaseForCompare(value?.name);
+      const normalized = normalizeReleaseForCompare(extractFieldText(value));
       if(normalized) versions.push(normalized);
     }
   }
 
-  return Array.from(new Set(versions));
+  return {
+    versions: Array.from(new Set(versions)),
+    matchedFieldNames: Array.from(matchedFieldNames)
+  };
+}
+
+function isGenericReleaseField(field){
+  return issueFieldName(field) === 'Версия релиза';
+}
+
+function isPlatformReleaseField(field, platform){
+  const fieldName = issueFieldName(field);
+  const fieldNameLc = fieldName.toLowerCase();
+  const aliases = issueFieldAliases(field).map((it)=>it.toLowerCase());
+  const exactNames = (YT_RELEASE_FIELD_BY_PLATFORM[platform] || []).map((it)=>String(it || '').trim()).filter(Boolean);
+  const exactNameSet = new Set(exactNames);
+
+  if(exactNameSet.has(fieldName) && !isGenericReleaseField(field)) return true;
+
+  if(platform === 'Android'){
+    if(aliases.includes('fixversion-android')) return true;
+    if(fieldNameLc.includes('версия релиза') && fieldNameLc.includes('android')) return true;
+  }
+  if(platform === 'iOS'){
+    if(aliases.includes('fixversion-ios')) return true;
+    if(fieldNameLc.includes('версия релиза') && fieldNameLc.includes('ios')) return true;
+  }
+
+  return false;
+}
+
+function readIssueReleaseInfo(issue, platform){
+  const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+  const platformFields = fields.filter((field)=>isPlatformReleaseField(field, platform));
+  if(platformFields.length){
+    return collectIssueReleaseVersionsFromFields(platformFields);
+  }
+  const genericFields = fields.filter((field)=>isGenericReleaseField(field));
+  if(genericFields.length){
+    return collectIssueReleaseVersionsFromFields(genericFields);
+  }
+  return {
+    versions: [],
+    matchedFieldNames: []
+  };
+}
+
+function findPrimaryIssueKeyForItem(item){
+  const targetKey = normalizeIssueKey(item?.key);
+  if(!targetKey) return '';
+  const entries = Array.isArray(item?.entries) ? item.entries : [];
+
+  for(const entry of entries){
+    if(isRevertGitlabEntry(entry)) continue;
+    const keys = Array.isArray(entry?.keys) ? entry.keys.map((key)=>normalizeIssueKey(key)).filter(Boolean) : [];
+    const keyIndex = keys.indexOf(targetKey);
+    if(keyIndex > 0) return keys[0] || '';
+  }
+
+  return '';
+}
+
+function collectPreviousHotfixReleases(targetRelease, releases){
+  const normalizedTarget = normalizeReleaseForCompare(targetRelease);
+  const parsedTarget = parseRelease(normalizedTarget);
+  if(!parsedTarget) return [];
+
+  const [major, minor, build] = parsedTarget;
+  const previousBaseBuild = Math.floor(build / 1000) * 1000 - 1000;
+  if(previousBaseBuild < 0) return [];
+
+  return Array.from(new Set((Array.isArray(releases) ? releases : [])
+    .map((release)=>normalizeReleaseForCompare(release))
+    .filter((release)=>{
+      if(!release || release === normalizedTarget) return false;
+      const parsed = parseRelease(release);
+      if(!parsed) return false;
+      return parsed[0] === major && parsed[1] === minor && parsed[2] > previousBaseBuild && parsed[2] < build;
+    })))
+    .sort(compareReleaseLabels);
 }
 
 async function enrichGitlabOnlyWithYtReasons(items, targetBranch){
@@ -572,18 +649,29 @@ async function enrichGitlabOnlyWithYtReasons(items, targetBranch){
     const platform = platformByIssueKey(item?.key, firstEntry.platform);
     const issue = await fetchIssueBrief(item?.key);
     const hasIssueData = Boolean(issue?.idReadable || (Array.isArray(issue?.fields) && issue.fields.length));
-    const ytReleases = readIssueReleaseVersions(issue, platform);
+    const releaseInfo = readIssueReleaseInfo(issue, platform);
+    const ytReleases = releaseInfo.versions;
+    const previousHotfixReleases = collectPreviousHotfixReleases(targetRelease, ytReleases);
+    const secondaryOf = findPrimaryIssueKeyForItem(item);
+    const isHotfixItem = Boolean(previousHotfixReleases.length) && (!targetRelease || !ytReleases.includes(targetRelease));
     let reason = '';
 
-    if(hasIssueData && !ytReleases.length){
+    if(secondaryOf){
+      reason = `Второстепенная задача ${secondaryOf}`;
+    }else if(hasIssueData && !releaseInfo.matchedFieldNames.length){
       reason = 'Не найдена версия релиза в задаче';
-    }else if(hasIssueData && targetRelease && !ytReleases.includes(targetRelease)){
+    }else if(hasIssueData && !ytReleases.length){
+      reason = 'Не найдена версия релиза в задаче';
+    }else if(hasIssueData && targetRelease && !ytReleases.includes(targetRelease) && !isHotfixItem){
       reason = 'Версия релиза в YT не равна ветке в гите';
     }
 
     return {
       ...item,
-      reason
+      reason,
+      ytReleases,
+      previousHotfixReleases,
+      isHotfixItem
     };
   });
 
@@ -836,7 +924,12 @@ async function fetchDeployIssueKeys(platform, rel){
 /* YouTrack */
 function ytIssueURL(key){
   const base = YT_BASE.replace(/\/+$/,'');
-  const fields = ['idReadable','summary','tags(name)','fields(projectCustomField(field(name)),value(name,localizedName,text,markdownText,presentation,$type),$type)'].join(',');
+  const fields = [
+    'idReadable',
+    'summary',
+    'tags(name)',
+    'fields(name,projectCustomField(field(name,aliases,localizedName)),value(name,localizedName,text,markdownText,presentation,id,$type),$type)'
+  ].join(',');
   return `${base}/api/issues/${encodeURIComponent(key)}?fields=${encodeURIComponent(fields)}&$top=-1`;
 }
 async function fetchIssueBrief(key){
@@ -1211,10 +1304,6 @@ function compareComposition(deployComposition, gitlabComposition, targetBranch, 
   const gitlabMap = gitlabComposition.keyMap || new Map();
   const withoutKeys = gitlabComposition.withoutKeys || [];
 
-  const deployOnly = Array.from(deployMap.values())
-    .filter((item)=> !gitlabMap.has(item.key))
-    .sort((a,b)=> a.key.localeCompare(b.key));
-
   const gitlabOnly = Array.from(gitlabMap.values())
     .filter((item)=> !deployMap.has(item.key))
     .filter((item)=>{
@@ -1224,7 +1313,6 @@ function compareComposition(deployComposition, gitlabComposition, targetBranch, 
     .sort((a,b)=> a.key.localeCompare(b.key));
 
   const matchedCount = Array.from(gitlabMap.keys()).filter((key)=> deployMap.has(key)).length;
-  const hasDiff = deployOnly.length > 0 || gitlabOnly.length > 0 || withoutKeys.length > 0;
   const releaseLabel = lastRelease ? displayRelease(lastRelease) : '—';
 
   return {
@@ -1233,10 +1321,10 @@ function compareComposition(deployComposition, gitlabComposition, targetBranch, 
     deployUniqueCount: deployMap.size,
     gitlabUniqueCount: gitlabMap.size,
     matchedCount,
-    deployOnly,
     gitlabOnly,
+    hotfixItems: [],
     withoutKeys,
-    hasDiff
+    hasDiff: gitlabOnly.length > 0 || withoutKeys.length > 0
   };
 }
 
@@ -1264,7 +1352,7 @@ function isRevertGitlabEntry(entry){
 
 function renderGitlabOnlyItems(items){
   if(!items.length){
-    return '<div class="composition-empty">Дополнительных MR в релизной ветке вне DeployLab не найдено.</div>';
+    return '<div class="composition-empty">MR вне DeployLab, кроме ЧПиков из ХФ, не найдено.</div>';
   }
   return `<ul class="composition-list">${
     items.map((item)=>{
@@ -1276,7 +1364,7 @@ function renderGitlabOnlyItems(items){
           Задача: ${renderIssueLink(item.key)}
         </div>
       `).join('');
-      const reason = item.reason === 'Не найдена версия релиза в задаче' || item.reason === 'Версия релиза в YT не равна ветке в гите'
+      const reason = item.reason
         ? `<div class="composition-meta">Причина: ${escapeHtml(item.reason)}</div>`
         : '';
       return `
@@ -1288,21 +1376,28 @@ function renderGitlabOnlyItems(items){
   }</ul>`;
 }
 
-function renderDeployOnlyItems(items){
+function renderHotfixItems(items){
   if(!items.length){
-    return '<div class="composition-empty">Все ключи из DeployLab нашлись среди merged MR в релизной ветке.</div>';
+    return '<div class="composition-empty">ЧПики из ХФ не найдены.</div>';
   }
   return `<ul class="composition-list">${
     items.map((item)=>{
-      const releases = Array.from(item.releases || []).sort(compareReleaseLabels);
-      const platforms = Array.from(item.platforms || []).sort((a,b)=> a.localeCompare(b));
+      const entries = item.entries
+        .filter((entry)=> !isRevertGitlabEntry(entry))
+        .map((entry)=>`
+        <div class="composition-entry composition-meta">
+          МР: ${renderMrLink(entry)}<br/>
+          Задача: ${renderIssueLink(item.key)}
+        </div>
+      `).join('');
+      const releases = Array.from(new Set(item.previousHotfixReleases || [])).sort(compareReleaseLabels);
+      const releaseMeta = releases.length
+        ? `<div class="composition-meta">Релиз в YT: ${escapeHtml(releases.join(', '))}</div>`
+        : '';
       return `
         <li class="composition-item">
-          <div class="composition-meta">
-            Задача: ${renderIssueLink(item.key)}<br/>
-            release: ${escapeHtml(releases.join(', ') || '—')}<br/>
-            platform: ${escapeHtml(platforms.join(', ') || '—')}
-          </div>
+          ${releaseMeta}
+          ${entries}
         </li>`;
     }).join('')
   }</ul>`;
@@ -1367,6 +1462,9 @@ function renderCompositionResult(model){
     return;
   }
 
+  const gitlabOnlyItems = Array.isArray(model.gitlabOnly) ? model.gitlabOnly : [];
+  const hotfixItems = Array.isArray(model.hotfixItems) ? model.hotfixItems : [];
+  const withoutKeysItems = Array.isArray(model.withoutKeys) ? model.withoutKeys : [];
   const summaryBadgeClass = model.hasDiff ? 'composition-badge composition-badge--warn' : 'composition-badge composition-badge--ok';
   const summaryBadgeText = model.hasDiff ? 'есть расхождения' : 'состав сходится';
 
@@ -1399,19 +1497,19 @@ function renderCompositionResult(model){
     </div>
 
     <div class="composition-columns">
-      <section class="composition-card ${model.gitlabOnly.length ? 'composition-card--bad' : 'composition-card--good'}">
+      <section class="composition-card ${gitlabOnlyItems.length ? 'composition-card--bad' : 'composition-card--good'}">
         <div class="composition-card-title">Есть в GitLab, но нет в DeployLab</div>
-        ${renderGitlabOnlyItems(model.gitlabOnly)}
+        ${renderGitlabOnlyItems(gitlabOnlyItems)}
       </section>
 
-      <section class="composition-card ${model.deployOnly.length ? 'composition-card--warn' : 'composition-card--good'}">
-        <div class="composition-card-title">Есть в DeployLab, но не найдены в GitLab MR релизной ветки</div>
-        ${renderDeployOnlyItems(model.deployOnly)}
+      <section class="composition-card ${hotfixItems.length ? 'composition-card--warn' : 'composition-card--good'}">
+        <div class="composition-card-title">ЧПики из ХФ</div>
+        ${renderHotfixItems(hotfixItems)}
       </section>
 
       <section class="composition-card composition-card--neutral">
         <div class="composition-card-title">MR релизной ветки без ANDR-/IOS-ключа в title</div>
-        ${renderWithoutKeysItems(model.withoutKeys)}
+        ${renderWithoutKeysItems(withoutKeysItems)}
       </section>
     </div>
   `;
@@ -1481,6 +1579,7 @@ async function checkCompositionAgainstGitlab(){
 
   try{
     saveToStorage();
+    window.__chp_issueBriefCache = new Map();
 
     const start = $('startRel').value.trim();
     const end = $('endRel').value.trim();
@@ -1490,6 +1589,9 @@ async function checkCompositionAgainstGitlab(){
 
     if(!$('dlToken').value.trim()){
       throw new Error('Для проверки состава ЧП заполните DeployLab токен');
+    }
+    if(!$('ytToken').value.trim()){
+      throw new Error('Для проверки состава ЧП заполните YouTrack токен');
     }
     if(!normalizeGitlabToken($('gitlabToken').value)){
       throw new Error('Для проверки состава ЧП заполните GitLab token');
@@ -1509,14 +1611,18 @@ async function checkCompositionAgainstGitlab(){
     setProgress(85);
 
     const result = compareComposition(deployComposition, gitlabComposition, targetBranch, lastRelease);
+    result.hotfixItems = [];
     if(result.gitlabOnly.length){
-      result.gitlabOnly = await enrichGitlabOnlyWithYtReasons(result.gitlabOnly, targetBranch);
+      const enriched = await enrichGitlabOnlyWithYtReasons(result.gitlabOnly, targetBranch);
+      result.hotfixItems = enriched.filter((item)=> item.isHotfixItem);
+      result.gitlabOnly = enriched.filter((item)=> !item.isHotfixItem);
     }
+    result.hasDiff = result.gitlabOnly.length > 0 || result.hotfixItems.length > 0 || result.withoutKeys.length > 0;
     renderCompositionResult(result);
 
     if(result.hasDiff){
       setStatus('Есть расхождения состава', 'warn');
-      logLine(`Проверка состава: GitLab-only ${result.gitlabOnly.length}, Deploy-only ${result.deployOnly.length}, без ключа ${result.withoutKeys.length}`, 'warn');
+      logLine(`Проверка состава: GitLab-only ${result.gitlabOnly.length}, HF ${result.hotfixItems.length}, без ключа ${result.withoutKeys.length}`, 'warn');
       showToast('Есть расхождения состава');
     }else{
       setStatus('Состав ЧП совпадает', 'ok');
