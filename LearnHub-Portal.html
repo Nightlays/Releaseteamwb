@@ -388,6 +388,38 @@ window.fbFetchKey = function(key){
 
 const asArray = (value)=>Array.isArray(value) ? value.filter(Boolean) : (value && typeof value === 'object' ? Object.values(value).filter(Boolean) : []);
 const hasData = (value)=>Array.isArray(value) ? value.length > 0 : !!(value && (typeof value !== 'object' || Object.keys(value).length));
+const normalizeStep = (step, stepIndex = 0)=>({
+  ...(step || {}),
+  id: String(step?.id || `s-auto-${stepIndex}`),
+  title: String(step?.title || `Шаг ${stepIndex + 1}`),
+  type: step?.type || 'text',
+  content: step?.content ?? '',
+  points: Number.isFinite(Number(step?.points)) ? Number(step.points) : 10,
+  required: step?.required !== false,
+  order: Number.isFinite(Number(step?.order)) ? Number(step.order) : stepIndex
+});
+const normalizeLesson = (lesson, lessonIndex = 0)=>({
+  ...(lesson || {}),
+  id: String(lesson?.id || `l-auto-${lessonIndex}`),
+  title: String(lesson?.title || `Урок ${lessonIndex + 1}`),
+  order: Number.isFinite(Number(lesson?.order)) ? Number(lesson.order) : lessonIndex,
+  steps: asArray(lesson?.steps).map((step, stepIndex)=>normalizeStep(step, stepIndex))
+});
+const normalizeModule = (module, moduleIndex = 0)=>({
+  ...(module || {}),
+  id: String(module?.id || `m-auto-${moduleIndex}`),
+  title: String(module?.title || `Модуль ${moduleIndex + 1}`),
+  order: Number.isFinite(Number(module?.order)) ? Number(module.order) : moduleIndex,
+  lessons: asArray(module?.lessons).map((lesson, lessonIndex)=>normalizeLesson(lesson, lessonIndex))
+});
+const normalizeCourseTree = (course)=>course ? ({
+  ...(course || {}),
+  modules: asArray(course?.modules).map((module, moduleIndex)=>normalizeModule(module, moduleIndex))
+}) : course;
+const normalizeCourseCollection = (courses)=>asArray(courses).map(course=>normalizeCourseTree(course));
+const getCourseModules = (course)=>asArray(course?.modules).map((module, moduleIndex)=>normalizeModule(module, moduleIndex));
+const getModuleLessons = (module)=>asArray(module?.lessons).map((lesson, lessonIndex)=>normalizeLesson(lesson, lessonIndex));
+const getLessonSteps = (lesson)=>asArray(lesson?.steps).map((step, stepIndex)=>normalizeStep(step, stepIndex));
 
 async function hydrateCriticalLearningData(){
   const criticalKeys = ['courses','enrollments','stepProgress','notifications','achievements','userAchievements','submissions','users','roles'];
@@ -408,7 +440,7 @@ async function hydrateCriticalLearningData(){
     if(course && course.id) mergedMap.set(course.id, course);
   });
   if(mergedMap.size){
-    window.LH_MEMORY.coursesMerged = Array.from(mergedMap.values());
+    window.LH_MEMORY.coursesMerged = normalizeCourseCollection(Array.from(mergedMap.values()));
   }
 }
 
@@ -432,7 +464,7 @@ const ROLE_MAP={'admin':'Администратор','manager':'Руководи
 // Seed data
 function seedData(){
   const hasUsers = asArray(S.g('users', [])).length > 0;
-  const existingCourses = asArray(S.g('courses', []));
+  const existingCourses = normalizeCourseCollection(S.g('courses', []));
   const hasCourses = existingCourses.length > 0;
   const hasRoles = asArray(S.g('roles', [])).length > 0;
   const hasEnrollments = asArray(S.g('enrollments', [])).length > 0;
@@ -551,7 +583,7 @@ function seedData(){
     mergedLegacy.forEach(course=>{
       if(course?.id && !mergedCourses.has(course.id)) mergedCourses.set(course.id, course);
     });
-    S.s('courses', Array.from(mergedCourses.values()));
+    S.s('courses', normalizeCourseCollection(Array.from(mergedCourses.values())));
   }
   if(!hasEnrollments)S.s('enrollments',enrollments);
   if(asArray(S.g('stepProgress',[])).length===0)S.s('stepProgress',stepProgress);
@@ -1172,7 +1204,7 @@ function ReviewsPage(){
 // ---- CONSTRUCTOR ----
 function ConstructorPage(){
   const{user,toast:addToast}=useApp();
-  const[courses,setCourses]=useState(S.g('courses',[]));
+  const[courses,setCourses]=useState(normalizeCourseCollection(S.g('courses',[])));
   const[cur,setCur]=useState(null);
   const[selStep,setSelStep]=useState(null);
   const[modals,setModals]=useState({course:false,module:false,lesson:false,step:false,editCourse:false});
@@ -1183,13 +1215,22 @@ function ConstructorPage(){
   useEffect(()=>{
     const unsubCourses=window.fbWatch('courses',arr=>{
       if(!Array.isArray(arr)) return;
-      setCourses(arr);
-      setCur(prev=>prev ? (arr.find(c=>c.id===prev.id) || null) : prev);
+      const normalized = normalizeCourseCollection(arr);
+      setCourses(normalized);
+      setCur(prev=>prev ? (normalized.find(c=>c.id===prev.id) || null) : prev);
     });
     return()=>unsubCourses();
   },[]);
 
-  const save=(updated)=>{setCourses(updated);S.s('courses',updated);if(cur){const found=updated.find(c=>c.id===cur.id);if(found)setCur(found)}};
+  const save=(updated)=>{
+    const normalized = normalizeCourseCollection(updated);
+    setCourses(normalized);
+    S.s('courses',normalized);
+    if(cur){
+      const found=normalized.find(c=>c.id===cur.id);
+      if(found)setCur(found);
+    }
+  };
   const openM=(k,extra)=>{setModals({...modals,[k]:true});if(extra)setForms(f=>({...f,...extra}))};
   const closeM=(k)=>setModals({...modals,[k]:false});
 
@@ -1221,61 +1262,93 @@ function ConstructorPage(){
   };
   // Duplicate course
   const dupCourse=(c)=>{
-    const nc=JSON.parse(JSON.stringify(c));nc.id='c'+Date.now();nc.title=c.title+' (копия)';nc.status='draft';nc.authorId=user.id;
-    // Regenerate IDs
-    nc.modules.forEach(m=>{m.id='m'+Date.now()+Math.random().toString(36).slice(2,6);m.lessons.forEach(l=>{l.id='l'+Date.now()+Math.random().toString(36).slice(2,6);l.steps.forEach(s=>{s.id='s'+Date.now()+Math.random().toString(36).slice(2,6)})})});
+    const makeId = (prefix)=>prefix+Date.now()+Math.random().toString(36).slice(2,6);
+    const source = normalizeCourseTree(JSON.parse(JSON.stringify(c)));
+    const nc={
+      ...source,
+      id:makeId('c'),
+      title:c.title+' (копия)',
+      status:'draft',
+      authorId:user.id,
+      modules:getCourseModules(source).map((m,moduleIndex)=>({
+        ...m,
+        id:makeId('m'),
+        order:moduleIndex,
+        lessons:getModuleLessons(m).map((l,lessonIndex)=>({
+          ...l,
+          id:makeId('l'),
+          order:lessonIndex,
+          steps:getLessonSteps(l).map((s,stepIndex)=>({
+            ...s,
+            id:makeId('s'),
+            order:stepIndex
+          }))
+        }))
+      }))
+    };
     const u=[...courses,nc];save(u);addToast('ok','Курс скопирован');
   };
   // Add module
   const addModule=()=>{
-    if(!forms.mTitle.trim()||!cur)return;
-    const nm={id:'m'+Date.now(),title:forms.mTitle,order:cur.modules.length,lessons:[]};
-    const u=courses.map(c=>c.id===cur.id?{...c,modules:[...c.modules,nm]}:c);save(u);closeM('module');setForms(f=>({...f,mTitle:''}));addToast('ok','Модуль добавлен');
+    if(!cur){addToast('err','Сначала выберите курс');return}
+    if(!forms.mTitle.trim()){addToast('err','Введите название модуля');return}
+    const currentModules = getCourseModules(cur);
+    const nm={id:'m'+Date.now(),title:forms.mTitle.trim(),order:currentModules.length,lessons:[]};
+    const u=courses.map(c=>c.id===cur.id?{...normalizeCourseTree(c),modules:[...getCourseModules(c),nm]}:c);
+    save(u);closeM('module');setForms(f=>({...f,mTitle:''}));addToast('ok','Модуль добавлен');
   };
   // Rename module inline
   const renameModule=(mid,newTitle)=>{
-    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===mid?{...m,title:newTitle}:m)}:c);save(u);
+    const title = String(newTitle || '').trim();
+    if(!title)return;
+    const u=courses.map(c=>c.id===cur.id?{...normalizeCourseTree(c),modules:getCourseModules(c).map(m=>m.id===mid?{...m,title}:m)}:c);save(u);
   };
   // Add lesson
   const addLesson=()=>{
-    if(!forms.lTitle.trim()||!cur||!selModId)return;
+    if(!cur){addToast('err','Сначала выберите курс');return}
+    if(!selModId){addToast('err','Сначала выберите модуль');return}
+    if(!forms.lTitle.trim()){addToast('err','Введите название урока');return}
     const nl={id:'l'+Date.now(),title:forms.lTitle,order:0,steps:[]};
-    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===selModId?{...m,lessons:[...m.lessons,nl]}:m)}:c);
+    const u=courses.map(c=>c.id===cur.id?{...normalizeCourseTree(c),modules:getCourseModules(c).map(m=>m.id===selModId?{...m,lessons:[...getModuleLessons(m),nl]}:m)}:c);
     save(u);closeM('lesson');setForms(f=>({...f,lTitle:''}));addToast('ok','Урок добавлен');
   };
   // Rename lesson inline
   const renameLesson=(mid,lid,newTitle)=>{
-    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===mid?{...m,lessons:m.lessons.map(l=>l.id===lid?{...l,title:newTitle}:l)}:m)}:c);save(u);
+    const title = String(newTitle || '').trim();
+    if(!title)return;
+    const u=courses.map(c=>c.id===cur.id?{...normalizeCourseTree(c),modules:getCourseModules(c).map(m=>m.id===mid?{...m,lessons:getModuleLessons(m).map(l=>l.id===lid?{...l,title}:l)}:m)}:c);save(u);
   };
   // Add step
   const addStep=()=>{
-    if(!forms.sTitle.trim()||!cur||!selModId||!selLesId)return;
+    if(!cur){addToast('err','Сначала выберите курс');return}
+    if(!selModId||!selLesId){addToast('err','Сначала выберите урок');return}
+    if(!forms.sTitle.trim()){addToast('err','Введите название шага');return}
     const defContent=forms.sType==='quiz'||forms.sType==='exam'?JSON.stringify({question:'',questionType:'single',options:[{id:'o1',text:'Вариант 1',isCorrect:true},{id:'o2',text:'Вариант 2',isCorrect:false}],points:10,attempts:3,explanation:''}):'';
     const ns={id:'s'+Date.now(),title:forms.sTitle,type:forms.sType,content:defContent,points:10,required:true,order:0};
-    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===selModId?{...m,lessons:m.lessons.map(l=>l.id===selLesId?{...l,steps:[...l.steps,ns]}:l)}:m)}:c);
+    const u=courses.map(c=>c.id===cur.id?{...normalizeCourseTree(c),modules:getCourseModules(c).map(m=>m.id===selModId?{...m,lessons:getModuleLessons(m).map(l=>l.id===selLesId?{...l,steps:[...getLessonSteps(l),ns]}:l)}:m)}:c);
     save(u);setSelStep(ns);closeM('step');setForms(f=>({...f,sTitle:''}));addToast('ok','Шаг добавлен');
   };
   // Delete
-  const delModule=(mid)=>{if(!confirm('Удалить модуль?'))return;const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.filter(m=>m.id!==mid)}:c);save(u);addToast('ok','Модуль удалён')};
-  const delLesson=(mid,lid)=>{if(!confirm('Удалить урок?'))return;const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===mid?{...m,lessons:m.lessons.filter(l=>l.id!==lid)}:m)}:c);save(u);addToast('ok','Урок удалён')};
-  const delStep=(mid,lid,sid)=>{if(!confirm('Удалить шаг?'))return;const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>m.id===mid?{...m,lessons:m.lessons.map(l=>l.id===lid?{...l,steps:l.steps.filter(s=>s.id!==sid)}:l)}:m)}:c);save(u);if(selStep?.id===sid)setSelStep(null);addToast('ok','Шаг удалён')};
+  const delModule=(mid)=>{if(!confirm('Удалить модуль?'))return;const u=courses.map(c=>c.id===cur.id?{...normalizeCourseTree(c),modules:getCourseModules(c).filter(m=>m.id!==mid)}:c);save(u);addToast('ok','Модуль удалён')};
+  const delLesson=(mid,lid)=>{if(!confirm('Удалить урок?'))return;const u=courses.map(c=>c.id===cur.id?{...normalizeCourseTree(c),modules:getCourseModules(c).map(m=>m.id===mid?{...m,lessons:getModuleLessons(m).filter(l=>l.id!==lid)}:m)}:c);save(u);addToast('ok','Урок удалён')};
+  const delStep=(mid,lid,sid)=>{if(!confirm('Удалить шаг?'))return;const u=courses.map(c=>c.id===cur.id?{...normalizeCourseTree(c),modules:getCourseModules(c).map(m=>m.id===mid?{...m,lessons:getModuleLessons(m).map(l=>l.id===lid?{...l,steps:getLessonSteps(l).filter(s=>s.id!==sid)}:l)}:m)}:c);save(u);if(selStep?.id===sid)setSelStep(null);addToast('ok','Шаг удалён')};
   // Move step
   const moveStep=(mid,lid,sid,dir)=>{
-    const u=courses.map(c=>{if(c.id!==cur.id)return c;return{...c,modules:c.modules.map(m=>{if(m.id!==mid)return m;return{...m,lessons:m.lessons.map(l=>{
+    const u=courses.map(c=>{if(c.id!==cur.id)return c;return{...normalizeCourseTree(c),modules:getCourseModules(c).map(m=>{if(m.id!==mid)return m;return{...m,lessons:getModuleLessons(m).map(l=>{
       if(l.id!==lid)return l;const steps=[...l.steps];const idx=steps.findIndex(s=>s.id===sid);
       if(idx<0||(dir===-1&&idx===0)||(dir===1&&idx===steps.length-1))return l;
       [steps[idx],steps[idx+dir]]=[steps[idx+dir],steps[idx]];return{...l,steps}})}})}});save(u);
   };
   // Move module
   const moveModule=(mid,dir)=>{
-    const u=courses.map(c=>{if(c.id!==cur.id)return c;const mods=[...c.modules];const idx=mods.findIndex(m=>m.id===mid);
+    const u=courses.map(c=>{if(c.id!==cur.id)return c;const mods=[...getCourseModules(c)];const idx=mods.findIndex(m=>m.id===mid);
       if(idx<0||(dir===-1&&idx===0)||(dir===1&&idx===mods.length-1))return c;
       [mods[idx],mods[idx+dir]]=[mods[idx+dir],mods[idx]];return{...c,modules:mods}});save(u);
   };
   // Update step content
   const updateStep=(field,value)=>{
     if(!selStep||!cur)return;
-    const u=courses.map(c=>c.id===cur.id?{...c,modules:c.modules.map(m=>({...m,lessons:m.lessons.map(l=>({...l,steps:l.steps.map(s=>s.id===selStep.id?{...s,[field]:value}:s)}))}))}:c);
+    const u=courses.map(c=>c.id===cur.id?{...normalizeCourseTree(c),modules:getCourseModules(c).map(m=>({...m,lessons:getModuleLessons(m).map(l=>({...l,steps:getLessonSteps(l).map(s=>s.id===selStep.id?{...s,[field]:value}:s)}))}))}:c);
     save(u);setSelStep(prev=>({...prev,[field]:value}));
   };
   // Publish
