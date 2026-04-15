@@ -427,7 +427,7 @@
       const BAND_CHANNEL_ID_FIXED = '6sqki85urpbfbqdkcdfen33owh';
       const NAPI_HOSTS_CHANNEL_ID = 'y14x9xytq7y7uduux8worartmh';
       const SWAT_TEAM_ONLY_CHANNEL_ID = 'nq1amqo347gy9d46oe14zgs44w';
-      const RELEASE_FEED_CHANNEL_ID = 'tdj9ns46eprx8n5neupw8ejw9c';
+      const RELEASE_FEED_CHANNEL_ID = 'xofy3mzmijbxxmongme4pke4bc';
       const RELEASE_FEED_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
       const RELEASE_ANDROID_BOT_USERNAME = 'release-android-bot';
       const RELEASE_ANDROID_BOT_REPLY_DELAY_MS = 10000;
@@ -462,6 +462,7 @@
       const DUTY_EDITOR_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby305NTQLS73Dw9CyG_QKkRMMljub5wkkdIlBpvHDuR6S9SntfPLTkR4jiq6uHXwHkoMg/exec';
       const DUTY_EDITOR_DOC_URL = 'https://docs.google.com/document/d/1glaEFkdpAzGuRyQZYz1muBzVkFOnKyn85BW-CXLFSFU/edit?tab=t.0';
       const DUTY_EDITOR_JSON_URL = 'https://drive.google.com/file/d/1Arzm2ZEix5aVyp0lqAFeZxLnDnkfkkUb/view?usp=sharing';
+      const RELEASE_STREAMS_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1W7fNhN5BD-ItG03za-U2-uPotvDfiZbt_baiyZXgLpI/edit?gid=557393962#gid=557393962';
       const RUN_MODE_MAJOR = 'major';
       const RUN_CREATOR_BASE_URL = 'https://allure-testops.wb.ru';
       const RUN_TAG_ANDROID = 4115;
@@ -3613,7 +3614,7 @@
           id: nextDutyEditorEntryId(),
           name: String(name || '').trim(),
           values: Array.isArray(values)
-            ? values.map((item) => String(item || '').trim()).filter(Boolean)
+            ? values.map((item) => String(item || '').trim())
             : [],
           editing: !!editing,
           allureLeafId: Number.isFinite(allureLeafId) && allureLeafId > 0 ? allureLeafId : null
@@ -3675,6 +3676,12 @@
         const aliases = buildHardcodedAliases();
         const streamNorm2Canonical = buildStreamNorm2Canonical(sourceStreamNames, aliases);
         const visibleStreamNorms = new Set(sourceStreamNames.map((stream) => norm(stream)));
+        const hasSharedCoreLeaf = sourceLeaves.some((leaf) => norm(leaf && leaf.name) === norm('Core'));
+        const hasPlatformCoreLeaves = sourceLeaves.some((leaf) => {
+          const leafNorm = norm(leaf && leaf.name);
+          return leafNorm === norm('Core iOS') || leafNorm === norm('Core Android');
+        });
+        const useSharedCoreLeaf = hasSharedCoreLeaf && !hasPlatformCoreLeaves;
         const visibleStreamByNorm = new Map();
         const visibleStreamByLooseNorm = new Map();
         for(const streamName of sourceStreamNames){
@@ -3689,6 +3696,8 @@
         }
         const leadByVisibleStreamNorm = new Map();
         const hiddenLeadAssignments = {};
+        let coreIosLead = '';
+        let coreAndroidLead = '';
 
         for(const [leadRaw, streamsRaw] of Object.entries(normalizedLeads)){
           const lead = String(leadRaw || '').trim();
@@ -3698,6 +3707,30 @@
             if(!stream) continue;
             const streamNorm = norm(stream);
             const streamLooseNorm = normLoose(stream);
+
+            if(useSharedCoreLeaf && streamNorm === norm('Core iOS')){
+              if(!coreIosLead){
+                coreIosLead = lead;
+                continue;
+              }
+              if(!Array.isArray(hiddenLeadAssignments[lead])) hiddenLeadAssignments[lead] = [];
+              if(!hiddenLeadAssignments[lead].includes(stream)){
+                hiddenLeadAssignments[lead].push(stream);
+              }
+              continue;
+            }
+            if(useSharedCoreLeaf && streamNorm === norm('Core Android')){
+              if(!coreAndroidLead){
+                coreAndroidLead = lead;
+                continue;
+              }
+              if(!Array.isArray(hiddenLeadAssignments[lead])) hiddenLeadAssignments[lead] = [];
+              if(!hiddenLeadAssignments[lead].includes(stream)){
+                hiddenLeadAssignments[lead].push(stream);
+              }
+              continue;
+            }
+
             const canonical = visibleStreamByNorm.get(streamNorm)
               || visibleStreamByLooseNorm.get(streamLooseNorm)
               || streamNorm2Canonical[streamNorm]
@@ -3719,11 +3752,30 @@
 
         return {
           entries: sourceLeaves.map((leaf) => {
+            if(useSharedCoreLeaf && norm(leaf.name) === norm('Core')){
+              return createDutyEditorEntry(leaf.name, [coreIosLead, coreAndroidLead], false, { allureLeafId: leaf.id });
+            }
             const mappedLead = String(leadByVisibleStreamNorm.get(norm(leaf.name)) || '').trim();
-            return createDutyEditorEntry(leaf.name, mappedLead ? [mappedLead] : [], false, { allureLeafId: leaf.id });
+            return createDutyEditorEntry(leaf.name, mappedLead ? [mappedLead] : [''], false, { allureLeafId: leaf.id });
           }),
           hiddenLeadAssignments: normalizeLeadsData(hiddenLeadAssignments)
         };
+      }
+
+      function isDutyEditorCoreLeadEntry(entry){
+        return norm(entry && entry.name) === norm('Core');
+      }
+
+      function getDutyEditorLeadFieldConfigs(entry){
+        if(isDutyEditorCoreLeadEntry(entry)){
+          return [
+            { index: 0, label: 'iOS', streamName: 'Core iOS', placeholder: 'Ищем в band по ФИО (iOS)' },
+            { index: 1, label: 'Android', streamName: 'Core Android', placeholder: 'Ищем в band по ФИО (Android)' }
+          ];
+        }
+        return [
+          { index: 0, label: '', streamName: String(entry && entry.name || '').trim(), placeholder: 'Ищем в band по ФИО' }
+        ];
       }
 
       function getDutyEditorEntries(kind){
@@ -3756,7 +3808,7 @@
           id: String(entry.id || nextDutyEditorEntryId()),
           name: String(entry.name || '').trim(),
           values: Array.isArray(entry.values)
-            ? entry.values.map((item) => String(item || '').trim()).filter(Boolean)
+            ? entry.values.map((item) => String(item || '').trim())
             : [],
           editing: !!entry.editing,
           allureLeafId: Number.isFinite(allureLeafId) && allureLeafId > 0 ? allureLeafId : null
@@ -3801,26 +3853,29 @@
           for(const rawEntry of Array.isArray(entries) ? entries : []){
             const entry = normalizeDutyEditorEntry(rawEntry);
             const streamName = String(entry.name || '').trim();
-            const lead = String(Array.isArray(entry.values) ? (entry.values[0] || '') : '').trim();
             if(!streamName){
               throw new Error('Заполни название стрима');
             }
-            if(!lead){
-              throw new Error(`Заполни лида для стрима "${streamName}"`);
-            }
 
-            const streamKey = norm(streamName);
-            if(seenStreams.has(streamKey)){
-              throw new Error(`Повторяющееся название стрима: ${streamName}`);
-            }
-            seenStreams.add(streamKey);
+            const fieldConfigs = getDutyEditorLeadFieldConfigs(entry);
+            for(const field of fieldConfigs){
+              const lead = String(Array.isArray(entry.values) ? (entry.values[field.index] || '') : '').trim();
+              if(!lead){
+                if(isDutyEditorCoreLeadEntry(entry)){
+                  throw new Error('Заполни лидов iOS и Android для стрима "Core"');
+                }
+                throw new Error(`Заполни лида для стрима "${streamName}"`);
+              }
 
-            if(!lead){
-              continue;
-            }
+              const streamKey = norm(field.streamName || streamName);
+              if(seenStreams.has(streamKey)){
+                throw new Error(`Повторяющееся название стрима: ${field.streamName || streamName}`);
+              }
+              seenStreams.add(streamKey);
 
-            if(!Array.isArray(out[lead])) out[lead] = [];
-            out[lead].push(streamName);
+              if(!Array.isArray(out[lead])) out[lead] = [];
+              out[lead].push(field.streamName || streamName);
+            }
           }
           return normalizeLeadsData(out);
         }
@@ -3867,7 +3922,9 @@
           if(kind === 'leads'){
             return {
               name: String(normalized.name || ''),
-              values: [String(Array.isArray(normalized.values) ? (normalized.values[0] || '') : '')]
+              values: Array.isArray(normalized.values)
+                ? normalized.values.map((value) => String(value || ''))
+                : []
             };
           }
           return {
@@ -3957,8 +4014,33 @@
         return '<span class="release-launch-duty-editor-inline-spinner" aria-hidden="true"></span>';
       }
 
-      function getDutyEditorLeadSearchState(entryId){
-        const key = String(entryId || '');
+      function getDutyEditorLeadSearchKey(entryId, valueIndex){
+        const entryKey = String(entryId || '').trim();
+        if(!entryKey) return '';
+        const index = Number.isInteger(Number(valueIndex)) && Number(valueIndex) >= 0 ? Number(valueIndex) : 0;
+        return `${entryKey}:${index}`;
+      }
+
+      function getDutyEditorLeadSearchKeysForEntry(entryId){
+        const entryKey = String(entryId || '').trim();
+        if(!entryKey) return [];
+        const out = new Set([entryKey, `${entryKey}:0`, `${entryKey}:1`]);
+        for(const source of [
+          appState.dutyEditorLeadSearchState,
+          appState.dutyEditorLeadSearchTimers,
+          appState.dutyEditorLeadSearchControllers
+        ]){
+          for(const key of Object.keys(source || {})){
+            if(key === entryKey || key.startsWith(`${entryKey}:`)){
+              out.add(key);
+            }
+          }
+        }
+        return Array.from(out);
+      }
+
+      function getDutyEditorLeadSearchState(entryId, valueIndex){
+        const key = getDutyEditorLeadSearchKey(entryId, valueIndex);
         if(!key) return null;
         if(!appState.dutyEditorLeadSearchState || typeof appState.dutyEditorLeadSearchState !== 'object'){
           appState.dutyEditorLeadSearchState = {};
@@ -3976,50 +4058,70 @@
         return appState.dutyEditorLeadSearchState[key];
       }
 
-      function patchDutyEditorLeadSearchState(entryId, patch){
-        const state = getDutyEditorLeadSearchState(entryId);
+      function patchDutyEditorLeadSearchState(entryId, valueIndex, patch){
+        const state = getDutyEditorLeadSearchState(entryId, valueIndex);
         if(!state) return null;
         Object.assign(state, patch || {});
         return state;
       }
 
-      function clearDutyEditorLeadSearchTimer(entryId){
-        const key = String(entryId || '');
-        if(!key || !appState.dutyEditorLeadSearchTimers) return;
-        const timerId = appState.dutyEditorLeadSearchTimers[key];
-        if(timerId){
-          clearTimeout(timerId);
+      function clearDutyEditorLeadSearchTimer(entryId, valueIndex){
+        const keys = valueIndex === undefined
+          ? getDutyEditorLeadSearchKeysForEntry(entryId)
+          : [getDutyEditorLeadSearchKey(entryId, valueIndex)];
+        if(!appState.dutyEditorLeadSearchTimers) return;
+        for(const key of keys){
+          if(!key) continue;
+          const timerId = appState.dutyEditorLeadSearchTimers[key];
+          if(timerId){
+            clearTimeout(timerId);
+          }
+          delete appState.dutyEditorLeadSearchTimers[key];
         }
-        delete appState.dutyEditorLeadSearchTimers[key];
       }
 
-      function abortDutyEditorLeadSearch(entryId){
-        const key = String(entryId || '');
-        if(!key || !appState.dutyEditorLeadSearchControllers) return;
-        const ctrl = appState.dutyEditorLeadSearchControllers[key];
-        if(ctrl && typeof ctrl.abort === 'function'){
-          ctrl.abort();
+      function abortDutyEditorLeadSearch(entryId, valueIndex){
+        const keys = valueIndex === undefined
+          ? getDutyEditorLeadSearchKeysForEntry(entryId)
+          : [getDutyEditorLeadSearchKey(entryId, valueIndex)];
+        if(!appState.dutyEditorLeadSearchControllers) return;
+        for(const key of keys){
+          if(!key) continue;
+          const ctrl = appState.dutyEditorLeadSearchControllers[key];
+          if(ctrl && typeof ctrl.abort === 'function'){
+            ctrl.abort();
+          }
+          delete appState.dutyEditorLeadSearchControllers[key];
         }
-        delete appState.dutyEditorLeadSearchControllers[key];
       }
 
-      function clearDutyEditorLeadSearchState(entryId){
-        const key = String(entryId || '');
-        if(!key) return;
-        clearDutyEditorLeadSearchTimer(key);
-        abortDutyEditorLeadSearch(key);
+      function clearDutyEditorLeadSearchState(entryId, valueIndex){
+        const keys = valueIndex === undefined
+          ? getDutyEditorLeadSearchKeysForEntry(entryId)
+          : [getDutyEditorLeadSearchKey(entryId, valueIndex)];
+        if(!keys.length) return;
+        clearDutyEditorLeadSearchTimer(entryId, valueIndex);
+        abortDutyEditorLeadSearch(entryId, valueIndex);
         if(appState.dutyEditorLeadSearchState && typeof appState.dutyEditorLeadSearchState === 'object'){
-          delete appState.dutyEditorLeadSearchState[key];
+          for(const key of keys){
+            delete appState.dutyEditorLeadSearchState[key];
+          }
         }
       }
 
       function clearAllDutyEditorLeadSearchState(){
-        for(const key of Object.keys(appState.dutyEditorLeadSearchTimers || {})){
-          clearDutyEditorLeadSearchTimer(key);
+        for(const timerId of Object.values(appState.dutyEditorLeadSearchTimers || {})){
+          if(timerId){
+            clearTimeout(timerId);
+          }
         }
-        for(const key of Object.keys(appState.dutyEditorLeadSearchControllers || {})){
-          abortDutyEditorLeadSearch(key);
+        for(const ctrl of Object.values(appState.dutyEditorLeadSearchControllers || {})){
+          if(ctrl && typeof ctrl.abort === 'function'){
+            ctrl.abort();
+          }
         }
+        appState.dutyEditorLeadSearchTimers = {};
+        appState.dutyEditorLeadSearchControllers = {};
         appState.dutyEditorLeadSearchState = {};
       }
 
@@ -4344,8 +4446,12 @@
           .sort((leftItem, rightItem) => {
             const left = leftItem.entry;
             const right = rightItem.entry;
-            const leftLead = getDutyEditorLeadMappedName(Array.isArray(left && left.values) ? left.values[0] : '');
-            const rightLead = getDutyEditorLeadMappedName(Array.isArray(right && right.values) ? right.values[0] : '');
+            const leftLead = (Array.isArray(left && left.values) ? left.values : [])
+              .map((value) => getDutyEditorLeadMappedName(value))
+              .find((value) => String(value || '').trim()) || '';
+            const rightLead = (Array.isArray(right && right.values) ? right.values : [])
+              .map((value) => getDutyEditorLeadMappedName(value))
+              .find((value) => String(value || '').trim()) || '';
             const leadCompare = String(leftLead || '').localeCompare(String(rightLead || ''), 'ru-RU', { sensitivity: 'base' });
             if(leadCompare !== 0) return leadCompare;
 
@@ -4409,7 +4515,8 @@
 
         const handles = Array.from(new Set(
           list
-            .map((entry) => normalizeDutyEditorBandHandle(Array.isArray(entry && entry.values) ? entry.values[0] : ''))
+            .flatMap((entry) => (Array.isArray(entry && entry.values) ? entry.values : []))
+            .map((value) => normalizeDutyEditorBandHandle(value))
             .filter(Boolean)
         )).filter((handle) => {
           const key = handle.toLocaleLowerCase('ru-RU');
@@ -4479,8 +4586,8 @@
         }
       }
 
-      function renderDutyEditorLeadSuggestions(entryId){
-        const state = getDutyEditorLeadSearchState(entryId);
+      function renderDutyEditorLeadSuggestions(entryId, valueIndex){
+        const state = getDutyEditorLeadSearchState(entryId, valueIndex);
         if(!state || !state.open) return '';
         if(state.loading){
           return '<div class="release-launch-duty-editor-search-empty">Ищем в Band...</div>';
@@ -4497,6 +4604,7 @@
             class="release-launch-duty-editor-search-option"
             data-duty-editor-kind="leads"
             data-duty-editor-id="${escHtml(entryId)}"
+            data-duty-editor-value-index="${Number(valueIndex) || 0}"
             data-duty-editor-action="pick-lead-suggestion"
             data-duty-editor-lead-handle="${escHtml(item.handle)}"
             aria-label="Выбрать ${escHtml(item.title || item.displayName)} ${escHtml(item.subtitle || item.handle)}"
@@ -4515,27 +4623,27 @@
         `).join('');
       }
 
-      function syncDutyEditorLeadSearchPanel(entryId){
-        const key = String(entryId || '');
+      function syncDutyEditorLeadSearchPanel(entryId, valueIndex){
+        const key = getDutyEditorLeadSearchKey(entryId, valueIndex);
         const panel = document.querySelector(`[data-duty-editor-lead-search-panel="${key}"]`);
         const wrap = document.querySelector(`[data-duty-editor-lead-search-wrap="${key}"]`);
-        const state = getDutyEditorLeadSearchState(entryId);
+        const state = getDutyEditorLeadSearchState(entryId, valueIndex);
         const isOpen = !!(state && state.open);
         if(wrap) wrap.classList.toggle('is-open', isOpen);
         if(panel){
-          panel.innerHTML = renderDutyEditorLeadSuggestions(entryId);
+          panel.innerHTML = renderDutyEditorLeadSuggestions(entryId, valueIndex);
           panel.style.display = isOpen ? '' : 'none';
         }
       }
 
       function syncDutyEditorLeadSearchPanels(){
-        const editingLeadIds = getDutyEditorEntries('leads')
-          .filter((entry) => entry && entry.editing)
-          .map((entry) => String(entry.id || ''))
-          .filter(Boolean);
+        const editingLeadEntries = getDutyEditorEntries('leads')
+          .filter((entry) => entry && entry.editing);
 
-        for(const entryId of editingLeadIds){
-          syncDutyEditorLeadSearchPanel(entryId);
+        for(const entry of editingLeadEntries){
+          for(const field of getDutyEditorLeadFieldConfigs(entry)){
+            syncDutyEditorLeadSearchPanel(entry.id, field.index);
+          }
         }
       }
 
@@ -4572,13 +4680,14 @@
         return result;
       }
 
-      function queueDutyEditorLeadSearch(entryId, term){
+      function queueDutyEditorLeadSearch(entryId, term, valueIndex){
         const query = String(term || '').trim();
-        clearDutyEditorLeadSearchTimer(entryId);
-        abortDutyEditorLeadSearch(entryId);
+        const searchKey = getDutyEditorLeadSearchKey(entryId, valueIndex);
+        clearDutyEditorLeadSearchTimer(entryId, valueIndex);
+        abortDutyEditorLeadSearch(entryId, valueIndex);
 
         if(query.length < 2 || query.startsWith('@')){
-          patchDutyEditorLeadSearchState(entryId, {
+          patchDutyEditorLeadSearchState(entryId, valueIndex, {
             query,
             loading: false,
             items: [],
@@ -4586,13 +4695,13 @@
             open: false,
             seq: 0
           });
-          syncDutyEditorLeadSearchPanel(entryId);
+          syncDutyEditorLeadSearchPanel(entryId, valueIndex);
           return;
         }
 
         const seq = Number(appState.dutyEditorLeadSearchSeq || 0) + 1;
         appState.dutyEditorLeadSearchSeq = seq;
-        patchDutyEditorLeadSearchState(entryId, {
+        patchDutyEditorLeadSearchState(entryId, valueIndex, {
           query,
           loading: true,
           items: [],
@@ -4600,17 +4709,17 @@
           open: true,
           seq
         });
-        syncDutyEditorLeadSearchPanel(entryId);
+        syncDutyEditorLeadSearchPanel(entryId, valueIndex);
 
-        appState.dutyEditorLeadSearchTimers[String(entryId || '')] = window.setTimeout(async () => {
+        appState.dutyEditorLeadSearchTimers[searchKey] = window.setTimeout(async () => {
           const ctrl = new AbortController();
-          appState.dutyEditorLeadSearchControllers[String(entryId || '')] = ctrl;
+          appState.dutyEditorLeadSearchControllers[searchKey] = ctrl;
           try{
             const foundItems = await bandSearchUsersByName(query, ctrl.signal);
             const items = await enrichDutyEditorBandUsersPresence(foundItems, ctrl.signal);
-            const state = getDutyEditorLeadSearchState(entryId);
+            const state = getDutyEditorLeadSearchState(entryId, valueIndex);
             if(!state || Number(state.seq || 0) !== seq) return;
-            patchDutyEditorLeadSearchState(entryId, {
+            patchDutyEditorLeadSearchState(entryId, valueIndex, {
               loading: false,
               items,
               error: '',
@@ -4619,17 +4728,17 @@
             prefetchDutyEditorLeadAvatars(items);
           }catch(err){
             if(ctrl.signal.aborted) return;
-            const state = getDutyEditorLeadSearchState(entryId);
+            const state = getDutyEditorLeadSearchState(entryId, valueIndex);
             if(!state || Number(state.seq || 0) !== seq) return;
-            patchDutyEditorLeadSearchState(entryId, {
+            patchDutyEditorLeadSearchState(entryId, valueIndex, {
               loading: false,
               items: [],
               error: err && err.message ? err.message : 'Не удалось найти пользователей в Band',
               open: true
             });
           }finally{
-            delete appState.dutyEditorLeadSearchControllers[String(entryId || '')];
-            syncDutyEditorLeadSearchPanel(entryId);
+            delete appState.dutyEditorLeadSearchControllers[searchKey];
+            syncDutyEditorLeadSearchPanel(entryId, valueIndex);
           }
         }, 220);
       }
@@ -4710,6 +4819,75 @@
         syncDutyEditorActionAvailability();
       }
 
+      function renderDutyEditorLeadDisplayItem(entryId, value, label, valueIndex){
+        const lead = String(value || '').trim();
+        const leadHandle = normalizeDutyEditorBandHandle(lead) || lead;
+        const leadProfile = getDutyEditorLeadProfile(lead);
+        const leadDisplayName = lead ? getDutyEditorLeadMappedName(lead) : '';
+        const leadAvatarUrl = leadProfile ? getDutyEditorLeadAvatarUrl(leadProfile) : '';
+        const leadInitials = buildDutyEditorBandUserInitials({
+          displayName: leadDisplayName,
+          username: String(leadHandle || '').replace(/^@+/, '')
+        });
+
+        if(label){
+          return `
+            <div class="release-launch-duty-editor-lead-stack-item">
+              <span class="release-launch-duty-editor-lead-platform-tag">${escHtml(label)}</span>
+              <div class="release-launch-duty-editor-lead-stack-value ${lead ? '' : 'is-muted'}">
+                ${lead ? `
+                  <div class="release-launch-duty-editor-lead-profile">
+                    <span class="release-launch-duty-editor-lead-avatar">
+                      ${leadAvatarUrl
+                        ? `<img src="${escHtml(leadAvatarUrl)}" alt="${escHtml(leadDisplayName || leadHandle)}" loading="lazy" />`
+                        : `<span>${escHtml(leadInitials || '@')}</span>`}
+                    </span>
+                    <div class="release-launch-duty-editor-lead-value-wrap">
+                      <span class="release-launch-duty-editor-lead-value-text">${escHtml(leadDisplayName)}</span>
+                      <button
+                        type="button"
+                        class="release-launch-duty-editor-icon-btn release-launch-duty-editor-lead-copy-btn"
+                        data-duty-editor-kind="leads"
+                        data-duty-editor-id="${escHtml(entryId)}"
+                        data-duty-editor-value-index="${Number(valueIndex) || 0}"
+                        data-duty-editor-action="copy-lead-handle"
+                        data-duty-editor-lead-handle="${escHtml(leadHandle)}"
+                        aria-label="Скопировать логин Band"
+                        title="Скопировать логин Band"
+                      >${getDutyEditorCopyIconMarkup()}</button>
+                    </div>
+                  </div>
+                ` : 'Не заполнено'}
+              </div>
+            </div>
+          `;
+        }
+
+        return lead ? `
+          <div class="release-launch-duty-editor-lead-profile">
+            <span class="release-launch-duty-editor-lead-avatar">
+              ${leadAvatarUrl
+                ? `<img src="${escHtml(leadAvatarUrl)}" alt="${escHtml(leadDisplayName || leadHandle)}" loading="lazy" />`
+                : `<span>${escHtml(leadInitials || '@')}</span>`}
+            </span>
+            <div class="release-launch-duty-editor-lead-value-wrap">
+              <span class="release-launch-duty-editor-lead-value-text">${escHtml(leadDisplayName)}</span>
+              <button
+                type="button"
+                class="release-launch-duty-editor-icon-btn release-launch-duty-editor-lead-copy-btn"
+                data-duty-editor-kind="leads"
+                data-duty-editor-id="${escHtml(entryId)}"
+                data-duty-editor-value-index="${Number(valueIndex) || 0}"
+                data-duty-editor-action="copy-lead-handle"
+                data-duty-editor-lead-handle="${escHtml(leadHandle)}"
+                aria-label="Скопировать логин Band"
+                title="Скопировать логин Band"
+              >${getDutyEditorCopyIconMarkup()}</button>
+            </div>
+          </div>
+        ` : 'Не заполнено';
+      }
+
       function renderDutyEditorLeadRows(root, entries){
         void warmDutyEditorLeadMappedNames(entries);
         const sortedEntries = getSortedDutyEditorLeadEntries(entries);
@@ -4722,10 +4900,36 @@
             </div>
             ${sortedEntries.map((entry) => {
               const name = String(entry.name || '').trim();
-              const lead = String(Array.isArray(entry.values) ? (entry.values[0] || '') : '').trim();
+              const fieldConfigs = getDutyEditorLeadFieldConfigs(entry);
 
               if(entry.editing){
-                const leadSearchState = getDutyEditorLeadSearchState(entry.id);
+                const editingFields = fieldConfigs.map((field) => {
+                  const leadValue = String(Array.isArray(entry.values) ? (entry.values[field.index] || '') : '').trim();
+                  const searchKey = getDutyEditorLeadSearchKey(entry.id, field.index);
+                  const leadSearchState = getDutyEditorLeadSearchState(entry.id, field.index);
+                  return `
+                    <div class="release-launch-duty-editor-lead-search-item">
+                      ${field.label ? `<span class="release-launch-duty-editor-lead-platform-tag">${escHtml(field.label)}</span>` : ''}
+                      <div class="release-launch-duty-editor-lead-search ${leadSearchState && leadSearchState.open ? 'is-open' : ''}" data-duty-editor-lead-search-wrap="${escHtml(searchKey)}">
+                        <input
+                          class="input"
+                          type="text"
+                          value="${escHtml(leadValue)}"
+                          placeholder="${escHtml(field.placeholder)}"
+                          spellcheck="false"
+                          autocomplete="off"
+                          data-duty-editor-kind="leads"
+                          data-duty-editor-id="${escHtml(entry.id)}"
+                          data-duty-editor-field="value"
+                          data-duty-editor-value-index="${field.index}"
+                        />
+                        <div class="release-launch-duty-editor-search-panel" data-duty-editor-lead-search-panel="${escHtml(searchKey)}" style="${leadSearchState && leadSearchState.open ? '' : 'display:none;'}">
+                          ${renderDutyEditorLeadSuggestions(entry.id, field.index)}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('');
                 return `
                   <div class="release-launch-duty-editor-lead-row is-editing">
                     <input
@@ -4738,22 +4942,8 @@
                       data-duty-editor-id="${escHtml(entry.id)}"
                       data-duty-editor-field="name"
                     />
-                    <div class="release-launch-duty-editor-lead-search ${leadSearchState && leadSearchState.open ? 'is-open' : ''}" data-duty-editor-lead-search-wrap="${escHtml(entry.id)}">
-                      <input
-                        class="input"
-                        type="text"
-                        value="${escHtml(lead)}"
-                        placeholder="Ищем в band по ФИО"
-                        spellcheck="false"
-                        autocomplete="off"
-                        data-duty-editor-kind="leads"
-                        data-duty-editor-id="${escHtml(entry.id)}"
-                        data-duty-editor-field="value"
-                        data-duty-editor-value-index="0"
-                      />
-                      <div class="release-launch-duty-editor-search-panel" data-duty-editor-lead-search-panel="${escHtml(entry.id)}" style="${leadSearchState && leadSearchState.open ? '' : 'display:none;'}">
-                        ${renderDutyEditorLeadSuggestions(entry.id)}
-                      </div>
+                    <div class="release-launch-duty-editor-lead-search-stack ${fieldConfigs.length > 1 ? 'is-multi' : ''}">
+                      ${editingFields}
                     </div>
                     <div class="release-launch-duty-editor-row-actions">
                       <button
@@ -4779,40 +4969,28 @@
                 `;
               }
 
-              const leadHandle = normalizeDutyEditorBandHandle(lead) || lead;
-              const leadProfile = getDutyEditorLeadProfile(lead);
-              const leadDisplayName = lead ? getDutyEditorLeadMappedName(lead) : '';
-              const leadAvatarUrl = leadProfile ? getDutyEditorLeadAvatarUrl(leadProfile) : '';
-              const leadInitials = buildDutyEditorBandUserInitials({
-                displayName: leadDisplayName,
-                username: String(leadHandle || '').replace(/^@+/, '')
-              });
+              const displayValue = fieldConfigs.length > 1
+                ? `
+                  <div class="release-launch-duty-editor-lead-stack">
+                    ${fieldConfigs.map((field) => renderDutyEditorLeadDisplayItem(
+                      entry.id,
+                      Array.isArray(entry.values) ? (entry.values[field.index] || '') : '',
+                      field.label,
+                      field.index
+                    )).join('')}
+                  </div>
+                `
+                : renderDutyEditorLeadDisplayItem(
+                    entry.id,
+                    Array.isArray(entry.values) ? (entry.values[0] || '') : '',
+                    '',
+                    0
+                  );
               return `
                 <div class="release-launch-duty-editor-lead-row">
                   <div class="release-launch-duty-editor-lead-cell ${name ? '' : 'is-muted'}">${name ? escHtml(name) : 'Не заполнено'}</div>
-                  <div class="release-launch-duty-editor-lead-cell ${lead ? '' : 'is-muted'}">
-                    ${lead ? `
-                      <div class="release-launch-duty-editor-lead-profile">
-                        <span class="release-launch-duty-editor-lead-avatar">
-                          ${leadAvatarUrl
-                            ? `<img src="${escHtml(leadAvatarUrl)}" alt="${escHtml(leadDisplayName || leadHandle)}" loading="lazy" />`
-                            : `<span>${escHtml(leadInitials || '@')}</span>`}
-                        </span>
-                        <div class="release-launch-duty-editor-lead-value-wrap">
-                          <span class="release-launch-duty-editor-lead-value-text">${escHtml(leadDisplayName)}</span>
-                          <button
-                            type="button"
-                            class="release-launch-duty-editor-icon-btn release-launch-duty-editor-lead-copy-btn"
-                            data-duty-editor-kind="leads"
-                            data-duty-editor-id="${escHtml(entry.id)}"
-                            data-duty-editor-action="copy-lead-handle"
-                            data-duty-editor-lead-handle="${escHtml(leadHandle)}"
-                            aria-label="Скопировать логин Band"
-                            title="Скопировать логин Band"
-                          >${getDutyEditorCopyIconMarkup()}</button>
-                        </div>
-                      </div>
-                    ` : 'Не заполнено'}
+                  <div class="release-launch-duty-editor-lead-cell ${fieldConfigs.some((field) => String(Array.isArray(entry.values) ? (entry.values[field.index] || '') : '').trim()) ? '' : 'is-muted'}">
+                    ${displayValue}
                   </div>
                   <div class="release-launch-duty-editor-row-actions">
                     <button
@@ -4968,7 +5146,7 @@
         setDutyEditorEntries(kind, entries);
         rememberDutyEditorEntryDraft(kind, entry.id, { isNew: true, name: '', values: [] });
         if(kind === 'leads'){
-          patchDutyEditorLeadSearchState(entry.id, {
+          patchDutyEditorLeadSearchState(entry.id, 0, {
             query: '',
             loading: false,
             items: [],
@@ -5000,14 +5178,16 @@
           rememberDutyEditorEntryDraft(kind, entryId, createDutyEditorEntryDraft(entry));
         }
         if(kind === 'leads'){
-          patchDutyEditorLeadSearchState(entryId, {
-            query: '',
-            loading: false,
-            items: [],
-            error: '',
-            open: false,
-            seq: 0
-          });
+          for(const field of getDutyEditorLeadFieldConfigs(entry)){
+            patchDutyEditorLeadSearchState(entryId, field.index, {
+              query: '',
+              loading: false,
+              items: [],
+              error: '',
+              open: false,
+              seq: 0
+            });
+          }
         }
         setDutyEditorEntryEditing(kind, entryId, true);
       }
@@ -5075,8 +5255,8 @@
         }
         entry.values[index] = String(value || '');
         refreshDutyEditorDirtyState();
-        if(kind === 'leads' && index === 0){
-          queueDutyEditorLeadSearch(entryId, value);
+        if(kind === 'leads'){
+          queueDutyEditorLeadSearch(entryId, value, index);
         }
       }
 
@@ -5113,9 +5293,10 @@
 
           const normalizedEntry = normalizeDutyEditorEntry(entry);
           const streamName = String(normalizedEntry.name || '').trim();
-          const lead = String(Array.isArray(normalizedEntry.values) ? (normalizedEntry.values[0] || '') : '').trim();
           const hasStream = !!streamName;
-          const hasLead = !!lead;
+          const hasLead = Array.isArray(normalizedEntry.values)
+            ? normalizedEntry.values.some((value) => String(value || '').trim())
+            : false;
           const leafId = Number(normalizedEntry.allureLeafId);
           const canDeleteAllureLeaf = Number.isFinite(leafId) && leafId > 0;
 
@@ -5216,8 +5397,9 @@
         if(action === 'pick-lead-suggestion'){
           const handle = String(actionBtn.getAttribute('data-duty-editor-lead-handle') || '').trim();
           if(handle){
-            updateDutyEditorEntryValue('leads', entryId, 0, handle);
-            patchDutyEditorLeadSearchState(entryId, {
+            const safeValueIndex = Number.isInteger(valueIndex) && valueIndex >= 0 ? valueIndex : 0;
+            updateDutyEditorEntryValue('leads', entryId, safeValueIndex, handle);
+            patchDutyEditorLeadSearchState(entryId, safeValueIndex, {
               query: handle,
               loading: false,
               items: [],
@@ -5283,17 +5465,19 @@
         const kind = String(field.getAttribute('data-duty-editor-kind') || '');
         const dutyField = String(field.getAttribute('data-duty-editor-field') || '');
         const entryId = String(field.getAttribute('data-duty-editor-id') || '');
+        const valueIndex = Number(field.getAttribute('data-duty-editor-value-index'));
         if(kind !== 'leads' || dutyField !== 'value') return false;
 
         const value = String(field.value || '');
-        const state = getDutyEditorLeadSearchState(entryId);
+        const safeValueIndex = Number.isInteger(valueIndex) && valueIndex >= 0 ? valueIndex : 0;
+        const state = getDutyEditorLeadSearchState(entryId, safeValueIndex);
         if(state && Array.isArray(state.items) && state.items.length && !String(value || '').trim().startsWith('@')){
-          patchDutyEditorLeadSearchState(entryId, { open: true });
-          syncDutyEditorLeadSearchPanel(entryId);
+          patchDutyEditorLeadSearchState(entryId, safeValueIndex, { open: true });
+          syncDutyEditorLeadSearchPanel(entryId, safeValueIndex);
           return true;
         }
 
-        queueDutyEditorLeadSearch(entryId, value);
+        queueDutyEditorLeadSearch(entryId, value, safeValueIndex);
         return true;
       }
 
@@ -7818,20 +8002,22 @@
       const PUSH_IOS_STEPS = [
         { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishIos' },
         { code: '2', title: 'Добавить дежурных из сбора', action: 'fillDutyIos' },
-        { code: '3', title: 'Отправить опрос в тред', action: 'publishPollIos' },
-        { code: '4', title: 'Напоминание @qadutyios', action: 'publishAtReminderIos' },
-        { code: '5', title: 'Опубликовать компоненты', action: 'publishComponentsIos', hasTimer: true },
-        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsIos' },
-        { code: '7', title: 'Создание рана готовности (оки)', action: 'createReadinessRunIos' }
+        { code: '3', title: 'Создать новую страницу таблицы для стримов', action: 'createStreamsSheetIos' },
+        { code: '4', title: 'Отправить опрос в тред', action: 'publishPollIos' },
+        { code: '5', title: 'Напоминание @qadutyios', action: 'publishAtReminderIos' },
+        { code: '6', title: 'Опубликовать компоненты', action: 'publishComponentsIos', hasTimer: true },
+        { code: '7', title: 'Заполнить раны Allure', action: 'fillRunsIos' },
+        { code: '8', title: 'Создание рана готовности (оки)', action: 'createReadinessRunIos' }
       ];
       const PUSH_AND_STEPS = [
         { code: '1', title: 'Опубликовать в ленту релизов', action: 'publishAndroid' },
         { code: '2', title: 'Добавить дежурных из сбора', action: 'fillDutyAnd' },
-        { code: '3', title: 'Отправить опрос в тред', action: 'publishPollAnd' },
-        { code: '4', title: 'Напоминание @qadutyandr', action: 'publishAtReminderAnd' },
-        { code: '5', title: 'Опубликовать компоненты', action: 'publishComponentsAnd', hasTimer: true },
-        { code: '6', title: 'Заполнить раны Allure', action: 'fillRunsAnd' },
-        { code: '7', title: 'Создание рана готовности (оки)', action: 'createReadinessRunAnd' }
+        { code: '3', title: 'Создать новую страницу таблицы для стримов', action: 'createStreamsSheetAnd' },
+        { code: '4', title: 'Отправить опрос в тред', action: 'publishPollAnd' },
+        { code: '5', title: 'Напоминание @qadutyandr', action: 'publishAtReminderAnd' },
+        { code: '6', title: 'Опубликовать компоненты', action: 'publishComponentsAnd', hasTimer: true },
+        { code: '7', title: 'Заполнить раны Allure', action: 'fillRunsAnd' },
+        { code: '8', title: 'Создание рана готовности (оки)', action: 'createReadinessRunAnd' }
       ];
 
       function getNextTuesdayMsk(){
@@ -7857,7 +8043,7 @@
           `Ориентировочное время старта регресса: ${today}`,
           `Ожидаемое время окончания проверки: ${nextTue}`,
           'Время старта регресс:',
-          'Таблица для стримов: https://docs.google.com/spreadsheets/d/1W7fNhN5BD-ItG03za-U2-uPotvDfiZbt_baiyZXgLpI/edit?gid=557393962#gid=557393962',
+          `Таблица для стримов: ${RELEASE_STREAMS_SPREADSHEET_URL}`,
           'Сборка: ',
           '',
           'Финальный ран: ',
@@ -7915,6 +8101,191 @@
         }
         if(!source.trim()) return value ? `${label} ${value}` : label;
         return `${source.replace(/\s*$/, '')}\n${value ? `${label} ${value}` : label}`;
+      }
+
+      function normalizeReleaseStreamsSheetResponse(payload){
+        const root = payload && payload.data && typeof payload.data === 'object' ? payload.data : payload;
+        if(!root || typeof root !== 'object'){
+          throw new Error('Apps Script вернул пустой ответ по таблице стримов');
+        }
+        return {
+          exists: !!root.exists,
+          created: !!root.created,
+          releaseCode: String(root.releaseCode || '').trim(),
+          sheetName: String(root.sheetName || '').trim(),
+          sheetUrl: String(root.sheetUrl || '').trim(),
+          sheetId: root.sheetId == null ? null : Number(root.sheetId)
+        };
+      }
+
+      async function requestReleaseStreamsSheet(payload){
+        const response = await httpRequest(DUTY_EDITOR_SCRIPT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify(payload)
+        });
+        const parsed = response.json || safeJson(response.text);
+        if(parsed && parsed.ok === false){
+          throw new Error(String(parsed.error || 'Apps Script не обработал таблицу стримов'));
+        }
+        return normalizeReleaseStreamsSheetResponse(parsed);
+      }
+
+      async function checkMajorReleaseStreamsSheet(release){
+        const normalizedRelease = String(release || '').trim();
+        if(!normalizedRelease){
+          return { exists: false, created: false, releaseCode: '', sheetName: '', sheetUrl: '', sheetId: null };
+        }
+        return requestReleaseStreamsSheet({
+          op: 'releaseStreamsSheetCheck',
+          release: normalizedRelease
+        });
+      }
+
+      async function findMajorReleaseMainPost(platform, release, cfg){
+        const settings = cfg || collectSettings();
+        ensureReleaseFeedFields(settings);
+        const userIds = collectBandAuthorUserIds(settings);
+        const rootPost = await findReleaseFeedRootPost(platform, release, settings);
+        const rootId = String(rootPost.id || '').trim();
+        const threadPosts = await bandFetchThreadPosts(rootId, settings, null);
+        const mainPost = findEarliestThreadPostByUserIds(threadPosts, rootId, userIds);
+        if(!mainPost){
+          throw new Error('Основное сообщение в треде не найдено — сначала выполни шаг 1.');
+        }
+        return {
+          cfg: settings,
+          rootPost,
+          rootId,
+          threadPosts,
+          mainPost,
+          text: normalizeBandMessageText(mainPost.message)
+        };
+      }
+
+      async function updateMajorReleaseThreadLine(platform, lineLabel, lineValue){
+        const isIos = platform === 'ios';
+        const label = isIos ? 'iOS' : 'Android';
+        const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${label}.`);
+        if(!textarea) throw new Error('Не найдено поле текста сообщения.');
+
+        const details = await findMajorReleaseMainPost(platform, release);
+        const existingText = String(details.text || '');
+        const newText = replaceMajorReleaseLine(existingText, lineLabel, lineValue);
+        textarea.value = newText;
+        if(existingText === newText){
+          return 'unchanged';
+        }
+
+        await bandPatchPost(details.mainPost, newText, details.cfg, null);
+        return 'updated';
+      }
+
+      async function resolveMajorReleaseExpectedFinishValue(platform){
+        const isIos = platform === 'ios';
+        const label = isIos ? 'iOS' : 'Android';
+        const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${label}.`);
+
+        const localText = textarea ? String(textarea.value || '') : '';
+        let expectedFinish = getMajorReleaseLineValue(localText, 'Ожидаемое время окончания проверки:');
+        if(expectedFinish) return expectedFinish;
+
+        const details = await findMajorReleaseMainPost(platform, release);
+        expectedFinish = getMajorReleaseLineValue(details.text, 'Ожидаемое время окончания проверки:');
+        if(textarea && details.text){
+          textarea.value = details.text;
+        }
+        if(!expectedFinish){
+          throw new Error('Не нашёл строку "Ожидаемое время окончания проверки:" в треде релиза.');
+        }
+        return expectedFinish;
+      }
+
+      function getPushWorkflowNextPendingIndex(statuses){
+        const list = Array.isArray(statuses) ? statuses : [];
+        const idx = list.findIndex((status) => status === 'pending');
+        return idx === -1 ? list.length : idx;
+      }
+
+      function markPushWorkflowActionDone(platform, action){
+        const isIos = platform === 'ios';
+        const steps = isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS;
+        const statusesKey = isIos ? 'pushIosStatuses' : 'pushAndStatuses';
+        const currentKey = isIos ? 'pushIosCurrentIndex' : 'pushAndCurrentIndex';
+        const idx = steps.findIndex((step) => step.action === action);
+        if(idx === -1) return;
+
+        const nextStatuses = Array.isArray(appState[statusesKey]) && appState[statusesKey].length === steps.length
+          ? appState[statusesKey].slice()
+          : steps.map(() => 'pending');
+        nextStatuses[idx] = 'done';
+        appState[statusesKey] = nextStatuses;
+        appState[currentKey] = getPushWorkflowNextPendingIndex(nextStatuses);
+        cancelStepSchedule(getStepScheduleKey('push', platform, idx));
+      }
+
+      function markReleaseStreamsSheetStepDoneAcrossPlatforms(){
+        markPushWorkflowActionDone('ios', 'createStreamsSheetIos');
+        markPushWorkflowActionDone('android', 'createStreamsSheetAnd');
+        renderPushWorkflow();
+      }
+
+      async function ensureMajorReleaseStreamsSheet(platform){
+        const isIos = platform === 'ios';
+        const label = isIos ? 'iOS' : 'Android';
+        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
+        const release = verInput ? String(verInput.value || '').trim() : '';
+        if(!release) throw new Error(`Укажи версию ${label}.`);
+
+        logMajorPush(`[${label}] Загружаю стримы из Allure для таблицы...`);
+        const streams = await fetchStreams(null);
+        if(!streams.length){
+          throw new Error('Не удалось получить стримы из Allure для таблицы.');
+        }
+        logMajorPush(`[${label}] Получено стримов: ${streams.length}.`, 'ok');
+
+        const expectedFinish = await resolveMajorReleaseExpectedFinishValue(platform);
+        logMajorPush(`[${label}] Ожидаемое время окончания проверки: ${expectedFinish}`, 'ok');
+
+        logMajorPush(`[${label}] Создаю или проверяю вкладку таблицы стримов...`);
+        const result = await requestReleaseStreamsSheet({
+          op: 'releaseStreamsSheetEnsure',
+          release,
+          expectedFinish,
+          streams
+        });
+
+        if(result.sheetUrl){
+          try{
+            const threadStatus = await updateMajorReleaseThreadLine(platform, 'Таблица для стримов:', result.sheetUrl);
+            if(threadStatus === 'updated'){
+              logMajorPush(`[${label}] Ссылка на таблицу обновлена в треде.`, 'ok');
+            }else{
+              logMajorPush(`[${label}] Ссылка на таблицу уже актуальна в треде.`, 'ok');
+            }
+          }catch(error){
+            logMajorPush(`[${label}] Таблица готова, но ссылку в треде обновить не удалось: ${error.message || error}`, 'warn');
+          }
+        }
+
+        logMajorPush(
+          result.created
+            ? `[${label}] Вкладка ${result.sheetName || result.releaseCode} создана.`
+            : `[${label}] Вкладка ${result.sheetName || result.releaseCode} уже существует.`,
+          'ok'
+        );
+        markReleaseStreamsSheetStepDoneAcrossPlatforms();
+        schedulePushWorkflowSync('ios');
+        schedulePushWorkflowSync('android');
+        return result;
       }
 
       async function updateMajorReadinessRunInThread(platform, run){
@@ -8579,6 +8950,7 @@
         const release = verInput ? String(verInput.value || '').trim() : '';
         const baselineStatuses = (isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS).map(() => 'pending');
         let readinessRun = null;
+        let streamsSheetExists = false;
 
         appState[seqKey] += 1;
         const syncSeq = appState[seqKey];
@@ -8592,6 +8964,13 @@
           }
 
           try{
+            const sheetState = await checkMajorReleaseStreamsSheet(release);
+            streamsSheetExists = !!(sheetState && sheetState.exists);
+          }catch(error){
+            console.warn(`[Release workflow sync] ${label} streams sheet check failed`, error);
+          }
+
+          try{
             readinessRun = await findMajorReadinessRun(platform, release, null);
           }catch(error){
             console.warn(`[Release workflow sync] ${label} readiness run check failed`, error);
@@ -8599,6 +8978,7 @@
 
           const cfg = collectSettings();
           if(!String(cfg.bandCookiesRead || '').trim()){
+            baselineStatuses[2] = streamsSheetExists ? 'done' : 'pending';
             applyResolvedPushWorkflowState(platform, baselineStatuses);
             return;
           }
@@ -8615,6 +8995,7 @@
 
           const rootPost = await resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts, null);
           if(!rootPost){
+            baselineStatuses[2] = streamsSheetExists ? 'done' : 'pending';
             applyResolvedPushWorkflowState(platform, baselineStatuses);
             return;
           }
@@ -8639,6 +9020,7 @@
           const statuses = [
             'done',
             dutyLines.length ? 'done' : 'pending',
+            streamsSheetExists ? 'done' : 'pending',
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (_, post) => isBandPollPost(post)) ? 'done' : 'pending',
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.includes(reminderNeedle)) ? 'done' : 'pending',
             hasOwnThreadReplyByUserIds(threadPosts, rootId, userIds, (text) => text.startsWith('Компоненты:')) ? 'done' : 'pending',
@@ -8655,6 +9037,7 @@
         }catch(error){
           if(syncSeq === appState[seqKey]){
             console.warn(`[Release workflow sync] ${label} failed`, error);
+            baselineStatuses[2] = streamsSheetExists ? 'done' : 'pending';
             applyResolvedPushWorkflowState(platform, baselineStatuses);
           }
         }finally{
@@ -8871,6 +9254,16 @@
           await ensureDutyCollectionForPushStep('android');
           await fillDutyOfficersInThreadText('android');
           showToast('Дежурные Android добавлены и тред обновлён');
+          return;
+        }
+        if(action === 'createStreamsSheetIos'){
+          const result = await ensureMajorReleaseStreamsSheet('ios');
+          showToast(result.created ? 'Таблица стримов создана' : 'Таблица стримов уже существует');
+          return;
+        }
+        if(action === 'createStreamsSheetAnd'){
+          const result = await ensureMajorReleaseStreamsSheet('android');
+          showToast(result.created ? 'Таблица стримов создана' : 'Таблица стримов уже существует');
           return;
         }
         if(action === 'fillRunsIos'){
