@@ -10,14 +10,13 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--p:#6C5CE7;--ph:#5A4BD1;--pl:#A29BFE;--pbg:#F0EEFF;--s:#00CEC9;--ok:#00B894;--warn:#FDCB6E;--err:#E17055;--info:#74B9FF;--bg:#fff;--bg2:#F8F9FA;--bg3:#E9ECEF;--tx:#2D3436;--tx2:#636E72;--tx3:#B2BEC3;--r:12px;--sh:0 1px 3px rgba(0,0,0,.08);--shm:0 4px 12px rgba(0,0,0,.1);--shl:0 8px 24px rgba(0,0,0,.15)}
 [data-theme=dark]{--p:#A29BFE;--ph:#8B82F8;--pl:#6C5CE7;--pbg:#2D2B55;--bg:#1E1E2E;--bg2:#252536;--bg3:#363650;--tx:#CDD6F4;--tx2:#A6ADC8;--tx3:#585B70;--sh:0 1px 3px rgba(0,0,0,.3);--shm:0 4px 12px rgba(0,0,0,.4)}
 [data-theme=corporate]{--p:#0984E3;--ph:#0773C5;--pl:#74B9FF;--pbg:#E8F4FD;--s:#74B9FF}
 [data-theme=warm]{--p:#E17055;--ph:#D35C43;--pl:#FAB1A0;--pbg:#FFF0EC;--s:#FDCB6E}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',sans-serif;background:var(--bg2);color:var(--tx);overflow:hidden;height:100vh}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:var(--bg2);color:var(--tx);overflow:hidden;height:100vh}
 #root{height:100vh;display:flex;flex-direction:column}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
 .navbar{height:64px;background:var(--bg);border-bottom:1px solid var(--bg3);display:flex;align-items:center;padding:0 20px;gap:16px;z-index:100;flex-shrink:0;box-shadow:var(--sh)}
@@ -210,32 +209,22 @@ textarea.fi{resize:vertical;min-height:80px}
 -->
 <script>
 window.LH_MEMORY = window.LH_MEMORY || Object.create(null);
-window.LH_VOLATILE_KEYS = new Set(['courses','courses_custom']);
-window.LH_MAX_LOCAL_VALUE_BYTES = 180000;
-window.pruneLearnHubLocalCacheForQuota = function(){
-  const bulkyKeys = ['lh_courses', 'lh_courses_custom'];
-  bulkyKeys.forEach(function(key){
-    try{
-      const value = localStorage.getItem(key);
-      if(value && value.length > 120000){
-        localStorage.removeItem(key);
-      }
-    }catch(e){}
-  });
-};
+window.LH_VOLATILE_KEYS = new Set([]); // courses are NOT volatile — they must persist
+window.LH_MAX_LOCAL_VALUE_BYTES = 2000000; // 2MB per key
+window.LH_GAS_URL = (function(){ try{ return localStorage.getItem('lh_gasUrl') || ''; }catch(e){ return ''; } })();
+
+window.pruneLearnHubLocalCacheForQuota = function(){};
 window.pruneLearnHubLocalCacheForQuota();
 window.lhCacheWrite = function(key, value){
   window.LH_MEMORY[key] = value;
   try{
     const raw = JSON.stringify(value);
-    const shouldPersist = !window.LH_VOLATILE_KEYS.has(key) && raw.length <= window.LH_MAX_LOCAL_VALUE_BYTES;
-    if(shouldPersist){
+    if(raw.length <= window.LH_MAX_LOCAL_VALUE_BYTES){
       localStorage.setItem('lh_'+key, raw);
-    }else{
-      localStorage.removeItem('lh_'+key);
     }
+    // If too large for localStorage, data is still in LH_MEMORY and remote stores (GAS/Firebase)
   }catch(e){
-    try{ localStorage.removeItem('lh_'+key); }catch(err){}
+    // localStorage quota exceeded — data lives in LH_MEMORY and remote stores
   }
 };
 
@@ -334,12 +323,45 @@ window.fbWatch = function(key, callback){
   var ref = window.fbDB.ref('lh/'+key);
   var handler = ref.on('value', function(snap){
     var data = snap.val();
-    var arr = data ? window.fbToLocal(key, data) : [];
+    if(data === null){
+      // Firebase has no data — don't overwrite local data with empty
+      // Just notify callback with existing local value so UI stays consistent
+      var existing = Object.prototype.hasOwnProperty.call(window.LH_MEMORY, key)
+        ? window.LH_MEMORY[key]
+        : null;
+      if(existing !== null && callback) callback(Array.isArray(existing) ? existing : []);
+      return;
+    }
+    var arr = window.fbToLocal(key, data);
     window.lhCacheWrite(key, arr);
     if(callback) callback(arr);
   });
-  // Return unsubscribe function
   return function(){ ref.off('value', handler); };
+};
+
+// ---- GAS storage for courses ----
+window.gasLoadCourses = async function(){
+  var url = window.LH_GAS_URL;
+  if(!url) return null;
+  try{
+    var res = await fetch(url.replace(/\/+$/, '') + '?op=get&name=learnhub_courses.json');
+    if(!res.ok) return null;
+    var data = await res.json();
+    return Array.isArray(data) ? data : null;
+  }catch(e){
+    console.warn('[LearnHub] GAS load courses error:', e.message);
+    return null;
+  }
+};
+
+window.gasSaveCourses = function(courses){
+  var url = window.LH_GAS_URL;
+  if(!url) return;
+  fetch(url.replace(/\/+$/, '') + '?name=learnhub_courses.json', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(courses)
+  }).catch(function(e){ console.warn('[LearnHub] GAS save courses error:', e.message); });
 };
 </script>
 
@@ -366,9 +388,11 @@ const S={
   s:(k,v)=>{
     window.lhCacheWrite(k, v);
     if(window.fbReady&&window.fbDB){
-      // Convert array→object for collection keys, write as-is for others
       const fbVal=window.fbFromLocal(k,v);
       window.fbDB.ref('lh/'+k).set(fbVal).catch(e=>console.warn('[LearnHub] FB write:',e));
+    }
+    if((k==='courses'||k==='courses_custom')&&Array.isArray(v)){
+      window.gasSaveCourses(v);
     }
   }
 };
@@ -426,17 +450,22 @@ async function hydrateCriticalLearningData(){
   for(const key of criticalKeys){
     const localValue = S.g(key, null);
     if(hasData(localValue)) continue;
+    // Try Firebase first (freshest), then GAS for courses, then give up
     const remoteValue = await window.fbFetchKey(key);
     if(hasData(remoteValue)){
       window.lhCacheWrite(key, remoteValue);
+    } else if(key === 'courses' || key === 'courses_custom'){
+      const gasValue = await window.gasLoadCourses();
+      if(hasData(gasValue)) window.lhCacheWrite(key, gasValue);
     }
   }
 
   const baseCourses = asArray(S.g('courses', []));
   const legacyLocal = asArray(S.g('courses_custom', []));
   const legacyRemote = asArray(await window.fbFetchKey('courses_custom'));
+  const legacyGas = asArray(await window.gasLoadCourses());
   const mergedMap = new Map();
-  [...baseCourses, ...legacyLocal, ...legacyRemote].forEach(course=>{
+  [...baseCourses, ...legacyLocal, ...legacyRemote, ...legacyGas].forEach(course=>{
     if(course && course.id) mergedMap.set(course.id, course);
   });
   if(mergedMap.size){
@@ -1969,6 +1998,13 @@ function AdminRolesPage(){
 function SettingsPage(){
   const{theme,setTheme,user,setUser,toast:addToast}=useApp();
   const ts=[{id:'',l:'🌈 Яркая',c:'#6C5CE7'},{id:'dark',l:'🌙 Тёмная',c:'#1E1E2E'},{id:'corporate',l:'💼 Корпоратив',c:'#0984E3'},{id:'warm',l:'🔥 Тёплая',c:'#E17055'}];
+  const[gasUrl,setGasUrlLocal]=useState(window.LH_GAS_URL||'');
+  const saveGasUrl=()=>{
+    const url=gasUrl.trim();
+    window.LH_GAS_URL=url;
+    try{ localStorage.setItem('lh_gasUrl',url); }catch(e){}
+    addToast('ok','GAS URL сохранён');
+  };
   const resetData=()=>{if(!confirm('Сбросить все данные? Это действие необратимо.'))return;localStorage.clear();location.reload()};
   return(<div>
     <h1 style={{fontSize:22,fontWeight:700,marginBottom:18}}>Настройки</h1>
@@ -1977,6 +2013,12 @@ function SettingsPage(){
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
         {ts.map(t=><button key={t.id} className={`btn ${theme===t.id?'btn-p':'btn-o'}`} style={{justifyContent:'center'}} onClick={()=>setTheme(t.id)}>{t.l}</button>)}
       </div>
+    </div>
+    <div className="card" style={{padding:20,marginBottom:16}}>
+      <h3 style={{fontSize:15,fontWeight:600,marginBottom:14}}>☁️ Google Apps Script (хранилище курсов)</h3>
+      <p style={{fontSize:12,color:'var(--tx2)',marginBottom:12}}>URL скрипта для резервного хранения курсов. Если не указан, курсы хранятся только в Firebase и localStorage.</p>
+      <div className="fg"><label className="fl">GAS URL</label><input className="fi" value={gasUrl} onChange={e=>setGasUrlLocal(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec"/></div>
+      <button className="btn btn-p btn-sm" onClick={saveGasUrl}>Сохранить URL</button>
     </div>
     <div className="card" style={{padding:20,marginBottom:16}}>
       <h3 style={{fontSize:15,fontWeight:600,marginBottom:14}}>👤 Профиль</h3>
