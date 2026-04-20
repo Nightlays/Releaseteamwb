@@ -704,14 +704,16 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
   );
   const maxPlausibleRate = totalTests / 6; // физически нельзя пройти всё быстрее, чем за 6 ч
 
-  // When there are few history snapshots, inject a synthetic zero-point at launch creation
-  // so we can calculate velocity from (completedCases / timeSinceLaunch).
+  // Inject synthetic zero-point at launch creation when history is sparse.
   const effectiveHistory = (() => {
     const launchTs = Number(input.launchCreatedTs || 0);
-    if (history.length >= 2 || !launchTs) return history;
+    if (!launchTs || current.manualFinished < 1) return history;
     const dtFromLaunch = (nowTs - launchTs) / 3_600_000;
-    // Only use if launch started ≥1h ago and has meaningful completed cases
-    if (dtFromLaunch < 1.0 || current.manualFinished < 1) return history;
+    if (dtFromLaunch < 0.25) return history;
+    // Don't inject if we already have a point close to launch start
+    const earliest = history[0];
+    const earliestDt = earliest ? (Number(earliest.updatedAt || 0) - launchTs) / 3_600_000 : Infinity;
+    if (earliestDt < 1.0) return history; // existing point is already near launch start
     const syntheticZero: DashboardHistoryPoint = {
       ...current,
       updatedAt: launchTs,
@@ -723,14 +725,28 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
     return [syntheticZero, ...history];
   })();
 
-  const recentRates = effectiveHistory.slice(1).map((point, index) => {
-    const prev = effectiveHistory[index];
+  // Min 15 min between snapshots (was 1h — too restrictive for frequent dashboard refreshes).
+  // Rates from short windows are noisy; we compensate by averaging over sliding windows below.
+  const MIN_RATE_DT_HOURS = 0.25;
+
+  // Sliding-window rates: compare each point against the most recent predecessor ≥ MIN_RATE_DT_HOURS ago.
+  // This avoids noise from adjacent snapshots that are seconds apart while capturing actual throughput.
+  const recentRates: number[] = [];
+  for (let i = effectiveHistory.length - 1; i >= 1; i--) {
+    const point = effectiveHistory[i];
+    // find the latest predecessor at least MIN_RATE_DT_HOURS before this point
+    let prev: DashboardHistoryPoint | null = null;
+    for (let j = i - 1; j >= 0; j--) {
+      const dt = (Number(point.updatedAt || 0) - Number(effectiveHistory[j].updatedAt || 0)) / 3_600_000;
+      if (dt >= MIN_RATE_DT_HOURS) { prev = effectiveHistory[j]; break; }
+    }
+    if (!prev) continue;
     const dtHours = (Number(point.updatedAt || 0) - Number(prev.updatedAt || 0)) / 3_600_000;
-    if (!Number.isFinite(dtHours) || dtHours < 1.0) return null;
     const delta = Math.max(0, Number(point.manualFinished || 0) - Number(prev.manualFinished || 0));
     const rate = delta / dtHours;
-    return rate > maxPlausibleRate ? null : rate;
-  }).filter((rate): rate is number => rate !== null && Number.isFinite(rate));
+    if (Number.isFinite(rate) && rate <= maxPlausibleRate) recentRates.push(rate);
+    if (recentRates.length >= 6) break; // keep last 6 windows
+  }
 
   const observedVelocityPerHour = recentRates.length ? weightedMean(recentRates.slice(-6)) : null;
   const criticalRemaining = Math.max(0, current.criticalTotal - current.criticalFinished);
