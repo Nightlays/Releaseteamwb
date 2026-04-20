@@ -3667,6 +3667,109 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   color:#93c5fd;
   text-decoration:underline;
 }
+.release-launch .release-launch-duty-ping-release-shell{
+  display:flex;
+  justify-content:center;
+}
+.release-launch .release-launch-duty-ping-release-input{
+  width:min(200px, 100%);
+  border-radius:10px;
+  border-color:#e6e8f5;
+  background:#fbfcff;
+  text-align:center;
+  font-weight:600;
+  color:#334155;
+  box-shadow:none;
+}
+.release-launch .release-launch-duty-ping-release-input:hover{
+  border-color:#cbd5e1;
+}
+.release-launch .release-launch-duty-ping-release-input:focus{
+  border-color:#93c5fd;
+  box-shadow:0 0 0 4px rgba(59,130,246,.12);
+}
+.release-launch .release-launch-duty-ping-platform-card{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  gap:0;
+}
+.release-launch .release-launch-duty-ping-platform-card .release-launch-field{
+  gap:4px;
+}
+.release-launch .release-launch-duty-ping-platform-card .release-launch-label{
+  font-size:12px;
+}
+.release-launch .release-launch-duty-ping-platform-card .release-launch-status{
+  font-size:12px;
+  line-height:1.35;
+}
+.release-launch .release-launch-duty-ping-platform-start-btn,
+.release-launch .release-launch-duty-ping-platform-publish-btn,
+.release-launch .release-launch-duty-ping-platform-stop-btn{
+  min-width:100px;
+  border-radius:10px;
+  font-weight:700;
+  padding:.46rem .72rem;
+  font-size:13px;
+}
+.release-launch .release-launch-duty-ping-platform-start-btn,
+.release-launch .release-launch-duty-ping-platform-publish-btn{
+  color:#fff;
+  border-color:#2563eb;
+  background:#2563eb;
+  box-shadow:0 8px 18px rgba(37,99,235,.18);
+}
+.release-launch .release-launch-duty-ping-platform-start-btn:hover,
+.release-launch .release-launch-duty-ping-platform-publish-btn:hover{
+  background:#1d4ed8;
+  border-color:#1d4ed8;
+}
+.release-launch .release-launch-duty-ping-platform-start-btn:disabled,
+.release-launch .release-launch-duty-ping-platform-publish-btn:disabled{
+  opacity:.62;
+  color:#e2e8f0;
+  background:#93c5fd;
+  border-color:#93c5fd;
+  box-shadow:none;
+  cursor:not-allowed;
+}
+.release-launch .release-launch-duty-ping-platform-stop-btn{
+  color:#fff;
+  border-color:#dc2626;
+  background:#dc2626;
+  box-shadow:0 8px 18px rgba(220,38,38,.16);
+}
+.release-launch .release-launch-duty-ping-platform-stop-btn:hover{
+  background:#b91c1c;
+  border-color:#b91c1c;
+}
+.release-launch .release-launch-duty-ping-log{
+  min-height:150px;
+  max-height:220px;
+}
+.release-launch .release-launch-duty-ping-platform-card textarea.release-launch-mono-input{
+  min-height:170px;
+  max-height:230px;
+  padding:.5rem .65rem;
+}
+@media (max-width: 1279px){
+  .release-launch .release-launch-duty-ping-platform-start-btn,
+  .release-launch .release-launch-duty-ping-platform-publish-btn,
+  .release-launch .release-launch-duty-ping-platform-stop-btn{
+    min-width:92px;
+    padding:.42rem .64rem;
+    font-size:12px;
+  }
+  .release-launch .release-launch-duty-ping-log{
+    min-height:140px;
+    max-height:200px;
+  }
+  .release-launch .release-launch-duty-ping-platform-card textarea.release-launch-mono-input{
+    min-height:156px;
+    max-height:210px;
+  }
+}
 .release-launch .release-launch-mode-standalone{
   width:100%;
   display:flex;
@@ -3731,6 +3834,76 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
 }
 .release-launch .release-launch-mode-tab:disabled:hover{
   transform:none;
+}
+.release-launch .release-launch-copy-feedback-btn{
+  position:relative;
+  overflow:hidden;
+}
+.release-launch .release-launch-copy-feedback-label,
+.release-launch .release-launch-copy-feedback-check{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:100%;
+  line-height:1;
+  transition:opacity .18s ease, transform .22s ease;
+}
+.release-launch .release-launch-copy-feedback-check{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  transform:scale(.72);
+  pointer-events:none;
+}
+.release-launch .release-launch-copy-feedback-check-visible{
+  position:static;
+  inset:auto;
+  opacity:1;
+  transform:scale(1);
+}
+.release-launch .release-launch-copy-feedback-btn.is-success{
+  color:#166534;
+  border-color:#bbf7d0 !important;
+  background:#f0fdf4 !important;
+}
+.release-launch .release-launch-copy-feedback-btn.is-success .release-launch-copy-feedback-label{
+  opacity:0;
+  transform:translateY(-3px) scale(.94);
+}
+.release-launch .release-launch-copy-feedback-btn.is-success .release-launch-copy-feedback-check{
+  opacity:1;
+  transform:scale(1);
+  animation:release-launch-copy-check-pop .28s ease;
+}
+.release-launch .release-launch-copy-feedback-btn.is-success:disabled{
+  opacity:1;
+}
+.release-launch .release-launch-results-copy-btn:disabled:not(.is-success),
+.release-launch .release-launch-results-copy-btn.is-disabled:not(.is-success),
+.release-launch .release-launch-copy-feedback-btn:disabled:not(.is-success),
+.release-launch .release-launch-copy-feedback-btn.is-disabled:not(.is-success){
+  opacity:.62;
+  color:#94a3b8 !important;
+  border-color:#e2e8f0 !important;
+  background:#f8fafc !important;
+  box-shadow:none;
+  cursor:not-allowed;
+  pointer-events:none;
+  transform:none;
+}
+.release-launch .release-launch-results-copy-btn:disabled:not(.is-success):hover,
+.release-launch .release-launch-results-copy-btn.is-disabled:not(.is-success):hover,
+.release-launch .release-launch-copy-feedback-btn:disabled:not(.is-success):hover,
+.release-launch .release-launch-copy-feedback-btn.is-disabled:not(.is-success):hover{
+  color:#94a3b8 !important;
+  border-color:#e2e8f0 !important;
+  background:#f8fafc !important;
+  transform:none;
+}
+@keyframes release-launch-copy-check-pop{
+  0%{transform:scale(.56);}
+  60%{transform:scale(1.16);}
+  100%{transform:scale(1);}
 }
 .release-launch .release-launch-mode-tab:focus,
 .release-launch .release-launch-mode-tab:focus-visible{
