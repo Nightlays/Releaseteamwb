@@ -1666,6 +1666,7 @@ export function Dashboard() {
           activePeopleCount: dashboardData.activePeopleCount,
           activePeopleLogins: dashboardData.activePeopleLogins,
           gasConfig: { gasUrl: settings.gasUrl, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
+          launchCreatedTs: dashboardData.launchCreatedTs ?? undefined,
         });
         setPrediction(nextPrediction);
       } catch {

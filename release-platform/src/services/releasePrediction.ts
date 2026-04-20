@@ -79,6 +79,7 @@ export interface DashboardPredictionInput {
   activePeopleCount?: number;
   activePeopleLogins?: string[];
   gasConfig?: GasConfig;
+  launchCreatedTs?: number | null;
 }
 
 export interface DashboardPrediction {
@@ -703,8 +704,27 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
   );
   const maxPlausibleRate = totalTests / 6; // физически нельзя пройти всё быстрее, чем за 6 ч
 
-  const recentRates = history.slice(1).map((point, index) => {
-    const prev = history[index];
+  // When there are few history snapshots, inject a synthetic zero-point at launch creation
+  // so we can calculate velocity from (completedCases / timeSinceLaunch).
+  const effectiveHistory = (() => {
+    const launchTs = Number(input.launchCreatedTs || 0);
+    if (history.length >= 2 || !launchTs) return history;
+    const dtFromLaunch = (nowTs - launchTs) / 3_600_000;
+    // Only use if launch started ≥1h ago and has meaningful completed cases
+    if (dtFromLaunch < 1.0 || current.manualFinished < 1) return history;
+    const syntheticZero: DashboardHistoryPoint = {
+      ...current,
+      updatedAt: launchTs,
+      finished: 0,
+      manualFinished: 0,
+      remaining: current.total,
+      inProgress: 0,
+    };
+    return [syntheticZero, ...history];
+  })();
+
+  const recentRates = effectiveHistory.slice(1).map((point, index) => {
+    const prev = effectiveHistory[index];
     const dtHours = (Number(point.updatedAt || 0) - Number(prev.updatedAt || 0)) / 3_600_000;
     if (!Number.isFinite(dtHours) || dtHours < 1.0) return null;
     const delta = Math.max(0, Number(point.manualFinished || 0) - Number(prev.manualFinished || 0));

@@ -26,8 +26,10 @@ export interface AllureLaunchStatisticItem {
 }
 
 export interface AllureLaunchMemberStatItem {
-  login?: string;
+  id?: string;           // primary field in Allure TestOps (matches testedBy/assignee)
+  login?: string;        // alternate
   displayName?: string;
+  name?: string;         // alternate displayName
   statistic?: AllureLaunchStatisticItem[];
 }
 
@@ -60,6 +62,7 @@ export interface DashboardAggregateResult {
   alerts: DashboardAlertEntry[];
   activePeopleCount: number;
   activePeopleLogins: string[];
+  launchCreatedTs: number | null; // earliest createdDate of labeled launches
 }
 
 export interface ReadinessLaunchSummary {
@@ -181,7 +184,7 @@ export function completedFromMemberStats(memberStats: AllureLaunchMemberStatItem
 export function activeLoginsFromMemberStats(memberStats: AllureLaunchMemberStatItem[] | undefined): string[] {
   return (Array.isArray(memberStats) ? memberStats : [])
     .filter(item => sumByStatuses(item?.statistic, ALL_ASSIGNED_STATUSES) > 0)
-    .map(item => String(item.login || item.displayName || '').trim())
+    .map(item => String(item.id || item.login || item.displayName || item.name || '').trim())
     .filter(Boolean);
 }
 
@@ -455,8 +458,9 @@ export function readCachedDashboardAggregate(version?: string): DashboardAggrega
     agg,
     uwu,
     alerts: alerts.sort((a, b) => b.id - a.id),
-    activePeopleCount: 1,
+    activePeopleCount: 0,
     activePeopleLogins: [],
+    launchCreatedTs: null,
   };
 }
 
@@ -920,6 +924,7 @@ export async function fetchDashboardAggregate(
   const launchesToRefresh: AllureLaunch[] = [];
   const allActiveLogins = new Set<string>();
   let allActivePeopleRawCount = 0; // fallback when logins are empty
+  let minLaunchCreatedTs: number | null = null; // earliest labeled launch creation time
 
   for (const rawLaunch of rawLaunches) {
     const launchId = Number(rawLaunch.id || 0);
@@ -1012,9 +1017,15 @@ export async function fetchDashboardAggregate(
     if (Array.isArray(memberStats) && label) {
       const logins = activeLoginsFromMemberStats(memberStats);
       logins.forEach(login => allActiveLogins.add(login));
-      // Track raw count for launches where login field is missing
       const rawCount = countActivePeopleFromMemberStats(memberStats);
       allActivePeopleRawCount = Math.max(allActivePeopleRawCount, rawCount);
+    }
+
+    if (label) {
+      const ts = Number(rawLaunch.createdDate || 0);
+      if (ts > 0 && (minLaunchCreatedTs === null || ts < minLaunchCreatedTs)) {
+        minLaunchCreatedTs = ts;
+      }
     }
 
     const resolvedUwu = launchUwu || cachedEntry?.uwu || null;
@@ -1075,5 +1086,6 @@ export async function fetchDashboardAggregate(
     // Prefer login-dedup Set; fall back to raw count if logins weren't populated by API
     activePeopleCount: allActiveLogins.size > 0 ? allActiveLogins.size : allActivePeopleRawCount,
     activePeopleLogins,
+    launchCreatedTs: minLaunchCreatedTs,
   };
 }
