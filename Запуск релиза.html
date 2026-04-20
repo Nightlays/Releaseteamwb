@@ -149,6 +149,7 @@
         <section class="card p-3 space-y-3">
           <div class="release-launch-mode-tabs release-launch-major-view-tabs" role="group" aria-label="Раздел мажорного релиза">
             <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="collection" aria-pressed="false">Сбор дежурных</button>
+            <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="ping" aria-pressed="false">Пинг дежурных</button>
             <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="release" aria-pressed="false">Релиз</button>
             <button type="button" class="release-launch-mode-tab release-launch-major-view-tab" data-major-view="editor" aria-pressed="false">Редактор</button>
           </div>
@@ -165,9 +166,12 @@
     		              <span class="chip">Заполнено: <b id="kpiFilled">0</b></span>
     		              <span class="chip">С пропусками: <b id="kpiMissing">0</b></span>
     		            </div>
-    		            <button id="resultsCopyBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white">
-    		              Копировать
-    		            </button>
+		            <button id="resultsCopyBtn" type="button" class="release-launch-results-copy-btn inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" disabled>
+		              Копировать список
+		            </button>
+		            <button id="resultsThreadsCopyBtn" type="button" class="release-launch-results-copy-btn inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" disabled>
+		              Копировать треды
+		            </button>
     		            <button id="resultsCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
     		              <span id="resultsCollapseIco" aria-hidden="true">▾</span>
     		              <span id="resultsCollapseText">Скрыть</span>
@@ -209,6 +213,66 @@
             <h2 class="text-lg font-semibold">Логи</h2>
             <div id="logs" class="release-launch-log"></div>
           </section>
+        </div>
+
+        <div id="majorDutyPingSection" class="space-y-4" style="display:none;">
+          <section class="card p-4 space-y-3">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="text-lg font-semibold">Пинг дежурных</h2>
+                <div id="majorDutyPingGlobalStatus" class="release-launch-status release-launch-status-muted">Можно запускать Android и iOS отдельно или параллельно.</div>
+              </div>
+              <div class="release-launch-duty-ping-release-shell">
+                <input id="majorDutyPingReleaseInput" class="input release-launch-duty-ping-release-input" type="text" placeholder="Номер релиза" />
+              </div>
+            </div>
+          </section>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
+            <section class="card p-4 space-y-3 release-launch-duty-ping-platform-card">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                  <h3 class="text-base font-semibold">Android</h3>
+                  <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                    <button id="majorDutyPingAndroidStartBtn" type="button" class="btn release-launch-duty-ping-platform-start-btn whitespace-nowrap">Старт пинга</button>
+                    <button id="majorDutyPingAndroidPublishBtn" type="button" class="btn release-launch-duty-ping-platform-publish-btn whitespace-nowrap" style="display:none;">Опубликовать</button>
+                    <button id="majorDutyPingAndroidStopBtn" type="button" class="btn release-launch-duty-ping-platform-stop-btn whitespace-nowrap" style="display:none;">Стоп пинга</button>
+                  </div>
+                </div>
+                <div id="majorDutyPingAndroidStatus" class="release-launch-status release-launch-status-muted">Ожидает запуска</div>
+              </div>
+              <label class="release-launch-field">
+                <span class="release-launch-label">Сообщение в тред</span>
+                <textarea id="majorDutyPingAndroidMessage" class="input release-launch-mono-input" rows="10" spellcheck="false" readonly></textarea>
+              </label>
+              <div class="space-y-2">
+                <div class="release-launch-label">Логи</div>
+                <div id="majorDutyPingAndroidLogs" class="release-launch-log release-launch-duty-ping-log"></div>
+              </div>
+            </section>
+
+            <section class="card p-4 space-y-3 release-launch-duty-ping-platform-card">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                  <h3 class="text-base font-semibold">iOS</h3>
+                  <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                    <button id="majorDutyPingIosStartBtn" type="button" class="btn release-launch-duty-ping-platform-start-btn whitespace-nowrap">Старт пинга</button>
+                    <button id="majorDutyPingIosPublishBtn" type="button" class="btn release-launch-duty-ping-platform-publish-btn whitespace-nowrap" style="display:none;">Опубликовать</button>
+                    <button id="majorDutyPingIosStopBtn" type="button" class="btn release-launch-duty-ping-platform-stop-btn whitespace-nowrap" style="display:none;">Стоп пинга</button>
+                  </div>
+                </div>
+                <div id="majorDutyPingIosStatus" class="release-launch-status release-launch-status-muted">Ожидает запуска</div>
+              </div>
+              <label class="release-launch-field">
+                <span class="release-launch-label">Сообщение в тред</span>
+                <textarea id="majorDutyPingIosMessage" class="input release-launch-mono-input" rows="10" spellcheck="false" readonly></textarea>
+              </label>
+              <div class="space-y-2">
+                <div class="release-launch-label">Логи</div>
+                <div id="majorDutyPingIosLogs" class="release-launch-log release-launch-duty-ping-log"></div>
+              </div>
+            </section>
+          </div>
         </div>
 
         <div id="majorReleaseSection" class="space-y-4" style="display:none;">
@@ -419,6 +483,7 @@
       const LS_STEP_SCHEDULES_KEY = 'wb_release_launch_step_schedules_v1';
       const LS_RUN_MODE_KEY = 'wb_release_launch_run_mode_v1';
       const LS_MAJOR_VIEW_KEY = 'wb_release_launch_major_view_v1';
+      const LS_MAJOR_DUTY_PING_RELEASE_KEY = 'wb_release_launch_major_duty_ping_release_v1';
       const DEPLOY_LAB_BASE_URL = 'https://deploy-lab-api.wb.ru';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
       const PROXY_BASE = 'http://localhost:8787';
@@ -437,6 +502,11 @@
       const IOS_BUILDS_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
       const GROUP_ANDROID_ID_FIXED = 'bbtekcuhfjykmm9awe56gebj9y';
       const GROUP_IOS_ID_FIXED = '6skkxrr3ufrkmy1u3paepd35ar';
+      const DUTY_PING_POLL_MS = 5000;
+      const DUTY_PING_RELEASE_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
+      const DUTY_PING_THREAD_FROM_UPDATE_AT = 1565303257750;
+      const DUTY_PING_OK = ':green_verify:';
+      const DUTY_PING_ETA = ':spiral_calendar_pad:';
       const YT_BASE_URL = 'https://youtrack.wildberries.ru';
       const YT_AGILE_ID_IOS = '83-469';
       const YT_AGILE_ID_ANDROID = '83-2175';
@@ -458,6 +528,7 @@
       const DUTY_EDITOR_ALLURE_WORKFLOW_ID = 1;
       const COLLECTION_ALLURE_SYNC_URL = 'https://allure-testops.wb.ru/api/testplan/3918/sync';
       const ALLURE_LAUNCHES_BASE = 'https://allure-testops.wb.ru/launch';
+      const BAND_THREAD_URL_BASE = 'https://band.wb.ru/mobile-team/pl/';
       const QA_LEADS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxPTT8Gc8rQLKV7tIrtwsUQd_ciUOkESbS7WoQ3JfPEoBtxB0gr6GpOs640uBIaPTCy8A/exec';
       const DUTY_EDITOR_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby305NTQLS73Dw9CyG_QKkRMMljub5wkkdIlBpvHDuR6S9SntfPLTkR4jiq6uHXwHkoMg/exec';
       const DUTY_EDITOR_DOC_URL = 'https://docs.google.com/document/d/1glaEFkdpAzGuRyQZYz1muBzVkFOnKyn85BW-CXLFSFU/edit?tab=t.0';
@@ -483,7 +554,8 @@
         'C2C': ['С2С', 'С2C', 'C2С'],
         'Корзина (B2B)': ['B2B', 'Корзина B2B', 'Корзина (B2B)'],
         'Способы доставки': ['Способы доставок'],
-        'ДБО Депозиты и накопления': ['Депозиты и накопления']
+        'ДБО Депозиты и накопления': ['Депозиты и накопления'],
+        'WB Клуб': ['wb club', 'WB Club', 'ВБ Клуб', 'вб клуб']
       };
 
       const EXCLUDED_STREAMS = [
@@ -518,6 +590,67 @@
       const RE_INLINE_FREE = new RegExp(`${DUTY_WORD}\\s+([^\\n\\r"@]+?)` + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'giu');
       const RE_ANDROID = new RegExp('\\b(?:Android|andr)\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
       const RE_IOS = new RegExp('\\bios\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
+      const DUTY_PING_TIME_HHMM_RE = /\b([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)\b/iu;
+      const DUTY_PING_TIME_TO_RE = /\bдо\s*([01]?\d|2[0-3])(?:\s*[:.]\s*([0-5]\d))?\b/iu;
+      const DUTY_PING_TIME_H_ONLY_RE = /\b(?:в|к)\s*([01]?\d|2[0-3])\b(?!\s*[:.]\s*\d)/iu;
+      const DUTY_PING_RANGE_MIN_SUFFIX_RE = /\b(\d{1,3})\s*[-–]\s*(\d{1,3})\s*(?:мин|минута|минуты|минут|минуток|минутак|m|м)\b/iu;
+      const DUTY_PING_RANGE_MIN_PREFIX_RE = /\b(?:минут(?:ок|ак)?|мин)\s*(\d{1,3})\s*[-–]\s*(\d{1,3})\b/iu;
+      const DUTY_PING_RANGE_NUMBERS_CONTEXT_MIN_RE = /\b(\d{1,3})\s*[-–]\s*(\d{1,3})\b/iu;
+      const DUTY_PING_MIN_PREFIX_RE = /\b(?:минут(?:ок|ак)?|мин)\s*(\d{1,3})\b/iu;
+      const DUTY_PING_MIN_SUFFIX_RE = /\b(\d{1,3})\s*(?:мин|минута|минуты|минут|минуток|минутак|m|м)\b/iu;
+      const DUTY_PING_H_SHORT_RE = /(?:^|[^\p{L}\p{N}])(\d+(?:[.,]\d+)?)\s*ч(?!\p{L}|\p{N})/iu;
+      const DUTY_PING_M_SHORT_RE = /(?:^|[^\p{L}\p{N}])(\d{1,3})\s*м(?!\p{L}|\p{N})/iu;
+      const DUTY_PING_ONE_HOUR_FUZZY_RE = /\b(?:часик(?:а)?|часок)\b/iu;
+      const DUTY_PING_RANGE_HOURS_RE = /\b(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)\s*(?:ч\.?|час(?:а|ов)?|часик(?:а)?|часка)\b/iu;
+      const DUTY_PING_HOURS_RE = /\b(?:через\s*)?(?:около\s*)?(\d+(?:[.,]\d+)?)\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b/iu;
+      const DUTY_PING_HOURS_REV_RE = /\b(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\s*(\d+(?:[.,]\d+)?)\b/iu;
+      const DUTY_PING_HALF_HOUR_WORD_RE = /\b(?:полчаса|полчасика|пол-часа|пол часа|полчас)\b/iu;
+      const DUTY_PING_ONE_AND_HALF_WORD_RE = /\b(?:полтора\s*часа|часа\s*полтора|час-полтора)\b/iu;
+      const DUTY_PING_HOUR_MAYBE_ONE_AND_HALF_RE = /\bчас(?:а)?\b[^\n]{0,30}\bполтора\b/iu;
+      const DUTY_PING_ONE_HOUR_APPROX_RE = /\b(?:примерно|приблизительно)\s*(?:час|часик(?:а)?|часок)\b/iu;
+      const DUTY_PING_THROUGH_HOUR_RE = /\bчерез\s*(?:часок|часик|час)\b/iu;
+      const DUTY_PING_WITHIN_ONE_HOUR_RE = /\b(?:в\s+течение|в\s+течении)\s*(?:ближайш(?:ий|его)\s*)?(?:часа|час|часик(?:а)?|часок)\b/iu;
+      const DUTY_PING_ONE_HOUR_PLAIN_RE = /\bчас\b/iu;
+      const DUTY_PING_WORD_HOURS_RE = /\b(?:через\s*)?(?:около\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b/iu;
+      const DUTY_PING_WORD_HOURS_REV_RE = /\b(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\s*(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\b/iu;
+      const DUTY_PING_WORD_MIN_RE = /\b(?:через\s*)?(?:около\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)\s*(?:минут(?:ок|ак)?|мин|m|м)\b/iu;
+      const DUTY_PING_WORD_MIN_REV_RE = /\b(?:минут(?:ок|ак)?|мин|m|м)\s*(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)\b/iu;
+      const DUTY_PING_WITHIN_WORD_HOURS_RE = /\b(?:в\s+течение|в\s+течении)\s*(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b/iu;
+      const DUTY_PING_WITHIN_HOURS_RE = /\b(?:в\s+течение|в\s+течении)\s*(\d+(?:[.,]\d+)?)\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b/iu;
+      const DUTY_PING_REPLY_STREAM_SPLIT_RE = /\s*(?:[-—:–|]|->|=>)\s*/u;
+      const DUTY_PING_REPLY_TIME_BOUNDARY_RE = /\b(?:до|в|к|через|около|минут(?:ок|ак)?|мин|час(?:а|ов)?|ч\.?|полтора|полчаса|полчасика|пол-часа|пол часа)\b/iu;
+      const DUTY_PING_REPLY_QUOTED_STREAM_RE = /["«]([^"»]{2,120})["»]/gu;
+      const DUTY_PING_NUM_WORDS = {
+        'ноль': 0,
+        'один': 1,
+        'одна': 1,
+        'одну': 1,
+        'раз': 1,
+        'два': 2,
+        'две': 2,
+        'двух': 2,
+        'пару': 2,
+        'пара': 2,
+        'пары': 2,
+        'три': 3,
+        'трех': 3,
+        'трёх': 3,
+        'четыре': 4,
+        'четырех': 4,
+        'четырёх': 4,
+        'пять': 5,
+        'шесть': 6,
+        'семь': 7,
+        'восемь': 8,
+        'восьми': 8,
+        'девять': 9,
+        'десять': 10,
+        'пятнадцать': 15,
+        'двадцать': 20,
+        'тридцать': 30,
+        'сорок': 40,
+        'полтора': 1.5
+      };
 
       const startBtn = $('startBtn');
       const stopBtn = $('stopBtn');
@@ -533,6 +666,7 @@
       const pingCollapseText = $('pingCollapseText');
       const resultsBody = $('resultsBody');
       const resultsCopyBtn = $('resultsCopyBtn');
+      const resultsThreadsCopyBtn = $('resultsThreadsCopyBtn');
       const resultsCollapseBtn = $('resultsCollapseBtn');
       const resultsCollapseIco = $('resultsCollapseIco');
       const resultsCollapseText = $('resultsCollapseText');
@@ -542,9 +676,24 @@
       const majorReleaseLayout = $('majorReleaseLayout');
       const majorReleaseEmptyState = $('majorReleaseEmptyState');
       const majorCollectionSection = $('majorCollectionSection');
+      const majorDutyPingSection = $('majorDutyPingSection');
       const majorReleaseSection = $('majorReleaseSection');
       const majorEditorSection = $('majorEditorSection');
       const majorViewButtons = Array.from(document.querySelectorAll('.release-launch-major-view-tab[data-major-view]'));
+      const majorDutyPingGlobalStatus = $('majorDutyPingGlobalStatus');
+      const majorDutyPingReleaseInput = $('majorDutyPingReleaseInput');
+      const majorDutyPingAndroidStartBtn = $('majorDutyPingAndroidStartBtn');
+      const majorDutyPingAndroidPublishBtn = $('majorDutyPingAndroidPublishBtn');
+      const majorDutyPingAndroidStopBtn = $('majorDutyPingAndroidStopBtn');
+      const majorDutyPingAndroidStatus = $('majorDutyPingAndroidStatus');
+      const majorDutyPingAndroidMessage = $('majorDutyPingAndroidMessage');
+      const majorDutyPingAndroidLogs = $('majorDutyPingAndroidLogs');
+      const majorDutyPingIosStartBtn = $('majorDutyPingIosStartBtn');
+      const majorDutyPingIosPublishBtn = $('majorDutyPingIosPublishBtn');
+      const majorDutyPingIosStopBtn = $('majorDutyPingIosStopBtn');
+      const majorDutyPingIosStatus = $('majorDutyPingIosStatus');
+      const majorDutyPingIosMessage = $('majorDutyPingIosMessage');
+      const majorDutyPingIosLogs = $('majorDutyPingIosLogs');
       const runCreateLayout = $('runCreateLayout');
       const runExtraControls = $('runExtraControls');
       const runPublishControls = $('runPublishControls');
@@ -629,6 +778,10 @@
         startButtonBusy: false,
         currentMode: '',
         majorView: '',
+        dutyPingPlatforms: {
+          android: { running: false, abortController: null, seq: 0, phase: 'idle', prepared: null },
+          ios: { running: false, abortController: null, seq: 0, phase: 'idle', prepared: null }
+        },
         majorPingText: '',
         majorPollLoading: false,
         majorPollSeq: 0,
@@ -683,6 +836,7 @@
         automationTickTimerId: 0,
         automationRunning: false,
         automationLastMessage: '',
+        copyFeedbackTimers: {},
         dutyEditorNextId: 0
       };
 
@@ -737,10 +891,18 @@
       function normLoose(s){
         return String(s || '')
           .toLocaleLowerCase('ru-RU')
+          .replace(/ё/g, 'е')
           .replace(/[«»"“”'`]/gu, ' ')
           .replace(/[^\p{L}\p{N}]+/gu, ' ')
           .trim()
           .replace(/\s+/g, ' ');
+      }
+
+      function normCompact(s){
+        return String(s || '')
+          .toLocaleLowerCase('ru-RU')
+          .replace(/ё/g, 'е')
+          .replace(/[^\p{L}\p{N}]+/gu, '');
       }
 
       function dedupKeepOrder(items){
@@ -872,6 +1034,252 @@
         return new Promise((resolve) => setTimeout(resolve, ms));
       }
 
+      function createAbortError(message){
+        const error = new Error(String(message || 'Остановлено пользователем.'));
+        error.name = 'AbortError';
+        return error;
+      }
+
+      function isAbortError(error){
+        return !!(error && (error.name === 'AbortError' || error.code === 20));
+      }
+
+      function throwIfAborted(signal){
+        if(signal && signal.aborted){
+          throw createAbortError();
+        }
+      }
+
+      function sleepWithAbort(ms, signal){
+        throwIfAborted(signal);
+        return new Promise((resolve, reject) => {
+          const timerId = window.setTimeout(() => {
+            if(signal){
+              signal.removeEventListener('abort', onAbort);
+            }
+            resolve();
+          }, Math.max(0, Number(ms) || 0));
+
+          const onAbort = () => {
+            clearTimeout(timerId);
+            signal.removeEventListener('abort', onAbort);
+            reject(createAbortError());
+          };
+
+          if(signal){
+            signal.addEventListener('abort', onAbort, { once: true });
+          }
+        });
+      }
+
+      function normalizeDutyPingPlatform(platform){
+        const value = String(platform || '').trim().toLowerCase();
+        return value === 'ios' ? 'ios' : 'android';
+      }
+
+      function getDutyPingPlatformLabel(platform){
+        return normalizeDutyPingPlatform(platform) === 'ios' ? 'iOS' : 'Android';
+      }
+
+      function getDutyPingPlatformState(platform){
+        const key = normalizeDutyPingPlatform(platform);
+        if(!appState.dutyPingPlatforms || typeof appState.dutyPingPlatforms !== 'object'){
+          appState.dutyPingPlatforms = {
+            android: { running: false, abortController: null, seq: 0 },
+            ios: { running: false, abortController: null, seq: 0 }
+          };
+        }
+        if(!appState.dutyPingPlatforms[key] || typeof appState.dutyPingPlatforms[key] !== 'object'){
+          appState.dutyPingPlatforms[key] = { running: false, abortController: null, seq: 0, phase: 'idle', prepared: null };
+        }
+        return appState.dutyPingPlatforms[key];
+      }
+
+      function getDutyPingPlatformPhase(platform){
+        return String(getDutyPingPlatformState(platform).phase || 'idle');
+      }
+
+      function setDutyPingPlatformPhase(platform, phase){
+        const state = getDutyPingPlatformState(platform);
+        state.phase = String(phase || 'idle');
+      }
+
+      function isDutyPingPlatformRunning(platform){
+        return !!getDutyPingPlatformState(platform).running;
+      }
+
+      function isDutyPingPlatformActive(platform){
+        return getDutyPingPlatformPhase(platform) !== 'idle';
+      }
+
+      function isAnyDutyPingRunning(){
+        return isDutyPingPlatformRunning('android') || isDutyPingPlatformRunning('ios');
+      }
+
+      function isAnyDutyPingActive(){
+        return isDutyPingPlatformActive('android') || isDutyPingPlatformActive('ios');
+      }
+
+      function getDutyPingPlatformUi(platform){
+        return normalizeDutyPingPlatform(platform) === 'ios'
+          ? {
+              status: majorDutyPingIosStatus,
+              message: majorDutyPingIosMessage,
+              logs: majorDutyPingIosLogs,
+              startBtn: majorDutyPingIosStartBtn,
+              publishBtn: majorDutyPingIosPublishBtn,
+              stopBtn: majorDutyPingIosStopBtn
+            }
+          : {
+              status: majorDutyPingAndroidStatus,
+              message: majorDutyPingAndroidMessage,
+              logs: majorDutyPingAndroidLogs,
+              startBtn: majorDutyPingAndroidStartBtn,
+              publishBtn: majorDutyPingAndroidPublishBtn,
+              stopBtn: majorDutyPingAndroidStopBtn
+            };
+      }
+
+      function setDutyPingStatusNode(node, message, kind){
+        if(!node) return;
+        const statusKind = ['muted', 'progress', 'ok', 'warn', 'err'].includes(String(kind || '')) ? String(kind) : 'muted';
+        node.className = `release-launch-status release-launch-status-${statusKind}`;
+        node.textContent = String(message || '').trim();
+      }
+
+      function setDutyPingGlobalStatus(message, kind){
+        setDutyPingStatusNode(majorDutyPingGlobalStatus, message || getDutyPingIdleGlobalMessage(), kind);
+      }
+
+      function setDutyPingPlatformStatus(platform, message, kind){
+        const ui = getDutyPingPlatformUi(platform);
+        setDutyPingStatusNode(ui.status, message || 'Ожидает запуска', kind);
+      }
+
+      function setDutyPingPlatformMessage(platform, message){
+        const ui = getDutyPingPlatformUi(platform);
+        if(ui.message) ui.message.value = String(message || '');
+      }
+
+      function appendDutyPingLog(platform, message, kind){
+        const ui = getDutyPingPlatformUi(platform);
+        if(!ui.logs) return;
+        const line = document.createElement('div');
+        line.className = 'release-launch-log-line' + (kind ? ` ${kind}` : '');
+        line.textContent = `[${new Date().toLocaleTimeString('ru-RU')}] ${String(message || '').trim()}`;
+        ui.logs.appendChild(line);
+        while(ui.logs.childElementCount > 240){
+          ui.logs.removeChild(ui.logs.firstChild);
+        }
+        ui.logs.scrollTop = ui.logs.scrollHeight;
+      }
+
+      function clearDutyPingPlatformUi(platform){
+        const state = getDutyPingPlatformState(platform);
+        state.prepared = null;
+        const ui = getDutyPingPlatformUi(platform);
+        if(ui.logs) ui.logs.innerHTML = '';
+        if(ui.message) ui.message.value = '';
+        setDutyPingPlatformStatus(platform, 'Ожидает запуска', 'muted');
+      }
+
+      function resetDutyPingUi(){
+        clearDutyPingPlatformUi('android');
+        clearDutyPingPlatformUi('ios');
+      }
+
+      function getDutyPingReleaseValue(){
+        return majorDutyPingReleaseInput ? String(majorDutyPingReleaseInput.value || '').trim() : '';
+      }
+
+      function getDutyPingIdleGlobalMessage(){
+        return 'Можно запускать Android и iOS отдельно или параллельно.';
+      }
+
+      function updateDutyPingGlobalStatusByRunningStates(options){
+        const opts = options && typeof options === 'object' ? options : {};
+        if(opts.message){
+          setDutyPingGlobalStatus(opts.message, opts.kind || (isAnyDutyPingRunning() ? 'progress' : 'muted'));
+          return;
+        }
+        const androidRunning = isDutyPingPlatformRunning('android');
+        const iosRunning = isDutyPingPlatformRunning('ios');
+        const androidPhase = getDutyPingPlatformPhase('android');
+        const iosPhase = getDutyPingPlatformPhase('ios');
+        if(androidRunning && iosRunning){
+          setDutyPingGlobalStatus('Android и iOS в работе параллельно.', opts.kind || 'progress');
+          return;
+        }
+        if(androidRunning){
+          setDutyPingGlobalStatus('Android в работе. iOS можно запустить отдельно.', opts.kind || 'progress');
+          return;
+        }
+        if(iosRunning){
+          setDutyPingGlobalStatus('iOS в работе. Android можно запустить отдельно.', opts.kind || 'progress');
+          return;
+        }
+        if(androidPhase === 'ready' && iosPhase === 'ready'){
+          setDutyPingGlobalStatus('Черновики Android и iOS готовы к публикации.', opts.kind || 'ok');
+          return;
+        }
+        if(androidPhase === 'ready'){
+          setDutyPingGlobalStatus('Черновик Android готов к публикации.', opts.kind || 'ok');
+          return;
+        }
+        if(iosPhase === 'ready'){
+          setDutyPingGlobalStatus('Черновик iOS готов к публикации.', opts.kind || 'ok');
+          return;
+        }
+        if(androidPhase === 'preparing' && iosPhase === 'preparing'){
+          setDutyPingGlobalStatus('Собираю данные для Android и iOS...', opts.kind || 'progress');
+          return;
+        }
+        if(androidPhase === 'preparing'){
+          setDutyPingGlobalStatus('Собираю данные для Android...', opts.kind || 'progress');
+          return;
+        }
+        if(iosPhase === 'preparing'){
+          setDutyPingGlobalStatus('Собираю данные для iOS...', opts.kind || 'progress');
+          return;
+        }
+        setDutyPingGlobalStatus(opts.message || getDutyPingIdleGlobalMessage(), opts.kind || 'muted');
+      }
+
+      function saveDutyPingReleaseValue(){
+        try{
+          localStorage.setItem(LS_MAJOR_DUTY_PING_RELEASE_KEY, getDutyPingReleaseValue());
+        }catch(_){ }
+      }
+
+      function syncDutyPingControls(){
+        const release = getDutyPingReleaseValue();
+        const lockedByOtherAction = appState.running || appState.workflowRunning || appState.runCreateRunning || appState.startButtonBusy;
+        const anyActive = isAnyDutyPingActive();
+        if(majorDutyPingReleaseInput){
+          majorDutyPingReleaseInput.disabled = anyActive;
+        }
+
+        for(const platform of ['android', 'ios']){
+          const ui = getDutyPingPlatformUi(platform);
+          const phase = getDutyPingPlatformPhase(platform);
+          const running = phase === 'running' || phase === 'preparing';
+          const ready = phase === 'ready';
+          if(ui.startBtn){
+            ui.startBtn.style.display = phase === 'idle' ? '' : 'none';
+            ui.startBtn.disabled = lockedByOtherAction || !release;
+            ui.startBtn.title = !release ? 'Укажи номер релиза' : '';
+          }
+          if(ui.publishBtn){
+            ui.publishBtn.style.display = ready ? '' : 'none';
+            ui.publishBtn.disabled = lockedByOtherAction || !release;
+          }
+          if(ui.stopBtn){
+            ui.stopBtn.style.display = phase !== 'idle' ? '' : 'none';
+            ui.stopBtn.disabled = phase === 'idle';
+          }
+        }
+      }
+
       function log(message, kind){
         if(!logs) return;
         const line = document.createElement('div');
@@ -899,6 +1307,67 @@
         box.style.opacity = '1';
         clearTimeout(showToast._t);
         showToast._t = setTimeout(() => { box.style.opacity = '0'; }, 1800);
+      }
+
+      function ensureCopyFeedbackButtonMarkup(button){
+        if(!button) return;
+        if(button.dataset.copyFeedbackReady === 'true') return;
+        button.dataset.copyFeedbackReady = 'true';
+        button.dataset.copyFeedbackLabel = String(button.textContent || '').trim();
+        button.classList.add('release-launch-copy-feedback-btn');
+        renderCopyFeedbackButtonMarkup(button);
+      }
+
+      function renderCopyFeedbackButtonMarkup(button, success){
+        if(!button) return;
+        const label = String(button.dataset.copyFeedbackLabel || button.textContent || '').trim();
+        button.dataset.copyFeedbackLabel = label;
+        if(success){
+          button.innerHTML = '<span class="release-launch-copy-feedback-check release-launch-copy-feedback-check-visible" aria-hidden="true">✓</span>';
+          return;
+        }
+        button.innerHTML = `
+          <span class="release-launch-copy-feedback-label">${escHtml(label)}</span>
+          <span class="release-launch-copy-feedback-check" aria-hidden="true">✓</span>
+        `;
+      }
+
+      function isCopyFeedbackActive(button){
+        return !!(button && button.dataset && button.dataset.copyFeedbackActive === 'true');
+      }
+
+      function clearCopyFeedbackTimer(button){
+        const key = String(button && button.id || '').trim();
+        if(!key) return;
+        const timerId = appState.copyFeedbackTimers[key];
+        if(timerId){
+          clearTimeout(timerId);
+          delete appState.copyFeedbackTimers[key];
+        }
+      }
+
+      function finishCopyFeedback(button){
+        if(!button) return;
+        clearCopyFeedbackTimer(button);
+        delete button.dataset.copyFeedbackActive;
+        button.classList.remove('is-success');
+        renderCopyFeedbackButtonMarkup(button, false);
+      }
+
+      function scheduleCopyFeedback(button){
+        if(!button) return;
+        ensureCopyFeedbackButtonMarkup(button);
+        finishCopyFeedback(button);
+        button.dataset.copyFeedbackActive = 'true';
+        button.classList.add('is-success');
+        renderCopyFeedbackButtonMarkup(button, true);
+        const key = String(button.id || '').trim();
+        if(key){
+          appState.copyFeedbackTimers[key] = window.setTimeout(() => {
+            finishCopyFeedback(button);
+            refreshButtons();
+          }, 2000);
+        }
       }
 
       function isRunModeSupported(mode){
@@ -1011,7 +1480,7 @@
       function normalizeMajorView(view){
         const value = String(view || '').trim().toLowerCase();
         if(value === 'message' || value === 'push') return 'collection';
-        return ['collection', 'release', 'editor'].includes(value) ? value : '';
+        return ['collection', 'ping', 'release', 'editor'].includes(value) ? value : '';
       }
 
       function getMajorPingText(){
@@ -1060,6 +1529,7 @@
 
         if(majorReleaseEmptyState) majorReleaseEmptyState.style.display = isMajor && !majorView ? '' : 'none';
         if(majorCollectionSection) majorCollectionSection.style.display = isMajor && majorView === 'collection' ? '' : 'none';
+        if(majorDutyPingSection) majorDutyPingSection.style.display = isMajor && majorView === 'ping' ? '' : 'none';
         if(majorReleaseSection) majorReleaseSection.style.display = isMajor && majorView === 'release' ? '' : 'none';
         if(majorEditorSection) majorEditorSection.style.display = isMajor && majorView === 'editor' ? '' : 'none';
       }
@@ -1079,6 +1549,9 @@
         syncMajorViewState();
         if(value === 'release' && prevView !== 'release'){
           initMajorPushTab();
+        }
+        if(value === 'ping' && prevView !== 'ping'){
+          syncDutyPingControls();
         }
         if(value === 'editor' && prevView !== 'editor'){
           ensureDutyEditorLoaded().catch((err) => {
@@ -3396,11 +3869,7 @@
           const url = new URL(ALLURE_TESTPLAN_LEAF_URL);
           url.searchParams.set('page', String(page));
 
-          const data = await httpJson(url.toString(), {
-            method: 'GET',
-            headers: allureHeaders(),
-            signal
-          });
+          const data = await proxyRequestJson('GET', url.toString(), allureHeaders(), undefined, signal);
 
           allNames.push(...parseStreamsFromLeafJson(data));
 
@@ -5985,7 +6454,7 @@
         throw new Error('Не удалось найти pinned-сообщение с NAPI-хостами.');
       }
 
-      async function fetchBandMessagesSince(sinceMs, cfg, signal){
+      async function fetchBandPostsSince(sinceMs, cfg, signal){
         const channel = String(cfg.bandChannelId || '').trim();
         if(!channel) throw new Error('Заполни Канал SWAT QA');
 
@@ -5998,7 +6467,7 @@
         const payload = unwrapBandPostsPayload(data);
         const rawPosts = collectBandPosts(payload);
 
-        const messages = [];
+        const posts = [];
 
         for(const post of rawPosts){
           const deletedAt = post && Number(post.delete_at);
@@ -6006,10 +6475,18 @@
           const created = post && Number(post.create_at);
           if(Number.isFinite(created) && created < sinceMs) continue;
           const msg = post && typeof post.message === 'string' ? post.message.trim() : '';
-          if(msg) messages.push(msg);
+          if(msg) posts.push(post);
         }
 
-        return messages;
+        posts.sort((a, b) => (Number(a && a.create_at) || 0) - (Number(b && b.create_at) || 0));
+        return posts;
+      }
+
+      async function fetchBandMessagesSince(sinceMs, cfg, signal){
+        const posts = await fetchBandPostsSince(sinceMs, cfg, signal);
+        return posts
+          .map((post) => String(post && post.message || '').trim())
+          .filter(Boolean);
       }
 
       function toHandle(value){
@@ -6043,7 +6520,7 @@
         return best || '';
       }
 
-      function parseDuties(messages, allStreams, streamAliases){
+      function parseDuties(postsOrMessages, allStreams, streamAliases){
         const duties = {};
         const streamNorm2Canonical = buildStreamNorm2Canonical(allStreams, streamAliases);
         const coreTargets = getCoreDutyTargets(allStreams);
@@ -6052,13 +6529,58 @@
         let otBlocks = 0;
         let headerBlocks = 0;
         let inlineBlocks = 0;
+        const entries = (Array.isArray(postsOrMessages) ? postsOrMessages : [])
+          .map((item) => {
+            if(item && typeof item === 'object' && !Array.isArray(item)){
+              const message = typeof item.message === 'string' ? item.message : '';
+              if(!message.trim()) return null;
+              return {
+                message,
+                postId: String(item.id || '').trim(),
+                createdAt: Number(item.create_at) || 0
+              };
+            }
+
+            const message = String(item || '').trim();
+            if(!message) return null;
+            return {
+              message,
+              postId: '',
+              createdAt: 0
+            };
+          })
+          .filter(Boolean);
 
         const ensureRow = (streamName) => {
-          if(!duties[streamName]) duties[streamName] = { Android: '', iOS: '' };
+          if(!duties[streamName]){
+            duties[streamName] = {
+              Android: '',
+              iOS: '',
+              _meta: {
+                post_id: '',
+                Android_post_id: '',
+                iOS_post_id: '',
+                create_at: -1
+              }
+            };
+          }
           return duties[streamName];
         };
 
-        for(const msg of messages){
+        const touchPostMeta = (row, postId, createdAt) => {
+          if(!row || !row._meta || !postId) return;
+          const created = Number(createdAt);
+          const current = Number(row._meta.create_at);
+          if(created >= (Number.isFinite(current) ? current : -1)){
+            row._meta.create_at = Number.isFinite(created) ? created : -1;
+            row._meta.post_id = postId;
+          }
+        };
+
+        for(const entry of entries){
+          const msg = entry.message;
+          const postId = entry.postId;
+          const createdAt = entry.createdAt;
           for(const m of msg.matchAll(RE_BLOCK_QUOTED)){
             quotedBlocks += 1;
             const streamRaw = String(m[1] || '').trim();
@@ -6075,15 +6597,24 @@
             }
 
             if(ma && androidStreamName){
-              ensureRow(androidStreamName).Android = toHandle(ma[1]);
+              const row = ensureRow(androidStreamName);
+              row.Android = toHandle(ma[1]);
+              if(postId) row._meta.Android_post_id = postId;
             }
             if(mi && iosStreamName){
-              ensureRow(iosStreamName).iOS = toHandle(mi[1]);
+              const row = ensureRow(iosStreamName);
+              row.iOS = toHandle(mi[1]);
+              if(postId) row._meta.iOS_post_id = postId;
             }
+            if(androidStreamName) touchPostMeta(ensureRow(androidStreamName), postId, createdAt);
+            if(iosStreamName && iosStreamName !== androidStreamName) touchPostMeta(ensureRow(iosStreamName), postId, createdAt);
           }
         }
 
-        for(const msg of messages){
+        for(const entry of entries){
+          const msg = entry.message;
+          const postId = entry.postId;
+          const createdAt = entry.createdAt;
           for(const m of msg.matchAll(RE_BLOCK_OT)){
             otBlocks += 1;
             const streamRaw = String(m[1] || '').trim();
@@ -6101,16 +6632,27 @@
 
             if(ma && androidStreamName){
               const row = ensureRow(androidStreamName);
-              if(!row.Android) row.Android = toHandle(ma[1]);
+              if(!row.Android){
+                row.Android = toHandle(ma[1]);
+                if(postId) row._meta.Android_post_id = postId;
+              }
             }
             if(mi && iosStreamName){
               const row = ensureRow(iosStreamName);
-              if(!row.iOS) row.iOS = toHandle(mi[1]);
+              if(!row.iOS){
+                row.iOS = toHandle(mi[1]);
+                if(postId) row._meta.iOS_post_id = postId;
+              }
             }
+            if(androidStreamName) touchPostMeta(ensureRow(androidStreamName), postId, createdAt);
+            if(iosStreamName && iosStreamName !== androidStreamName) touchPostMeta(ensureRow(iosStreamName), postId, createdAt);
           }
         }
 
-        for(const msg of messages){
+        for(const entry of entries){
+          const msg = entry.message;
+          const postId = entry.postId;
+          const createdAt = entry.createdAt;
           for(const m of msg.matchAll(RE_BLOCK_HEADER)){
             headerBlocks += 1;
             const header = String(m[1] || '').trim();
@@ -6128,16 +6670,27 @@
 
             if(ma && androidStreamName){
               const row = ensureRow(androidStreamName);
-              if(!row.Android) row.Android = toHandle(ma[1]);
+              if(!row.Android){
+                row.Android = toHandle(ma[1]);
+                if(postId) row._meta.Android_post_id = postId;
+              }
             }
             if(mi && iosStreamName){
               const row = ensureRow(iosStreamName);
-              if(!row.iOS) row.iOS = toHandle(mi[1]);
+              if(!row.iOS){
+                row.iOS = toHandle(mi[1]);
+                if(postId) row._meta.iOS_post_id = postId;
+              }
             }
+            if(androidStreamName) touchPostMeta(ensureRow(androidStreamName), postId, createdAt);
+            if(iosStreamName && iosStreamName !== androidStreamName) touchPostMeta(ensureRow(iosStreamName), postId, createdAt);
           }
         }
 
-        for(const msg of messages){
+        for(const entry of entries){
+          const msg = entry.message;
+          const postId = entry.postId;
+          const createdAt = entry.createdAt;
           for(const m of msg.matchAll(RE_INLINE_FREE)){
             inlineBlocks += 1;
             const rawName = String(m[1] || '').replace(/\s+/g, ' ').trim();
@@ -6162,7 +6715,11 @@
               continue;
             }
             const row = ensureRow(streamName);
-            if(platform) row[platform] = person;
+            if(platform){
+              row[platform] = person;
+              if(postId) row._meta[`${platform}_post_id`] = postId;
+            }
+            touchPostMeta(row, postId, createdAt);
           }
         }
 
@@ -6294,6 +6851,136 @@
           '[Android]',
           ...androidLines
         ].join('\n').trim();
+      }
+
+      function buildDutyThreadUrl(postId){
+        const value = String(postId || '').trim();
+        return value ? `${BAND_THREAD_URL_BASE}${encodeURIComponent(value)}` : '';
+      }
+
+      function buildDutyThreadBullet(display, url, indent){
+        const prefix = '    '.repeat(Math.max(0, Number(indent) || 0));
+        const tail = url ? `[тред](${url})` : 'тред';
+        return `${prefix}*   ${display} - ${tail}`;
+      }
+
+      function buildCurrentDutyThreadsCopyText(duties, streams, grouping){
+        const dutiesMap = duties && typeof duties === 'object' && !Array.isArray(duties) ? duties : {};
+        const groupingMap = grouping && typeof grouping === 'object' && !Array.isArray(grouping) ? grouping : {};
+        const streamList = Array.isArray(streams)
+          ? streams.map((item) => String(item || '').trim()).filter(Boolean)
+          : [];
+        const excludedItems = Array.isArray(groupingMap.Excluded) ? groupingMap.Excluded : [];
+        const excludedNorm = new Set();
+        const excludedLoose = new Set();
+
+        for(const item of excludedItems){
+          const value = String(item || '').trim();
+          if(!value) continue;
+          excludedNorm.add(norm(value));
+          excludedLoose.add(normCompact(value));
+        }
+
+        const isExcluded = (name) => {
+          const value = String(name || '').trim();
+          if(!value) return false;
+          return excludedNorm.has(norm(value)) || excludedLoose.has(normCompact(value));
+        };
+
+        const filteredStreams = streamList.filter((stream) => !isExcluded(stream));
+        const byNorm = {};
+        const byLoose = {};
+
+        for(const stream of filteredStreams){
+          const valueNorm = norm(stream);
+          const valueLoose = normCompact(stream);
+          if(valueNorm) byNorm[valueNorm] = stream;
+          if(valueLoose && !byLoose[valueLoose]) byLoose[valueLoose] = stream;
+        }
+
+        const resolveStreamName = (name) => {
+          const value = String(name || '').trim();
+          if(!value) return '';
+          return byNorm[norm(value)] || byLoose[normCompact(value)] || '';
+        };
+
+        const dutyUrlByStream = (streamName, platform) => {
+          const row = dutiesMap[streamName];
+          const meta = row && row._meta && typeof row._meta === 'object' ? row._meta : {};
+          let postId = platform ? meta[`${platform}_post_id`] : meta.post_id;
+          if(!postId && platform){
+            postId = meta.post_id;
+          }
+          return buildDutyThreadUrl(postId);
+        };
+
+        const lines = [];
+        const coveredStreamNorms = new Set();
+        let firstGroup = true;
+
+        for(const [groupNameRaw, items] of Object.entries(groupingMap)){
+          const groupName = String(groupNameRaw || '').trim();
+          if(!groupName || groupName === 'Excluded') continue;
+
+          if(!firstGroup){
+            lines.push('');
+          }
+          firstGroup = false;
+
+          lines.push(`*   ${groupName}:`);
+          for(const itemRaw of Array.isArray(items) ? items : []){
+            const item = String(itemRaw || '').trim();
+            if(!item || isExcluded(item)) continue;
+
+            const itemNorm = norm(item);
+            if(itemNorm === 'android' || itemNorm === 'ios'){
+              const baseStream = resolveStreamName(groupName);
+              if(baseStream && !isExcluded(baseStream)){
+                const platform = itemNorm === 'ios' ? 'iOS' : 'Android';
+                coveredStreamNorms.add(norm(baseStream));
+                lines.push(buildDutyThreadBullet(item, dutyUrlByStream(baseStream, platform), 1));
+                continue;
+              }
+            }
+
+            const streamName = resolveStreamName(item);
+            if(streamName && !isExcluded(streamName)){
+              coveredStreamNorms.add(norm(streamName));
+              lines.push(buildDutyThreadBullet(item, dutyUrlByStream(streamName, ''), 1));
+            }else{
+              lines.push(buildDutyThreadBullet(item, '', 1));
+            }
+          }
+        }
+
+        const leftovers = filteredStreams.filter((stream) => !coveredStreamNorms.has(norm(stream)) && !isExcluded(stream));
+        if(leftovers.length){
+          if(lines.length){
+            lines.push('');
+          }
+          for(const stream of leftovers){
+            lines.push(buildDutyThreadBullet(stream, dutyUrlByStream(stream, ''), 0));
+          }
+        }
+
+        if(!lines.length){
+          lines.push('Нет данных для формирования треда (не найдены стримы в Allure или посты с дежурными в Band).');
+        }
+
+        return lines.join('\n');
+      }
+
+      async function getCurrentDutyThreadGrouping(signal){
+        if(appState.dutyEditorLoaded && appState.dutyEditorData){
+          try{
+            return convertDutyEditorEntriesToMap(getDutyEditorEntries('streams'), 'streams');
+          }catch(err){
+            console.warn('Failed to use local duty editor streams for thread copy', err);
+          }
+        }
+
+        const data = await fetchDutyEditorData(signal);
+        return normalizeStreamGroupsData((data && data.streamsTree) || {});
       }
 
       function extractHandles(duties){
@@ -6623,19 +7310,33 @@
         return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       }
 
-      async function bandFetchThreadPosts(rootPostId, cfg, signal){
+      async function bandFetchThreadPostsExtended(rootPostId, cfg, signal, options){
         const rootId = String(rootPostId || '').trim();
         if(!rootId) throw new Error('Не задан root id треда.');
-        const url = `https://band.wb.ru/api/v4/posts/${encodeURIComponent(rootId)}/thread?skipFetchThreads=false&collapsedThreads=true&collapsedThreadsExtended=false&direction=down&perPage=60`;
+        const opts = options && typeof options === 'object' ? options : {};
+        const url = new URL(`https://band.wb.ru/api/v4/posts/${encodeURIComponent(rootId)}/thread`);
+        url.searchParams.set('skipFetchThreads', 'false');
+        url.searchParams.set('collapsedThreads', 'true');
+        url.searchParams.set('collapsedThreadsExtended', 'false');
+        url.searchParams.set('direction', String(opts.direction || 'down'));
+        url.searchParams.set('perPage', String(Math.max(1, Math.min(200, Number(opts.perPage) || 60))));
+        if(opts.updatesOnly) url.searchParams.set('updatesOnly', 'true');
+        if(Number.isFinite(Number(opts.fromUpdateAt))){
+          url.searchParams.set('fromUpdateAt', String(Number(opts.fromUpdateAt)));
+        }
         const headers = {
           'Accept': 'application/json',
           'Accept-Language': 'ru',
           'X-Requested-With': 'XMLHttpRequest',
           [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
         };
-        const data = await proxyRequestJson('GET', url, headers, undefined, signal);
+        const data = await proxyRequestJson('GET', url.toString(), headers, undefined, signal);
         const payload = unwrapBandPostsPayload(data);
-        return collectBandPosts(payload);
+        return collectBandPosts(payload).sort((a, b) => getBandPostCreateAt(a) - getBandPostCreateAt(b));
+      }
+
+      async function bandFetchThreadPosts(rootPostId, cfg, signal){
+        return bandFetchThreadPostsExtended(rootPostId, cfg, signal, { perPage: 60 });
       }
 
       async function bandFetchChannelPostsSince(channelId, sinceMs, cfg, signal){
@@ -6957,6 +7658,1275 @@
         const rootPost = scoredCandidates[0] ? scoredCandidates[0].rootPost : candidates[0];
         if(rootPost) saveMajorPushRootAnchor(platform, release, String(rootPost.id || '').trim());
         return rootPost;
+      }
+
+      function getDutyPingTimeFromMs(ms){
+        const parts = getMskParts(ms);
+        return `${two(parts.hours)}:${two(parts.minutes)}`;
+      }
+
+      function buildDutyPingEtaFromMinutes(baseMs, minutes){
+        return getDutyPingTimeFromMs(Number(baseMs) + Math.max(0, Number(minutes) || 0) * 60 * 1000);
+      }
+
+      function dutyPingWordValue(word){
+        const key = String(word || '').trim().toLocaleLowerCase('ru-RU');
+        return Object.prototype.hasOwnProperty.call(DUTY_PING_NUM_WORDS, key) ? DUTY_PING_NUM_WORDS[key] : null;
+      }
+
+      function parseDutyPingMinutesLikeText(text){
+        const source = String(text || '').trim().toLocaleLowerCase('ru-RU');
+        if(!source) return null;
+
+        if(DUTY_PING_THROUGH_HOUR_RE.test(source)) return 60;
+        if(DUTY_PING_HALF_HOUR_WORD_RE.test(source)) return 30;
+        if(DUTY_PING_ONE_AND_HALF_WORD_RE.test(source)) return 90;
+        if(DUTY_PING_HOUR_MAYBE_ONE_AND_HALF_RE.test(source)) return 90;
+        if(DUTY_PING_ONE_HOUR_APPROX_RE.test(source)) return 60;
+        if(DUTY_PING_WITHIN_ONE_HOUR_RE.test(source)) return 60;
+        if(DUTY_PING_ONE_HOUR_FUZZY_RE.test(source)) return 60;
+        if(DUTY_PING_ONE_HOUR_PLAIN_RE.test(source)) return 60;
+
+        let match = source.match(DUTY_PING_WITHIN_WORD_HOURS_RE);
+        if(match){
+          const value = dutyPingWordValue(match[1]);
+          if(value != null) return Math.round(value * 60);
+        }
+
+        match = source.match(DUTY_PING_WITHIN_HOURS_RE);
+        if(match){
+          return Math.round(parseFloat(String(match[1]).replace(',', '.')) * 60);
+        }
+
+        match = source.match(DUTY_PING_WORD_HOURS_RE);
+        if(match){
+          const value = dutyPingWordValue(match[1]);
+          if(value != null) return Math.round(value * 60);
+        }
+
+        match = source.match(DUTY_PING_WORD_HOURS_REV_RE);
+        if(match){
+          const value = dutyPingWordValue(match[1]);
+          if(value != null) return Math.round(value * 60);
+        }
+
+        match = source.match(DUTY_PING_WORD_MIN_RE);
+        if(match){
+          const value = dutyPingWordValue(match[1]);
+          if(value != null) return Math.round(value);
+        }
+
+        match = source.match(DUTY_PING_WORD_MIN_REV_RE);
+        if(match){
+          const value = dutyPingWordValue(match[1]);
+          if(value != null) return Math.round(value);
+        }
+
+        match = source.match(DUTY_PING_H_SHORT_RE);
+        if(match){
+          return Math.round(parseFloat(String(match[1]).replace(',', '.')) * 60);
+        }
+
+        match = source.match(DUTY_PING_M_SHORT_RE);
+        if(match){
+          return Number(match[1]);
+        }
+
+        match = source.match(DUTY_PING_HOURS_RE);
+        if(match){
+          return Math.round(parseFloat(String(match[1]).replace(',', '.')) * 60);
+        }
+
+        match = source.match(DUTY_PING_HOURS_REV_RE);
+        if(match){
+          return Math.round(parseFloat(String(match[1]).replace(',', '.')) * 60);
+        }
+
+        match = source.match(DUTY_PING_RANGE_HOURS_RE);
+        if(match){
+          const left = parseFloat(String(match[1]).replace(',', '.'));
+          const right = parseFloat(String(match[2]).replace(',', '.'));
+          return Math.round(Math.max(left, right) * 60);
+        }
+
+        match = source.match(DUTY_PING_RANGE_MIN_SUFFIX_RE);
+        if(match){
+          return Math.max(Number(match[1]), Number(match[2]));
+        }
+
+        match = source.match(DUTY_PING_RANGE_MIN_PREFIX_RE);
+        if(match){
+          return Math.max(Number(match[1]), Number(match[2]));
+        }
+
+        match = source.match(DUTY_PING_RANGE_NUMBERS_CONTEXT_MIN_RE);
+        if(match && /\b(?:минут(?:ок|ак)?|мин|m|м)\b/iu.test(source)){
+          return Math.max(Number(match[1]), Number(match[2]));
+        }
+
+        match = source.match(DUTY_PING_MIN_PREFIX_RE);
+        if(match){
+          const value = Number(match[1]);
+          if(value >= 1 && value <= 24 * 60) return value;
+        }
+
+        match = source.match(DUTY_PING_MIN_SUFFIX_RE);
+        if(match){
+          const value = Number(match[1]);
+          if(value >= 1 && value <= 24 * 60) return value;
+        }
+
+        match = source.match(/^\s*(\d{1,3})\s*[!?.,…]?\s*$/u);
+        if(match){
+          const value = Number(match[1]);
+          if(value >= 1 && value <= 24 * 60) return value;
+        }
+
+        return null;
+      }
+
+      function parseDutyPingReplyEta(text, baseMs){
+        const source = String(text || '').trim().toLocaleLowerCase('ru-RU');
+        if(!source) return null;
+
+        const relativeMinutes = parseDutyPingMinutesLikeText(source);
+        if(relativeMinutes != null){
+          return buildDutyPingEtaFromMinutes(baseMs, Math.max(0, Math.min(relativeMinutes, 24 * 60)));
+        }
+
+        const base = Number(baseMs);
+        if(!Number.isFinite(base)) return null;
+        const baseParts = getMskParts(base);
+
+        let match = source.match(DUTY_PING_TIME_HHMM_RE);
+        if(match){
+          let etaMs = Date.UTC(baseParts.year, baseParts.month - 1, baseParts.day, Number(match[1]), Number(match[2]), 0, 0) - MSK_OFFSET_MS;
+          if(etaMs < base - 10 * 60 * 1000) etaMs += 24 * 60 * 60 * 1000;
+          return getDutyPingTimeFromMs(etaMs);
+        }
+
+        match = source.match(DUTY_PING_TIME_TO_RE);
+        if(match){
+          let etaMs = Date.UTC(baseParts.year, baseParts.month - 1, baseParts.day, Number(match[1]), Number(match[2] || 0), 0, 0) - MSK_OFFSET_MS;
+          if(etaMs < base - 10 * 60 * 1000) etaMs += 24 * 60 * 60 * 1000;
+          return getDutyPingTimeFromMs(etaMs);
+        }
+
+        match = source.match(DUTY_PING_TIME_H_ONLY_RE);
+        if(match){
+          let etaMs = Date.UTC(baseParts.year, baseParts.month - 1, baseParts.day, Number(match[1]), 0, 0, 0) - MSK_OFFSET_MS;
+          if(etaMs < base - 10 * 60 * 1000) etaMs += 24 * 60 * 60 * 1000;
+          return getDutyPingTimeFromMs(etaMs);
+        }
+
+        return null;
+      }
+
+      function extractDutyPingReplyStreams(text, allowedStreams, streamNorm2Canonical){
+        const allowed = Array.isArray(allowedStreams) ? allowedStreams.filter(Boolean) : [];
+        if(!allowed.length) return [];
+        const allowedSet = new Set(allowed);
+        const candidates = [];
+
+        for(const rawLine of String(text || '').split(/\r?\n/)){
+          const line = String(rawLine || '').trim().replace(/\s+/g, ' ');
+          if(!line) continue;
+
+          for(const match of line.matchAll(DUTY_PING_REPLY_QUOTED_STREAM_RE)){
+            const quoted = String(match[1] || '').trim().replace(/\s+/g, ' ');
+            if(quoted) candidates.push(quoted);
+          }
+
+          const prefixSep = line.split(DUTY_PING_REPLY_STREAM_SPLIT_RE, 1)[0].trim();
+          if(prefixSep && prefixSep !== line){
+            candidates.push(prefixSep);
+          }
+
+          const boundaryMatch = line.match(DUTY_PING_REPLY_TIME_BOUNDARY_RE);
+          if(boundaryMatch && Number.isFinite(boundaryMatch.index)){
+            const prefixTime = line.slice(0, boundaryMatch.index).trim().replace(/[-—:–|,.;\s]+$/u, '');
+            if(prefixTime && prefixTime !== line){
+              candidates.push(prefixTime);
+            }
+          }
+        }
+
+        const resolved = [];
+        const seen = new Set();
+        for(const candidate of candidates){
+          const matched = matchStream(candidate, streamNorm2Canonical);
+          if(!matched || !allowedSet.has(matched) || seen.has(matched)) continue;
+          seen.add(matched);
+          resolved.push(matched);
+        }
+        return resolved;
+      }
+
+      function lineWithDutyPingStatus(baseLine, status){
+        let line = String(baseLine || '').trimEnd();
+        line = line.replace(/\s*:green_verify:\s*/giu, ' ');
+        line = line.replace(/\s*:verified:\s*/giu, ' ');
+        line = line.replace(/\s*:multi-search:\s*/giu, ' ');
+        line = line.replace(/\s*:spiral_calendar_pad:\s*\d{1,2}\s*[:.]\s*\d{2}\s*/giu, ' ');
+        line = line.replace(/\s*:spiral_calendar_pad:\s*/giu, ' ');
+        line = line.replace(/\s+/gu, ' ').trim();
+        return status ? `${line}   ${status}`.trimEnd() : line;
+      }
+
+      function matchDutyPingStreamFromLine(line, streamsSorted){
+        let value = String(line || '').trimStart();
+        value = value.replace(/^[-–—•*✅☑️🟩🟢]+\s*/u, '');
+        for(const stream of Array.isArray(streamsSorted) ? streamsSorted : []){
+          if(!value.startsWith(stream)) continue;
+          const rest = value.slice(stream.length);
+          if(!rest || /\s|[-–—:]/u.test(rest[0])) return stream;
+        }
+        return '';
+      }
+
+      function resolveDutyPingUserStreams(username, streamOrder, usernameToStreams, streamToHandle){
+        const userKey = String(username || '').trim().toLocaleLowerCase('ru-RU');
+        if(!userKey) return [];
+
+        const resolved = [];
+        const seen = new Set();
+        const direct = Array.isArray(usernameToStreams && usernameToStreams[userKey]) ? usernameToStreams[userKey] : [];
+        for(const stream of direct){
+          if(Array.isArray(streamOrder) && streamOrder.includes(stream) && !seen.has(stream)){
+            seen.add(stream);
+            resolved.push(stream);
+          }
+        }
+        if(resolved.length) return resolved;
+
+        for(const stream of Array.isArray(streamOrder) ? streamOrder : []){
+          const handle = String(streamToHandle && streamToHandle[stream] || '').replace(/^@+/, '').trim().toLocaleLowerCase('ru-RU');
+          if(handle && handle !== '?' && handle === userKey && !seen.has(stream)){
+            seen.add(stream);
+            resolved.push(stream);
+          }
+        }
+
+        return resolved;
+      }
+
+      function buildDutyPingMessage(platformLabel, streamOrder, streamToHandle, streamToStatus){
+        const lines = [
+          `Коллеги, просьба написать сроки проставления оков по платформе ${platformLabel}`,
+          ''
+        ];
+        for(const stream of Array.isArray(streamOrder) ? streamOrder : []){
+          const handle = String(streamToHandle && streamToHandle[stream] || '?').trim() || '?';
+          const status = streamToStatus && Object.prototype.hasOwnProperty.call(streamToStatus, stream) ? streamToStatus[stream] : null;
+          let line = `${stream} ${handle}`.trimEnd();
+          if(status){
+            line = `${line}   ${status}`;
+          }
+          lines.push(line);
+        }
+        return lines.join('\n').replace(/\s+$/u, '') + '\n';
+      }
+
+      function updateDutyPingMessagePreservingBase(baseMessage, streamOrder, streamToHandle, streamToStatus){
+        const lines = String(baseMessage || '').split(/\r?\n/);
+        const updated = new Set();
+        const streamsSorted = [...(Array.isArray(streamOrder) ? streamOrder : [])].sort((a, b) => String(b).length - String(a).length);
+
+        for(let index = 0; index < lines.length; index += 1){
+          const matchedStream = matchDutyPingStreamFromLine(lines[index], streamsSorted);
+          if(!matchedStream) continue;
+
+          const status = streamToStatus && Object.prototype.hasOwnProperty.call(streamToStatus, matchedStream)
+            ? streamToStatus[matchedStream]
+            : null;
+          if(status == null){
+            updated.add(matchedStream);
+            continue;
+          }
+
+          lines[index] = lineWithDutyPingStatus(lines[index], status);
+          updated.add(matchedStream);
+        }
+
+        const missing = (Array.isArray(streamOrder) ? streamOrder : []).filter((stream) => !updated.has(stream));
+        if(missing.length){
+          if(lines.length && String(lines[lines.length - 1] || '').trim()){
+            lines.push('');
+          }
+          for(const stream of missing){
+            const handle = String(streamToHandle && streamToHandle[stream] || '?').trim() || '?';
+            const status = streamToStatus && Object.prototype.hasOwnProperty.call(streamToStatus, stream)
+              ? streamToStatus[stream]
+              : null;
+            let line = `${stream} ${handle}`.trimEnd();
+            if(status){
+              line = `${line}   ${status}`;
+            }
+            lines.push(line);
+          }
+        }
+
+        return lines.join('\n').replace(/\s+$/u, '') + '\n';
+      }
+
+      function diffDutyPingLines(oldMessage, newMessage){
+        const oldLines = String(oldMessage || '').split(/\r?\n/);
+        const newLines = String(newMessage || '').split(/\r?\n/);
+        const max = Math.max(oldLines.length, newLines.length);
+        const out = [];
+        for(let index = 0; index < max; index += 1){
+          const oldLine = index < oldLines.length ? oldLines[index] : '';
+          const newLine = index < newLines.length ? newLines[index] : '';
+          if(oldLine === newLine) continue;
+          if(oldLine) out.push(`- ${oldLine}`);
+          if(newLine) out.push(`+ ${newLine}`);
+        }
+        return out.join('\n').trim();
+      }
+
+      function findDutyPingRootPostFromFeedPosts(platform, release, feedPosts){
+        const platformTag = normalizeDutyPingPlatform(platform) === 'ios' ? '#ios' : '#android';
+        const releaseNeedle = String(release || '').trim().toLocaleLowerCase('ru-RU');
+        let found = null;
+
+        for(const post of Array.isArray(feedPosts) ? feedPosts : []){
+          if(!isActiveBandRootPost(post)) continue;
+          const message = normalizeBandMessageText(post && post.message);
+          const lowered = message.toLocaleLowerCase('ru-RU');
+          if(!lowered.includes(platformTag) || !lowered.includes('#release') || !lowered.includes(releaseNeedle)) continue;
+          if(!found || getBandPostCreateAt(post) > getBandPostCreateAt(found)){
+            found = post;
+          }
+        }
+
+        return found;
+      }
+
+      async function fetchDutyPingLaunch(platform, release, signal){
+        const platformLabel = getDutyPingPlatformLabel(platform);
+        const targetName = `[ALL][${platformLabel}] Готовность к релизу ${String(release || '').trim()}`;
+        const search = allureB64Query([{ id: 'name', type: 'string', value: targetName }]);
+        const url = `https://allure-testops.wb.ru/api/launch?page=0&size=25&projectId=7&preview=true&sort=createdDate%2Cdesc&search=${encodeURIComponent(search)}`;
+        const data = await proxyRequestJson('GET', url, allureHeaders(), undefined, signal);
+        const launches = data && Array.isArray(data.content) ? data.content : [];
+        return launches[0] || null;
+      }
+
+      async function fetchDutyPingPendingLeafAllPages(launchId, signal, options){
+        const size = Math.max(50, Math.min(200, Number(options && options.size) || 200));
+        const search = allureB64Query([{
+          id: 'progress',
+          type: 'testProgressStatusArray',
+          value: ['pending']
+        }]);
+        const result = new Map();
+        let page = 0;
+        let guard = 0;
+
+        while(true){
+          throwIfAborted(signal);
+          const url = `https://allure-testops.wb.ru/api/testresulttree/leaf?launchId=${encodeURIComponent(String(launchId))}&search=${encodeURIComponent(search)}&sort=name%2Casc&size=${size}&page=${page}`;
+          const data = await proxyRequestJson('GET', url, allureHeaders(), undefined, signal);
+          const content = data && Array.isArray(data.content) ? data.content : [];
+
+          for(const item of content){
+            const id = String(item && item.id || '').trim();
+            const name = String(item && item.name || '').trim();
+            if(id && name) result.set(id, name);
+          }
+
+          const totalPages = Number.isInteger(data && data.totalPages) ? data.totalPages : null;
+          const last = data && data.last === true;
+          if(last) break;
+          if(totalPages != null && page >= totalPages - 1) break;
+          if(!content.length) break;
+
+          page += 1;
+          guard += 1;
+          if(guard > 100) break;
+        }
+
+        return result;
+      }
+
+      async function dutyPingTestResultExistsInLaunch(testResultId, launchId, signal){
+        const url = `https://allure-testops.wb.ru/api/testresult/${encodeURIComponent(String(testResultId || ''))}`;
+        try{
+          const data = await proxyRequestJson('GET', url, allureHeaders(), undefined, signal);
+          const currentLaunchId = data && (data.launchId || data.launch_id);
+          if(currentLaunchId == null) return true;
+          return String(currentLaunchId) === String(launchId);
+        }catch(error){
+          if(isAbortError(error)) throw error;
+          if(Number(error && error.status) === 404) return false;
+          return true;
+        }
+      }
+
+      async function fetchBandChannelUsers(channelId, cfg, signal, options){
+        const channel = String(channelId || '').trim();
+        if(!channel) throw new Error('Не задан канал Band для чтения пользователей.');
+        const pageLimit = Math.max(1, Math.min(20, Number(options && options.pageLimit) || 6));
+        const perPage = Math.max(1, Math.min(200, Number(options && options.perPage) || 200));
+        const headers = {
+          'Accept': 'application/json',
+          'Accept-Language': 'ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          [PROXY_COOKIE_HEADER]: String(cfg.bandCookiesRead || '')
+        };
+        const result = {};
+
+        for(let page = 0; page < pageLimit; page += 1){
+          throwIfAborted(signal);
+          const url = new URL('https://band.wb.ru/api/v4/users');
+          url.searchParams.set('in_channel', channel);
+          url.searchParams.set('page', String(page));
+          url.searchParams.set('per_page', String(perPage));
+          url.searchParams.set('sort', 'admin');
+          const data = await proxyRequestJson('GET', url.toString(), headers, undefined, signal);
+          if(!Array.isArray(data) || !data.length) break;
+
+          for(const user of data){
+            const id = String(user && user.id || '').trim();
+            const username = String(user && user.username || '').trim();
+            if(id && username) result[id] = username;
+          }
+
+          if(data.length < perPage) break;
+        }
+
+        return result;
+      }
+
+      function addDutyPingUsernameStream(usernameToStreams, handle, stream){
+        const login = String(handle || '').replace(/^@+/, '').trim().toLocaleLowerCase('ru-RU');
+        if(!login || login === '?') return;
+        if(!Array.isArray(usernameToStreams[login])){
+          usernameToStreams[login] = [];
+        }
+        if(!usernameToStreams[login].includes(stream)){
+          usernameToStreams[login].push(stream);
+        }
+      }
+
+      function ensureDutyPingTrackedStream(runtime, stream, testResultId){
+        const streamName = String(stream || '').trim();
+        const resultId = String(testResultId || '').trim();
+        if(!streamName) return;
+
+        if(!Array.isArray(runtime.streamToIds[streamName])){
+          runtime.streamToIds[streamName] = [];
+        }
+        if(resultId && !runtime.streamToIds[streamName].includes(resultId)){
+          runtime.streamToIds[streamName].push(resultId);
+        }
+        if(!runtime.streamOrder.includes(streamName)){
+          runtime.streamOrder.push(streamName);
+        }
+        if(!Object.prototype.hasOwnProperty.call(runtime.streamVerified, streamName)){
+          runtime.streamVerified[streamName] = false;
+        }
+        if(!Object.prototype.hasOwnProperty.call(runtime.streamToHandle, streamName)){
+          const row = runtime.duties && runtime.duties[streamName];
+          const handle = String(row && row[runtime.platformLabel] || '?').trim() || '?';
+          runtime.streamToHandle[streamName] = handle;
+          addDutyPingUsernameStream(runtime.usernameToStreams, handle, streamName);
+        }
+        if(resultId){
+          runtime.idToStream[resultId] = streamName;
+        }
+      }
+
+      function removeDutyPingTrackedStream(runtime, stream){
+        const streamName = String(stream || '').trim();
+        if(!streamName) return;
+        delete runtime.streamToIds[streamName];
+        delete runtime.streamVerified[streamName];
+        delete runtime.streamEta[streamName];
+        delete runtime.streamToHandle[streamName];
+        runtime.streamOrder = runtime.streamOrder.filter((item) => item !== streamName);
+        for(const [login, streams] of Object.entries(runtime.usernameToStreams)){
+          const next = (Array.isArray(streams) ? streams : []).filter((item) => item !== streamName);
+          if(next.length) runtime.usernameToStreams[login] = next;
+          else delete runtime.usernameToStreams[login];
+        }
+      }
+
+      function findDutyPingBasePost(threadPosts, rootId, myUserId, platformLabel){
+        const list = Array.isArray(threadPosts) ? threadPosts : [];
+        const root = String(rootId || '').trim();
+        const userId = String(myUserId || '').trim();
+        const platformNeedle = String(platformLabel || '').toLocaleLowerCase('ru-RU');
+        let found = null;
+
+        for(const post of list){
+          if(!post || typeof post !== 'object') continue;
+          if(String(post.root_id || '').trim() !== root) continue;
+          if(userId && String(post.user_id || '').trim() !== userId) continue;
+          const message = String(post.message || '');
+          const lowered = message.toLocaleLowerCase('ru-RU');
+          if(!lowered.includes('просьба написать сроки') || !lowered.includes(platformNeedle)) continue;
+          if(!found || getBandPostCreateAt(post) > getBandPostCreateAt(found)){
+            found = post;
+          }
+        }
+
+        return found;
+      }
+
+      async function findExistingDutyPingPost(platform, sharedContext, signal){
+        const platformKey = normalizeDutyPingPlatform(platform);
+        const rootPost = sharedContext && sharedContext.rootPosts ? sharedContext.rootPosts[platformKey] : null;
+        if(!rootPost) return null;
+        const cfg = sharedContext && sharedContext.cfg;
+        const rootId = String(rootPost && rootPost.id || '').trim();
+        if(!rootId) return null;
+        const myUserId = getCurrentBandUserId(cfg);
+        const threadPosts = await bandFetchThreadPostsExtended(rootId, cfg, signal, {
+          perPage: 200,
+          updatesOnly: true,
+          fromUpdateAt: DUTY_PING_THREAD_FROM_UPDATE_AT
+        });
+        return findDutyPingBasePost(threadPosts, rootId, myUserId, getDutyPingPlatformLabel(platformKey));
+      }
+
+      async function buildDutyPingPreviewDraft(platform, sharedContext, signal){
+        const platformKey = normalizeDutyPingPlatform(platform);
+        const platformLabel = getDutyPingPlatformLabel(platformKey);
+        appendDutyPingLog(platformKey, '[Шаг 1/5] Ищу запуск в Allure...');
+        const launch = await fetchDutyPingLaunch(platformKey, sharedContext.release, signal);
+        if(!launch){
+          throw new Error(`Не найден запуск [ALL][${platformLabel}] Готовность к релизу ${sharedContext.release}`);
+        }
+        const launchId = String(launch.id || '').trim();
+        appendDutyPingLog(platformKey, `launchId: ${launchId}`, 'ok');
+
+        appendDutyPingLog(platformKey, '[Шаг 2/5] Получаю pending кейсы...');
+        const pendingMap = await fetchDutyPingPendingLeafAllPages(launchId, signal, { size: 200 });
+        appendDutyPingLog(platformKey, `pending кейсов: ${pendingMap.size}`, pendingMap.size ? 'ok' : 'warn');
+        if(!pendingMap.size){
+          return {
+            message: '',
+            launchId,
+            streamOrder: [],
+            streamToHandle: {}
+          };
+        }
+
+        appendDutyPingLog(platformKey, `[Шаг 3/5] Каталог стримов Allure: ${sharedContext.catalogStreams.length}`, 'ok');
+        appendDutyPingLog(platformKey, '[Шаг 4/5] Собираю стримы из pending...');
+        const streamToIds = {};
+        const idToStream = {};
+        const streamOrder = [];
+        const streamToHandle = {};
+
+        for(const [testResultId, rawStreamName] of pendingMap.entries()){
+          const streamName = String(rawStreamName || '').trim();
+          if(!streamName || sharedContext.excludeSet.has(norm(streamName))) continue;
+          if(!Array.isArray(streamToIds[streamName])){
+            streamToIds[streamName] = [];
+            streamOrder.push(streamName);
+            const row = sharedContext.duties && sharedContext.duties[streamName];
+            const handle = String(row && row[platformLabel] || '?').trim() || '?';
+            streamToHandle[streamName] = handle;
+          }
+          streamToIds[streamName].push(testResultId);
+          idToStream[testResultId] = streamName;
+        }
+
+        const sortedStreamOrder = sortComponentDisplayTexts(streamOrder);
+        appendDutyPingLog(platformKey, `Стримов в pending: ${sortedStreamOrder.length}`, sortedStreamOrder.length ? 'ok' : 'warn');
+        if(!sortedStreamOrder.length){
+          return {
+            message: '',
+            launchId,
+            streamOrder: [],
+            streamToHandle: {}
+          };
+        }
+
+        appendDutyPingLog(platformKey, '[Шаг 5/5] Определяю дежурных...');
+        let foundAssignments = 0;
+        for(const stream of sortedStreamOrder){
+          if(String(streamToHandle[stream] || '').trim() && String(streamToHandle[stream] || '').trim() !== '?'){
+            foundAssignments += 1;
+          }
+        }
+        appendDutyPingLog(
+          platformKey,
+          `Дежурные распознаны: ${foundAssignments}/${sortedStreamOrder.length} (${sharedContext.windowInfo.baseMskText})`,
+          foundAssignments ? 'ok' : 'warn'
+        );
+
+        const rootPost = sharedContext.rootPosts[platformKey];
+        if(!rootPost){
+          throw new Error(`Не найден root-тред релиза по ${platformLabel} #Release ${sharedContext.release}`);
+        }
+        appendDutyPingLog(platformKey, `root_id: ${String(rootPost.id || '').trim()}`, 'ok');
+
+        return {
+          message: buildDutyPingMessage(
+            platformLabel,
+            sortedStreamOrder,
+            streamToHandle,
+            Object.fromEntries(sortedStreamOrder.map((stream) => [stream, null]))
+          ),
+          launchId,
+          streamOrder: sortedStreamOrder,
+          streamToHandle
+        };
+      }
+
+      async function ensureDutyPingBasePost(runtime){
+        const initialMessage = buildDutyPingMessage(
+          runtime.platformLabel,
+          runtime.streamOrder,
+          runtime.streamToHandle,
+          Object.fromEntries(runtime.streamOrder.map((stream) => [stream, null]))
+        );
+
+        let threadPosts = [];
+        try{
+          threadPosts = await bandFetchThreadPostsExtended(runtime.rootId, runtime.cfg, runtime.signal, {
+            perPage: 200,
+            updatesOnly: true,
+            fromUpdateAt: DUTY_PING_THREAD_FROM_UPDATE_AT
+          });
+        }catch(error){
+          if(isAbortError(error)) throw error;
+          appendDutyPingLog(runtime.platform, `Не удалось сразу прочитать тред: ${error && error.message ? error.message : error}`, 'warn');
+        }
+
+        const existingPost = findDutyPingBasePost(threadPosts, runtime.rootId, runtime.myUserId, runtime.platformLabel);
+        if(existingPost){
+          runtime.pingPostId = String(existingPost.id || '').trim();
+          runtime.pingCreatedAt = getBandPostCreateAt(existingPost);
+          appendDutyPingLog(runtime.platform, `Найдено существующее сообщение-пинг: ${runtime.pingPostId}`, 'ok');
+          setDutyPingPlatformMessage(runtime.platform, String(existingPost.message || initialMessage));
+          return existingPost;
+        }
+
+        appendDutyPingLog(runtime.platform, `Публикую сообщение-пинг в тред ${runtime.rootId}...`, 'progress');
+        const createdPost = await bandCreatePost(initialMessage, runtime.cfg, runtime.signal, {
+          channelId: RELEASE_FEED_CHANNEL_ID,
+          rootId: runtime.rootId
+        });
+        runtime.pingPostId = String(createdPost && createdPost.id || '').trim();
+        runtime.pingCreatedAt = getBandPostCreateAt(createdPost);
+        if(!runtime.pingPostId){
+          throw new Error('Не удалось получить id опубликованного сообщения-пинга.');
+        }
+        appendDutyPingLog(runtime.platform, `Опубликован пинг: ${runtime.pingPostId}`, 'ok');
+        setDutyPingPlatformMessage(runtime.platform, String(createdPost && createdPost.message || initialMessage));
+        return createdPost;
+      }
+
+      async function runDutyPingPlatform(platform, sharedContext, signal){
+        const platformKey = normalizeDutyPingPlatform(platform);
+        const platformLabel = getDutyPingPlatformLabel(platformKey);
+        const runtime = {
+          platform: platformKey,
+          platformLabel,
+          release: sharedContext.release,
+          cfg: sharedContext.cfg,
+          signal,
+          aliases: sharedContext.aliases,
+          duties: sharedContext.duties,
+          myUserId: getCurrentBandUserId(sharedContext.cfg),
+          rootId: String(sharedContext.rootPosts[platformKey] && sharedContext.rootPosts[platformKey].id || '').trim(),
+          userIdToUsername: sharedContext.userIdToUsername,
+          streamToIds: {},
+          idToStream: {},
+          streamOrder: [],
+          streamToHandle: {},
+          usernameToStreams: {},
+          streamEta: {},
+          streamVerified: {},
+          seenThreadPostsUat: {},
+          warnedUsersNoStream: new Set(),
+          etaParseWarnedIds: new Set(),
+          etaRefreshStreams: new Set(),
+          pingPostId: '',
+          pingCreatedAt: 0
+        };
+
+        try{
+          setDutyPingPlatformStatus(platformKey, 'Инициализация...', 'progress');
+          appendDutyPingLog(platformKey, '[Шаг 1/5] Ищу запуск в Allure...');
+          const launch = await fetchDutyPingLaunch(platformKey, sharedContext.release, signal);
+          if(!launch){
+            throw new Error(`Не найден запуск [ALL][${platformLabel}] Готовность к релизу ${sharedContext.release}`);
+          }
+          const launchId = String(launch.id || '').trim();
+          appendDutyPingLog(platformKey, `launchId: ${launchId}`, 'ok');
+
+          appendDutyPingLog(platformKey, '[Шаг 2/5] Получаю pending кейсы...');
+          const pendingMap = await fetchDutyPingPendingLeafAllPages(launchId, signal, { size: 200 });
+          appendDutyPingLog(platformKey, `pending кейсов: ${pendingMap.size}`, pendingMap.size ? 'ok' : 'warn');
+          if(!pendingMap.size){
+            setDutyPingPlatformStatus(platformKey, 'Pending кейсов нет', 'ok');
+            setDutyPingPlatformMessage(platformKey, '');
+            return { platform: platformKey, status: 'empty' };
+          }
+
+          appendDutyPingLog(platformKey, `[Шаг 3/5] Каталог стримов Allure: ${sharedContext.catalogStreams.length}`, 'ok');
+          appendDutyPingLog(platformKey, '[Шаг 4/5] Собираю стримы из pending...');
+          for(const [testResultId, rawStreamName] of pendingMap.entries()){
+            const streamName = String(rawStreamName || '').trim();
+            if(!streamName || sharedContext.excludeSet.has(norm(streamName))) continue;
+            ensureDutyPingTrackedStream(runtime, streamName, testResultId);
+          }
+          runtime.streamOrder = sortComponentDisplayTexts(runtime.streamOrder);
+          appendDutyPingLog(platformKey, `Стримов в pending: ${runtime.streamOrder.length}`, runtime.streamOrder.length ? 'ok' : 'warn');
+          if(!runtime.streamOrder.length){
+            setDutyPingPlatformStatus(platformKey, 'В pending нет корректных стримов', 'warn');
+            setDutyPingPlatformMessage(platformKey, '');
+            return { platform: platformKey, status: 'empty' };
+          }
+
+          appendDutyPingLog(platformKey, '[Шаг 5/5] Определяю дежурных...');
+          let foundAssignments = 0;
+          for(const stream of runtime.streamOrder){
+            const handle = String(runtime.streamToHandle[stream] || '?').trim() || '?';
+            if(handle && handle !== '?') foundAssignments += 1;
+          }
+          appendDutyPingLog(
+            platformKey,
+            `Дежурные распознаны: ${foundAssignments}/${runtime.streamOrder.length} (${sharedContext.windowInfo.baseMskText})`,
+            foundAssignments ? 'ok' : 'warn'
+          );
+
+          const rootPost = sharedContext.rootPosts[platformKey];
+          if(!rootPost){
+            throw new Error(`Не найден root-тред релиза по ${platformLabel} #Release ${sharedContext.release}`);
+          }
+          appendDutyPingLog(platformKey, `root_id: ${runtime.rootId}`, 'ok');
+
+          await ensureDutyPingBasePost(runtime);
+          setDutyPingPlatformStatus(platformKey, 'Мониторинг запущен', 'progress');
+
+          while(true){
+            throwIfAborted(signal);
+            try{
+              const currentPendingMap = await fetchDutyPingPendingLeafAllPages(launchId, signal, { size: 200 });
+            const currentPendingIds = new Set(currentPendingMap.keys());
+
+            for(const [testResultId, rawStreamName] of currentPendingMap.entries()){
+              if(Object.prototype.hasOwnProperty.call(runtime.idToStream, testResultId)) continue;
+              const streamName = String(rawStreamName || '').trim();
+              if(!streamName || sharedContext.excludeSet.has(norm(streamName))) continue;
+              ensureDutyPingTrackedStream(runtime, streamName, testResultId);
+              appendDutyPingLog(platformKey, `Добавлен новый pending-стрим: ${streamName}`, 'warn');
+            }
+
+            for(const stream of [...runtime.streamOrder]){
+              const ids = Array.isArray(runtime.streamToIds[stream]) ? [...runtime.streamToIds[stream]] : [];
+              const keepIds = [];
+              for(const testResultId of ids){
+                if(currentPendingIds.has(testResultId)){
+                  keepIds.push(testResultId);
+                  continue;
+                }
+                const exists = await dutyPingTestResultExistsInLaunch(testResultId, launchId, signal);
+                if(exists){
+                  keepIds.push(testResultId);
+                }else{
+                  delete runtime.idToStream[testResultId];
+                  appendDutyPingLog(platformKey, `TestResult ${testResultId} удален из рана для "${stream}"`, 'warn');
+                }
+              }
+              if(keepIds.length){
+                runtime.streamToIds[stream] = keepIds;
+              }else{
+                removeDutyPingTrackedStream(runtime, stream);
+                appendDutyPingLog(platformKey, `Стрим удален из трекинга: ${stream}`, 'warn');
+              }
+            }
+
+            for(const stream of [...runtime.streamOrder]){
+              const ids = Array.isArray(runtime.streamToIds[stream]) ? runtime.streamToIds[stream] : [];
+              const pendingHits = ids.filter((testResultId) => currentPendingIds.has(testResultId));
+              const allDone = ids.length > 0 && pendingHits.length === 0;
+
+              if(allDone && !runtime.streamVerified[stream]){
+                runtime.streamVerified[stream] = true;
+                appendDutyPingLog(platformKey, `OK проставлен: ${stream}`, 'ok');
+              }else if(!allDone && runtime.streamVerified[stream]){
+                runtime.streamVerified[stream] = false;
+                runtime.etaRefreshStreams.add(stream);
+                appendDutyPingLog(platformKey, `OK снят, pending вернулся: ${stream}`, 'warn');
+              }
+            }
+
+            const activeStreamMap = buildStreamNorm2Canonical(runtime.streamOrder, runtime.aliases);
+            const threadPosts = await bandFetchThreadPostsExtended(runtime.rootId, runtime.cfg, signal, {
+              perPage: 200,
+              updatesOnly: true,
+              fromUpdateAt: DUTY_PING_THREAD_FROM_UPDATE_AT
+            });
+
+            let basePost = threadPosts.find((post) => String(post && post.id || '').trim() === runtime.pingPostId) || null;
+            if(!basePost){
+              const rediscovered = findDutyPingBasePost(threadPosts, runtime.rootId, runtime.myUserId, runtime.platformLabel);
+              if(rediscovered){
+                runtime.pingPostId = String(rediscovered.id || '').trim();
+                runtime.pingCreatedAt = getBandPostCreateAt(rediscovered);
+                basePost = rediscovered;
+                appendDutyPingLog(platformKey, `Наш пост найден заново: ${runtime.pingPostId}`, 'warn');
+              }
+            }
+            if(!basePost){
+              appendDutyPingLog(platformKey, 'Базовый пост временно не найден, жду следующий цикл...', 'warn');
+              await sleepWithAbort(DUTY_PING_POLL_MS, signal);
+              continue;
+            }
+
+            const baseMessage = String(basePost.message || '');
+            setDutyPingPlatformMessage(platformKey, baseMessage);
+            const okInMessage = new Set();
+            const streamsSorted = [...runtime.streamOrder].sort((a, b) => String(b).length - String(a).length);
+            for(const line of baseMessage.split(/\r?\n/)){
+              const matchedStream = matchDutyPingStreamFromLine(line, streamsSorted);
+              if(!matchedStream) continue;
+              const lowered = line.toLocaleLowerCase('ru-RU');
+              if(lowered.includes(':green_verify:') || lowered.includes(':verified:')){
+                okInMessage.add(matchedStream);
+              }
+            }
+
+            if(runtime.etaRefreshStreams.size){
+              for(const neededStream of [...runtime.etaRefreshStreams]){
+                let bestEta = '';
+                let bestCreatedAt = -1;
+                let bestUser = '';
+                let bestSnippet = '';
+
+                for(const post of threadPosts){
+                  if(!post || typeof post !== 'object') continue;
+                  const postId = String(post.id || '').trim();
+                  if(postId === runtime.rootId || postId === runtime.pingPostId) continue;
+                  if(String(post.root_id || '').trim() !== runtime.rootId) continue;
+                  const createdAt = getBandPostCreateAt(post);
+                  if(runtime.pingCreatedAt && createdAt < runtime.pingCreatedAt) continue;
+
+                  const username = String(runtime.userIdToUsername[String(post.user_id || '').trim()] || '').trim();
+                  if(!username) continue;
+                  const matchedStreams = resolveDutyPingUserStreams(username, runtime.streamOrder, runtime.usernameToStreams, runtime.streamToHandle);
+                  if(!matchedStreams.includes(neededStream)) continue;
+
+                  const message = String(post.message || '');
+                  const explicitStreams = extractDutyPingReplyStreams(message, matchedStreams, activeStreamMap);
+                  if(explicitStreams.length && !explicitStreams.includes(neededStream)) continue;
+
+                  const eta = parseDutyPingReplyEta(message, createdAt);
+                  if(!eta || createdAt < bestCreatedAt) continue;
+
+                  bestCreatedAt = createdAt;
+                  bestEta = eta;
+                  bestUser = username;
+                  bestSnippet = String(message || '').trim().replace(/\s+/g, ' ');
+                }
+
+                if(bestEta){
+                  runtime.streamEta[neededStream] = bestEta;
+                  const shortSnippet = bestSnippet.length > 120 ? `${bestSnippet.slice(0, 120)}…` : bestSnippet;
+                  appendDutyPingLog(platformKey, `ETA восстановлен для ${neededStream} (@${bestUser}): ${shortSnippet} -> ${bestEta}`, 'ok');
+                }
+                runtime.etaRefreshStreams.delete(neededStream);
+              }
+            }
+
+            for(const post of threadPosts){
+              if(!post || typeof post !== 'object') continue;
+              const postId = String(post.id || '').trim();
+              if(postId === runtime.rootId || postId === runtime.pingPostId) continue;
+              if(String(post.root_id || '').trim() !== runtime.rootId) continue;
+
+              const createdAt = getBandPostCreateAt(post);
+              if(runtime.pingCreatedAt && createdAt < runtime.pingCreatedAt) continue;
+
+              const updateAt = Number(post.update_at) || createdAt;
+              const prevUpdateAt = Number(runtime.seenThreadPostsUat[postId]);
+              if(Number.isFinite(prevUpdateAt) && updateAt <= prevUpdateAt) continue;
+              runtime.seenThreadPostsUat[postId] = updateAt;
+
+              const username = String(runtime.userIdToUsername[String(post.user_id || '').trim()] || '').trim();
+              if(!username) continue;
+
+              const dutyStreams = Array.isArray(runtime.usernameToStreams[username.toLocaleLowerCase('ru-RU')])
+                ? runtime.usernameToStreams[username.toLocaleLowerCase('ru-RU')]
+                : [];
+              const matchedStreams = resolveDutyPingUserStreams(username, runtime.streamOrder, runtime.usernameToStreams, runtime.streamToHandle);
+              if(!matchedStreams.length){
+                const userKey = username.toLocaleLowerCase('ru-RU');
+                if(dutyStreams.length && !runtime.warnedUsersNoStream.has(userKey)){
+                  runtime.warnedUsersNoStream.add(userKey);
+                  appendDutyPingLog(platformKey, `Есть дежурный @${username}, но среди pending-стримов соответствия нет`, 'warn');
+                }
+                continue;
+              }
+
+              const message = String(post.message || '');
+              let replyStreams = matchedStreams;
+              const explicitStreams = extractDutyPingReplyStreams(message, matchedStreams, activeStreamMap);
+              if(explicitStreams.length){
+                replyStreams = explicitStreams;
+              }
+
+              const eta = parseDutyPingReplyEta(message, createdAt);
+              if(eta){
+                const changedStreams = [];
+                for(const stream of replyStreams){
+                  if(runtime.streamEta[stream] !== eta){
+                    runtime.streamEta[stream] = eta;
+                    changedStreams.push(stream);
+                  }
+                }
+                if(changedStreams.length){
+                  const snippet = message.trim().replace(/\s+/g, ' ');
+                  const shortSnippet = snippet.length > 120 ? `${snippet.slice(0, 120)}…` : snippet;
+                  appendDutyPingLog(platformKey, `${changedStreams.join(', ')} (@${username}): ${shortSnippet} -> ${eta}`, 'ok');
+                }
+              }else if(!runtime.etaParseWarnedIds.has(postId)){
+                runtime.etaParseWarnedIds.add(postId);
+                const snippet = message.trim().replace(/\s+/g, ' ');
+                const shortSnippet = snippet.length > 120 ? `${snippet.slice(0, 120)}…` : snippet;
+                appendDutyPingLog(platformKey, `Не смог разобрать ETA для ${replyStreams.join(', ')} (@${username}): ${shortSnippet}`, 'warn');
+              }
+            }
+
+            const streamToStatus = {};
+            for(const stream of runtime.streamOrder){
+              if(runtime.streamVerified[stream]){
+                streamToStatus[stream] = DUTY_PING_OK;
+              }else if(runtime.streamEta[stream]){
+                streamToStatus[stream] = `${DUTY_PING_ETA} ${runtime.streamEta[stream]}`;
+              }else{
+                streamToStatus[stream] = okInMessage.has(stream) ? '' : null;
+              }
+            }
+
+            const newMessage = updateDutyPingMessagePreservingBase(baseMessage, runtime.streamOrder, runtime.streamToHandle, streamToStatus);
+            if(newMessage.trim() !== baseMessage.trim()){
+              const diff = diffDutyPingLines(baseMessage, newMessage);
+              if(diff){
+                appendDutyPingLog(platformKey, 'Изменения в сообщении:', 'progress');
+                for(const line of diff.split('\n')){
+                  if(!line) continue;
+                  appendDutyPingLog(platformKey, line, line.startsWith('+') ? 'ok' : 'warn');
+                }
+              }
+              await bandPatchPost(basePost, newMessage, runtime.cfg, signal);
+              setDutyPingPlatformMessage(platformKey, newMessage);
+            }
+
+            if(!runtime.streamOrder.length){
+              setDutyPingPlatformStatus(platformKey, 'Трекинг завершен: стримов не осталось', 'ok');
+              appendDutyPingLog(platformKey, 'Все стримы сняты с трекинга.', 'ok');
+              return { platform: platformKey, status: 'empty' };
+            }
+
+            if(runtime.streamOrder.every((stream) => runtime.streamVerified[stream])){
+              setDutyPingPlatformStatus(platformKey, 'Все стримы отмечены OK', 'ok');
+              appendDutyPingLog(platformKey, 'Все стримы отмечены как OK.', 'ok');
+              return { platform: platformKey, status: 'done' };
+            }
+
+            await sleepWithAbort(DUTY_PING_POLL_MS, signal);
+          }catch(error){
+            if(isAbortError(error)) throw error;
+            appendDutyPingLog(platformKey, `Ошибка цикла мониторинга: ${error && error.message ? error.message : error}`, 'err');
+            await sleepWithAbort(DUTY_PING_POLL_MS, signal);
+          }
+        }
+        }catch(error){
+          if(isAbortError(error)){
+            setDutyPingPlatformStatus(platformKey, 'Остановлено', 'warn');
+            appendDutyPingLog(platformKey, 'Мониторинг остановлен.', 'warn');
+            throw error;
+          }
+          const message = error && error.message ? error.message : String(error || 'Не удалось запустить мониторинг');
+          setDutyPingPlatformStatus(platformKey, 'Ошибка', 'err');
+          appendDutyPingLog(platformKey, message, 'err');
+          throw error;
+        }
+      }
+
+      async function prepareDutyPingSharedContext(release, cfg, signal){
+        const aliases = buildHardcodedAliases();
+        const excludeSet = buildHardcodedExcludeSet();
+        const windowInfo = buildSinceWindow();
+        const catalogStreams = await fetchStreams(signal);
+        const dutyPosts = await fetchBandPostsSince(windowInfo.sinceMs, cfg, signal);
+        const parsed = parseDuties(dutyPosts, catalogStreams, aliases);
+        const feedPosts = await bandFetchActiveRootPostsWindow(
+          RELEASE_FEED_CHANNEL_ID,
+          Date.now() - DUTY_PING_RELEASE_LOOKBACK_MS,
+          cfg,
+          signal,
+          { perPage: 200, pageLimit: 24 }
+        );
+        const userIdToUsername = await fetchBandChannelUsers(RELEASE_FEED_CHANNEL_ID, cfg, signal, {
+          pageLimit: 8,
+          perPage: 200
+        });
+        const rootPosts = {
+          android: findDutyPingRootPostFromFeedPosts('android', release, feedPosts),
+          ios: findDutyPingRootPostFromFeedPosts('ios', release, feedPosts)
+        };
+        if(!rootPosts.android || !rootPosts.ios){
+          const fallbackPosts = await bandFetchChannelPostsSince(
+            RELEASE_FEED_CHANNEL_ID,
+            Date.now() - DUTY_PING_RELEASE_LOOKBACK_MS,
+            cfg,
+            signal
+          );
+          if(!rootPosts.android){
+            rootPosts.android = findDutyPingRootPostFromFeedPosts('android', release, fallbackPosts);
+          }
+          if(!rootPosts.ios){
+            rootPosts.ios = findDutyPingRootPostFromFeedPosts('ios', release, fallbackPosts);
+          }
+        }
+
+        return {
+          release: String(release || '').trim(),
+          cfg,
+          aliases,
+          excludeSet,
+          catalogStreams,
+          duties: parsed.duties || {},
+          parseStats: parsed.stats || {},
+          userIdToUsername,
+          windowInfo: {
+            sinceMs: windowInfo.sinceMs,
+            baseMskText: `${formatMskHuman(windowInfo.baseUtcDate)}`
+          },
+          rootPosts
+        };
+      }
+
+      function logDutyPingSharedStats(platform, sharedContext){
+        appendDutyPingLog(
+          platform,
+          `Парсинг дежурных: стримов=${sharedContext.parseStats.matchedStreams || 0}, iOS=${sharedContext.parseStats.iosFilled || 0}, Android=${sharedContext.parseStats.androidFilled || 0}`,
+          (sharedContext.parseStats.matchedStreams || 0) > 0 ? 'ok' : 'warn'
+        );
+        if(Array.isArray(sharedContext.parseStats.unmatchedSamples) && sharedContext.parseStats.unmatchedSamples.length){
+          appendDutyPingLog(platform, `Не сопоставлены названия: ${sharedContext.parseStats.unmatchedSamples.join(' | ')}`, 'warn');
+        }
+      }
+
+      async function startDutyPing(platform){
+        const platformKey = normalizeDutyPingPlatform(platform);
+        const platformLabel = getDutyPingPlatformLabel(platformKey);
+        const state = getDutyPingPlatformState(platformKey);
+        const phase = getDutyPingPlatformPhase(platformKey);
+        if(phase === 'preparing' || phase === 'running') return false;
+
+        const release = getDutyPingReleaseValue();
+        if(!release){
+          throw new Error('Укажи номер релиза для пинга.');
+        }
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+        saveSettings();
+        saveDutyPingReleaseValue();
+
+        const ctrl = new AbortController();
+        const seq = Number(state.seq || 0) + 1;
+        state.seq = seq;
+        state.abortController = ctrl;
+        state.running = false;
+        setDutyPingPlatformPhase(platformKey, 'preparing');
+        state.prepared = null;
+        clearDutyPingPlatformUi(platformKey);
+        setDutyPingPlatformStatus(platformKey, 'Подготовка...', 'progress');
+        updateDutyPingGlobalStatusByRunningStates({ kind: 'progress' });
+        refreshButtons();
+
+        try{
+          const sharedContext = await prepareDutyPingSharedContext(release, cfg, ctrl.signal);
+          logDutyPingSharedStats(platformKey, sharedContext);
+          updateDutyPingGlobalStatusByRunningStates({ kind: 'progress' });
+          const existingPost = await findExistingDutyPingPost(platformKey, sharedContext, ctrl.signal);
+          if(ctrl.signal.aborted){
+            throw createAbortError();
+          }
+
+          if(existingPost){
+            appendDutyPingLog(platformKey, `Найдено существующее сообщение-пинг: ${String(existingPost.id || '').trim()}`, 'ok');
+            setDutyPingPlatformPhase(platformKey, 'running');
+            state.running = true;
+            refreshButtons();
+            const result = await runDutyPingPlatform(platformKey, sharedContext, ctrl.signal);
+            if(ctrl.signal.aborted){
+              throw createAbortError();
+            }
+
+            if(result && result.status === 'done'){
+              updateDutyPingGlobalStatusByRunningStates({
+                kind: isAnyDutyPingRunning() ? 'progress' : 'ok',
+                message: `${platformLabel} завершен. ${getDutyPingIdleGlobalMessage()}`
+              });
+            }else{
+              updateDutyPingGlobalStatusByRunningStates({
+                kind: isAnyDutyPingRunning() ? 'progress' : 'ok',
+                message: `${platformLabel} завершен без активных pending-стримов.`
+              });
+            }
+            return true;
+          }
+
+          const draft = await buildDutyPingPreviewDraft(platformKey, sharedContext, ctrl.signal);
+          if(ctrl.signal.aborted){
+            throw createAbortError();
+          }
+          if(!draft.streamOrder.length){
+            setDutyPingPlatformStatus(platformKey, 'В pending нет активных стримов', 'ok');
+            setDutyPingPlatformMessage(platformKey, '');
+            updateDutyPingGlobalStatusByRunningStates({
+              message: `${platformLabel}: pending-стримов нет. ${getDutyPingIdleGlobalMessage()}`,
+              kind: 'ok'
+            });
+            return true;
+          }
+
+          state.prepared = { sharedContext, draft };
+          setDutyPingPlatformPhase(platformKey, 'ready');
+          setDutyPingPlatformMessage(platformKey, draft.message);
+          setDutyPingPlatformStatus(platformKey, 'Готово к публикации', 'ok');
+          appendDutyPingLog(platformKey, 'Черновик готов. Проверь и нажми «Опубликовать».', 'ok');
+          updateDutyPingGlobalStatusByRunningStates({
+            message: `${platformLabel}: черновик готов к публикации.`,
+            kind: isAnyDutyPingRunning() ? 'progress' : 'ok'
+          });
+          return true;
+        }catch(error){
+          if(isAbortError(error)){
+            appendDutyPingLog(platformKey, 'Мониторинг остановлен пользователем.', 'warn');
+            setDutyPingPlatformStatus(platformKey, 'Остановлено', 'warn');
+            updateDutyPingGlobalStatusByRunningStates({
+              kind: isAnyDutyPingRunning() ? 'progress' : 'warn',
+              message: `${platformLabel} остановлен. ${getDutyPingIdleGlobalMessage()}`
+            });
+            return false;
+          }
+
+          const message = error && error.message ? error.message : String(error || 'Не удалось запустить пинг');
+          if(!getDutyPingPlatformUi(platformKey).logs.childElementCount){
+            appendDutyPingLog(platformKey, message, 'err');
+          }
+          setDutyPingPlatformStatus(platformKey, 'Ошибка запуска', 'err');
+          updateDutyPingGlobalStatusByRunningStates({
+            kind: isAnyDutyPingRunning() ? 'warn' : 'err',
+            message: `${platformLabel}: ${message}`
+          });
+          throw error;
+        }finally{
+          if(seq === state.seq){
+            const currentPhase = getDutyPingPlatformPhase(platformKey);
+            state.running = false;
+            state.abortController = null;
+            if(currentPhase !== 'ready'){
+              state.prepared = null;
+              setDutyPingPlatformPhase(platformKey, 'idle');
+            }
+            refreshButtons();
+            if(!isAnyDutyPingRunning()){
+              updateDutyPingGlobalStatusByRunningStates();
+            }else{
+              updateDutyPingGlobalStatusByRunningStates({ kind: 'progress' });
+            }
+          }
+        }
+      }
+
+      async function publishDutyPing(platform){
+        const platformKey = normalizeDutyPingPlatform(platform);
+        const platformLabel = getDutyPingPlatformLabel(platformKey);
+        const state = getDutyPingPlatformState(platformKey);
+        const prepared = state.prepared;
+        if(!prepared || getDutyPingPlatformPhase(platformKey) !== 'ready'){
+          return false;
+        }
+
+        const ctrl = new AbortController();
+        const seq = Number(state.seq || 0) + 1;
+        let resetToIdle = true;
+        state.seq = seq;
+        state.abortController = ctrl;
+        state.running = true;
+        setDutyPingPlatformPhase(platformKey, 'running');
+        appendDutyPingLog(platformKey, 'Публикую пинг и запускаю мониторинг...', 'progress');
+        setDutyPingPlatformStatus(platformKey, 'Публикация и запуск...', 'progress');
+        refreshButtons();
+
+        try{
+          const result = await runDutyPingPlatform(platformKey, prepared.sharedContext, ctrl.signal);
+          if(ctrl.signal.aborted){
+            throw createAbortError();
+          }
+          if(result && result.status === 'done'){
+            updateDutyPingGlobalStatusByRunningStates({
+              kind: isAnyDutyPingRunning() ? 'progress' : 'ok',
+              message: `${platformLabel} завершен. ${getDutyPingIdleGlobalMessage()}`
+            });
+          }else{
+            updateDutyPingGlobalStatusByRunningStates({
+              kind: isAnyDutyPingRunning() ? 'progress' : 'ok',
+              message: `${platformLabel} завершен без активных pending-стримов.`
+            });
+          }
+          return true;
+        }catch(error){
+          if(isAbortError(error)){
+            appendDutyPingLog(platformKey, 'Мониторинг остановлен пользователем.', 'warn');
+            setDutyPingPlatformStatus(platformKey, 'Остановлено', 'warn');
+            return false;
+          }
+          const message = error && error.message ? error.message : String(error || 'Не удалось опубликовать пинг');
+          setDutyPingPlatformStatus(platformKey, 'Ошибка публикации', 'err');
+          appendDutyPingLog(platformKey, message, 'err');
+          resetToIdle = false;
+          throw error;
+        }finally{
+          if(seq === state.seq){
+            state.running = false;
+            state.abortController = null;
+            if(resetToIdle){
+              state.prepared = null;
+              setDutyPingPlatformPhase(platformKey, 'idle');
+            }else{
+              setDutyPingPlatformPhase(platformKey, 'ready');
+            }
+            refreshButtons();
+            if(!isAnyDutyPingRunning()){
+              updateDutyPingGlobalStatusByRunningStates();
+            }else{
+              updateDutyPingGlobalStatusByRunningStates({ kind: 'progress' });
+            }
+          }
+        }
+      }
+
+      function stopDutyPing(platform){
+        const state = getDutyPingPlatformState(platform);
+        const phase = getDutyPingPlatformPhase(platform);
+        if(state.abortController){
+          state.abortController.abort();
+          return;
+        }
+        if(phase === 'ready'){
+          state.prepared = null;
+          state.running = false;
+          state.abortController = null;
+          setDutyPingPlatformPhase(platform, 'idle');
+          clearDutyPingPlatformUi(platform);
+          updateDutyPingGlobalStatusByRunningStates();
+          refreshButtons();
+        }
       }
 
       function findEarliestThreadPostByUserIds(posts, rootPostId, userIds){
@@ -7402,6 +9372,63 @@
         await proxyRequestJson('POST', url, headers, { user_ids: userIds }, signal);
       }
 
+      function hasCollectionRows(){
+        return !!(appState.lastRun && Array.isArray(appState.lastRun.rows) && appState.lastRun.rows.length);
+      }
+
+      function hasRequestedAllDuties(){
+        return String(appState.workflowStatuses[0] || '') === 'done';
+      }
+
+      function getCollectionCopyBlockedReason(){
+        if(!hasCollectionRows()) return '';
+        if(!hasRequestedAllDuties()) return 'Сначала запросите всех дежурных';
+        return '';
+      }
+
+      function canCopyCollectionResults(){
+        return hasCollectionRows() && !getCollectionCopyBlockedReason();
+      }
+
+      function syncCollectionCopyButton(button){
+        if(!button) return;
+        ensureCopyFeedbackButtonMarkup(button);
+        const blockedReason = getCollectionCopyBlockedReason();
+        const shouldDisable = appState.running || !hasCollectionRows() || !!blockedReason || isCopyFeedbackActive(button);
+        button.disabled = shouldDisable;
+        button.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+        button.classList.toggle('is-disabled', shouldDisable);
+        button.title = blockedReason;
+      }
+
+      function syncCollectionCopyButtons(){
+        syncCollectionCopyButton(resultsCopyBtn);
+        syncCollectionCopyButton(resultsThreadsCopyBtn);
+      }
+
+      async function runCollectionCopyAction(button, action){
+        if(!button) return false;
+        if(!canCopyCollectionResults()){
+          const message = getCollectionCopyBlockedReason() || 'Нет данных для копирования';
+          showToast(message, false);
+          return false;
+        }
+
+        button.disabled = true;
+        try{
+          const copied = await action();
+          if(copied){
+            scheduleCopyFeedback(button);
+          }else{
+            refreshButtons();
+          }
+          return copied;
+        }catch(error){
+          refreshButtons();
+          throw error;
+        }
+      }
+
       function renderResults(rows){
         const displayRows = [];
 
@@ -7513,10 +9540,8 @@
       }
 
       function refreshButtons(){
-        if(resultsCopyBtn){
-          const hasRows = !!(appState.lastRun && Array.isArray(appState.lastRun.rows) && appState.lastRun.rows.length);
-          resultsCopyBtn.disabled = appState.running || !hasRows;
-        }
+        syncCollectionCopyButtons();
+        syncDutyPingControls();
         renderWorkflow();
         refreshModeControls();
       }
@@ -7525,7 +9550,7 @@
         const isMajor = appState.currentMode === RUN_MODE_MAJOR;
         const hasMode = String(appState.currentMode || '').length > 0;
         const isNonMajor = hasMode && !isMajor;
-        const majorLocked = appState.running || appState.workflowRunning;
+        const majorLocked = appState.running || appState.workflowRunning || isAnyDutyPingRunning();
         const nonMajorLocked = appState.runCreateRunning || appState.startButtonBusy;
         const locked = isMajor ? majorLocked : (isNonMajor ? nonMajorLocked : (majorLocked || nonMajorLocked));
         const isReleaseFeedBlockedMode = appState.currentMode === '3' || appState.currentMode === '4';
@@ -7564,6 +9589,7 @@
           closeSwatScheduleMenu();
         }
         renderAutomationControls();
+        syncDutyPingControls();
       }
 
       function setRunCreateRunning(running){
@@ -7662,7 +9688,7 @@
         }
 
         if(copyPingBtn) copyPingBtn.disabled = running;
-        if(resultsCopyBtn) resultsCopyBtn.disabled = running;
+        syncCollectionCopyButtons();
         renderWorkflow();
         refreshModeControls();
       }
@@ -7732,13 +9758,14 @@
           log(`Лидов загружено: ${Object.keys(leadsRaw).length}`, 'ok');
 
           log('Шаг 4/5: читаю сообщения из Band...');
-          const messages = await fetchBandMessagesSince(windowInfo.sinceMs, cfg, ctrl.signal);
+          const posts = await fetchBandPostsSince(windowInfo.sinceMs, cfg, ctrl.signal);
+          const messages = posts.map((post) => String(post && post.message || '').trim()).filter(Boolean);
           log(`Сообщений получено: ${messages.length}`, 'ok');
 
           log('Шаг 5/5: парсю дежурных...');
           const aliases = buildHardcodedAliases();
           const excludeSet = buildHardcodedExcludeSet();
-          const parsed = parseDuties(messages, streams, aliases);
+          const parsed = parseDuties(posts, streams, aliases);
           const duties = parsed.duties;
           const parseStats = parsed.stats || { matchedStreams: 0, iosFilled: 0, androidFilled: 0, quotedBlocks: 0, otBlocks: 0, headerBlocks: 0, inlineBlocks: 0, unmatchedSamples: [] };
           const parseKind = parseStats.matchedStreams > 0 ? 'ok' : 'warn';
@@ -7864,7 +9891,8 @@
         }
       }
 
-      async function copyTextToClipboard(text, successMessage, emptyMessage){
+      async function copyTextToClipboard(text, successMessage, emptyMessage, options){
+        const opts = options && typeof options === 'object' ? options : {};
         const value = String(text || '').trim();
         if(!value){
           showToast(String(emptyMessage || 'Нечего копировать'), false);
@@ -7887,7 +9915,9 @@
           area.remove();
         }
 
-        showToast(String(successMessage || 'Скопировано'));
+        if(!opts.silentSuccess){
+          showToast(String(successMessage || 'Скопировано'));
+        }
         return true;
       }
 
@@ -7896,26 +9926,28 @@
         const text = buildCurrentDutiesCopyText(rows);
         if(!text){
           showToast('Нет текущих дежурных для копирования', false);
-          return;
+          return false;
+        }
+        return copyTextToClipboard(text, 'Текущие дежурные скопированы', 'Нет текущих дежурных для копирования', {
+          silentSuccess: true
+        });
+      }
+
+      async function copyCurrentDutyThreadsMessage(){
+        if(!appState.lastRun){
+          showToast('Нет данных для копирования тредов', false);
+          return false;
         }
 
-        try{
-          await navigator.clipboard.writeText(text);
-          showToast('Текущие дежурные скопированы');
-        }catch(_){
-          const area = document.createElement('textarea');
-          area.value = text;
-          area.setAttribute('readonly', 'true');
-          area.style.position = 'fixed';
-          area.style.opacity = '0';
-          area.style.pointerEvents = 'none';
-          document.body.appendChild(area);
-          area.focus();
-          area.select();
-          document.execCommand('copy');
-          area.remove();
-          showToast('Текущие дежурные скопированы');
-        }
+        const duties = appState.lastRun.duties && typeof appState.lastRun.duties === 'object'
+          ? appState.lastRun.duties
+          : {};
+        const streams = Array.isArray(appState.lastRun.streams) ? appState.lastRun.streams : [];
+        const grouping = await getCurrentDutyThreadGrouping();
+        const text = buildCurrentDutyThreadsCopyText(duties, streams, grouping);
+        return copyTextToClipboard(text, 'Треды скопированы', 'Нет данных для копирования тредов', {
+          silentSuccess: true
+        });
       }
 
       function ensurePostFields(cfg){
@@ -9694,8 +11726,9 @@
 
         const aliases = buildHardcodedAliases();
         const excludeSet = buildHardcodedExcludeSet();
-        const messages = await fetchBandMessagesSince(sinceMs, cfg);
-        const parsed = parseDuties(messages, streams, aliases);
+        const posts = await fetchBandPostsSince(sinceMs, cfg);
+        const messages = posts.map((post) => String(post && post.message || '').trim()).filter(Boolean);
+        const parsed = parseDuties(posts, streams, aliases);
         const duties = parsed.duties;
         const parseStats = parsed.stats || { matchedStreams: 0, iosFilled: 0, androidFilled: 0, quotedBlocks: 0, otBlocks: 0, headerBlocks: 0, inlineBlocks: 0, unmatchedSamples: [] };
         const parseKind = parseStats.matchedStreams > 0 ? 'ok' : 'warn';
@@ -9836,6 +11869,13 @@
             runBuildInput.value = '';
           }
         }
+        if(majorDutyPingReleaseInput){
+          try{
+            majorDutyPingReleaseInput.value = String(localStorage.getItem(LS_MAJOR_DUTY_PING_RELEASE_KEY) || '');
+          }catch(_){
+            majorDutyPingReleaseInput.value = '';
+          }
+        }
         if(automationTriggerModeSelect){
           automationTriggerModeSelect.value = 'delay';
         }
@@ -9904,6 +11944,7 @@
 
         const windowInfo = buildSinceWindow();
         baseInfo.textContent = `База выборки сообщений: ${formatMskHuman(windowInfo.baseUtcDate)}`;
+        setDutyPingGlobalStatus(getDutyPingIdleGlobalMessage(), 'muted');
         syncDutyEditorSourceLinks();
         syncDutyEditorLayout();
 
@@ -10138,7 +12179,50 @@
           schedulePreviewRefresh();
         });
         pingMessage?.addEventListener('input', refreshButtons);
-        resultsCopyBtn?.addEventListener('click', copyCurrentDutiesMessage);
+        majorDutyPingReleaseInput?.addEventListener('input', () => {
+          saveDutyPingReleaseValue();
+          syncDutyPingControls();
+        });
+        majorDutyPingReleaseInput?.addEventListener('change', () => {
+          saveDutyPingReleaseValue();
+          syncDutyPingControls();
+        });
+        majorDutyPingAndroidStartBtn?.addEventListener('click', () => {
+          startDutyPing('android').catch((err) => {
+            showToast(err && err.message ? err.message : 'Не удалось запустить Android пинг', false);
+          });
+        });
+        majorDutyPingAndroidPublishBtn?.addEventListener('click', () => {
+          publishDutyPing('android').catch((err) => {
+            showToast(err && err.message ? err.message : 'Не удалось опубликовать Android пинг', false);
+          });
+        });
+        majorDutyPingAndroidStopBtn?.addEventListener('click', () => {
+          stopDutyPing('android');
+        });
+        majorDutyPingIosStartBtn?.addEventListener('click', () => {
+          startDutyPing('ios').catch((err) => {
+            showToast(err && err.message ? err.message : 'Не удалось запустить iOS пинг', false);
+          });
+        });
+        majorDutyPingIosPublishBtn?.addEventListener('click', () => {
+          publishDutyPing('ios').catch((err) => {
+            showToast(err && err.message ? err.message : 'Не удалось опубликовать iOS пинг', false);
+          });
+        });
+        majorDutyPingIosStopBtn?.addEventListener('click', () => {
+          stopDutyPing('ios');
+        });
+        resultsCopyBtn?.addEventListener('click', () => {
+          runCollectionCopyAction(resultsCopyBtn, copyCurrentDutiesMessage).catch((err) => {
+            showToast(err && err.message ? err.message : 'Не удалось скопировать список', false);
+          });
+        });
+        resultsThreadsCopyBtn?.addEventListener('click', () => {
+          runCollectionCopyAction(resultsThreadsCopyBtn, copyCurrentDutyThreadsMessage).catch((err) => {
+            showToast(err && err.message ? err.message : 'Не удалось скопировать треды', false);
+          });
+        });
         copyPingBtn?.addEventListener('click', copyPingMessage);
 
         // Push workflow — last hour selector change
