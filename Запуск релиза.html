@@ -8567,6 +8567,59 @@
         return lines.join('\n').replace(/\s+$/u, '') + '\n';
       }
 
+      function markDutyPingMessageAllOk(baseMessage, knownStreams){
+        const lines = String(baseMessage || '').split(/\r?\n/);
+        const streamsSorted = [...new Set((Array.isArray(knownStreams) ? knownStreams : []).filter(Boolean))]
+          .sort((a, b) => String(b).length - String(a).length);
+        let changed = false;
+
+        for(let index = 0; index < lines.length; index += 1){
+          const matchedStream = matchDutyPingStreamFromLine(lines[index], streamsSorted);
+          if(!matchedStream) continue;
+          const nextLine = lineWithDutyPingStatus(lines[index], DUTY_PING_OK);
+          if(nextLine !== lines[index]){
+            lines[index] = nextLine;
+            changed = true;
+          }
+        }
+
+        return {
+          message: lines.join('\n').replace(/\s+$/u, '') + '\n',
+          changed
+        };
+      }
+
+      function collectDutyPingMessageStreams(baseMessage, knownStreams){
+        const lines = String(baseMessage || '').split(/\r?\n/);
+        const streamsSorted = [...new Set((Array.isArray(knownStreams) ? knownStreams : []).filter(Boolean))]
+          .sort((a, b) => String(b).length - String(a).length);
+        const collected = [];
+        const seen = new Set();
+
+        for(const line of lines){
+          const matchedStream = matchDutyPingStreamFromLine(line, streamsSorted);
+          if(!matchedStream || seen.has(matchedStream)) continue;
+          seen.add(matchedStream);
+          collected.push(matchedStream);
+        }
+
+        return collected;
+      }
+
+      function hydrateDutyPingRuntimeFromMessage(runtime, baseMessage){
+        const knownStreams = [
+          ...new Set([
+            ...(Array.isArray(runtime.catalogStreams) ? runtime.catalogStreams : []),
+            ...Object.keys(runtime.duties || {}),
+            ...(Array.isArray(runtime.streamOrder) ? runtime.streamOrder : [])
+          ].map((item) => String(item || '').trim()).filter(Boolean))
+        ];
+        const messageStreams = collectDutyPingMessageStreams(baseMessage, knownStreams);
+        for(const stream of messageStreams){
+          ensureDutyPingTrackedStream(runtime, stream, '');
+        }
+      }
+
       function diffDutyPingLines(oldMessage, newMessage){
         const oldLines = String(oldMessage || '').split(/\r?\n/);
         const newLines = String(newMessage || '').split(/\r?\n/);
@@ -8900,8 +8953,13 @@
           runtime.pingPostId = String(existingPost.id || '').trim();
           runtime.pingCreatedAt = getBandPostCreateAt(existingPost);
           appendDutyPingLog(runtime.platform, `Найдено существующее сообщение-пинг: ${runtime.pingPostId}`, 'ok');
-          setDutyPingPlatformMessage(runtime.platform, String(existingPost.message || initialMessage));
-          return existingPost;
+          const existingMessage = String(existingPost.message || initialMessage);
+          hydrateDutyPingRuntimeFromMessage(runtime, existingMessage);
+          setDutyPingPlatformMessage(runtime.platform, existingMessage);
+          return {
+            ...existingPost,
+            message: existingMessage
+          };
         }
 
         appendDutyPingLog(runtime.platform, `Публикую сообщение-пинг в тред ${runtime.rootId}...`, 'progress');
@@ -8930,6 +8988,7 @@
           signal,
           aliases: sharedContext.aliases,
           duties: sharedContext.duties,
+          catalogStreams: sharedContext.catalogStreams,
           myUserId: getCurrentBandUserId(sharedContext.cfg),
           rootId: String(sharedContext.rootPosts[platformKey] && sharedContext.rootPosts[platformKey].id || '').trim(),
           userIdToUsername: sharedContext.userIdToUsername,
@@ -8962,8 +9021,25 @@
           const pendingMap = await fetchDutyPingPendingLeafAllPages(launchId, signal, { size: 200 });
           appendDutyPingLog(platformKey, `pending кейсов: ${pendingMap.size}`, pendingMap.size ? 'ok' : 'warn');
           if(!pendingMap.size){
+            const existingPost = await findExistingDutyPingPost(platformKey, sharedContext, signal);
+            if(existingPost){
+              const knownStreams = [
+                ...new Set([
+                  ...(Array.isArray(sharedContext.catalogStreams) ? sharedContext.catalogStreams : []),
+                  ...Object.keys(sharedContext.duties || {})
+                ].map((item) => String(item || '').trim()).filter(Boolean))
+              ];
+              const currentMessage = String(existingPost.message || '');
+              const synced = markDutyPingMessageAllOk(currentMessage, knownStreams);
+              if(synced.changed){
+                appendDutyPingLog(platformKey, 'Pending пустой, проставляю OK в существующем пинге...', 'progress');
+                await bandPatchPost(existingPost, synced.message, sharedContext.cfg, signal);
+              }
+              setDutyPingPlatformMessage(platformKey, synced.message);
+            }else{
+              setDutyPingPlatformMessage(platformKey, '');
+            }
             setDutyPingPlatformStatus(platformKey, 'Pending кейсов нет', 'ok');
-            setDutyPingPlatformMessage(platformKey, '');
             return { platform: platformKey, status: 'empty' };
           }
 
@@ -9008,13 +9084,21 @@
             try{
               const currentPendingMap = await fetchDutyPingPendingLeafAllPages(launchId, signal, { size: 200 });
             const currentPendingIds = new Set(currentPendingMap.keys());
+            const currentPendingStreams = new Set();
 
             for(const [testResultId, rawStreamName] of currentPendingMap.entries()){
               if(Object.prototype.hasOwnProperty.call(runtime.idToStream, testResultId)) continue;
               const streamName = String(rawStreamName || '').trim();
               if(!streamName || sharedContext.excludeSet.has(norm(streamName))) continue;
+              currentPendingStreams.add(streamName);
               ensureDutyPingTrackedStream(runtime, streamName, testResultId);
               appendDutyPingLog(platformKey, `Добавлен новый pending-стрим: ${streamName}`, 'warn');
+            }
+
+            for(const [, rawStreamName] of currentPendingMap.entries()){
+              const streamName = String(rawStreamName || '').trim();
+              if(!streamName || sharedContext.excludeSet.has(norm(streamName))) continue;
+              currentPendingStreams.add(streamName);
             }
 
             for(const stream of [...runtime.streamOrder]){
@@ -9035,6 +9119,8 @@
               }
               if(keepIds.length){
                 runtime.streamToIds[stream] = keepIds;
+              }else if(!ids.length){
+                runtime.streamToIds[stream] = [];
               }else{
                 removeDutyPingTrackedStream(runtime, stream);
                 appendDutyPingLog(platformKey, `Стрим удален из трекинга: ${stream}`, 'warn');
@@ -9042,9 +9128,7 @@
             }
 
             for(const stream of [...runtime.streamOrder]){
-              const ids = Array.isArray(runtime.streamToIds[stream]) ? runtime.streamToIds[stream] : [];
-              const pendingHits = ids.filter((testResultId) => currentPendingIds.has(testResultId));
-              const allDone = ids.length > 0 && pendingHits.length === 0;
+              const allDone = !currentPendingStreams.has(stream);
 
               if(allDone && !runtime.streamVerified[stream]){
                 runtime.streamVerified[stream] = true;
