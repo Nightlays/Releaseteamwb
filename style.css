@@ -3194,7 +3194,8 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   background:linear-gradient(90deg,#f59e0b,#f97316) !important;
   color:#fff !important;
 }
-.release-launch #resultsCopyBtn:disabled{
+.release-launch #resultsCopyBtn:disabled:not(.is-success):not(.is-loading),
+.release-launch #resultsThreadsCopyBtn:disabled:not(.is-success):not(.is-loading){
   background:#f1f5f9 !important;
   color:#94a3b8 !important;
   border-color:#e2e8f0 !important;
@@ -3204,7 +3205,8 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   opacity:1;
   transform:none;
 }
-.release-launch #resultsCopyBtn:disabled:hover{
+.release-launch #resultsCopyBtn:disabled:not(.is-success):not(.is-loading):hover,
+.release-launch #resultsThreadsCopyBtn:disabled:not(.is-success):not(.is-loading):hover{
   background:#f1f5f9 !important;
   color:#94a3b8 !important;
   transform:none;
@@ -3667,16 +3669,55 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   color:#93c5fd;
   text-decoration:underline;
 }
+.release-launch .release-launch-duty-ping-release-card{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.release-launch .release-launch-major-release-toolbar{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items:center;
+  gap:12px;
+}
+.release-launch .release-launch-major-release-toolbar-shell{
+  grid-column:2;
+  justify-content:center;
+}
+.release-launch .release-launch-major-release-toolbar-btn{
+  grid-column:3;
+  justify-self:end;
+  min-height:40px;
+  white-space:nowrap;
+}
 .release-launch .release-launch-duty-ping-release-shell{
   display:flex;
   justify-content:center;
 }
+.release-launch #majorDutyPingGlobalStatus:empty{
+  display:none;
+}
+.release-launch .release-launch-duty-ping-release-row{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  width:min(320px, 100%);
+}
+.release-launch .release-launch-duty-ping-release-side-label{
+  margin:0;
+  white-space:nowrap;
+  color:#475569;
+}
 .release-launch .release-launch-duty-ping-release-input{
-  width:min(200px, 100%);
+  width:min(170px, 100%);
+  flex:0 1 170px;
+  min-height:40px;
+  padding:.5rem .75rem;
   border-radius:10px;
   border-color:#e6e8f5;
   background:#fbfcff;
-  text-align:center;
+  text-align:left;
   font-weight:600;
   color:#334155;
   box-shadow:none;
@@ -3770,6 +3811,56 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
     max-height:210px;
   }
 }
+@media (max-width: 640px){
+  .release-launch .release-launch-major-release-toolbar{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:stretch;
+  }
+  .release-launch .release-launch-major-release-toolbar-shell{
+    grid-column:auto;
+    flex-basis:100%;
+    justify-content:center;
+  }
+  .release-launch .release-launch-major-release-toolbar-btn{
+    grid-column:auto;
+    justify-self:auto;
+    width:100%;
+  }
+  .release-launch .release-launch-duty-ping-release-row{
+    flex-direction:column;
+    align-items:stretch;
+    width:min(220px, 100%);
+    gap:6px;
+  }
+  .release-launch .release-launch-duty-ping-release-side-label{
+    text-align:center;
+  }
+  .release-launch .release-launch-duty-ping-release-input{
+    width:100%;
+    flex-basis:auto;
+    text-align:center;
+  }
+  .release-launch .release-launch-major-notice-channel-row{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+  .release-launch .release-launch-major-notice-channel-status-wrap{
+    min-width:0;
+    width:100%;
+    justify-content:flex-start;
+  }
+  .release-launch .release-launch-major-notice-actions{
+    flex-direction:row;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:center;
+  }
+  .release-launch .release-launch-major-notice-actions .btn-danger,
+  .release-launch .release-launch-major-notice-actions .btn-grad{
+    width:min(220px, 100%);
+  }
+}
 .release-launch .release-launch-mode-standalone{
   width:100%;
   display:flex;
@@ -3836,28 +3927,56 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   transform:none;
 }
 .release-launch .release-launch-copy-feedback-btn{
-  position:relative;
-  overflow:hidden;
+  flex-wrap:nowrap;
+  justify-content:center;
+  min-width:160px;
 }
-.release-launch .release-launch-copy-feedback-label,
+.release-launch .release-launch-copy-feedback-label{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:1;
+  white-space:nowrap;
+}
+.release-launch .release-launch-copy-feedback-status{
+  position:relative;
+  flex:0 0 20px;
+  width:20px;
+  height:20px;
+  display:inline-grid;
+  place-items:center;
+}
+.release-launch .release-launch-copy-feedback-spinner,
+.release-launch .release-launch-copy-feedback-check{
+  grid-area:1 / 1;
+  opacity:0;
+  transform:scale(.72);
+  transition:opacity .18s ease, transform .22s ease;
+}
+.release-launch .release-launch-copy-feedback-spinner{
+  width:14px;
+  height:14px;
+  pointer-events:none;
+}
 .release-launch .release-launch-copy-feedback-check{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  min-width:100%;
+  min-width:20px;
   line-height:1;
-  transition:opacity .18s ease, transform .22s ease;
-}
-.release-launch .release-launch-copy-feedback-check{
-  position:absolute;
-  inset:0;
-  opacity:0;
-  transform:scale(.72);
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:-0.08em;
   pointer-events:none;
 }
-.release-launch .release-launch-copy-feedback-check-visible{
-  position:static;
-  inset:auto;
+.release-launch .release-launch-copy-feedback-btn.is-loading{
+  color:#1d4ed8;
+  border-color:#bfdbfe !important;
+  background:#eff6ff !important;
+  box-shadow:none;
+  cursor:progress;
+}
+.release-launch .release-launch-copy-feedback-btn.is-loading .release-launch-copy-feedback-spinner{
   opacity:1;
   transform:scale(1);
 }
@@ -3866,22 +3985,19 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   border-color:#bbf7d0 !important;
   background:#f0fdf4 !important;
 }
-.release-launch .release-launch-copy-feedback-btn.is-success .release-launch-copy-feedback-label{
-  opacity:0;
-  transform:translateY(-3px) scale(.94);
-}
 .release-launch .release-launch-copy-feedback-btn.is-success .release-launch-copy-feedback-check{
   opacity:1;
   transform:scale(1);
   animation:release-launch-copy-check-pop .28s ease;
 }
+.release-launch .release-launch-copy-feedback-btn.is-loading:disabled,
 .release-launch .release-launch-copy-feedback-btn.is-success:disabled{
   opacity:1;
 }
-.release-launch .release-launch-results-copy-btn:disabled:not(.is-success),
-.release-launch .release-launch-results-copy-btn.is-disabled:not(.is-success),
-.release-launch .release-launch-copy-feedback-btn:disabled:not(.is-success),
-.release-launch .release-launch-copy-feedback-btn.is-disabled:not(.is-success){
+.release-launch .release-launch-results-copy-btn:disabled:not(.is-success):not(.is-loading),
+.release-launch .release-launch-results-copy-btn.is-disabled:not(.is-success):not(.is-loading),
+.release-launch .release-launch-copy-feedback-btn:disabled:not(.is-success):not(.is-loading),
+.release-launch .release-launch-copy-feedback-btn.is-disabled:not(.is-success):not(.is-loading){
   opacity:.62;
   color:#94a3b8 !important;
   border-color:#e2e8f0 !important;
@@ -3891,10 +4007,10 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
   pointer-events:none;
   transform:none;
 }
-.release-launch .release-launch-results-copy-btn:disabled:not(.is-success):hover,
-.release-launch .release-launch-results-copy-btn.is-disabled:not(.is-success):hover,
-.release-launch .release-launch-copy-feedback-btn:disabled:not(.is-success):hover,
-.release-launch .release-launch-copy-feedback-btn.is-disabled:not(.is-success):hover{
+.release-launch .release-launch-results-copy-btn:disabled:not(.is-success):not(.is-loading):hover,
+.release-launch .release-launch-results-copy-btn.is-disabled:not(.is-success):not(.is-loading):hover,
+.release-launch .release-launch-copy-feedback-btn:disabled:not(.is-success):not(.is-loading):hover,
+.release-launch .release-launch-copy-feedback-btn.is-disabled:not(.is-success):not(.is-loading):hover{
   color:#94a3b8 !important;
   border-color:#e2e8f0 !important;
   background:#f8fafc !important;
@@ -4325,6 +4441,123 @@ body.swat-release #casesStreamsFilterList .cases-filter-check{
 .release-launch .release-launch-modal-actions .btn:hover{
   filter:none;
   transform:none;
+}
+.release-launch .release-launch-major-notice-modal-dialog{
+  width:min(760px, calc(100vw - 32px));
+}
+.release-launch .release-launch-major-notice-modal-body{
+  display:grid;
+  gap:14px;
+}
+.release-launch .release-launch-major-notice-textarea{
+  min-height:176px;
+  resize:vertical;
+}
+.release-launch .release-launch-major-notice-channels-block{
+  border:1px solid #ecebff;
+  border-radius:16px;
+  background:#fbfcff;
+  padding:14px 16px;
+}
+.release-launch .release-launch-major-notice-channels-title{
+  font-size:13px;
+  font-weight:800;
+  color:#475569;
+  margin-bottom:10px;
+}
+.release-launch .release-launch-major-notice-channels-list{
+  display:grid;
+  gap:10px;
+}
+.release-launch .release-launch-major-notice-channel-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:10px 0;
+}
+.release-launch .release-launch-major-notice-channel-row + .release-launch-major-notice-channel-row{
+  border-top:1px solid #ecebff;
+}
+.release-launch .release-launch-major-notice-channel-meta{
+  min-width:0;
+}
+.release-launch .release-launch-major-notice-channel-name{
+  font-size:14px;
+  font-weight:700;
+  color:#334155;
+}
+.release-launch .release-launch-major-notice-channel-id{
+  margin-top:2px;
+  font-size:11px;
+  color:#94a3b8;
+}
+.release-launch .release-launch-major-notice-channel-status-wrap{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  min-width:128px;
+}
+.release-launch .release-launch-major-notice-channel-status{
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  font-size:12px;
+  font-weight:700;
+  text-align:right;
+}
+.release-launch .release-launch-major-notice-channel-status-idle{
+  color:#94a3b8;
+}
+.release-launch .release-launch-major-notice-channel-status-loading{
+  color:#475569;
+}
+.release-launch .release-launch-major-notice-channel-status-success{
+  color:#15803d;
+}
+.release-launch .release-launch-major-notice-channel-status-error{
+  color:#b91c1c;
+}
+.release-launch .release-launch-major-notice-channel-status-ico{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:20px;
+  height:20px;
+  border-radius:999px;
+  border:1px solid transparent;
+  font-size:12px;
+  font-weight:800;
+  line-height:1;
+}
+.release-launch .release-launch-major-notice-channel-status-ico-success{
+  color:#15803d;
+  background:#dcfce7;
+  border-color:#bbf7d0;
+  animation:release-launch-copy-check-pop .28s ease;
+}
+.release-launch .release-launch-major-notice-channel-status-ico-error{
+  color:#b91c1c;
+  background:#ffe4e6;
+  border-color:#fecdd3;
+}
+.release-launch .release-launch-major-notice-actions{
+  gap:10px;
+  justify-content:center;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.release-launch .release-launch-major-notice-actions .btn-danger,
+.release-launch .release-launch-major-notice-actions .btn-danger:hover,
+.release-launch .release-launch-major-notice-actions .btn-danger:focus,
+.release-launch .release-launch-major-notice-actions .btn-danger:focus-visible{
+  min-width:140px;
+  color:#fff;
+  background:linear-gradient(90deg,#ef4444,#dc2626);
+}
+.release-launch .release-launch-major-notice-actions .btn-grad{
+  min-width:180px;
 }
 .release-launch .release-launch-duty-editor-shell{
   position:relative;
