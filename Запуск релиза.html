@@ -166,10 +166,10 @@
     		              <span class="chip">Заполнено: <b id="kpiFilled">0</b></span>
     		              <span class="chip">С пропусками: <b id="kpiMissing">0</b></span>
     		            </div>
-		            <button id="resultsCopyBtn" type="button" class="release-launch-results-copy-btn inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" disabled>
+		            <button id="resultsCopyBtn" type="button" class="release-launch-results-copy-btn inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" data-copy-feedback-success-icon="✓" disabled>
 		              Копировать список
 		            </button>
-		            <button id="resultsThreadsCopyBtn" type="button" class="release-launch-results-copy-btn inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" disabled>
+		            <button id="resultsThreadsCopyBtn" type="button" class="release-launch-results-copy-btn inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" data-copy-feedback-success-icon="✓" disabled>
 		              Копировать треды
 		            </button>
     		            <button id="resultsCollapseBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/70 ring-1 ring-[#ecebff] text-slate-600 hover:bg-white" aria-expanded="true">
@@ -216,16 +216,14 @@
         </div>
 
         <div id="majorDutyPingSection" class="space-y-4" style="display:none;">
-          <section class="card p-4 space-y-3">
-            <div class="space-y-2">
-              <div class="flex items-center justify-between gap-3 flex-wrap">
-                <h2 class="text-lg font-semibold">Пинг дежурных</h2>
-                <div id="majorDutyPingGlobalStatus" class="release-launch-status release-launch-status-muted">Можно запускать Android и iOS отдельно или параллельно.</div>
-              </div>
-              <div class="release-launch-duty-ping-release-shell">
-                <input id="majorDutyPingReleaseInput" class="input release-launch-duty-ping-release-input" type="text" placeholder="Номер релиза" />
-              </div>
+          <section class="card p-3 space-y-2 release-launch-duty-ping-release-card">
+            <div class="release-launch-duty-ping-release-shell">
+              <label class="release-launch-duty-ping-release-row" for="majorDutyPingReleaseInput">
+                <span class="release-launch-label release-launch-duty-ping-release-side-label">Номер релиза</span>
+                <input id="majorDutyPingReleaseInput" class="input release-launch-duty-ping-release-input" type="text" placeholder="например: 7.3.1000" />
+              </label>
             </div>
+            <div id="majorDutyPingGlobalStatus" class="release-launch-status release-launch-status-muted"></div>
           </section>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
@@ -276,14 +274,20 @@
         </div>
 
         <div id="majorReleaseSection" class="space-y-4" style="display:none;">
+          <section class="card p-3 release-launch-major-release-toolbar">
+            <div class="release-launch-duty-ping-release-shell release-launch-major-release-toolbar-shell">
+              <label class="release-launch-duty-ping-release-row" for="majorReleaseVersionInput">
+                <span class="release-launch-label release-launch-duty-ping-release-side-label">Номер релиза</span>
+                <input id="majorReleaseVersionInput" class="input release-launch-duty-ping-release-input" type="text" placeholder="например: 7.5.5" />
+              </label>
+            </div>
+            <button id="majorReleasePublishNoticeBtn" type="button" class="btn btn-soft release-launch-major-release-toolbar-btn">Опубликовать оповещение</button>
+          </section>
+
           <!-- Редакторы iOS и Android рядом -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <section class="card p-5 space-y-3">
               <h2 class="text-lg font-semibold">iOS</h2>
-              <label class="release-launch-field">
-                <span class="release-launch-label">Версия (тред: #IOS #Release [версия])</span>
-                <input id="majorIosReleaseVersion" class="input" type="text" placeholder="например: 7.5.5" />
-              </label>
               <label class="release-launch-field">
                 <span class="release-launch-label">Сообщение в тред</span>
                 <textarea id="majorIosThreadText" class="input release-launch-mono-input" rows="20" spellcheck="false"></textarea>
@@ -292,10 +296,6 @@
 
             <section class="card p-5 space-y-3">
               <h2 class="text-lg font-semibold">Android</h2>
-              <label class="release-launch-field">
-                <span class="release-launch-label">Версия (тред: #Android #Release [версия])</span>
-                <input id="majorAndroidReleaseVersion" class="input" type="text" placeholder="например: 7.5.5" />
-              </label>
               <label class="release-launch-field">
                 <span class="release-launch-label">Сообщение в тред</span>
                 <textarea id="majorAndroidThreadText" class="input release-launch-mono-input" rows="20" spellcheck="false"></textarea>
@@ -466,6 +466,32 @@
     </div>
   </div>
 
+  <div id="majorReleaseNoticeModal" class="release-launch-modal" role="dialog" aria-modal="true" aria-labelledby="majorReleaseNoticeModalTitle" aria-hidden="true" hidden>
+    <div class="release-launch-modal-dialog release-launch-major-notice-modal-dialog">
+      <div class="release-launch-modal-head">
+        <div>
+          <div id="majorReleaseNoticeModalTitle" class="release-launch-modal-title">Опубликовать оповещение</div>
+        </div>
+        <button id="majorReleaseNoticeModalClose" type="button" class="release-launch-modal-close" aria-label="Закрыть окно оповещения">×</button>
+      </div>
+      <div class="release-launch-modal-body release-launch-major-notice-modal-body">
+        <div id="majorReleaseNoticeModalError" class="release-launch-run-error" style="display:none;"></div>
+        <label class="release-launch-modal-field">
+          <span class="release-launch-modal-label">Текст</span>
+          <textarea id="majorReleaseNoticeTextarea" class="input release-launch-mono-input release-launch-major-notice-textarea" rows="7" spellcheck="false"></textarea>
+        </label>
+        <div class="release-launch-major-notice-channels-block">
+          <div class="release-launch-major-notice-channels-title">Каналы</div>
+          <div id="majorReleaseNoticeChannels" class="release-launch-major-notice-channels-list"></div>
+        </div>
+        <div class="release-launch-modal-actions release-launch-major-notice-actions">
+          <button id="majorReleaseNoticeCancelBtn" type="button" class="btn btn-danger">Отмена</button>
+          <button id="majorReleaseNoticePublishBtn" type="button" class="btn btn-grad">Опубликовать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function(){
       const $ = (id) => document.getElementById(id);
@@ -483,6 +509,7 @@
       const LS_STEP_SCHEDULES_KEY = 'wb_release_launch_step_schedules_v1';
       const LS_RUN_MODE_KEY = 'wb_release_launch_run_mode_v1';
       const LS_MAJOR_VIEW_KEY = 'wb_release_launch_major_view_v1';
+      const LS_MAJOR_RELEASE_KEY = 'wb_release_launch_major_release_v1';
       const LS_MAJOR_DUTY_PING_RELEASE_KEY = 'wb_release_launch_major_duty_ping_release_v1';
       const DEPLOY_LAB_BASE_URL = 'https://deploy-lab-api.wb.ru';
       const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -500,6 +527,12 @@
       const RELEASE_ANDROID_BOT_TIMEOUT_MS = 30000;
       const IOS_BUILDS_CHANNEL_ID = 'sm7z55bao7gmumy7cbxq31159y';
       const IOS_BUILDS_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+      const MAJOR_RELEASE_NOTICE_CHANNELS = [
+        { id: 'e87794p6sirx8kyg71dgrzp74r', name: 'mp-ios-release' },
+        { id: 'bzd6dd5133855cor6faew61xtr', name: 'mp-Релиз Андроид' },
+        { id: '11pg8zfbdfbwpdzijiseg6g6zr', name: 'Олеся и Лиды QA' },
+        { id: '6sqki85urpbfbqdkcdfen33owh', name: 'SWAT QA' }
+      ];
       const GROUP_ANDROID_ID_FIXED = 'bbtekcuhfjykmm9awe56gebj9y';
       const GROUP_IOS_ID_FIXED = '6skkxrr3ufrkmy1u3paepd35ar';
       const DUTY_PING_POLL_MS = 5000;
@@ -694,6 +727,7 @@
       const majorDutyPingIosStatus = $('majorDutyPingIosStatus');
       const majorDutyPingIosMessage = $('majorDutyPingIosMessage');
       const majorDutyPingIosLogs = $('majorDutyPingIosLogs');
+      const majorReleasePublishNoticeBtn = $('majorReleasePublishNoticeBtn');
       const runCreateLayout = $('runCreateLayout');
       const runExtraControls = $('runExtraControls');
       const runPublishControls = $('runPublishControls');
@@ -720,6 +754,13 @@
       const swatScheduleTimeInput = $('swatScheduleTimeInput');
       const swatScheduleSubmitBtn = $('swatScheduleSubmitBtn');
       const swatScheduleModalError = $('swatScheduleModalError');
+      const majorReleaseNoticeModal = $('majorReleaseNoticeModal');
+      const majorReleaseNoticeModalClose = $('majorReleaseNoticeModalClose');
+      const majorReleaseNoticeModalError = $('majorReleaseNoticeModalError');
+      const majorReleaseNoticeTextarea = $('majorReleaseNoticeTextarea');
+      const majorReleaseNoticeChannels = $('majorReleaseNoticeChannels');
+      const majorReleaseNoticeCancelBtn = $('majorReleaseNoticeCancelBtn');
+      const majorReleaseNoticePublishBtn = $('majorReleaseNoticePublishBtn');
       const dutyEditorShell = $('dutyEditorShell');
       const dutyEditorLoader = $('dutyEditorLoader');
       const dutyEditorContent = $('dutyEditorContent');
@@ -786,6 +827,11 @@
         majorPollLoading: false,
         majorPollSeq: 0,
         majorPollText: '',
+        majorReleaseNoticeLoading: false,
+        majorReleaseNoticeLoadSeq: 0,
+        majorReleaseNoticeAbortController: null,
+        majorReleaseNoticePublishing: false,
+        majorReleaseNoticeStatusByChannel: {},
         resolvedRunBuildValue: '',
         ytBoardInfoCache: new Map(),
         previewRefreshTimer: 0,
@@ -1189,11 +1235,17 @@
       }
 
       function getDutyPingReleaseValue(){
-        return majorDutyPingReleaseInput ? String(majorDutyPingReleaseInput.value || '').trim() : '';
+        return getMajorSharedReleaseValue();
       }
 
       function getDutyPingIdleGlobalMessage(){
-        return 'Можно запускать Android и iOS отдельно или параллельно.';
+        return '';
+      }
+
+      function withDutyPingIdleGlobalMessage(message){
+        const base = String(message || '').trim();
+        const idle = getDutyPingIdleGlobalMessage();
+        return idle ? `${base} ${idle}`.trim() : base;
       }
 
       function updateDutyPingGlobalStatusByRunningStates(options){
@@ -1246,9 +1298,7 @@
       }
 
       function saveDutyPingReleaseValue(){
-        try{
-          localStorage.setItem(LS_MAJOR_DUTY_PING_RELEASE_KEY, getDutyPingReleaseValue());
-        }catch(_){ }
+        saveMajorSharedReleaseToStorage(getDutyPingReleaseValue());
       }
 
       function syncDutyPingControls(){
@@ -1314,26 +1364,34 @@
         if(button.dataset.copyFeedbackReady === 'true') return;
         button.dataset.copyFeedbackReady = 'true';
         button.dataset.copyFeedbackLabel = String(button.textContent || '').trim();
+        if(!String(button.dataset.copyFeedbackSuccessIcon || '').trim()){
+          button.dataset.copyFeedbackSuccessIcon = button.id === 'resultsThreadsCopyBtn' ? '✓✓' : '✓';
+        }
         button.classList.add('release-launch-copy-feedback-btn');
         renderCopyFeedbackButtonMarkup(button);
       }
 
-      function renderCopyFeedbackButtonMarkup(button, success){
+      function renderCopyFeedbackButtonMarkup(button){
         if(!button) return;
         const label = String(button.dataset.copyFeedbackLabel || button.textContent || '').trim();
+        const successIcon = String(button.dataset.copyFeedbackSuccessIcon || '✓').trim() || '✓';
         button.dataset.copyFeedbackLabel = label;
-        if(success){
-          button.innerHTML = '<span class="release-launch-copy-feedback-check release-launch-copy-feedback-check-visible" aria-hidden="true">✓</span>';
-          return;
-        }
         button.innerHTML = `
           <span class="release-launch-copy-feedback-label">${escHtml(label)}</span>
-          <span class="release-launch-copy-feedback-check" aria-hidden="true">✓</span>
+          <span class="release-launch-copy-feedback-status" aria-hidden="true">
+            <span class="release-launch-copy-feedback-spinner release-launch-duty-editor-inline-spinner"></span>
+            <span class="release-launch-copy-feedback-check">${escHtml(successIcon)}</span>
+          </span>
         `;
       }
 
+      function getCopyFeedbackState(button){
+        return button && button.dataset ? String(button.dataset.copyFeedbackState || 'idle').trim() || 'idle' : 'idle';
+      }
+
       function isCopyFeedbackActive(button){
-        return !!(button && button.dataset && button.dataset.copyFeedbackActive === 'true');
+        const state = getCopyFeedbackState(button);
+        return state === 'loading' || state === 'success';
       }
 
       function clearCopyFeedbackTimer(button){
@@ -1346,21 +1404,36 @@
         }
       }
 
+      function setCopyFeedbackState(button, state){
+        if(!button) return;
+        const next = state === 'loading' || state === 'success' ? state : 'idle';
+        if(next === 'idle'){
+          delete button.dataset.copyFeedbackState;
+        }else{
+          button.dataset.copyFeedbackState = next;
+        }
+        button.classList.toggle('is-loading', next === 'loading');
+        button.classList.toggle('is-success', next === 'success');
+      }
+
       function finishCopyFeedback(button){
         if(!button) return;
         clearCopyFeedbackTimer(button);
-        delete button.dataset.copyFeedbackActive;
-        button.classList.remove('is-success');
-        renderCopyFeedbackButtonMarkup(button, false);
+        setCopyFeedbackState(button, 'idle');
+      }
+
+      function startCopyFeedback(button){
+        if(!button) return;
+        ensureCopyFeedbackButtonMarkup(button);
+        clearCopyFeedbackTimer(button);
+        setCopyFeedbackState(button, 'loading');
       }
 
       function scheduleCopyFeedback(button){
         if(!button) return;
         ensureCopyFeedbackButtonMarkup(button);
-        finishCopyFeedback(button);
-        button.dataset.copyFeedbackActive = 'true';
-        button.classList.add('is-success');
-        renderCopyFeedbackButtonMarkup(button, true);
+        clearCopyFeedbackTimer(button);
+        setCopyFeedbackState(button, 'success');
         const key = String(button.id || '').trim();
         if(key){
           appState.copyFeedbackTimers[key] = window.setTimeout(() => {
@@ -1368,6 +1441,16 @@
             refreshButtons();
           }, 2000);
         }
+      }
+
+      function waitForNextPaint(){
+        return new Promise((resolve) => {
+          if(typeof requestAnimationFrame === 'function'){
+            requestAnimationFrame(() => resolve());
+            return;
+          }
+          setTimeout(resolve, 0);
+        });
       }
 
       function isRunModeSupported(mode){
@@ -1475,6 +1558,22 @@
         if(!Number.isFinite(buildNum)) return raw;
         const buildNorm = String(buildNum * Math.pow(10, 4 - buildRaw.length)).padStart(4, '0');
         return `${major}.${minor}.${buildNorm}`;
+      }
+
+      function normalizeDeployLabIsoForJs(value){
+        let text = String(value || '').trim();
+        if(!text) return '';
+        text = text.replace(/(\.\d{3})\d+(?=[Z+\-])/, '$1');
+        text = text.replace(/(\.\d{2})(?=[Z+\-])/, '$10');
+        text = text.replace(/(\.\d)(?=[Z+\-])/, '$100');
+        return text;
+      }
+
+      function parseDeployLabIsoMs(value){
+        const normalized = normalizeDeployLabIsoForJs(value);
+        if(!normalized) return NaN;
+        const parsed = Date.parse(normalized);
+        return Number.isFinite(parsed) ? parsed : NaN;
       }
 
       function normalizeMajorView(view){
@@ -3058,6 +3157,14 @@
         }catch(_){ }
       }
 
+      function loadMajorPushSharedReleaseFromStorage(){
+        return loadMajorSharedReleaseFromStorage();
+      }
+
+      function saveMajorPushSharedReleaseToStorage(value){
+        saveMajorSharedReleaseToStorage(value);
+      }
+
       function loadMajorPushRootAnchor(platform){
         try{
           const raw = String(localStorage.getItem(getMajorPushRootAnchorStorageKey(platform)) || '').trim();
@@ -3091,6 +3198,476 @@
         try{
           localStorage.removeItem(getMajorPushRootAnchorStorageKey(platform));
         }catch(_){ }
+      }
+
+      function clearMajorPushRootAnchors(){
+        clearMajorPushRootAnchor('ios');
+        clearMajorPushRootAnchor('android');
+      }
+
+      function normalizeMajorSharedReleaseValue(value){
+        return String(value || '').trim();
+      }
+
+      function loadMajorSharedReleaseFromStorage(){
+        try{
+          const shared = normalizeMajorSharedReleaseValue(localStorage.getItem(LS_MAJOR_RELEASE_KEY));
+          if(shared) return shared;
+          const dutyPing = normalizeMajorSharedReleaseValue(localStorage.getItem(LS_MAJOR_DUTY_PING_RELEASE_KEY));
+          if(dutyPing) return dutyPing;
+          const pushIos = normalizeMajorSharedReleaseValue(localStorage.getItem(LS_MAJOR_PUSH_IOS_RELEASE_KEY));
+          if(pushIos) return pushIos;
+          const pushAndroid = normalizeMajorSharedReleaseValue(localStorage.getItem(LS_MAJOR_PUSH_ANDROID_RELEASE_KEY));
+          if(pushAndroid) return pushAndroid;
+        }catch(_){ }
+        return '';
+      }
+
+      function saveMajorSharedReleaseToStorage(value){
+        const normalized = normalizeMajorSharedReleaseValue(value);
+        try{
+          if(normalized){
+            localStorage.setItem(LS_MAJOR_RELEASE_KEY, normalized);
+          }else{
+            localStorage.removeItem(LS_MAJOR_RELEASE_KEY);
+          }
+          localStorage.removeItem(LS_MAJOR_DUTY_PING_RELEASE_KEY);
+          localStorage.removeItem(LS_MAJOR_PUSH_IOS_RELEASE_KEY);
+          localStorage.removeItem(LS_MAJOR_PUSH_ANDROID_RELEASE_KEY);
+        }catch(_){ }
+      }
+
+      function getMajorSharedReleaseValue(){
+        const releaseInput = getMajorPushReleaseInput();
+        const releaseInputValue = releaseInput ? normalizeMajorSharedReleaseValue(releaseInput.value) : '';
+        if(releaseInputValue) return releaseInputValue;
+        const dutyInputValue = majorDutyPingReleaseInput ? normalizeMajorSharedReleaseValue(majorDutyPingReleaseInput.value) : '';
+        if(dutyInputValue) return dutyInputValue;
+        return loadMajorSharedReleaseFromStorage();
+      }
+
+      function syncMajorSharedReleaseInputs(value, options){
+        const normalized = normalizeMajorSharedReleaseValue(value);
+        const opts = options && typeof options === 'object' ? options : {};
+        const skipInput = opts.skipInput || null;
+        const releaseInput = getMajorPushReleaseInput();
+        if(majorDutyPingReleaseInput && majorDutyPingReleaseInput !== skipInput && normalizeMajorSharedReleaseValue(majorDutyPingReleaseInput.value) !== normalized){
+          majorDutyPingReleaseInput.value = normalized;
+        }
+        if(releaseInput && releaseInput !== skipInput && normalizeMajorSharedReleaseValue(releaseInput.value) !== normalized){
+          releaseInput.value = normalized;
+        }
+      }
+
+      function getMajorPushReleaseInput(){
+        return $('majorReleaseVersionInput');
+      }
+
+      function getMajorPushReleaseValue(){
+        return getMajorSharedReleaseValue();
+      }
+
+      function requireMajorPushRelease(platform){
+        const release = getMajorPushReleaseValue();
+        if(release) return release;
+        const label = platform === 'ios' ? 'iOS' : 'Android';
+        throw new Error(`Укажи номер релиза для ${label}.`);
+      }
+
+      function setMajorReleaseThreadDrafts(release){
+        const normalized = String(release || '').trim() || '[версия]';
+        const iosTextarea = $('majorIosThreadText');
+        const andTextarea = $('majorAndroidThreadText');
+        if(iosTextarea) iosTextarea.value = buildMajorReleaseThreadMessage('ios', normalized);
+        if(andTextarea) andTextarea.value = buildMajorReleaseThreadMessage('android', normalized);
+      }
+
+      function getMajorReleaseAnnouncementWeekdayLabel(dow){
+        return ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'][Number(dow) || 0] || '';
+      }
+
+      function getMajorReleaseAnnouncementMonthLabel(monthIndex){
+        return ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'][Number(monthIndex) || 0] || '';
+      }
+
+      function getMajorReleaseAnnouncementMeta(ms){
+        const value = Number(ms);
+        if(!Number.isFinite(value)) return null;
+        const parts = getMskParts(value);
+        const weekdayDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+        return {
+          year: parts.year,
+          month: parts.month,
+          day: parts.day,
+          hours: parts.hours,
+          minutes: parts.minutes,
+          weekday: getMajorReleaseAnnouncementWeekdayLabel(weekdayDate.getUTCDay()),
+          monthLabel: getMajorReleaseAnnouncementMonthLabel(parts.month - 1),
+          dateKey: `${parts.year}-${two(parts.month)}-${two(parts.day)}`,
+          timeKey: `${two(parts.hours)}:${two(parts.minutes)}`
+        };
+      }
+
+      function formatMajorReleaseAnnouncementDate(ms){
+        const meta = getMajorReleaseAnnouncementMeta(ms);
+        if(!meta) return '';
+        return `${meta.day} ${meta.monthLabel} (${meta.weekday})`;
+      }
+
+      function formatMajorReleaseAnnouncementTime(ms){
+        const meta = getMajorReleaseAnnouncementMeta(ms);
+        if(!meta) return '';
+        return `${two(meta.hours)}:${two(meta.minutes)}`;
+      }
+
+      function formatMajorReleaseAnnouncementDateTime(ms){
+        const date = formatMajorReleaseAnnouncementDate(ms);
+        const time = formatMajorReleaseAnnouncementTime(ms);
+        if(!date || !time) return '';
+        return `${date} - в ${time}`;
+      }
+
+      function buildMajorReleaseCodeFreezeMs(cutoffMs){
+        const parts = getMskParts(cutoffMs);
+        return Date.UTC(parts.year, parts.month - 1, parts.day - 1, 19, 0, 0, 0) - MSK_OFFSET_MS;
+      }
+
+      function buildMajorReleaseNoticeFallbackText(release){
+        const releaseText = String(release || '').trim() || '[релиз]';
+        return [
+          `❗️ Катофф ${releaseText} - [заполни дату и время вручную]`,
+          `❗️ Кодфриз ${releaseText} - [заполни дату и время вручную]`,
+          '❗️ Просьба все стримы проверить свои тест-планы, а так же актуализировать статус задач'
+        ].join('\n');
+      }
+
+      function getMajorReleaseNoticePlatformLabel(platform){
+        return platform === 'ios' ? 'iOS' : 'Android';
+      }
+
+      function getMajorReleaseNoticePlatformVersion(platform, release){
+        return normalizeDeployLabRelease(release);
+      }
+
+      function getMajorReleaseNoticeCutoffMinuteKey(ms){
+        const value = Number(ms);
+        if(!Number.isFinite(value)) return '';
+        return String(Math.floor(value / 60000));
+      }
+
+      function getMajorReleaseNoticeCutoffDateKey(ms){
+        const meta = getMajorReleaseAnnouncementMeta(ms);
+        return meta ? meta.dateKey : '';
+      }
+
+      function buildMajorReleaseNoticeCutoffLine(release, items){
+        const releaseText = String(release || '').trim();
+        const normalizedItems = Array.isArray(items)
+          ? items.filter((item) => item && Number.isFinite(item.cutoffMs))
+          : [];
+        if(!normalizedItems.length){
+          return `❗️ Катофф ${releaseText} - [заполни дату и время вручную]`;
+        }
+
+        if(normalizedItems.length === 1){
+          return `❗️ Катофф ${releaseText} - ${formatMajorReleaseAnnouncementDateTime(normalizedItems[0].cutoffMs)}`;
+        }
+
+        const dateKeys = new Set(normalizedItems.map((item) => getMajorReleaseNoticeCutoffDateKey(item.cutoffMs)).filter(Boolean));
+        const minuteKeys = new Set(normalizedItems.map((item) => getMajorReleaseNoticeCutoffMinuteKey(item.cutoffMs)).filter(Boolean));
+
+        if(dateKeys.size === 1){
+          const sharedDate = formatMajorReleaseAnnouncementDate(normalizedItems[0].cutoffMs);
+          if(minuteKeys.size === 1){
+            return `❗️ Катофф ${releaseText} - ${sharedDate} - в ${formatMajorReleaseAnnouncementTime(normalizedItems[0].cutoffMs)}`;
+          }
+          const details = normalizedItems.map((item) => `${getMajorReleaseNoticePlatformLabel(item.platform)} в ${formatMajorReleaseAnnouncementTime(item.cutoffMs)}`).join(', ');
+          return `❗️ Катофф ${releaseText} - ${sharedDate} - ${details}`;
+        }
+
+        const details = normalizedItems.map((item) => {
+          const platformLabel = getMajorReleaseNoticePlatformLabel(item.platform);
+          return `${platformLabel} ${formatMajorReleaseAnnouncementDate(item.cutoffMs)} в ${formatMajorReleaseAnnouncementTime(item.cutoffMs)}`;
+        }).join(', ');
+        return `❗️ Катофф ${releaseText} - ${details}`;
+      }
+
+      function buildMajorReleaseNoticeText(release, info){
+        const releaseText = String(release || '').trim();
+        const items = info && Array.isArray(info.items)
+          ? info.items.filter((item) => item && Number.isFinite(item.cutoffMs))
+          : [];
+        if(!items.length){
+          return buildMajorReleaseNoticeFallbackText(releaseText);
+        }
+
+        const primaryCutoffMs = Math.min(...items.map((item) => Number(item.cutoffMs)).filter(Number.isFinite));
+        const codeFreezeMs = buildMajorReleaseCodeFreezeMs(primaryCutoffMs);
+        return [
+          buildMajorReleaseNoticeCutoffLine(releaseText, items),
+          `❗️ Кодфриз ${releaseText} - ${formatMajorReleaseAnnouncementDateTime(codeFreezeMs)}`,
+          '❗️ Просьба все стримы проверить свои тест-планы, а так же актуализировать статус задач'
+        ].join('\n');
+      }
+
+      async function fetchDeployLabNoticeReleaseInfo(platform, version, token, signal){
+        const deployLabVersion = getMajorReleaseNoticePlatformVersion(platform, version);
+        const releaseId = buildDeployLabReleaseId(platform, deployLabVersion);
+        const url = `${DEPLOY_LAB_BASE_URL}/releaseboss/admin_panel/release/${encodeURIComponent(releaseId)}`;
+        const data = await proxyRequestJson('GET', url, buildDeployLabHeaders(token), undefined, signal);
+        const payload = unwrapDeployLabPayload(data);
+        const cutoffRaw = payload && typeof payload === 'object' ? (payload.date || payload.cutoff_date || null) : null;
+        const cutoffMs = parseDeployLabIsoMs(cutoffRaw);
+        if(!Number.isFinite(cutoffMs)){
+          throw new Error(`В ${releaseId} не найдено поле date.`);
+        }
+        const payloadRelease = payload && typeof payload === 'object' ? String(payload.version || '').trim() : '';
+        return {
+          platform,
+          release: payloadRelease || deployLabVersion,
+          cutoffMs,
+          releaseId
+        };
+      }
+
+      async function fetchMajorReleaseNoticeCutoffInfo(release, signal){
+        const token = getDeployLabTokenFromStorage();
+        if(!token){
+          throw new Error('Не найден Deploy Lab token (заполни поле в настройках).');
+        }
+
+        const attempts = await Promise.allSettled([
+          fetchDeployLabNoticeReleaseInfo('android', release, token, signal),
+          fetchDeployLabNoticeReleaseInfo('ios', release, token, signal)
+        ]);
+
+        const items = attempts
+          .filter((item) => item.status === 'fulfilled' && item.value && Number.isFinite(item.value.cutoffMs))
+          .map((item) => item.value)
+          .sort((a, b) => {
+            const aOrder = a.platform === 'android' ? 0 : 1;
+            const bOrder = b.platform === 'android' ? 0 : 1;
+            if(aOrder !== bOrder) return aOrder - bOrder;
+            return a.cutoffMs - b.cutoffMs;
+          });
+
+        const errors = attempts
+          .filter((item) => item.status === 'rejected')
+          .map((item) => item.reason && item.reason.message ? item.reason.message : String(item.reason || 'Неизвестная ошибка'))
+          .filter(Boolean);
+
+        if(items.length){
+          return { items, errors };
+        }
+
+        throw new Error(errors[0] || 'Не удалось получить дату релиза из Deploy Lab.');
+      }
+
+      function getMajorReleaseNoticeTextareaValue(){
+        return majorReleaseNoticeTextarea ? String(majorReleaseNoticeTextarea.value || '').trim() : '';
+      }
+
+      function showMajorReleaseNoticeModalError(message){
+        if(!majorReleaseNoticeModalError) return;
+        const text = String(message || '').trim();
+        majorReleaseNoticeModalError.textContent = text;
+        majorReleaseNoticeModalError.style.display = text ? '' : 'none';
+      }
+
+      function setMajorReleaseNoticeChannelState(channelId, state, message){
+        appState.majorReleaseNoticeStatusByChannel[String(channelId || '').trim()] = {
+          state: String(state || 'idle').trim() || 'idle',
+          message: String(message || '').trim()
+        };
+        renderMajorReleaseNoticeChannels();
+        syncMajorReleaseNoticeControls();
+      }
+
+      function resetMajorReleaseNoticeChannelStates(){
+        appState.majorReleaseNoticeStatusByChannel = Object.fromEntries(
+          MAJOR_RELEASE_NOTICE_CHANNELS.map((channel) => [channel.id, { state: 'idle', message: '' }])
+        );
+        renderMajorReleaseNoticeChannels();
+      }
+
+      function abortMajorReleaseNoticeLoad(){
+        const ctrl = appState.majorReleaseNoticeAbortController;
+        appState.majorReleaseNoticeAbortController = null;
+        if(ctrl){
+          try{
+            ctrl.abort();
+          }catch(_){ }
+        }
+      }
+
+      function buildMajorReleaseNoticeChannelStatusMarkup(status){
+        const state = status && status.state ? String(status.state) : 'idle';
+        const text = status && status.message ? String(status.message) : '';
+        if(state === 'loading'){
+          return `
+            <span class="release-launch-major-notice-channel-status release-launch-major-notice-channel-status-loading">
+              ${getDutyEditorButtonSpinnerMarkup()}
+              <span>Отправляю...</span>
+            </span>
+          `;
+        }
+        if(state === 'success'){
+          return `
+            <span class="release-launch-major-notice-channel-status release-launch-major-notice-channel-status-success" title="Отправлено">
+              <span class="release-launch-major-notice-channel-status-ico release-launch-major-notice-channel-status-ico-success" aria-hidden="true">✓</span>
+            </span>
+          `;
+        }
+        if(state === 'error'){
+          return `
+            <span class="release-launch-major-notice-channel-status release-launch-major-notice-channel-status-error" title="${escHtml(text || 'Ошибка отправки')}">
+              <span class="release-launch-major-notice-channel-status-ico release-launch-major-notice-channel-status-ico-error" aria-hidden="true">✕</span>
+              <span>${escHtml(text || 'Ошибка')}</span>
+            </span>
+          `;
+        }
+        return '<span class="release-launch-major-notice-channel-status release-launch-major-notice-channel-status-idle">Не отправлено</span>';
+      }
+
+      function renderMajorReleaseNoticeChannels(){
+        if(!majorReleaseNoticeChannels) return;
+        majorReleaseNoticeChannels.innerHTML = MAJOR_RELEASE_NOTICE_CHANNELS.map((channel) => {
+          const status = appState.majorReleaseNoticeStatusByChannel[channel.id] || { state: 'idle', message: '' };
+          return `
+            <div class="release-launch-major-notice-channel-row">
+              <div class="release-launch-major-notice-channel-meta">
+                <div class="release-launch-major-notice-channel-name">${escHtml(channel.name)}</div>
+                <div class="release-launch-major-notice-channel-id">(${escHtml(channel.id)})</div>
+              </div>
+              <div class="release-launch-major-notice-channel-status-wrap">
+                ${buildMajorReleaseNoticeChannelStatusMarkup(status)}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function syncMajorReleaseNoticeControls(){
+        const hasText = !!getMajorReleaseNoticeTextareaValue();
+        const disabled = appState.majorReleaseNoticeLoading || appState.majorReleaseNoticePublishing || !hasText;
+        if(majorReleaseNoticePublishBtn) majorReleaseNoticePublishBtn.disabled = disabled;
+      }
+
+      function closeMajorReleaseNoticeModal(){
+        if(!majorReleaseNoticeModal) return;
+        appState.majorReleaseNoticeLoadSeq += 1;
+        abortMajorReleaseNoticeLoad();
+        majorReleaseNoticeModal.hidden = true;
+        majorReleaseNoticeModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('release-launch-modal-open');
+        appState.majorReleaseNoticeLoading = false;
+        appState.majorReleaseNoticePublishing = false;
+        showMajorReleaseNoticeModalError('');
+        resetMajorReleaseNoticeChannelStates();
+        if(majorReleaseNoticeTextarea) majorReleaseNoticeTextarea.value = '';
+        syncMajorReleaseNoticeControls();
+      }
+
+      function openMajorReleaseNoticeModalShell(){
+        if(!majorReleaseNoticeModal) return;
+        majorReleaseNoticeModal.hidden = false;
+        majorReleaseNoticeModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('release-launch-modal-open');
+        renderMajorReleaseNoticeChannels();
+        syncMajorReleaseNoticeControls();
+      }
+
+      async function openMajorReleaseNoticeModal(){
+        const release = getMajorPushReleaseValue();
+        if(!release){
+          showToast('Укажи номер релиза для вкладки «Релиз».', false);
+          return;
+        }
+
+        appState.majorReleaseNoticeLoadSeq += 1;
+        const loadSeq = appState.majorReleaseNoticeLoadSeq;
+        abortMajorReleaseNoticeLoad();
+        const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+        appState.majorReleaseNoticeAbortController = ctrl;
+        resetMajorReleaseNoticeChannelStates();
+        showMajorReleaseNoticeModalError('');
+        if(majorReleaseNoticeTextarea) majorReleaseNoticeTextarea.value = '';
+        appState.majorReleaseNoticeLoading = true;
+        appState.majorReleaseNoticePublishing = false;
+        openMajorReleaseNoticeModalShell();
+        if(majorReleaseNoticeTextarea){
+          majorReleaseNoticeTextarea.value = 'Формирую текст оповещения...';
+        }
+        syncMajorReleaseNoticeControls();
+
+        try{
+          const info = await fetchMajorReleaseNoticeCutoffInfo(release, ctrl ? ctrl.signal : null);
+          if(appState.majorReleaseNoticeLoadSeq !== loadSeq || appState.majorReleaseNoticeAbortController !== ctrl){
+            return;
+          }
+          if(majorReleaseNoticeTextarea){
+            majorReleaseNoticeTextarea.value = buildMajorReleaseNoticeText(release, info);
+          }
+          if(info && Array.isArray(info.errors) && info.errors.length){
+            showMajorReleaseNoticeModalError(info.errors.join(' | '));
+          }
+        }catch(error){
+          if((ctrl && ctrl.signal && ctrl.signal.aborted) || appState.majorReleaseNoticeLoadSeq !== loadSeq){
+            return;
+          }
+          if(majorReleaseNoticeTextarea){
+            majorReleaseNoticeTextarea.value = buildMajorReleaseNoticeFallbackText(release);
+          }
+          showMajorReleaseNoticeModalError(error && error.message ? error.message : String(error || 'Не удалось подготовить текст оповещения'));
+        }finally{
+          if(appState.majorReleaseNoticeAbortController === ctrl){
+            appState.majorReleaseNoticeAbortController = null;
+          }
+          if(appState.majorReleaseNoticeLoadSeq === loadSeq){
+            appState.majorReleaseNoticeLoading = false;
+          }
+          syncMajorReleaseNoticeControls();
+        }
+      }
+
+      async function publishMajorReleaseNotice(){
+        const text = getMajorReleaseNoticeTextareaValue();
+        if(!text){
+          throw new Error('Текст оповещения пуст.');
+        }
+
+        const cfg = collectSettings();
+        ensureReleaseFeedFields(cfg);
+
+        appState.majorReleaseNoticePublishing = true;
+        showMajorReleaseNoticeModalError('');
+        resetMajorReleaseNoticeChannelStates();
+        const results = [];
+        for(const channel of MAJOR_RELEASE_NOTICE_CHANNELS){
+          setMajorReleaseNoticeChannelState(channel.id, 'loading', '');
+          try{
+            await bandCreatePost(text, cfg, null, { channelId: channel.id });
+            setMajorReleaseNoticeChannelState(channel.id, 'success', '');
+            results.push({ channel, ok: true });
+          }catch(error){
+            const message = error && error.message ? error.message : String(error || 'Ошибка отправки');
+            setMajorReleaseNoticeChannelState(channel.id, 'error', message);
+            results.push({ channel, ok: false, message });
+          }
+        }
+
+        appState.majorReleaseNoticePublishing = false;
+        syncMajorReleaseNoticeControls();
+
+        const failed = results.filter((item) => !item.ok);
+        if(!failed.length){
+          showToast('Оповещение опубликовано');
+          return;
+        }
+
+        const firstError = failed[0] && failed[0].message ? failed[0].message : 'Не все каналы приняли сообщение.';
+        showMajorReleaseNoticeModalError(firstError);
+        showToast('Не все каналы приняли оповещение', false);
       }
 
       function buildMajorReleaseRootMessage(platform, release){
@@ -8768,7 +9345,7 @@
             if(result && result.status === 'done'){
               updateDutyPingGlobalStatusByRunningStates({
                 kind: isAnyDutyPingRunning() ? 'progress' : 'ok',
-                message: `${platformLabel} завершен. ${getDutyPingIdleGlobalMessage()}`
+                message: withDutyPingIdleGlobalMessage(`${platformLabel} завершен.`)
               });
             }else{
               updateDutyPingGlobalStatusByRunningStates({
@@ -8787,7 +9364,7 @@
             setDutyPingPlatformStatus(platformKey, 'В pending нет активных стримов', 'ok');
             setDutyPingPlatformMessage(platformKey, '');
             updateDutyPingGlobalStatusByRunningStates({
-              message: `${platformLabel}: pending-стримов нет. ${getDutyPingIdleGlobalMessage()}`,
+              message: withDutyPingIdleGlobalMessage(`${platformLabel}: pending-стримов нет.`),
               kind: 'ok'
             });
             return true;
@@ -8809,7 +9386,7 @@
             setDutyPingPlatformStatus(platformKey, 'Остановлено', 'warn');
             updateDutyPingGlobalStatusByRunningStates({
               kind: isAnyDutyPingRunning() ? 'progress' : 'warn',
-              message: `${platformLabel} остановлен. ${getDutyPingIdleGlobalMessage()}`
+              message: withDutyPingIdleGlobalMessage(`${platformLabel} остановлен.`)
             });
             return false;
           }
@@ -8871,7 +9448,7 @@
           if(result && result.status === 'done'){
             updateDutyPingGlobalStatusByRunningStates({
               kind: isAnyDutyPingRunning() ? 'progress' : 'ok',
-              message: `${platformLabel} завершен. ${getDutyPingIdleGlobalMessage()}`
+              message: withDutyPingIdleGlobalMessage(`${platformLabel} завершен.`)
             });
           }else{
             updateDutyPingGlobalStatusByRunningStates({
@@ -9415,15 +9992,19 @@
         }
 
         button.disabled = true;
+        startCopyFeedback(button);
+        await waitForNextPaint();
         try{
           const copied = await action();
           if(copied){
             scheduleCopyFeedback(button);
           }else{
+            finishCopyFeedback(button);
             refreshButtons();
           }
           return copied;
         }catch(error){
+          finishCopyFeedback(button);
           refreshButtons();
           throw error;
         }
@@ -10236,11 +10817,8 @@
 
       async function updateMajorReleaseThreadLine(platform, lineLabel, lineValue){
         const isIos = platform === 'ios';
-        const label = isIos ? 'iOS' : 'Android';
         const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${label}.`);
+        const release = requireMajorPushRelease(platform);
         if(!textarea) throw new Error('Не найдено поле текста сообщения.');
 
         const details = await findMajorReleaseMainPost(platform, release);
@@ -10257,11 +10835,8 @@
 
       async function resolveMajorReleaseExpectedFinishValue(platform){
         const isIos = platform === 'ios';
-        const label = isIos ? 'iOS' : 'Android';
         const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${label}.`);
+        const release = requireMajorPushRelease(platform);
 
         const localText = textarea ? String(textarea.value || '') : '';
         let expectedFinish = getMajorReleaseLineValue(localText, 'Ожидаемое время окончания проверки:');
@@ -10310,9 +10885,7 @@
       async function ensureMajorReleaseStreamsSheet(platform){
         const isIos = platform === 'ios';
         const label = isIos ? 'iOS' : 'Android';
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${label}.`);
+        const release = requireMajorPushRelease(platform);
 
         logMajorPush(`[${label}] Загружаю стримы из Allure для таблицы...`);
         const streams = await fetchStreams(null);
@@ -10361,9 +10934,7 @@
         const isIos = platform === 'ios';
         const label = isIos ? 'iOS' : 'Android';
         const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${label}.`);
+        const release = requireMajorPushRelease(platform);
         if(!textarea) throw new Error('Не найдено поле текста сообщения.');
 
         const runName = String((run && run.name) || buildMajorReadinessLaunchName(platform, release)).trim();
@@ -10398,9 +10969,7 @@
       async function createMajorReadinessRun(platform, signal){
         const isIos = platform === 'ios';
         const label = isIos ? 'iOS' : 'Android';
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${label}.`);
+        const release = requireMajorPushRelease(platform);
 
         const launchName = buildMajorReadinessLaunchName(platform, release);
         const releaseTagName = buildMajorReadinessReleaseTagName(release);
@@ -10588,9 +11157,7 @@
       async function fillRunsInThreadText(platform){
         const isIos = platform === 'ios';
         const label = isIos ? 'iOS' : 'Android';
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${label}.`);
+        const release = requireMajorPushRelease(platform);
 
         logMajorPush(`[${label}] Ищу раны Allure для версии ${release}...`);
         const { blockerHigh, selective } = await fetchAllureRunsForPlatform(release, platform);
@@ -10641,7 +11208,6 @@
       async function fillDutyOfficersInThreadText(platform){
         const isIos = platform === 'ios';
         const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
         if(!textarea) throw new Error('Не найдено поле текста сообщения.');
 
         const rows = (appState.lastRun && Array.isArray(appState.lastRun.rows)) ? appState.lastRun.rows : [];
@@ -10666,8 +11232,7 @@
         const label = isIos ? 'iOS' : 'Android';
         logMajorPush(`[${label}] Дежурные вставлены (${lines.length} стримов), обновляю тред...`);
 
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${label}.`);
+        const release = requireMajorPushRelease(platform);
 
         const cfg = collectSettings();
         ensureReleaseFeedFields(cfg);
@@ -10699,9 +11264,7 @@
         const isIos = platform === 'ios';
         const updateExisting = !!(options && options.updateExisting);
         const label = isIos ? 'iOS' : 'Android';
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${label}.`);
+        const release = requireMajorPushRelease(platform);
         const rootPost = await findReleaseFeedRootPost(platform, release, cfg);
         const rootId = String(rootPost.id || '').trim();
         const orderedComponents = sortComponentDisplayTexts(components);
@@ -10746,9 +11309,7 @@
         const isIos = platform === 'ios';
         const token = getDeployLabTokenFromStorage();
         if(!token) throw new Error('Не найден Deploy Lab token (заполни поле в настройках).');
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
+        const release = requireMajorPushRelease(platform);
         const releaseId = buildDeployLabReleaseId(platform, release);
         logMajorPush(`[${isIos ? 'iOS' : 'Android'}] Запрашиваю компоненты для ${releaseId}...`);
         const components = await fetchReleaseComponents(platform, release, token);
@@ -11017,8 +11578,7 @@
         const seqKey = isIos ? 'pushIosSyncSeq' : 'pushAndSyncSeq';
         const syncingKey = isIos ? 'pushIosSyncing' : 'pushAndSyncing';
         const label = isIos ? 'iOS' : 'Android';
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
+        const release = getMajorPushReleaseValue();
         const baselineStatuses = (isIos ? PUSH_IOS_STEPS : PUSH_AND_STEPS).map(() => 'pending');
         let readinessRun = null;
         let streamsSheetExists = false;
@@ -11134,10 +11694,8 @@
 
       async function fetchAndFillMajorYtData(platform){
         const isIos = platform === 'ios';
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
         const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Заполни версию ${isIos ? 'iOS' : 'Android'} перед загрузкой.`);
+        const release = requireMajorPushRelease(platform);
 
         const mode = isIos ? '2' : '1';
         logMajorPush(`Загружаю доску из YT для релиза ${release}...`);
@@ -11169,52 +11727,44 @@
       }
 
       function initMajorPushTab(){
-        const iosVerInput = $('majorIosReleaseVersion');
-        const andVerInput = $('majorAndroidReleaseVersion');
+        const releaseInput = getMajorPushReleaseInput();
         const iosTextarea = $('majorIosThreadText');
         const andTextarea = $('majorAndroidThreadText');
         const pollTextarea = getMajorPollTextarea();
+        const initialRelease = getMajorSharedReleaseValue() || loadMajorSharedReleaseFromStorage();
 
-        if(iosVerInput && !String(iosVerInput.value || '').trim()){
-          iosVerInput.value = loadMajorPushReleaseFromStorage('ios');
-        }
-        if(andVerInput && !String(andVerInput.value || '').trim()){
-          andVerInput.value = loadMajorPushReleaseFromStorage('android');
-        }
+        syncMajorSharedReleaseInputs(initialRelease);
+        saveMajorSharedReleaseToStorage(initialRelease);
 
         if(iosTextarea && !String(iosTextarea.value || '').trim()){
-          iosTextarea.value = buildMajorReleaseThreadMessage('ios', String(iosVerInput ? iosVerInput.value : '').trim() || '[версия]');
+          iosTextarea.value = buildMajorReleaseThreadMessage('ios', getMajorPushReleaseValue() || '[версия]');
         }
         if(andTextarea && !String(andTextarea.value || '').trim()){
-          andTextarea.value = buildMajorReleaseThreadMessage('android', String(andVerInput ? andVerInput.value : '').trim() || '[версия]');
+          andTextarea.value = buildMajorReleaseThreadMessage('android', getMajorPushReleaseValue() || '[версия]');
         }
         if(pollTextarea) pollTextarea.readOnly = true;
         if(!String(appState.majorPollText || '').trim()){
           setMajorPollStatus('Получаем стримы из Allure...', 'progress');
         }
 
-        const iosListenerKey = '__majorIosInputListener';
-        const andListenerKey = '__majorAndInputListener';
-        if(iosVerInput && !iosVerInput[iosListenerKey]){
-          iosVerInput[iosListenerKey] = true;
-          iosVerInput.addEventListener('input', () => {
-            if(!iosTextarea) return;
-            const ver = String(iosVerInput.value || '').trim();
-            saveMajorPushReleaseToStorage('ios', ver);
-            clearMajorPushRootAnchor('ios');
-            iosTextarea.value = buildMajorReleaseThreadMessage('ios', ver || '[версия]');
+        const releaseListenerKey = '__majorReleaseInputListener';
+        if(releaseInput && !releaseInput[releaseListenerKey]){
+          releaseInput[releaseListenerKey] = true;
+          releaseInput.addEventListener('input', () => {
+            const release = normalizeMajorSharedReleaseValue(releaseInput.value);
+            saveMajorSharedReleaseToStorage(release);
+            syncMajorSharedReleaseInputs(release, { skipInput: releaseInput });
+            clearMajorPushRootAnchors();
+            setMajorReleaseThreadDrafts(release);
+            syncDutyPingControls();
             schedulePushWorkflowSync('ios');
-          });
-        }
-        if(andVerInput && !andVerInput[andListenerKey]){
-          andVerInput[andListenerKey] = true;
-          andVerInput.addEventListener('input', () => {
-            if(!andTextarea) return;
-            const ver = String(andVerInput.value || '').trim();
-            saveMajorPushReleaseToStorage('android', ver);
-            clearMajorPushRootAnchor('android');
-            andTextarea.value = buildMajorReleaseThreadMessage('android', ver || '[версия]');
             schedulePushWorkflowSync('android');
+          });
+          releaseInput.addEventListener('change', () => {
+            const release = normalizeMajorSharedReleaseValue(releaseInput.value);
+            saveMajorSharedReleaseToStorage(release);
+            syncMajorSharedReleaseInputs(release, { skipInput: releaseInput });
+            syncDutyPingControls();
           });
         }
 
@@ -11230,10 +11780,8 @@
 
       async function publishMajorReleaseFeedPost(platform){
         const isIos = platform === 'ios';
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
         const textarea = $(isIos ? 'majorIosThreadText' : 'majorAndroidThreadText');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
+        const release = requireMajorPushRelease(platform);
 
         // Загружаем данные из YouTrack перед публикацией
         await fetchAndFillMajorYtData(platform);
@@ -11275,9 +11823,7 @@
         const pollText = String(await refreshMajorPollText(null) || '').trim();
         if(!pollText) throw new Error('Текст опроса пуст.');
 
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
+        const release = requireMajorPushRelease(platform);
 
         const rootMessage = buildMajorReleaseRootMessage(platform, release);
         const rootPost = await resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts, null);
@@ -11289,9 +11835,7 @@
 
       async function publishAtReminderToThread(platform, feedPosts, cfg){
         const isIos = platform === 'ios';
-        const verInput = $(isIos ? 'majorIosReleaseVersion' : 'majorAndroidReleaseVersion');
-        const release = verInput ? String(verInput.value || '').trim() : '';
-        if(!release) throw new Error(`Укажи версию ${isIos ? 'iOS' : 'Android'}.`);
+        const release = requireMajorPushRelease(platform);
 
         const rootMessage = buildMajorReleaseRootMessage(platform, release);
         const rootPost = await resolveReleaseFeedRootPostFromFeedPosts(platform, release, cfg, feedPosts, null);
@@ -11869,13 +12413,9 @@
             runBuildInput.value = '';
           }
         }
-        if(majorDutyPingReleaseInput){
-          try{
-            majorDutyPingReleaseInput.value = String(localStorage.getItem(LS_MAJOR_DUTY_PING_RELEASE_KEY) || '');
-          }catch(_){
-            majorDutyPingReleaseInput.value = '';
-          }
-        }
+        const initialMajorRelease = loadMajorSharedReleaseFromStorage();
+        syncMajorSharedReleaseInputs(initialMajorRelease);
+        saveMajorSharedReleaseToStorage(initialMajorRelease);
         if(automationTriggerModeSelect){
           automationTriggerModeSelect.value = 'delay';
         }
@@ -12010,6 +12550,24 @@
           if(event.target === swatScheduleModal){
             closeSwatScheduleModal();
           }
+        });
+        majorReleasePublishNoticeBtn?.addEventListener('click', () => {
+          openMajorReleaseNoticeModal().catch((err) => {
+            showToast(err && err.message ? err.message : 'Не удалось открыть оповещение', false);
+          });
+        });
+        majorReleaseNoticeModalClose?.addEventListener('click', closeMajorReleaseNoticeModal);
+        majorReleaseNoticeCancelBtn?.addEventListener('click', closeMajorReleaseNoticeModal);
+        majorReleaseNoticeModal?.addEventListener('click', (event) => {
+          if(event.target === majorReleaseNoticeModal){
+            closeMajorReleaseNoticeModal();
+          }
+        });
+        majorReleaseNoticeTextarea?.addEventListener('input', syncMajorReleaseNoticeControls);
+        majorReleaseNoticePublishBtn?.addEventListener('click', () => {
+          withButtonBusy(majorReleaseNoticePublishBtn, 'Публикую...', publishMajorReleaseNotice).catch((err) => {
+            showMajorReleaseNoticeModalError(err && err.message ? err.message : 'Не удалось опубликовать оповещение');
+          });
         });
         dutyEditorReloadBtn?.addEventListener('click', () => withButtonBusy(dutyEditorReloadBtn, 'Загружаю...', () => loadDutyEditorData(true)).catch((err) => {
           const message = err && err.message ? err.message : String(err || 'Не удалось загрузить редактор');
@@ -12167,6 +12725,7 @@
           if(event.key === 'Escape'){
             closeSwatScheduleMenu();
             closeSwatScheduleModal();
+            closeMajorReleaseNoticeModal();
             closeAllDutyEditorLeadSearchPanels();
           }
         });
@@ -12180,11 +12739,19 @@
         });
         pingMessage?.addEventListener('input', refreshButtons);
         majorDutyPingReleaseInput?.addEventListener('input', () => {
-          saveDutyPingReleaseValue();
+          const release = normalizeMajorSharedReleaseValue(majorDutyPingReleaseInput.value);
+          saveMajorSharedReleaseToStorage(release);
+          syncMajorSharedReleaseInputs(release, { skipInput: majorDutyPingReleaseInput });
+          clearMajorPushRootAnchors();
+          setMajorReleaseThreadDrafts(release);
           syncDutyPingControls();
+          schedulePushWorkflowSync('ios');
+          schedulePushWorkflowSync('android');
         });
         majorDutyPingReleaseInput?.addEventListener('change', () => {
-          saveDutyPingReleaseValue();
+          const release = normalizeMajorSharedReleaseValue(majorDutyPingReleaseInput.value);
+          saveMajorSharedReleaseToStorage(release);
+          syncMajorSharedReleaseInputs(release, { skipInput: majorDutyPingReleaseInput });
           syncDutyPingControls();
         });
         majorDutyPingAndroidStartBtn?.addEventListener('click', () => {
