@@ -623,35 +623,41 @@
       const RE_INLINE_FREE = new RegExp(`${DUTY_WORD}\\s+([^\\n\\r"@]+?)` + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'giu');
       const RE_ANDROID = new RegExp('\\b(?:Android|andr)\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
       const RE_IOS = new RegExp('\\bios\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
-      const DUTY_PING_TIME_HHMM_RE = /\b([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)\b/iu;
-      const DUTY_PING_TIME_TO_RE = /\bдо\s*([01]?\d|2[0-3])(?:\s*[:.]\s*([0-5]\d))?\b/iu;
-      const DUTY_PING_TIME_H_ONLY_RE = /\b(?:в|к)\s*([01]?\d|2[0-3])\b(?!\s*[:.]\s*\d)/iu;
-      const DUTY_PING_RANGE_MIN_SUFFIX_RE = /\b(\d{1,3})\s*[-–]\s*(\d{1,3})\s*(?:мин|минута|минуты|минут|минуток|минутак|m|м)\b/iu;
-      const DUTY_PING_RANGE_MIN_PREFIX_RE = /\b(?:минут(?:ок|ак)?|мин)\s*(\d{1,3})\s*[-–]\s*(\d{1,3})\b/iu;
-      const DUTY_PING_RANGE_NUMBERS_CONTEXT_MIN_RE = /\b(\d{1,3})\s*[-–]\s*(\d{1,3})\b/iu;
-      const DUTY_PING_MIN_PREFIX_RE = /\b(?:минут(?:ок|ак)?|мин)\s*(\d{1,3})\b/iu;
-      const DUTY_PING_MIN_SUFFIX_RE = /\b(\d{1,3})\s*(?:мин|минута|минуты|минут|минуток|минутак|m|м)\b/iu;
+      const DUTY_PING_ETA_APPROX_WORDS_PART = '(?:около|примерно|приблизительно|ориентировочно|где\\s*[-–—]?\\s*то|гдето)';
+      const DUTY_PING_WORD_LEFT = '(?<![\\p{L}\\p{N}_])';
+      const DUTY_PING_WORD_RIGHT = '(?![\\p{L}\\p{N}_])';
+      function dutyPingWordRe(pattern, flags = 'iu'){
+        return new RegExp(`${DUTY_PING_WORD_LEFT}${pattern}${DUTY_PING_WORD_RIGHT}`, flags);
+      }
+      const DUTY_PING_TIME_HHMM_RE = dutyPingWordRe('([01]?\\d|2[0-3])\\s*[:.]\\s*([0-5]\\d)');
+      const DUTY_PING_TIME_TO_RE = dutyPingWordRe('до\\s*([01]?\\d|2[0-3])(?:\\s*[:.]\\s*([0-5]\\d))?');
+      const DUTY_PING_TIME_H_ONLY_RE = new RegExp(`${DUTY_PING_WORD_LEFT}(?:в|к)\\s*([01]?\\d|2[0-3])${DUTY_PING_WORD_RIGHT}(?!\\s*[:.]\\s*\\d)`, 'iu');
+      const DUTY_PING_RANGE_MIN_SUFFIX_RE = dutyPingWordRe('(\\d{1,3})\\s*[-–]\\s*(\\d{1,3})\\s*(?:мин|минута|минуты|минут|минуток|минутак|m|м)');
+      const DUTY_PING_RANGE_MIN_PREFIX_RE = dutyPingWordRe('(?:минут(?:ок|ак)?|мин)\\s*(\\d{1,3})\\s*[-–]\\s*(\\d{1,3})');
+      const DUTY_PING_RANGE_NUMBERS_CONTEXT_MIN_RE = dutyPingWordRe('(\\d{1,3})\\s*[-–]\\s*(\\d{1,3})');
+      const DUTY_PING_MIN_PREFIX_RE = dutyPingWordRe('(?:минут(?:ок|ак)?|мин)\\s*(\\d{1,3})');
+      const DUTY_PING_MIN_SUFFIX_RE = dutyPingWordRe('(\\d{1,3})\\s*(?:мин|минута|минуты|минут|минуток|минутак|m|м)');
       const DUTY_PING_H_SHORT_RE = /(?:^|[^\p{L}\p{N}])(\d+(?:[.,]\d+)?)\s*ч(?!\p{L}|\p{N})/iu;
       const DUTY_PING_M_SHORT_RE = /(?:^|[^\p{L}\p{N}])(\d{1,3})\s*м(?!\p{L}|\p{N})/iu;
-      const DUTY_PING_ONE_HOUR_FUZZY_RE = /\b(?:часик(?:а)?|часок)\b/iu;
-      const DUTY_PING_RANGE_HOURS_RE = /\b(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)\s*(?:ч\.?|час(?:а|ов)?|часик(?:а)?|часка)\b/iu;
-      const DUTY_PING_HOURS_RE = /\b(?:через\s*)?(?:около\s*)?(\d+(?:[.,]\d+)?)\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b/iu;
-      const DUTY_PING_HOURS_REV_RE = /\b(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\s*(\d+(?:[.,]\d+)?)\b/iu;
-      const DUTY_PING_HALF_HOUR_WORD_RE = /\b(?:полчаса|полчасика|пол-часа|пол часа|полчас)\b/iu;
-      const DUTY_PING_ONE_AND_HALF_WORD_RE = /\b(?:полтора\s*часа|часа\s*полтора|час-полтора)\b/iu;
-      const DUTY_PING_HOUR_MAYBE_ONE_AND_HALF_RE = /\bчас(?:а)?\b[^\n]{0,30}\bполтора\b/iu;
-      const DUTY_PING_ONE_HOUR_APPROX_RE = /\b(?:примерно|приблизительно)\s*(?:час|часик(?:а)?|часок)\b/iu;
-      const DUTY_PING_THROUGH_HOUR_RE = /\bчерез\s*(?:часок|часик|час)\b/iu;
-      const DUTY_PING_WITHIN_ONE_HOUR_RE = /\b(?:в\s+течение|в\s+течении)\s*(?:ближайш(?:ий|его)\s*)?(?:часа|час|часик(?:а)?|часок)\b/iu;
-      const DUTY_PING_ONE_HOUR_PLAIN_RE = /\bчас\b/iu;
-      const DUTY_PING_WORD_HOURS_RE = /\b(?:через\s*)?(?:около\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b/iu;
-      const DUTY_PING_WORD_HOURS_REV_RE = /\b(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\s*(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\b/iu;
-      const DUTY_PING_WORD_MIN_RE = /\b(?:через\s*)?(?:около\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)\s*(?:минут(?:ок|ак)?|мин|m|м)\b/iu;
-      const DUTY_PING_WORD_MIN_REV_RE = /\b(?:минут(?:ок|ак)?|мин|m|м)\s*(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)\b/iu;
-      const DUTY_PING_WITHIN_WORD_HOURS_RE = /\b(?:в\s+течение|в\s+течении)\s*(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b/iu;
-      const DUTY_PING_WITHIN_HOURS_RE = /\b(?:в\s+течение|в\s+течении)\s*(\d+(?:[.,]\d+)?)\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\.?)\b/iu;
+      const DUTY_PING_ONE_HOUR_FUZZY_RE = dutyPingWordRe('(?:часик(?:а)?|часок)');
+      const DUTY_PING_RANGE_HOURS_RE = dutyPingWordRe('(\\d+(?:[.,]\\d+)?)\\s*[-–]\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:ч\\.?|час(?:а|ов)?|часик(?:а)?|часка)');
+      const DUTY_PING_HOURS_RE = dutyPingWordRe(`(?:через\\s*)?(?:${DUTY_PING_ETA_APPROX_WORDS_PART}\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)`);
+      const DUTY_PING_HOURS_REV_RE = dutyPingWordRe('(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)\\s*(\\d+(?:[.,]\\d+)?)');
+      const DUTY_PING_HALF_HOUR_WORD_RE = dutyPingWordRe('(?:полчаса|полчасика|пол-часа|пол часа|полчас)');
+      const DUTY_PING_ONE_AND_HALF_WORD_RE = dutyPingWordRe('(?:полтора\\s*часа|часа\\s*полтора|час-полтора)');
+      const DUTY_PING_HOUR_MAYBE_ONE_AND_HALF_RE = new RegExp(`${DUTY_PING_WORD_LEFT}час(?:а)?${DUTY_PING_WORD_RIGHT}[^\\n]{0,30}${DUTY_PING_WORD_LEFT}полтора${DUTY_PING_WORD_RIGHT}`, 'iu');
+      const DUTY_PING_ONE_HOUR_APPROX_RE = dutyPingWordRe(`(?:${DUTY_PING_ETA_APPROX_WORDS_PART})\\s*(?:час|часик(?:а)?|часок)`);
+      const DUTY_PING_THROUGH_HOUR_RE = dutyPingWordRe('через\\s*(?:часок|часик|час)');
+      const DUTY_PING_WITHIN_ONE_HOUR_RE = dutyPingWordRe('(?:в\\s+течение|в\\s+течении)\\s*(?:ближайш(?:ий|его)\\s*)?(?:часа|час|часик(?:а)?|часок)');
+      const DUTY_PING_ONE_HOUR_PLAIN_RE = dutyPingWordRe('час');
+      const DUTY_PING_WORD_HOURS_RE = dutyPingWordRe(`(?:через\\s*)?(?:${DUTY_PING_ETA_APPROX_WORDS_PART}\\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)`);
+      const DUTY_PING_WORD_HOURS_REV_RE = dutyPingWordRe('(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)\\s*(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)');
+      const DUTY_PING_WORD_MIN_RE = dutyPingWordRe(`(?:через\\s*)?(?:${DUTY_PING_ETA_APPROX_WORDS_PART}\\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)\\s*(?:минут(?:ок|ак)?|мин|m|м)`);
+      const DUTY_PING_WORD_MIN_REV_RE = dutyPingWordRe('(?:минут(?:ок|ак)?|мин|m|м)\\s*(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)');
+      const DUTY_PING_WITHIN_WORD_HOURS_RE = dutyPingWordRe('(?:в\\s+течение|в\\s+течении)\\s*(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)');
+      const DUTY_PING_WITHIN_HOURS_RE = dutyPingWordRe('(?:в\\s+течение|в\\s+течении)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)');
       const DUTY_PING_REPLY_STREAM_SPLIT_RE = /\s*(?:[-—:–|]|->|=>)\s*/u;
-      const DUTY_PING_REPLY_TIME_BOUNDARY_RE = /\b(?:до|в|к|через|около|минут(?:ок|ак)?|мин|час(?:а|ов)?|ч\.?|полтора|полчаса|полчасика|пол-часа|пол часа)\b/iu;
+      const DUTY_PING_REPLY_TIME_BOUNDARY_RE = dutyPingWordRe(`(?:до|в|к|через|${DUTY_PING_ETA_APPROX_WORDS_PART}|минут(?:ок|ак)?|мин|час(?:а|ов)?|ч\\.?|полтора|полчаса|полчасика|пол-часа|пол часа)`);
       const DUTY_PING_REPLY_QUOTED_STREAM_RE = /["«]([^"»]{2,120})["»]/gu;
       const DUTY_PING_NUM_WORDS = {
         'ноль': 0,
@@ -8251,8 +8257,18 @@
         return Object.prototype.hasOwnProperty.call(DUTY_PING_NUM_WORDS, key) ? DUTY_PING_NUM_WORDS[key] : null;
       }
 
+      function normalizeDutyPingEtaText(text){
+        return String(text || '')
+          .replace(/&nbsp;/giu, ' ')
+          .replace(/[\u00a0\u202f\u2007\u2009]/gu, ' ')
+          .replace(/[\u200b-\u200d\ufeff]/gu, '')
+          .trim()
+          .toLocaleLowerCase('ru-RU')
+          .replace(/\s+/gu, ' ');
+      }
+
       function parseDutyPingMinutesLikeText(text){
-        const source = String(text || '').trim().toLocaleLowerCase('ru-RU');
+        const source = normalizeDutyPingEtaText(text);
         if(!source) return null;
 
         if(DUTY_PING_THROUGH_HOUR_RE.test(source)) return 60;
@@ -8363,7 +8379,7 @@
       }
 
       function parseDutyPingReplyEta(text, baseMs){
-        const source = String(text || '').trim().toLocaleLowerCase('ru-RU');
+        const source = normalizeDutyPingEtaText(text);
         if(!source) return null;
 
         const relativeMinutes = parseDutyPingMinutesLikeText(source);
@@ -8406,7 +8422,12 @@
         const candidates = [];
 
         for(const rawLine of String(text || '').split(/\r?\n/)){
-          const line = String(rawLine || '').trim().replace(/\s+/g, ' ');
+          const line = String(rawLine || '')
+            .replace(/&nbsp;/giu, ' ')
+            .replace(/[\u00a0\u202f\u2007\u2009]/gu, ' ')
+            .replace(/[\u200b-\u200d\ufeff]/gu, '')
+            .trim()
+            .replace(/\s+/g, ' ');
           if(!line) continue;
 
           for(const match of line.matchAll(DUTY_PING_REPLY_QUOTED_STREAM_RE)){
@@ -9091,7 +9112,7 @@
                   const matchedStreams = resolveDutyPingUserStreams(username, runtime.streamOrder, runtime.usernameToStreams, runtime.streamToHandle);
                   if(!matchedStreams.includes(neededStream)) continue;
 
-                  const message = String(post.message || '');
+                  const message = normalizeBandMessageText(post && post.message);
                   const explicitStreams = extractDutyPingReplyStreams(message, matchedStreams, activeStreamMap);
                   if(explicitStreams.length && !explicitStreams.includes(neededStream)) continue;
 
@@ -9143,7 +9164,7 @@
                 continue;
               }
 
-              const message = String(post.message || '');
+              const message = normalizeBandMessageText(post && post.message);
               let replyStreams = matchedStreams;
               const explicitStreams = extractDutyPingReplyStreams(message, matchedStreams, activeStreamMap);
               if(explicitStreams.length){
