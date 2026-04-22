@@ -256,7 +256,7 @@ window.fbReady = false;
 
 // Keys stored as {id: record} objects in Firebase (not flat arrays).
 // This allows per-record writes and real-time listeners per user/role.
-window.FB_OBJ_KEYS = ['users', 'roles'];
+window.FB_OBJ_KEYS = ['users', 'roles', 'enrollments', 'notifications'];
 
 (function initFirebase(){
   try {
@@ -281,7 +281,15 @@ window.fbToLocal = function(k, v){
 window.fbFromLocal = function(k, v){
   if(window.FB_OBJ_KEYS.includes(k) && Array.isArray(v)){
     const obj = {};
-    v.forEach(function(item){ if(item && item.id) obj[item.id] = item; });
+    v.forEach(function(item){
+      if(!item) return;
+      if(item.id) {
+        obj[item.id] = item;
+      } else if(k === 'enrollments' && item.userId && item.courseId) {
+        var eid = item.userId + '_' + item.courseId;
+        obj[eid] = Object.assign({}, item, {id: eid});
+      }
+    });
     return obj;
   }
   return v;
@@ -328,6 +336,19 @@ window.fbDeleteUser = function(userId){
 window.fbDeleteRole = function(roleId){
   if(!window.fbReady || !window.fbDB || !roleId) return;
   window.fbDB.ref('lh/roles/'+roleId).remove().catch(function(e){ console.warn('[LearnHub] FB role delete error:', e); });
+};
+
+// Write a single enrollment record to Firebase (key = userId_courseId)
+window.fbSaveEnrollment = function(enrollment){
+  if(!window.fbReady || !window.fbDB || !enrollment || !enrollment.userId || !enrollment.courseId) return;
+  var id = enrollment.userId + '_' + enrollment.courseId;
+  window.fbDB.ref('lh/enrollments/'+id).set(Object.assign({}, enrollment, {id: id})).catch(function(e){ console.warn('[LearnHub] FB enrollment save error:', e); });
+};
+
+// Write a single notification record to Firebase
+window.fbSaveNotification = function(notif){
+  if(!window.fbReady || !window.fbDB || !notif || !notif.id) return;
+  window.fbDB.ref('lh/notifications/'+notif.id).set(notif).catch(function(e){ console.warn('[LearnHub] FB notification save error:', e); });
 };
 
 // Subscribe to real-time changes on users/roles (calls callback with updated array)
@@ -554,11 +575,13 @@ const getEnrollmentApproverId=(member,users=getAllUsers())=>{
 };
 const getEnrollmentRecord=(userId,courseId,enrollments=getAllEnrollments())=>enrollments.find(e=>e.userId===userId&&e.courseId===courseId)||null;
 const upsertEnrollmentRecord=(record,enrollments=getAllEnrollments())=>{
+  const merged={id:record.userId+'_'+record.courseId,...record};
   const next=[...enrollments];
   const index=next.findIndex(e=>e.userId===record.userId&&e.courseId===record.courseId);
-  if(index>=0) next[index]={...next[index],...record};
-  else next.push(record);
-  S.s('enrollments',next);
+  if(index>=0) next[index]={...next[index],...merged};
+  else next.push(merged);
+  window.lhCacheWrite('enrollments',next);
+  window.fbSaveEnrollment(merged);
   return next;
 };
 const getStepAnswerRecord=(userId,courseId,stepId,answers=getAllStepAnswers())=>answers.find(a=>a.userId===userId&&a.courseId===courseId&&a.stepId===stepId)||null;
@@ -746,15 +769,15 @@ function seedData(){
       ]}]}]},
   ];
   const enrollments=[
-    {userId:'u1',courseId:'c1',progress:60,status:'active',startedAt:'2026-03-01'},
-    {userId:'u1',courseId:'c3',progress:100,status:'completed',startedAt:'2026-02-01',completedAt:'2026-02-20'},
-    {userId:'u2',courseId:'c1',progress:100,status:'completed',startedAt:'2026-02-10',completedAt:'2026-03-01'},
-    {userId:'u2',courseId:'c2',progress:45,status:'active',startedAt:'2026-03-05'},
-    {userId:'u3',courseId:'c1',progress:80,status:'active',startedAt:'2026-02-15'},
-    {userId:'u4',courseId:'c1',progress:30,status:'active',startedAt:'2026-03-01'},
-    {userId:'u5',courseId:'c1',progress:10,status:'active',startedAt:'2026-03-10'},
-    {userId:'u6',courseId:'c2',progress:100,status:'completed',startedAt:'2026-01-15',completedAt:'2026-02-10'},
-    {userId:'u7',courseId:'c1',progress:15,status:'active',startedAt:'2026-03-12'},
+    {id:'u1_c1',userId:'u1',courseId:'c1',progress:60,status:'active',startedAt:'2026-03-01'},
+    {id:'u1_c3',userId:'u1',courseId:'c3',progress:100,status:'completed',startedAt:'2026-02-01',completedAt:'2026-02-20'},
+    {id:'u2_c1',userId:'u2',courseId:'c1',progress:100,status:'completed',startedAt:'2026-02-10',completedAt:'2026-03-01'},
+    {id:'u2_c2',userId:'u2',courseId:'c2',progress:45,status:'active',startedAt:'2026-03-05'},
+    {id:'u3_c1',userId:'u3',courseId:'c1',progress:80,status:'active',startedAt:'2026-02-15'},
+    {id:'u4_c1',userId:'u4',courseId:'c1',progress:30,status:'active',startedAt:'2026-03-01'},
+    {id:'u5_c1',userId:'u5',courseId:'c1',progress:10,status:'active',startedAt:'2026-03-10'},
+    {id:'u6_c2',userId:'u6',courseId:'c2',progress:100,status:'completed',startedAt:'2026-01-15',completedAt:'2026-02-10'},
+    {id:'u7_c1',userId:'u7',courseId:'c1',progress:15,status:'active',startedAt:'2026-03-12'},
   ];
   const stepProgress=[
     {userId:'u1',stepId:'s1',courseId:'c1',status:'completed',score:100},
@@ -845,11 +868,24 @@ function Navbar(){
   const{theme,setTheme,user,go,toast:addToast,logout}=useApp();
   const[showNotif,setShowNotif]=useState(false);
   const[showDD,setShowDD]=useState(false);
-  const[notifs,setNotifs]=useState(S.g('notifications',[]));
+  const filterNotifs=(all)=>asArray(all).filter(n=>!n.forUserId||n.forUserId===user.id);
+  const[notifs,setNotifs]=useState(()=>filterNotifs(S.g('notifications',[])));
   const[searchQ,setSearchQ]=useState('');
   const[searchFocus,setSearchFocus]=useState(false);
+  useEffect(()=>{
+    const unsub=window.fbWatch('notifications',arr=>{if(Array.isArray(arr))setNotifs(filterNotifs(arr));});
+    return unsub;
+  },[]);
   const unread=notifs.filter(n=>!n.read).length;
-  const markRead=()=>{const u=notifs.map(n=>({...n,read:true}));setNotifs(u);S.s('notifications',u)};
+  const refreshNotifs=()=>setNotifs(filterNotifs(S.g('notifications',[])));
+  const openNotif=()=>{refreshNotifs();setShowNotif(s=>!s);setShowDD(false)};
+  const markRead=()=>{
+    const all=S.g('notifications',[]);
+    const updated=all.map(n=>(!n.forUserId||n.forUserId===user.id)?{...n,read:true}:n);
+    window.lhCacheWrite('notifications',updated);
+    updated.filter(n=>!n.forUserId||n.forUserId===user.id).forEach(n=>window.fbSaveNotification(n));
+    setNotifs(filterNotifs(updated));
+  };
   const ini=user.firstName[0]+user.lastName[0];
   const ts=[{id:'',c:'#6C5CE7',l:'Яркая'},{id:'dark',c:'#1E1E2E',l:'Тёмная'},{id:'corporate',c:'#0984E3',l:'Корпоратив'},{id:'warm',c:'#E17055',l:'Тёплая'}];
 
@@ -884,7 +920,7 @@ function Navbar(){
     <div className="nav-r">
       <div className="themes">{ts.map(t=><div key={t.id} className={`tdot ${theme===t.id?'on':''}`} style={{background:t.c}} onClick={()=>setTheme(t.id)} title={t.l}/>)}</div>
       <div style={{position:'relative'}}>
-        <div className="nav-btn" onClick={()=>{setShowNotif(!showNotif);setShowDD(false)}}>🔔{unread>0&&<span className="badge-c">{unread}</span>}</div>
+        <div className="nav-btn" onClick={openNotif}>🔔{unread>0&&<span className="badge-c">{unread}</span>}</div>
         {showNotif&&<div className="notif-dd">
           <div style={{padding:'10px 14px',fontWeight:600,fontSize:13,borderBottom:'1px solid var(--bg3)',display:'flex',justifyContent:'space-between'}}>
             <span>Уведомления</span>{unread>0&&<span style={{color:'var(--p)',cursor:'pointer',fontSize:11}} onClick={markRead}>Прочитать все</span>}
@@ -917,10 +953,16 @@ function Sidebar(){
   const{page,go,mini,setMini,user}=useApp();
   const isA=user.role==='admin',isM=isA||user.role==='manager',isI=isA||user.role==='instructor';
   const pendingReviews=S.g('submissions',[]).filter(s=>s.status==='pending'&&s.managerId===user.id).length;
+  const[pendingEnrollments,setPendingEnrollments]=useState(()=>getAllEnrollments().filter(e=>e.status==='pending'&&e.approverId===user.id).length);
+  useEffect(()=>{
+    if(!isM) return;
+    const unsub=window.fbWatch('enrollments',arr=>{if(Array.isArray(arr))setPendingEnrollments(arr.filter(e=>e.status==='pending'&&e.approverId===user.id).length);});
+    return unsub;
+  },[]);
   const items=[
     {s:'Обучение'},{id:'dash',i:'📊',l:'Dashboard'},{id:'catalog',i:'📚',l:'Каталог'},{id:'mycourses',i:'📖',l:'Мои курсы'},{id:'achievements',i:'🏆',l:'Достижения'},
   ];
-  if(isM)items.push({s:'Управление'},{id:'team',i:'👥',l:'Команда'},{id:'analytics',i:'📈',l:'Аналитика'},{id:'reviews',i:'📋',l:'Проверки',badge:pendingReviews});
+  if(isM)items.push({s:'Управление'},{id:'team',i:'👥',l:'Команда',badge:pendingEnrollments},{id:'analytics',i:'📈',l:'Аналитика'},{id:'reviews',i:'📋',l:'Проверки',badge:pendingReviews});
   if(isI)items.push({s:'Создание'},{id:'constructor',i:'🛠️',l:'Конструктор'});
   if(isA)items.push({s:'Админ'},{id:'admin-users',i:'👤',l:'Пользователи'},{id:'admin-roles',i:'🔑',l:'Роли'});
   items.push({id:'settings',i:'⚙️',l:'Настройки'});
@@ -1014,17 +1056,22 @@ function CatalogPage(){
   const enroll=(cid)=>{
     if(enrs.find(e=>e.userId===user.id&&e.courseId===cid)){addToast('info','Заявка или запись уже есть');return}
     const approverId=getEnrollmentApproverId(user);
-    const ne={userId:user.id,courseId:cid,progress:0,status:'pending',startedAt:null,requestedAt:new Date().toISOString(),approverId};
-    const u=[...enrs,ne];setEnrs(u);S.s('enrollments',u);
-    const notifs=S.g('notifications',[]);notifs.unshift({id:'n'+Date.now(),text:'Вы записались на курс!',icon:'📚',time:'только что',read:false});S.s('notifications',notifs);
+    const ne={id:user.id+'_'+cid,userId:user.id,courseId:cid,progress:0,status:'pending',startedAt:null,requestedAt:new Date().toISOString(),approverId};
+    const u=[...enrs,ne];setEnrs(u);
+    window.lhCacheWrite('enrollments',u);
+    window.fbSaveEnrollment(ne);
+    const courseTitle=courses.find(c=>c.id===cid)?.title||'курс';
+    const nUser={id:'n'+Date.now(),text:`Заявка на курс "${courseTitle}" отправлена на согласование`,icon:'📚',time:'только что',read:false,forUserId:user.id};
+    window.fbSaveNotification(nUser);
+    const allNotifs=[nUser,...S.g('notifications',[])];
     if(approverId){
-      const approver=getAllUsers().find(item=>item.id===approverId);
       const requester=`${user.firstName} ${user.lastName}`.trim();
-      const courseTitle=courses.find(c=>c.id===cid)?.title||'курс';
-      notifs.unshift({id:'n'+Date.now()+'a',text:`${requester} запросил(а) запись на курс "${courseTitle}"`,icon:'📝',time:'только что',read:false,forUserId:approverId});
-      S.s('notifications',notifs);
+      const nApprover={id:'n'+Date.now()+'a',text:`${requester} запросил(а) запись на курс "${courseTitle}"`,icon:'📝',time:'только что',read:false,forUserId:approverId};
+      window.fbSaveNotification(nApprover);
+      allNotifs.unshift(nApprover);
     }
-    addToast('ok','Заявка на запись отправлена');
+    window.lhCacheWrite('notifications',allNotifs);
+    addToast('ok',approverId?'Заявка отправлена на согласование руководителю':'Заявка отправлена');
   };
   return(<div>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -2053,6 +2100,10 @@ function TeamPage(){
   const[assignUser,setAssignUser]=useState('');
   const[assignCourse,setAssignCourse]=useState('');
   const[tab,setTab]=useState('overview');
+  useEffect(()=>{
+    const unsub=window.fbWatch('enrollments',arr=>{if(Array.isArray(arr))setAllEnrs(arr);});
+    return unsub;
+  },[]);
 
   const getTeamStats=(uid)=>{
     const enrs=allEnrs.filter(e=>e.userId===uid);
@@ -2072,34 +2123,44 @@ function TeamPage(){
     if(!assignUser||!assignCourse){addToast('err','Выберите сотрудника и курс');return}
     const enrs=getAllEnrollments();
     if(enrs.find(e=>e.userId===assignUser&&e.courseId===assignCourse)){addToast('info','Уже назначен');setShowAssign(false);return}
-    const next=[...enrs,{userId:assignUser,courseId:assignCourse,progress:0,status:'active',startedAt:new Date().toISOString()}];
-    S.s('enrollments',next);
+    const newRec={id:assignUser+'_'+assignCourse,userId:assignUser,courseId:assignCourse,progress:0,status:'active',startedAt:new Date().toISOString()};
+    const next=[...enrs,newRec];
+    window.lhCacheWrite('enrollments',next);
+    window.fbSaveEnrollment(newRec);
     setAllEnrs(next);
     const u=allUsers.find(x=>x.id===assignUser);const c=courses.find(x=>x.id===assignCourse);
-    const notifs=S.g('notifications',[]);notifs.unshift({id:'n'+Date.now(),text:`Курс "${c?.title}" назначен ${u?.firstName} ${u?.lastName}`,icon:'📋',time:'только что',read:false});S.s('notifications',notifs);
+    const nEmp={id:'n'+Date.now()+'e',text:`Вам назначен курс "${c?.title||'Курс'}"`,icon:'📋',time:'только что',read:false,forUserId:assignUser};
+    const nMgr={id:'n'+Date.now(),text:`Курс "${c?.title}" назначен ${u?.firstName||''} ${u?.lastName||''}`,icon:'📋',time:'только что',read:false,forUserId:user.id};
+    window.fbSaveNotification(nEmp);
+    window.fbSaveNotification(nMgr);
+    window.lhCacheWrite('notifications',[nEmp,nMgr,...S.g('notifications',[])]);
     addToast('ok','Курс назначен!');setShowAssign(false);
   };
   const decideRequest=(request,status)=>{
-    const next=allEnrs.map(enrollment=>enrollment.userId===request.userId&&enrollment.courseId===request.courseId?{
-      ...enrollment,
+    const updatedEnr={
+      ...request,
+      id: request.id || (request.userId+'_'+request.courseId),
       status,
-      progress:status==='active'?enrollment.progress||0:0,
-      startedAt:status==='active'?(enrollment.startedAt||new Date().toISOString()):null,
+      progress:status==='active'?request.progress||0:0,
+      startedAt:status==='active'?(request.startedAt||new Date().toISOString()):null,
       reviewedAt:new Date().toISOString()
-    }:enrollment);
-    S.s('enrollments',next);
+    };
+    const next=allEnrs.map(enrollment=>enrollment.userId===request.userId&&enrollment.courseId===request.courseId?updatedEnr:enrollment);
+    window.lhCacheWrite('enrollments',next);
+    window.fbSaveEnrollment(updatedEnr);
     setAllEnrs(next);
     const member=allUsers.find(item=>item.id===request.userId);
     const course=courses.find(item=>item.id===request.courseId)||S.g('courses',[]).find(item=>item.id===request.courseId);
-    const notifications=S.g('notifications',[]);
-    notifications.unshift({
+    const notif={
       id:'n'+Date.now(),
-      text:`Заявка на курс "${course?.title||'Курс'}" ${status==='active'?'одобрена':'отклонена'}`,
+      text:`Ваша заявка на курс "${course?.title||'Курс'}" ${status==='active'?'одобрена ✅':'отклонена ❌'}`,
       icon:status==='active'?'✅':'❌',
       time:'только что',
-      read:false
-    });
-    S.s('notifications',notifications);
+      read:false,
+      forUserId:request.userId
+    };
+    window.fbSaveNotification(notif);
+    window.lhCacheWrite('notifications',[notif,...S.g('notifications',[])]);
     addToast('ok',status==='active'?`Запись ${member?.firstName||'сотрудника'} подтверждена`:`Заявка отклонена`);
   };
 
