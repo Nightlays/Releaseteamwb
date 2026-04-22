@@ -568,10 +568,16 @@ const getAllStepAnswers=()=>asArray(S.g(STEP_ANSWERS_KEY,[]));
 const getAllStepProgress=()=>asArray(S.g('stepProgress',[]));
 const saveStepAnswers=(items)=>S.s(STEP_ANSWERS_KEY,items);
 const saveStepProgress=(items)=>S.s('stepProgress',items);
-const getEnrollmentApproverId=(member,users=getAllUsers())=>{
-  if(member?.managerId&&users.some(u=>u.id===member.managerId)) return member.managerId;
+const getEnrollmentApproverIds=(member,users=getAllUsers())=>{
+  const ids=[];
+  if(member?.managerId&&users.some(u=>u.id===member.managerId)) ids.push(member.managerId);
   const admin=users.find(u=>u.role==='admin');
-  return admin?.id||null;
+  if(admin&&!ids.includes(admin.id)) ids.push(admin.id);
+  return ids.filter(Boolean);
+};
+const isApproverFor=(enrollment,userId)=>{
+  if(enrollment.approverIds&&Array.isArray(enrollment.approverIds)) return enrollment.approverIds.includes(userId);
+  return enrollment.approverId===userId;
 };
 const getEnrollmentRecord=(userId,courseId,enrollments=getAllEnrollments())=>enrollments.find(e=>e.userId===userId&&e.courseId===courseId)||null;
 const upsertEnrollmentRecord=(record,enrollments=getAllEnrollments())=>{
@@ -953,10 +959,10 @@ function Sidebar(){
   const{page,go,mini,setMini,user}=useApp();
   const isA=user.role==='admin',isM=isA||user.role==='manager',isI=isA||user.role==='instructor';
   const pendingReviews=S.g('submissions',[]).filter(s=>s.status==='pending'&&s.managerId===user.id).length;
-  const[pendingEnrollments,setPendingEnrollments]=useState(()=>getAllEnrollments().filter(e=>e.status==='pending'&&e.approverId===user.id).length);
+  const[pendingEnrollments,setPendingEnrollments]=useState(()=>getAllEnrollments().filter(e=>e.status==='pending'&&isApproverFor(e,user.id)).length);
   useEffect(()=>{
     if(!isM) return;
-    const unsub=window.fbWatch('enrollments',arr=>{if(Array.isArray(arr))setPendingEnrollments(arr.filter(e=>e.status==='pending'&&e.approverId===user.id).length);});
+    const unsub=window.fbWatch('enrollments',arr=>{if(Array.isArray(arr))setPendingEnrollments(arr.filter(e=>e.status==='pending'&&isApproverFor(e,user.id)).length);});
     return unsub;
   },[]);
   const items=[
@@ -1055,8 +1061,8 @@ function CatalogPage(){
   const filtered=publishedCourses.filter(c=>(cat==='Все'||c.category===cat)&&c.title.toLowerCase().includes(q.toLowerCase()));
   const enroll=(cid)=>{
     if(enrs.find(e=>e.userId===user.id&&e.courseId===cid)){addToast('info','Заявка или запись уже есть');return}
-    const approverId=getEnrollmentApproverId(user);
-    const ne={id:user.id+'_'+cid,userId:user.id,courseId:cid,progress:0,status:'pending',startedAt:null,requestedAt:new Date().toISOString(),approverId};
+    const approverIds=getEnrollmentApproverIds(user);
+    const ne={id:user.id+'_'+cid,userId:user.id,courseId:cid,progress:0,status:'pending',startedAt:null,requestedAt:new Date().toISOString(),approverIds,approvalHistory:[]};
     const u=[...enrs,ne];setEnrs(u);
     window.lhCacheWrite('enrollments',u);
     window.fbSaveEnrollment(ne);
@@ -1064,14 +1070,14 @@ function CatalogPage(){
     const nUser={id:'n'+Date.now(),text:`Заявка на курс "${courseTitle}" отправлена на согласование`,icon:'📚',time:'только что',read:false,forUserId:user.id};
     window.fbSaveNotification(nUser);
     const allNotifs=[nUser,...S.g('notifications',[])];
-    if(approverId){
-      const requester=`${user.firstName} ${user.lastName}`.trim();
-      const nApprover={id:'n'+Date.now()+'a',text:`${requester} запросил(а) запись на курс "${courseTitle}"`,icon:'📝',time:'только что',read:false,forUserId:approverId};
-      window.fbSaveNotification(nApprover);
-      allNotifs.unshift(nApprover);
-    }
+    const requester=`${user.firstName} ${user.lastName}`.trim();
+    approverIds.forEach((aid,i)=>{
+      const nA={id:'n'+Date.now()+'a'+i,text:`${requester} запросил(а) запись на курс "${courseTitle}"`,icon:'📝',time:'только что',read:false,forUserId:aid};
+      window.fbSaveNotification(nA);
+      allNotifs.unshift(nA);
+    });
     window.lhCacheWrite('notifications',allNotifs);
-    addToast('ok',approverId?'Заявка отправлена на согласование руководителю':'Заявка отправлена');
+    addToast('ok',approverIds.length?'Заявка отправлена на согласование':'Заявка отправлена');
   };
   return(<div>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -2117,7 +2123,7 @@ function TeamPage(){
   const avgAll=team.length?Math.round(team.reduce((s,t)=>s+t.avg,0)/team.length):0;
   const lag=team.filter(t=>t.avg<30&&t.total>0).length;
   const totalDone=team.reduce((s,t)=>s+t.done,0);
-  const pendingRequests=allEnrs.filter(e=>e.status==='pending'&&e.approverId===user.id);
+  const pendingRequests=allEnrs.filter(e=>e.status==='pending'&&isApproverFor(e,user.id));
 
   const doAssign=()=>{
     if(!assignUser||!assignCourse){addToast('err','Выберите сотрудника и курс');return}
@@ -2137,13 +2143,16 @@ function TeamPage(){
     addToast('ok','Курс назначен!');setShowAssign(false);
   };
   const decideRequest=(request,status)=>{
+    const approverName=`${user.firstName} ${user.lastName}`.trim();
+    const historyEntry={approverId:user.id,approverName,action:status==='active'?'approved':'rejected',at:new Date().toISOString()};
     const updatedEnr={
       ...request,
-      id: request.id || (request.userId+'_'+request.courseId),
+      id:request.id||(request.userId+'_'+request.courseId),
       status,
       progress:status==='active'?request.progress||0:0,
       startedAt:status==='active'?(request.startedAt||new Date().toISOString()):null,
-      reviewedAt:new Date().toISOString()
+      reviewedAt:new Date().toISOString(),
+      approvalHistory:[...(request.approvalHistory||[]),historyEntry]
     };
     const next=allEnrs.map(enrollment=>enrollment.userId===request.userId&&enrollment.courseId===request.courseId?updatedEnr:enrollment);
     window.lhCacheWrite('enrollments',next);
@@ -2153,7 +2162,7 @@ function TeamPage(){
     const course=courses.find(item=>item.id===request.courseId)||S.g('courses',[]).find(item=>item.id===request.courseId);
     const notif={
       id:'n'+Date.now(),
-      text:`Ваша заявка на курс "${course?.title||'Курс'}" ${status==='active'?'одобрена ✅':'отклонена ❌'}`,
+      text:`Ваша заявка на курс "${course?.title||'Курс'}" ${status==='active'?`одобрена ✅ (${approverName})`:`отклонена ❌ (${approverName})`}`,
       icon:status==='active'?'✅':'❌',
       time:'только что',
       read:false,
@@ -2175,7 +2184,7 @@ function TeamPage(){
       <div className="stat"><div className="stat-i" style={{background:'#e8f4fd',color:'var(--info)'}}>✅</div><div className="stat-v">{totalDone}</div><div className="stat-l">Курсов завершено</div></div>
       <div className="stat"><div className="stat-i" style={{background:'#fde8e4',color:'var(--err)'}}>⚠️</div><div className="stat-v" style={{color:'var(--err)'}}>{lag}</div><div className="stat-l">Отстающих</div></div>
     </div>
-    <Tabs tabs={[{id:'overview',label:'Обзор',icon:'👥'},{id:'requests',label:`Запросы (${pendingRequests.length})`,icon:'⏳'},{id:'leaderboard',label:'Рейтинг',icon:'🏅'}]} active={tab} onChange={setTab}/>
+    <Tabs tabs={[{id:'overview',label:'Обзор',icon:'👥'},{id:'requests',label:`Запросы (${pendingRequests.length})`,icon:'⏳'},{id:'history',label:'История',icon:'📋'},{id:'leaderboard',label:'Рейтинг',icon:'🏅'}]} active={tab} onChange={setTab}/>
     {tab==='overview'&&<div className="grid2">{team.map(m=>{const isLag=m.avg<30&&m.total>0;
       return<div key={m.id} className={`team-c ${isLag?'lag':''}`}>
         <div style={{width:44,height:44,borderRadius:'50%',background:GRADS[parseInt(m.id.replace('u',''))%GRADS.length],display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:600,fontSize:14,flexShrink:0}}>{m.firstName[0]}{m.lastName[0]}</div>
@@ -2196,17 +2205,28 @@ function TeamPage(){
           {pendingRequests.map(request=>{
             const member=allUsers.find(item=>item.id===request.userId);
             const course=S.g('courses',[]).find(item=>item.id===request.courseId);
+            const coApprovers=(request.approverIds||[]).filter(aid=>aid!==user.id).map(aid=>allUsers.find(u=>u.id===aid)).filter(Boolean);
             return <div key={`${request.userId}_${request.courseId}`} className="card" style={{padding:18}}>
               <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start'}}>
                 <div>
                   <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>{course?.title||'Курс не найден'}</div>
-                  <div style={{fontSize:12,color:'var(--tx2)',marginBottom:6}}>
+                  <div style={{fontSize:12,color:'var(--tx2)',marginBottom:4}}>
                     {member?`${member.firstName} ${member.lastName} · ${member.email}`:'Сотрудник не найден'}
                   </div>
+                  {coApprovers.length>0&&<div style={{fontSize:11,color:'var(--tx3)',marginBottom:4}}>Также согласует: {coApprovers.map(a=>`${a.firstName} ${a.lastName}`).join(', ')}</div>}
                   <div style={{fontSize:11,color:'var(--tx3)'}}>Запрос отправлен {request.requestedAt?new Date(request.requestedAt).toLocaleString('ru-RU'):'—'}</div>
                 </div>
                 <span className="rbdg" style={{background:'#fff8e0',color:'#b7791f'}}>Ожидает подтверждения</span>
               </div>
+              {request.approvalHistory?.length>0&&<div style={{marginTop:12,borderTop:'1px solid var(--bg3)',paddingTop:10}}>
+                <div style={{fontSize:11,fontWeight:600,color:'var(--tx2)',marginBottom:6}}>История действий:</div>
+                {request.approvalHistory.map((h,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:11,marginBottom:3}}>
+                  <span>{h.action==='approved'?'✅':'❌'}</span>
+                  <span style={{fontWeight:600,color:'var(--tx1)'}}>{h.approverName}</span>
+                  <span style={{color:'var(--tx2)'}}>{h.action==='approved'?'одобрил(а)':'отклонил(а)'}</span>
+                  <span style={{color:'var(--tx3)',marginLeft:'auto'}}>{h.at?new Date(h.at).toLocaleString('ru-RU'):'—'}</span>
+                </div>)}
+              </div>}
               <div style={{display:'flex',gap:8,marginTop:14}}>
                 <button className="btn btn-ok btn-sm" onClick={()=>decideRequest(request,'active')}>✅ Подтвердить</button>
                 <button className="btn btn-d btn-sm" onClick={()=>decideRequest(request,'rejected')}>❌ Отклонить</button>
@@ -2215,6 +2235,42 @@ function TeamPage(){
           })}
         </div>
     )}
+    {tab==='history'&&(()=>{
+      const histEnrs=allEnrs.filter(e=>e.approvalHistory?.length>0&&isApproverFor(e,user.id));
+      const fmt=iso=>iso?new Date(iso).toLocaleString('ru-RU'):'—';
+      return histEnrs.length===0
+        ?<div className="empty"><div className="empty-i">📋</div><div className="empty-t">История пуста</div><div className="empty-d">Здесь появятся решения по заявкам</div></div>
+        :<div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {[...histEnrs].sort((a,b)=>new Date(b.reviewedAt||b.requestedAt||0)-new Date(a.reviewedAt||a.requestedAt||0)).map(enr=>{
+            const member=allUsers.find(u=>u.id===enr.userId);
+            const course=S.g('courses',[]).find(c=>c.id===enr.courseId);
+            const lastEntry=enr.approvalHistory[enr.approvalHistory.length-1];
+            return <div key={enr.id||`${enr.userId}_${enr.courseId}`} className="card" style={{padding:18}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700,marginBottom:3}}>{course?.title||'Курс'}</div>
+                  <div style={{fontSize:12,color:'var(--tx2)'}}>{member?`${member.firstName} ${member.lastName}`:'—'}</div>
+                  <div style={{fontSize:11,color:'var(--tx3)',marginTop:3}}>Запрос: {fmt(enr.requestedAt)}</div>
+                </div>
+                <span className="rbdg" style={{background:enr.status==='active'?'#e6f9f0':enr.status==='rejected'?'#fde8e4':'#fff8e0',color:enr.status==='active'?'var(--ok)':enr.status==='rejected'?'var(--err)':'#b7791f'}}>
+                  {enr.status==='active'?'Одобрено':enr.status==='rejected'?'Отклонено':'Ожидает'}
+                </span>
+              </div>
+              <div style={{borderTop:'1px solid var(--bg3)',paddingTop:10}}>
+                <div style={{fontSize:11,fontWeight:600,color:'var(--tx2)',marginBottom:8}}>История согласования:</div>
+                {enr.approvalHistory.map((h,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12,padding:'6px 0',borderBottom:i<enr.approvalHistory.length-1?'1px solid var(--bg3)':'none'}}>
+                  <span style={{fontSize:16}}>{h.action==='approved'?'✅':'❌'}</span>
+                  <div style={{flex:1}}>
+                    <span style={{fontWeight:600}}>{h.approverName}</span>
+                    <span style={{color:'var(--tx2)',marginLeft:6}}>{h.action==='approved'?'одобрил(а)':'отклонил(а)'}</span>
+                  </div>
+                  <span style={{fontSize:11,color:'var(--tx3)',flexShrink:0}}>{fmt(h.at)}</span>
+                </div>)}
+              </div>
+            </div>;
+          })}
+        </div>;
+    })()}
     {tab==='leaderboard'&&<Leaderboard/>}
     <Modal open={showAssign} title="Назначить курс" onClose={()=>setShowAssign(false)} footer={<><button className="btn btn-g" onClick={()=>setShowAssign(false)}>Отмена</button><button className="btn btn-p" onClick={doAssign}>Назначить</button></>}>
       <div className="fg"><label className="fl">Сотрудник</label><select className="fi" value={assignUser} onChange={e=>setAssignUser(e.target.value)}><option value="">Выберите...</option>{users.map(u=><option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.email})</option>)}</select></div>
