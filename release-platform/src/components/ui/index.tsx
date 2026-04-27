@@ -1,4 +1,5 @@
 import React, { ReactNode, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+export { CanonicalTable, type CanonicalTableColumn } from './CanonicalTable';
 
 /* ─── BUTTON ─────────────────────────────────────────────── */
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'icon';
@@ -223,10 +224,14 @@ export function StatusPill({ status, children }: { status: PillStatus; children:
 }
 
 /* ─── LOG ────────────────────────────────────────────────── */
-interface LogProps { lines: Array<{ text: string; level?: 'info' | 'ok' | 'warn' | 'error' }>; maxHeight?: number; }
+interface LogProps {
+  lines: Array<{ text: string; level?: 'info' | 'ok' | 'warn' | 'error' }>;
+  maxHeight?: number | string;
+  style?: React.CSSProperties;
+}
 const LOG_COLORS = { info: 'var(--text-2)', ok: '#4ADE80', warn: '#FCD34D', error: '#F87171' };
 
-export function LogView({ lines, maxHeight = 220 }: LogProps) {
+export function LogView({ lines, maxHeight = 220, style }: LogProps) {
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
@@ -237,6 +242,7 @@ export function LogView({ lines, maxHeight = 220 }: LogProps) {
       fontFamily: 'var(--mono)', fontSize: 11, lineHeight: 1.7,
       background: 'var(--surface)', border: '1px solid var(--border)',
       borderRadius: 10, padding: '10px 12px', maxHeight, overflowY: 'auto', color: 'var(--text-2)',
+      ...style,
     }}>
       {lines.map((l, i) => (
         <div key={i} style={{ color: LOG_COLORS[l.level ?? 'info'] }}>{l.text}</div>
@@ -270,17 +276,24 @@ export function Modal({ open, onClose, title, children, width = 560 }: {
 }
 
 /* ─── TABLE ──────────────────────────────────────────────── */
-export function Table({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
+export function Table({ children, style, tableStyle }: { children: ReactNode; style?: React.CSSProperties; tableStyle?: React.CSSProperties }) {
   return (
     <div style={{ overflowX: 'auto', borderRadius: '0 0 18px 18px', ...style }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>{children}</table>
+      <table style={{ width: '100%', borderCollapse: 'collapse', ...tableStyle }}>{children}</table>
     </div>
   );
 }
 
-export function Th({ children, style }: { children?: ReactNode; style?: React.CSSProperties }) {
+export function Th({
+  children,
+  style,
+  ...props
+}: {
+  children?: ReactNode;
+  style?: React.CSSProperties;
+} & React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <th style={{ padding: '10px 14px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text-3)', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', ...style }}>
+    <th {...props} style={{ padding: '10px 14px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text-3)', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', ...style }}>
       {children}
     </th>
   );

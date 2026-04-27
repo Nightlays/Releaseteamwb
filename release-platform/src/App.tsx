@@ -468,6 +468,11 @@ function Layout() {
     return <AuthScreen error={authError} theme={theme} onToggleTheme={toggleTheme} onSubmit={handleLogin} />;
   }
 
+  const isWideModule = currentModule.id === 'charts' || currentModule.id === 'goals' || currentModule.id === 'releaseAnalysis';
+  const mainPadding = currentModule.id === 'releaseAnalysis'
+    ? '10px 12px 18px 12px'
+    : (currentModule.id === 'charts' || currentModule.id === 'goals') ? '0' : 16;
+
   return (
     <div style={{
       display: 'flex',
@@ -504,10 +509,10 @@ function Layout() {
           flex: 1,
           minHeight: 0,
           overflow: 'auto',
-          padding: (currentModule.id === 'charts' || currentModule.id === 'goals') ? '0' : 16,
+          padding: mainPadding,
           background: 'var(--main-bg)',
         }}>
-          <div style={{ maxWidth: (currentModule.id === 'charts' || currentModule.id === 'goals') ? undefined : 1440, margin: '0 auto', width: '100%', height: '100%' }}>
+          <div style={{ maxWidth: isWideModule ? undefined : 1440, margin: '0 auto', width: '100%', height: '100%' }}>
             <ModuleContent moduleId={currentModule.id} refreshKey={refreshKey} rbac={rbac} onRbacChange={setRbac} />
           </div>
         </main>
