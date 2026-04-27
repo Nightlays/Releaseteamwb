@@ -1,0 +1,2336 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css" />
+  <title>WB BI Users v3 — UI (фикс меток, редизайн настроек)</title>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="min-h-screen bi-user">
+  <div class="app-shell max-w-6xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="brand-badge">
+        <span class="brand-dot"></span>
+        <div>
+          <div class="flex items-center gap-2">
+            <div class="font-extrabold leading-tight">WB BI Users</div>
+            <span class="chip">v3</span>
+          </div>
+          <div class="hint">Пользователи по версиям</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <a href="local-cors-proxy-macos.zip" class="btn btn-soft" download>Скачать локальный прокси (macOS)</a>
+        <button id="exportPdfBtn" type="button" class="btn btn-soft">Экспорт PDF</button>
+      </div>
+    </header>
+
+<main class="mt-5 grid grid-cols-1 gap-4">
+  <!-- ===== Настройки (редизайн) ===== -->
+  <section class="card p-5 space-y-4">
+  <div class="settings-grid">
+    <div class="form-field">
+      <label>Proxy Base</label>
+      <input id="proxyBase" class="form-ctl input" value="http://localhost:8787/"/>
+      <div class="muted">Поддержка <b>?url=</b> и <b>/prefix/</b>.</div>
+    </div>
+
+    <div class="form-field">
+      <label>Режим</label>
+      <div class="switch-line" style="gap:12px">
+        <select id="proxyMode" class="form-ctl input" style="flex:1 1 auto">
+          <option value="query" selected>?url=</option>
+          <option value="prefix">/prefix/</option>
+        </select>
+        <div class="proxy-toggle">
+          <span class="proxy-toggle-label">Использовать прокси</span>
+          <label style="cursor:pointer">
+            <input id="useProxy" type="checkbox" checked>
+          </label>
+        </div>
+      </div>
+      <div class="badges-line" style="margin-top:6px">
+        <span class="pill" id="healthPill">proxy: unknown</span>
+        <span class="pill" id="drivePill">drive: ?</span>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label>Платформы</label>
+      <div class="dropdown form-ctl input" id="platformDropdown">
+        <div class="dropdown-selected" id="platformSelectedText">iOS, Android</div>
+        <div class="dropdown-list">
+          <label>
+            <span>iOS</span>
+            <input type="checkbox" value="iOS" checked>
+          </label>
+          <label>
+            <span>Android</span>
+            <input type="checkbox" value="Android" checked>
+          </label>
+          <div class="dropdown-footer">
+            <button type="button" class="btn-sm" id="platSelectAll">Выбрать все</button>
+            <button type="button" class="btn-sm" id="platClear">Сбросить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label>Интервал (WB)</label>
+      <div class="dropdown form-ctl input" id="intervalDropdown">
+        <div class="dropdown-selected" id="intervalSelectedText">last_2_days</div>
+        <div class="dropdown-list">
+          <label>
+            <span>today</span>
+            <input type="radio" name="interval" value="today">
+          </label>
+          <label>
+            <span>yesterday</span>
+            <input type="radio" name="interval" value="yesterday">
+          </label>
+          <label>
+            <span>last_2_days</span>
+            <input type="radio" name="interval" value="last_2_days" checked>
+          </label>
+          <label>
+            <span>last_7_days</span>
+            <input type="radio" name="interval" value="last_7_days">
+          </label>
+          <label>
+            <span>last_30_days</span>
+            <input type="radio" name="interval" value="last_30_days">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label>Снэпшоты: от</label>
+      <input type="datetime-local" id="snapFrom" class="form-ctl input"/>
+    </div>
+
+    <div class="form-field">
+      <label>Снэпшоты: до</label>
+      <div class="inline snap-range">
+        <input type="datetime-local" id="snapTo" class="form-ctl input" style="flex:1 1 auto"/>
+        <button type="button" id="btnApplySnapDates" class="btn-sm ghost" style="white-space:nowrap">Применить</button>
+      </div>
+    </div>
+
+    <div class="form-field" style="grid-column: span 2">
+      <label>Выбрать снэпшоты (до 20)</label>
+      <div class="dropdown form-ctl dropdown--slim input" id="snapshotsDropdown">
+        <div class="dropdown-selected" id="snapshotsSelectedText">Последние 4</div>
+        <div class="dropdown-list">
+          <div class="toolbar" style="justify-content:space-between">
+            <button type="button" class="btn-sm" id="snapPickLast4">Последние 4</button>
+            <button type="button" class="btn-sm" id="snapPickLast20">Последние 20</button>
+            <button type="button" class="btn-sm" id="snapUncheckAll">Сброс</button>
+          </div>
+          <div class="snapshots-list" id="snapshotsList" style="max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:6px;padding:6px"></div>
+        </div>
+      </div>
+      <div class="muted">Если ничего не выбрано — берутся последние 4 из периода.</div>
+    </div>
+
+    <div class="form-field" style="grid-column: 1 / -1">
+      <label>Cookie WB BI (в одну строку)</label>
+      <textarea id="cookieInput" class="form-ctl input" style="height:80px" placeholder="wbx-validation-key=851d9f8d-c840-487d-afda-5eb3ba9c4504; _ym_uid=1750866811332929169; _ym_d=1750866811; _ga=GA1.1.665364734.1752585353; _ga_NM1B0HQXGM=GS2.1.s1753849272$o2$g0$t1753849272$j60$l0$h0; _wbauid=4822661931756460966; BIWBToken=7F+a7PAMgcLwZ/qMPJO5DWOT46gdM+zEuw9jGoSLOYVeEJCCwNoOxAo4gHiwqA=="></textarea>
+      <div class="muted">Уйдёт в <code>X-Proxy-Cookie</code> и проксируется как <code>Cookie</code>.</div>
+    </div>
+  </div>
+
+  <div class="settings-foot">
+    <div class="badges-line">
+      <span class="badge">Текущий снепшот: <span id="snapNow">—</span></span>
+      <span class="badge">Предыдущий: <span id="snapPrev">—</span></span>
+      <span class="badge">key_jwt: <span id="jwtBadge">—</span></span>
+      <span class="muted">Статус: <span id="status">idle</span></span>
+    </div>
+
+    <a href="local-cors-proxy-macos.zip" class="btn-sm" download>Скачать локальный прокси (macOS)</a>
+    <button id="btnSaveSettings" class="btn btn-ghost">Сохранить настройки</button>
+    <button id="btnExportCsv" class="btn btn-ghost">Экспорт CSV (сводная топ-20)</button>
+    <button class="btn btn-grad" id="btnRunAll">Запустить полный поток</button>
+  </div>
+</section>
+
+  <!-- ===== Графики ===== -->
+  <section class="card p-5 space-y-4" id="chartsCard">
+    <div class="row" style="display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:end">
+      <div>
+        <label>Релизы</label>
+        <div class="dropdown dropdown--slim" id="releasesDropdown">
+          <div class="dropdown-selected" id="releasesSelectedText">Выберите релизы</div>
+          <div class="dropdown-list">
+            <div class="toolbar" style="justify-content:space-between;gap:8px;align-items:center">
+              <button type="button" class="btn-sm" id="relSelectAll">Все</button>
+              <input id="relSearch" class="form-ctl input" placeholder="Поиск релиза…" 
+                     style="height:24px;max-width:260px;padding:6px 6px"/>
+              <button type="button" class="btn-sm" id="relClear">Сброс</button>
+            </div>
+            <div class="releases-list" id="releasesList"
+                 style="max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:0px;padding:0px"></div>
+            <div class="muted" id="releasesCounter" style="padding:0 0px 0px">—</div>
+          </div>
+        </div>
+
+        <div class="check-row" style="margin-top:8px;gap:16px">
+          <label><input type="radio" name="viewMode" value="full" checked> Полный</label>
+          <label><input type="radio" name="viewMode" value="top8"> Топ-8 актуальных</label>
+          <label><input type="radio" name="viewMode" value="selected"> Только выбранные</label>
+        </div>
+      </div>
+
+      <div>
+        <label>Показывать релизов</label>
+        <select id="showCount">
+          <option>5</option><option selected>10</option><option>15</option><option>20</option>
+        </select>
+      </div>
+      <div>
+        <label>Порядок</label>
+        <select id="orderDirection">
+          <option value="desc" selected>desc</option>
+          <option value="asc">asc</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="inline" style="margin:8px 0 4px;gap:12px">
+      <span class="pill">Ось X — «короткие» версии (7.3.6001 → 7361). В тултипе полная версия.</span>
+      <span class="badge">Текущий снепшот: <span id="snapNowDup">—</span></span>
+      <span class="badge">Предыдущий: <span id="snapPrevDup">—</span></span>
+    </div>
+
+    <div class="charts" style="margin-top:10px">
+      <div class="chart-wrap">
+        <div class="chart-head">
+          <div class="title" id="deltaTitle">Пользователи по релизам</div>
+          <div class="hint">Фильтр по платформам не перезапрашивает данные</div>
+        </div>
+
+        <div class="check-row" style="gap:16px;margin:6px 0 2px">
+          <label><input type="checkbox" id="chkIOS" checked> iOS</label>
+          <label><input type="checkbox" id="chkAndroid" checked> Android</label>
+        </div>
+
+        <div class="chart-viewport"><canvas id="deltaChart"></canvas></div>
+
+        <div id="deltaNotes" class="chart-notes">
+          <div class="legend">
+            <span class="up"><span class="dot"></span>рост</span>
+            <span class="down"><span class="dot"></span>отток</span>
+          </div>
+          <div class="meta" id="deltaMeta"></div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-head">
+          <div class="title">Тренд суммарных пользователей по платформам</div>
+          <div class="hint">Берётся из localStorage (<code>bi_users_history</code>)</div>
+        </div>
+        <div class="chart-viewport" id="trendViewport"><canvas id="trendChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Ответ и логи ===== -->
+  <section class="card p-5 space-y-4">
+    <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <label>Ответ (последний шаг)</label>
+        <div class="logbox"><pre id="response">—</pre></div>
+      </div>
+      <div>
+        <label>Логи</label>
+        <div class="logbox"><pre id="logs">—</pre></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Сводная таблица ===== -->
+  <section class="card p-5 space-y-4" id="summaryCard">
+    <div class="inline" style="justify-content:space-between;align-items:center">
+      <div class="muted">Сводная таблица по релизам (агрегация как в скрипте)</div>
+      <div class="inline" style="gap:8px;align-items:center">
+        <button class="btn-sm" id="btnExportSummaryCsv">Экспорт CSV (топ-20)</button>
+        <div class="muted">Кеш: <code>wb_local_cache</code> (<span id="cacheCount">0</span>)</div>
+      </div>
+    </div>
+
+    <div class="row" style="display:grid;grid-template-columns:280px 1fr;gap:14px;margin-top:10px">
+      <aside style="background:#fff;border:1px solid #efe5f4;border-radius:12px;padding:12px;height:fit-content">
+        <div class="group">
+          <label>Платформа</label>
+          <select id="sumPlat">
+            <option value="all" selected>Все</option>
+            <option value="iOS">iOS</option>
+            <option value="Android">Android</option>
+          </select>
+        </div>
+        <div class="group">
+          <label>Фильтр по релизу</label>
+          <input id="sumRel" placeholder="например 7.3.6001 или 7.3." />
+        </div>
+        <div class="group">
+          <label>Сортировка</label>
+          <div class="inline" style="gap:8px">
+            <button class="btn-sm" id="sumSortDesc">По убыванию</button>
+            <button class="btn-sm" id="sumSortAsc">По возрастанию</button>
+          </div>
+        </div>
+        <div class="group">
+          <label>Строк на странице</label>
+          <select id="sumPageSize" disabled>
+            <option value="20" selected>20</option>
+          </select>
+        </div>
+        <div class="muted" style="font-size:12px">Можно кликать по заголовку «Пользователи» для переключения.</div>
+      </aside>
+
+      <div style="background:#fff;border:1px solid #efe5f4;border-radius:12px;padding:12px">
+        <div style="overflow:auto">
+          <table id="tbl">
+            <thead>
+            <tr>
+              <th>Платформа</th>
+              <th>Релиз</th>
+              <th id="thUsers" title="Клик: переключить asc/desc" style="cursor:pointer">Пользователи</th>
+              <th>%</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="inline" style="justify-content:flex-end;margin-top:10px;gap:8px">
+          <button class="btn-sm" id="sumPrev">Назад</button>
+          <span class="muted">Стр. <span id="sumPageNo">1</span> / <span id="sumPageAll">1</span></span>
+          <button class="btn-sm" id="sumNext">Вперёд</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Android: свод по магазинам ===== -->
+  <section class="card p-5 space-y-4" id="androidSummaryCard">
+    <div class="inline" style="justify-content:space-between;align-items:center">
+      <div class="muted">Android — распределение пользователей по типу сборки</div>
+      <div class="muted">Доля от общего числа Android</div>
+    </div>
+    <div style="overflow:auto">
+      <table id="androidTbl">
+        <thead>
+        <tr>
+          <th>Категория</th>
+          <th>Пользователи</th>
+          <th>% от Android</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr><td class="muted" colspan="3">Нет данных</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== Аналитика версий (Δ-таблица) ===== -->
+  <section class="card p-5 space-y-4" id="growthCard">
+    <div class="inline" style="justify-content:space-between;align-items:center">
+      <div class="muted">
+        Аналитика версий: прирост/убывание по <b>топ-4 версиям по пользователям</b>
+        (версии берутся из фильтрованных данных «Сводной таблицы»)
+      </div>
+      <div class="toolbar">
+        <button class="btn-sm" id="btnGrowthRecalc">Пересчитать</button>
+        <button class="btn-sm" id="btnExportGrowthCsv">Экспорт CSV (аналитика)</button>
+        <span class="badge">Снепшоты: <span id="growthSnapsMeta">—</span></span>
+      </div>
+    </div>
+
+    <div class="kpis" id="growthKpis"></div>
+
+    <div style="overflow:auto;margin-top:8px">
+      <table id="growthTbl">
+        <thead>
+        <tr>
+          <th>Платформа</th>
+          <th>Версия</th>
+          <th>Срез-1</th>
+          <th>Срез-2</th>
+          <th>Срез−3</th>
+          <th>Срез−4</th>
+          <th>Разница (Срез1 vs Срез−1)</th>
+          <th>Разница% (Срез-1 vs Срез2−1)</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+  </div>
+<script>
+/* ---------- Утилиты ---------- */
+const BASE='https://bi.wb.ru', API_QUEUE=BASE + '/bi/v2/queue', API_QUEUE_V1=BASE + '/bi/queue', API_CACHE='https://bi.wb.ru/cache-puller/api/v1/cache', DATASOURCE_ID=11386, DBCONN_ID=4;
+const $=id=>document.getElementById(id);
+const proxyBase=$('proxyBase'), proxyMode=$('proxyMode'), useProxy=$('useProxy');
+const btnRunAll=$('btnRunAll'), respEl=$('response'), logsEl=$('logs'), statusEl=$('status');
+const jwtBadge=$('jwtBadge'), cacheCount=$('cacheCount'), healthPill=$('healthPill');
+const btnExportCsv=$('btnExportCsv'); const btnExportSummaryCsv=$('btnExportSummaryCsv'); const btnExportGrowthCsv=$('btnExportGrowthCsv'); const btnSaveSettings=$('btnSaveSettings'); const tblBody=document.querySelector('#tbl tbody');
+const androidTblBody=document.querySelector('#androidTbl tbody');
+
+const platformDropdown=$('platformDropdown'), intervalDropdown=$('intervalDropdown');
+const platformSelectedText=$('platformSelectedText'), intervalSelectedText=$('intervalSelectedText');
+
+const snapFrom=$('snapFrom'), snapTo=$('snapTo');
+const snapshotsDropdown=$('snapshotsDropdown'), snapshotsSelectedText=$('snapshotsSelectedText'), snapshotsList=$('snapshotsList');
+
+const releasesDropdown=$('releasesDropdown');
+const releasesSelectedText=$('releasesSelectedText');
+const releasesList=$('releasesList');
+const showCountEl=$('showCount'), orderDirectionEl=$('orderDirection');
+
+const snapNow=$('snapNow'), snapPrev=$('snapPrev');
+const snapNowDup=$('snapNowDup'), snapPrevDup=$('snapPrevDup');
+
+const sumPlat=$('sumPlat'), sumRel=$('sumRel');
+const sumSortAsc=$('sumSortAsc'), sumSortDesc=$('sumSortDesc'), thUsers=$('thUsers');
+const sumPageSizeEl=$('sumPageSize'), sumPrev=$('sumPrev'), sumNext=$('sumNext'), sumPageNo=$('sumPageNo'), sumPageAll=$('sumPageAll');
+
+let summaryRaw=[]; let summarySort='desc'; let page=1, pageSize=20; let filteredRows=[];
+const ts=()=>new Date().toLocaleTimeString();
+const log = (m) => {
+  const prefix = (logsEl.textContent === '—' ? '' : logsEl.textContent + '\n');
+  logsEl.textContent = prefix + ts() + ' ' + m;
+  const box = logsEl.parentElement;
+  if (box) {
+    box.scrollTop = box.scrollHeight;
+    box.scrollLeft = 0; // не уезжаем вправо
+  }
+};
+const setStatus=s=>{ if(statusEl) statusEl.textContent=s; };
+const setJwtState=()=>{ if(jwtBadge) jwtBadge.textContent = localStorage.getItem('bi_key_jwt') ? 'есть' : '—'; };
+const pretty=x=>{ try{return JSON.stringify(JSON.parse(x),null,2);}catch{return x;} };
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const num=n=>new Intl.NumberFormat('ru-RU').format(n);
+const cookieHeader=()=>{ const el=document.getElementById('cookieInput'); return el?el.value.trim():''; };
+
+const SETTINGS_KEY = 'bi_users_calc_settings_v1';
+const SNAP_LIMIT = 20;
+const SNAP_DEFAULT = 4;
+const CHART_SNAP_MAX = 4;
+const SUMMARY_TOP_LIMIT = 20;
+
+function collectSettings(){
+  return {
+    proxyBase: proxyBase.value,
+    proxyMode: proxyMode.value,
+    useProxy: !!useProxy.checked,
+    cookie: cookieHeader(),
+    platforms: getSelectedPlatforms(),
+    interval: getIntervalValue(),
+    snapFrom: snapFrom.value,
+    snapTo: snapTo.value,
+    viewMode: viewMode(),
+    showCount: showCountEl.value,
+    orderDirection: orderDirectionEl.value,
+    sumPlat: sumPlat.value,
+    sumRel: sumRel.value,
+    sumPageSize: sumPageSizeEl.value
+  };
+}
+
+function applySettings(cfg){
+  if (!cfg || typeof cfg !== 'object') return;
+
+  if (typeof cfg.proxyBase === 'string') proxyBase.value = cfg.proxyBase;
+  if (typeof cfg.proxyMode === 'string') proxyMode.value = cfg.proxyMode;
+  if (typeof cfg.useProxy === 'boolean') useProxy.checked = cfg.useProxy;
+
+  const cookieEl = document.getElementById('cookieInput');
+  if (cookieEl && typeof cfg.cookie === 'string') cookieEl.value = cfg.cookie;
+
+  if (Array.isArray(cfg.platforms)){
+    const set = new Set(cfg.platforms);
+    platformDropdown.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.checked = set.has(cb.value);
+    });
+    refreshPlatformCaption();
+  }
+
+  if (typeof cfg.interval === 'string'){
+    intervalDropdown.querySelectorAll('input[type=radio]').forEach(r=>{
+      r.checked = (r.value === cfg.interval);
+    });
+    refreshIntervalCaption();
+  }
+
+  if (typeof cfg.snapFrom === 'string') snapFrom.value = cfg.snapFrom;
+  if (typeof cfg.snapTo === 'string') snapTo.value = cfg.snapTo;
+
+  if (typeof cfg.viewMode === 'string'){
+    document.querySelectorAll('input[name="viewMode"]').forEach(r=>{
+      r.checked = (r.value === cfg.viewMode);
+    });
+  }
+
+  if (cfg.showCount != null) showCountEl.value = String(cfg.showCount);
+  if (typeof cfg.orderDirection === 'string') orderDirectionEl.value = cfg.orderDirection;
+
+  if (typeof cfg.sumPlat === 'string') sumPlat.value = cfg.sumPlat;
+  if (typeof cfg.sumRel === 'string') sumRel.value = cfg.sumRel;
+  if (cfg.sumPageSize != null) sumPageSizeEl.value = String(cfg.sumPageSize);
+}
+
+function saveSettings(){
+  try{
+    const cfg = collectSettings();
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(cfg));
+    log('Настройки сохранены в localStorage');
+  }catch(e){
+    log('Ошибка сохранения настроек: ' + (e && e.message ? e.message : e));
+  }
+}
+
+function loadSettings(){
+  try{
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const cfg = JSON.parse(raw);
+    applySettings(cfg);
+    buildSnapshotsDropdown();
+    updateSnapshotBadges();
+    buildReleasesDropdown();
+    renderViewFromHistory();
+    drawCharts();
+    renderGrowth();
+    setJwtState();
+    log('Настройки загружены из localStorage');
+  }catch(e){
+    log('Ошибка загрузки настроек: ' + (e && e.message ? e.message : e));
+  }
+}
+
+/* ---------- DRIVE STORAGE (Google Apps Script) ---------- */
+const DRIVE = {
+  // URL опубликованного Web App (GAS)
+  URL: 'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec',
+  HISTORY_FILE: 'bi_users_history.json',
+  CACHE_FILE: 'wb_local_cache.json'
+};
+
+/**
+ * Нормализация массива снапшотов, приходящих из Drive.
+ * Принимает: Array | Object | stringified JSON.
+ * Возвращает: Array<{ time: string, records: Array<{platform:string,release:string,users:number,share:number|null}> }>
+ */
+function normalizeSnapshots(raw){
+  try{
+    const x = (typeof raw === 'string') ? JSON.parse(raw || '[]') : raw;
+    const arr = Array.isArray(x) ? x : (x && typeof x === 'object' ? [x] : []);
+    return arr
+      .filter(s => s && typeof s.time === 'string' && s.records != null)
+      .map(s => ({
+        time: String(s.time),
+        records: (Array.isArray(s.records) ? s.records : [])
+          .map(r => ({
+            platform: String(r.platform ?? ''),
+            release : String(r.release ?? ''),
+            users   : Number(r.users ?? 0),
+            share   : (r.share == null ? null : Number(r.share))
+          }))
+      }));
+  }catch{ return []; }
+}
+
+/**
+ * Обертка над fetch для GAS, которая всегда гоняет запрос через выбранный прокси (query/prefix),
+ * чтобы не ловить CORS от script.google.com. Никаких credentials к GAS не шлем.
+ */
+async function driveFetch(rawUrl, opts = {}) {
+  const isGAS = /^https:\/\/script\.google\.com\/macros\//i.test(rawUrl);
+  const target = buildUrl(rawUrl);
+
+  // Короткие заголовки. К GAS не тащим Cookie/Authorization/Origin/Referer.
+  const baseHeaders = { 'Accept': 'application/json' };
+  const hdrs = Object.assign({}, baseHeaders, opts.headers || {});
+  if (isGAS) {
+    delete hdrs['X-Proxy-Cookie'];
+    delete hdrs['Cookie'];
+    delete hdrs['X-Authorization'];
+    delete hdrs['Authorization'];
+    delete hdrs['Referer'];
+    delete hdrs['Origin'];
+  }
+
+  const init = {
+    method: (opts.method || 'GET'),
+    headers: hdrs,
+    body: opts.body,
+    redirect: 'follow',
+    cache: 'no-store',
+    credentials: 'omit',
+    mode: 'cors',
+    keepalive: false
+  };
+
+  // Если вдруг собрали длинный GET — конвертируем в POST (переносим payload из query)
+  if (init.method === 'GET' && typeof rawUrl === 'string' && rawUrl.length > 1800) {
+    const m = (rawUrl.match(/[?&]data=([^&]+)/) || [])[1];
+    if (m) {
+      try {
+        const decoded = decodeURIComponent(m);
+        init.method = 'POST';
+        init.body = decoded;
+        const withoutData = rawUrl
+          .replace(/([?&])data=[^&]*/,'$1')
+          .replace(/[?&]op=save/,'?')
+          .replace(/\?$/,'');
+        return fetch(buildUrl(withoutData), init);
+      } catch {}
+    }
+  }
+
+  const res = await fetch(target, init);
+
+  // Fallback: получили 431 на GET — повторяем POST'ом с телом из ?data=
+  if (res.status === 431 && init.method === 'GET') {
+    try {
+      const urlObj = new URL(rawUrl);
+      const name = urlObj.searchParams.get('name') || 'history.json';
+      const data = urlObj.searchParams.get('data') || '[]';
+      const postUrl = rawUrl.split('?')[0] + '?name=' + encodeURIComponent(name);
+      return fetch(buildUrl(postUrl), {
+        method: 'POST',
+        headers: Object.assign({}, baseHeaders, { 'Content-Type': 'application/json' }),
+        body: data,
+        redirect: 'follow',
+        cache: 'no-store',
+        credentials: 'omit',
+        mode: 'cors',
+        keepalive: false
+      });
+    } catch {}
+  }
+
+  return res;
+}
+
+async function driveGet(name){
+  const url = `${DRIVE.URL}?op=get&name=${encodeURIComponent(name)}`;
+  const r = await driveFetch(url, { method: 'GET' });
+  const txt = await r.text();
+  if (!r.ok && r.status !== 302) throw new Error(`Drive GET ${name} HTTP ${r.status}: ${txt.slice(0,200)}`);
+  try { return JSON.parse(txt || '[]'); } catch { return []; }
+}
+
+async function driveSave(name, data){
+  // POST to GAS to avoid 431 (headers/query too large) and keep payload out of the URL.
+  // GAS doPost → save_(e) expects ?name=... and raw body in e.postData.contents.
+  const payload = typeof data === 'string' ? data : JSON.stringify(data ?? []);
+  const url = `${DRIVE.URL}?name=${encodeURIComponent(name)}`;
+  const r = await driveFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload });
+  const txt = await r.text();
+  // GAS sometimes issues 302; proxy follows. Treat 302 as OK the same way as 200.
+  if (!r.ok && r.status !== 302) throw new Error(`Drive SAVE ${name} HTTP ${r.status}: ${txt.slice(0,200)}`);
+  let j = null; try { j = JSON.parse(txt); } catch {}
+  if (j && j.ok === false) throw new Error(`Drive SAVE ${name} error: ${j.error || 'unknown'}`);
+  return true;
+}
+
+function normalizeSnapshotsFromDrive(raw){
+  const safe = normalizeSnapshots(raw);
+  return safe
+    .filter(s => s && typeof s.time === 'string' && Array.isArray(s.records))
+    .map(s => ({
+      time: s.time,
+      records: s.records.map(r => ({
+        platform: String(r.platform ?? ''),
+        release : String(r.release ?? ''),
+        users   : Number(r.users ?? 0),
+        share   : (r.share == null ? null : Number(r.share))
+      }))
+    }));
+}
+
+async function driveGetHistory(){
+  try {
+    const arr = await driveGet(DRIVE.HISTORY_FILE);
+    return normalizeSnapshotsFromDrive(arr);
+  } catch(e) {
+    log('Drive getHistory failed: ' + (e.message || e));
+    return [];
+  }
+}
+
+async function driveSaveHistory(historyArr){
+  try {
+    const data = Array.isArray(historyArr) ? historyArr : [];
+    await driveSave(DRIVE.HISTORY_FILE, data);
+    return true;
+  } catch(e) {
+    log('Drive saveHistory failed: ' + (e.message || e));
+    return false;
+  }
+}
+
+async function driveGetCache(){
+  try {
+    const arr = await driveGet(DRIVE.CACHE_FILE);
+    return Array.isArray(arr) ? arr : [];
+  } catch(e) {
+    log('Drive getCache failed: ' + (e.message || e));
+    return [];
+  }
+}
+
+async function driveSaveCache(items){
+  try {
+    const data = Array.isArray(items) ? items : [];
+    await driveSave(DRIVE.CACHE_FILE, data);
+    return true;
+  } catch(e) {
+    log('Drive saveCache failed: ' + (e.message || e));
+    return false;
+  }
+}
+
+/* ---------- CLOUD SYNC (Drive ←→ localStorage) ---------- */
+// Local cache helpers
+function getCacheRaw(){ try { return JSON.parse(localStorage.getItem('wb_local_cache') || '[]'); } catch { return []; } }
+function setCache(arr){ localStorage.setItem('wb_local_cache', JSON.stringify(Array.isArray(arr) ? arr : [])); }
+
+// Merge Drive history into localStorage history (by ISO time)
+async function cloudHistoryLoadMerge(){
+  try{
+    const rawHist = await driveGetHistory(); const driveHist = Array.isArray(rawHist) ? rawHist : (rawHist ? [rawHist] : []);
+    const cur = getHistoryRaw();                            // local [{time, records[]}, ...]
+    const byTime = new Map((Array.isArray(cur)?cur:[]).map(s => [s && s.time, s]));
+    const merged = Array.isArray(cur) ? cur.slice() : [];
+    (Array.isArray(driveHist)?driveHist:[]).forEach(s => {
+      if(!s || !s.time) return;
+      if(byTime.has(s.time)){
+        // replace existing entry with Drive version
+        const i = merged.findIndex(x => x && x.time === s.time);
+        if(i >= 0) merged[i] = s;
+      }else{
+        merged.push(s);
+      }
+    });
+    setHistory(merged.slice(-50));
+  }catch(e){
+    log('cloudHistoryLoadMerge error: ' + (e.message || e));
+  }
+}
+
+// Save localStorage history to Drive
+async function cloudHistorySave(){
+  try{
+    const hist = getHistoryRaw();
+    await driveSaveHistory(Array.isArray(hist) ? hist : []);
+  }catch(e){
+    log('cloudHistorySave error: ' + (e.message || e));
+  }
+}
+
+// Load Drive cache and merge into local wb_local_cache
+async function cloudCacheLoadMerge(){
+  try{
+    const fromDrive = await driveGetCache();                // array
+    const cur = getCacheRaw();
+    const keyOf = it => (it && (it.key || it.id || it.uuid || it.name)) || JSON.stringify(it).slice(0,64);
+    const map = new Map();
+    (Array.isArray(cur)?cur:[]).forEach(it => map.set(keyOf(it), it));
+    (Array.isArray(fromDrive)?fromDrive:[]).forEach(it => map.set(keyOf(it), it));
+    setCache([...map.values()]);
+  }catch(e){
+    log('cloudCacheLoadMerge error: ' + (e.message || e));
+  }
+}
+
+// Save local wb_local_cache to Drive
+async function cloudCacheSave(){
+  try{
+    const arr = getCacheRaw();
+    await driveSaveCache(Array.isArray(arr) ? arr : []);
+  }catch(e){
+    log('cloudCacheSave error: ' + (e.message || e));
+  }
+}
+
+/* Пинг статуса GAS через прокси */
+async function pingDrive(){
+  const pill = document.getElementById('drivePill');
+  try{
+    const r = await driveFetch(`${DRIVE.URL}?op=get&name=${encodeURIComponent(DRIVE.HISTORY_FILE)}`, { method:'GET' });
+    const ok = r.ok;
+    if (pill){
+      pill.textContent = ok ? 'drive: ok' : 'drive: down';
+      pill.style.background = ok ? 'rgba(22,139,88,.08)' : 'rgba(198,40,40,.08)';
+    }
+  }catch(e){
+    if (pill){
+      pill.textContent = 'drive: down';
+      pill.style.background = 'rgba(198,40,40,.08)';
+    }
+  }
+}
+
+pingProxy();
+pingDrive();
+window.addEventListener('load', ()=>{ try{ pingDrive(); }catch(e){} });
+
+/* ---------- Выпадашки ---------- */
+function initDropdown(dd){
+  const sel=dd.querySelector('.dropdown-selected');
+  if(!sel) return;
+  sel.addEventListener('click',()=>dd.classList.toggle('open'));
+  document.addEventListener('click',e=>{ if(!dd.contains(e.target)) dd.classList.remove('open'); });
+}
+[platformDropdown, intervalDropdown, releasesDropdown, snapshotsDropdown].forEach(initDropdown);
+
+function getSelectedPlatforms(){ return Array.from(platformDropdown.querySelectorAll('input[type=checkbox]:checked')).map(cb=>cb.value); }
+function refreshPlatformCaption(){ const vals=getSelectedPlatforms(); platformSelectedText.textContent = vals.length?vals.join(', '):'Не выбрано'; }
+platformDropdown.addEventListener('change', ()=>{refreshPlatformCaption(); drawCharts(); renderViewFromHistory(); renderGrowth();});
+$('platSelectAll').addEventListener('click', ()=>{ platformDropdown.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=true); refreshPlatformCaption(); drawCharts(); renderViewFromHistory(); renderGrowth(); });
+$('platClear').addEventListener('click', ()=>{ platformDropdown.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false); refreshPlatformCaption(); drawCharts(); renderViewFromHistory(); renderGrowth(); });
+refreshPlatformCaption();
+
+function getIntervalValue(){ const r=intervalDropdown.querySelector('input[type=radio]:checked'); return r?r.value:'last_2_days'; }
+function refreshIntervalCaption(){ intervalSelectedText.textContent=getIntervalValue(); }
+intervalDropdown.addEventListener('change', ()=>{ refreshIntervalCaption(); drawCharts(); renderGrowth(); });
+refreshIntervalCaption();
+
+function viewMode(){ return document.querySelector('input[name="viewMode"]:checked')?.value || 'full'; }
+
+/* ---------- История ---------- */
+function getHistoryRaw(){ try{return JSON.parse(localStorage.getItem('bi_users_history')||'[]');}catch{return [];} }
+function getHistory(){
+  const arr = getHistoryRaw();
+  return (Array.isArray(arr) ? arr : []).filter(
+    s => s && s.time && !Number.isNaN(Date.parse(s.time)) && Array.isArray(s.records)
+  );
+}
+function setHistory(arr){ localStorage.setItem('bi_users_history', JSON.stringify(arr.slice(-50))); }
+
+function filterHistoryByDate(hist){
+  const fromVal=snapFrom.value? new Date(snapFrom.value) : null;
+  const toVal=snapTo.value? new Date(snapTo.value) : null;
+  return hist.filter(s=>{
+    const t=new Date(s.time);
+    if(fromVal && t<fromVal) return false;
+    if(toVal && t>toVal) return false;
+    return true;
+  });
+}
+
+/* ---------- Снэпшоты ---------- */
+function buildSnapshotsDropdown(){
+  const filtered = filterHistoryByDate(getHistory());
+  const list = snapshotsList; if(!list) return;
+
+  list.innerHTML = '';
+  if (!filtered.length){
+    snapshotsSelectedText.textContent = 'Нет данных';
+    return;
+  }
+
+  const items = [...filtered]
+    .map(s => ({ time: s.time, records: Array.isArray(s.records) ? s.records : [] }))
+    .sort((a,b) => new Date(b.time) - new Date(a.time));
+
+  const viewItems = items.slice(0, SNAP_LIMIT);
+  list.innerHTML = viewItems.map((s,idx) => {
+    const id  = 'snap_'+idx;
+    const lbl = new Date(s.time).toLocaleString('ru-RU');
+    const size= s.records.length;
+    return `<label class="snap-item" for="${id}" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div>${esc(lbl)}</div>
+      <div class="muted" style="font-size:12px">${size} записей</div>
+      <input id="${id}" type="checkbox" value="${esc(s.time)}">
+    </label>`;
+  }).join('');
+
+  refreshSnapshotsCaption();
+}
+function getSelectedSnapshotTimes(){
+  return Array.from(snapshotsList.querySelectorAll('input[type=checkbox]:checked')).map(i=>i.value);
+}
+function refreshSnapshotsCaption(){
+  const selected = getSelectedSnapshotTimes().length;
+  snapshotsSelectedText.textContent = selected ? `Выбрано: ${selected}` : `Последние ${SNAP_DEFAULT}`;
+}
+const btns = {
+  snapPickLast4: ()=>{ const nodes = snapshotsList.querySelectorAll('input[type=checkbox]'); nodes.forEach(cb=>cb.checked=false); [...nodes].slice(0,SNAP_DEFAULT).forEach(cb=>cb.checked=true); },
+  snapPickLast20: ()=>{ const nodes = snapshotsList.querySelectorAll('input[type=checkbox]'); nodes.forEach(cb=>cb.checked=false); [...nodes].slice(0,SNAP_LIMIT).forEach(cb=>cb.checked=true); },
+  snapUncheckAll: ()=>{ snapshotsList.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false); },
+  btnSnapApply: ()=>{},
+  btnSnapClear: ()=>{ snapFrom.value=''; snapTo.value=''; buildSnapshotsDropdown(); }
+};
+['snapPickLast4','snapPickLast20','snapUncheckAll','btnSnapApply','btnSnapClear'].forEach(id=>{
+  const el=$(id); if(el) el.addEventListener('click',()=>{ btns[id](); refreshSnapshotsCaption(); updateSnapshotBadges(); buildReleasesDropdown(); drawCharts(); renderGrowth(); renderViewFromHistory(); });
+});
+snapshotsList?.addEventListener('change', e=>{
+  const checked = snapshotsList.querySelectorAll('input[type=checkbox]:checked');
+  if(checked.length>SNAP_LIMIT){ e.target.checked=false; return; }
+  refreshSnapshotsCaption(); updateSnapshotBadges(); buildReleasesDropdown(); drawCharts(); renderGrowth(); renderViewFromHistory();
+});
+
+/* ---------- Releases ---------- */
+let selectedReleasesSet = new Set();
+const relSearchEl = document.getElementById('relSearch');
+function getSelectedReleases(){ return new Set(selectedReleasesSet); }
+function refreshReleasesCaption(){
+  const total = releasesList.querySelectorAll('input[type=checkbox]').length;
+  const selected = releasesList.querySelectorAll('input[type=checkbox]:checked').length;
+  releasesSelectedText.textContent = selected===0 ? 'Выберите релизы' : (selected===total ? 'Все' : `Выбрано: ${selected}`);
+}
+
+/* ---------- HTTP ---------- */
+function buildUrl(u){
+  // Для Google Apps Script всегда /prefix/, чтобы не ловить 431 из-за длинных query
+  if(!useProxy.checked) return u;
+  const b = proxyBase.value.replace(/\/+$/,'') + '/';
+  const isGAS = /^https:\/\/script\.google\.com\/macros\//i.test(u);
+  if (isGAS) {
+    const clean = u.replace(/^https?:\/\//,'');
+    return b + 'prefix/https://' + clean;
+  }
+  if (proxyMode.value === 'query') return b + '?url=' + encodeURIComponent(u);
+  const clean = u.replace(/^https?:\/\//,'');
+  return b + 'prefix/https://' + clean;
+}
+function headersCommon(){ return { 'Accept':'application/json, text/plain, */*', 'Accept-Language':'ru,en;q=0.9', 'Origin':'https://bi.wb.ru', 'Referer':'https://bi.wb.ru/' }; }
+async function http(method,url,headers,body){
+  const target=buildUrl(url);
+  const opts={method,headers,credentials:'include',body:body==null?undefined:body};
+  const res=await fetch(target,opts); const txt=await res.text();
+  return { status:res.status, ok:res.ok, text:txt, json:safeJson(txt) };
+}
+function safeJson(t){ try{return JSON.parse(t);}catch{ return null; } }
+function find(obj,key){ if(!obj||typeof obj!=='object') return ''; if(key in obj && typeof obj[key]==='string') return obj[key]; for(const k in obj){ const v=find(obj[k],key); if(v) return v; } return ''; }
+
+/* ---------- Rows ---------- */
+function renderView(fullRecords){
+  // НОРМАЛИЗАЦИЯ: приводим поля, пришедшие из JSONBin, к нужным типам
+  summaryRaw = Array.isArray(fullRecords)
+    ? fullRecords.map(r => ({
+        platform: String(r.platform || ''),
+        release: String(r.release || ''),
+        users: Number(r.users || 0),
+        share: r.share == null ? null : Number(r.share)
+      }))
+    : [];
+  applySummaryFiltersSort();
+  renderAndroidSummary(summaryRaw);
+  cacheCount.textContent=(JSON.parse(localStorage.getItem('wb_local_cache')||'[]')).length;
+}
+
+function classifyAndroidRelease(release){
+  const r = String(release || '').toLowerCase();
+  if (r.includes('rustore')) return 'rustore';
+  if (r.includes('huawei')) return 'huawei';
+  return 'google';
+}
+
+function renderAndroidSummary(records){
+  if (!androidTblBody) return;
+  const rows = Array.isArray(records)
+    ? records.filter(r => String(r.platform || '').toLowerCase() === 'android')
+    : [];
+  let total = 0;
+  const counts = { rustore: 0, huawei: 0, google: 0 };
+  rows.forEach(r=>{
+    const u = Number(r.users || 0) || 0;
+    total += u;
+    const tag = classifyAndroidRelease(r.release);
+    counts[tag] = (counts[tag] || 0) + u;
+  });
+
+  androidTblBody.innerHTML = '';
+  if (!rows.length){
+    androidTblBody.innerHTML = '<tr><td class=\"muted\" colspan=\"3\">Нет данных</td></tr>';
+    return;
+  }
+
+  const data = [
+    { label: 'Всего Android', users: total, share: total > 0 ? 100 : 0 },
+    { label: 'RuStore', users: counts.rustore, share: total > 0 ? (counts.rustore / total * 100) : 0 },
+    { label: 'Huawei', users: counts.huawei, share: total > 0 ? (counts.huawei / total * 100) : 0 },
+    { label: 'Google', users: counts.google, share: total > 0 ? (counts.google / total * 100) : 0 }
+  ];
+
+  data.forEach(row=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${esc(row.label)}</td><td>${num(row.users)}</td><td>${row.share.toFixed(2)}</td>`;
+    androidTblBody.appendChild(tr);
+  });
+}
+
+/* ---------- Summary table ---------- */
+function renderTablePage(rows){
+  tblBody.innerHTML='';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${esc(r.platform)}</td><td>${esc(r.release)}</td><td>${num(r.users)}</td><td>${r.share==null?'':Number(r.share).toFixed(2)}</td>`;
+    tblBody.appendChild(tr);
+  });
+}
+function applySummaryFiltersSort(){
+  const plat = sumPlat.value;
+  const mask = (sumRel.value||'').trim().toLowerCase();
+  let rows = Array.isArray(summaryRaw) ? summaryRaw.slice() : [];
+
+  if(plat!=='all') rows = rows.filter(r=>r.platform===plat);
+  if(mask) rows = rows.filter(r=> String(r.release).toLowerCase().includes(mask));
+
+  // База: берём топ-20 по пользователям
+  rows.sort((a,b)=> (b.users-a.users));
+  rows = rows.slice(0, SUMMARY_TOP_LIMIT);
+  // Переупорядочим внутри топ-20, если пользователь выбрал asc
+  if (summarySort === 'asc') rows.sort((a,b)=> a.users-b.users);
+  filteredRows = rows;
+
+  renderTablePage(filteredRows);
+  page = 1;
+  sumPageNo.textContent='1';
+  sumPageAll.textContent='1';
+  if (sumPrev) sumPrev.disabled = true;
+  if (sumNext) sumNext.disabled = true;
+}
+sumPlat.addEventListener('change', ()=>{ page=1; applySummaryFiltersSort(); });
+sumRel.addEventListener('input', ()=>{ page=1; applySummaryFiltersSort(); });
+sumSortAsc.addEventListener('click', ()=>{ summarySort='asc'; page=1; applySummaryFiltersSort(); });
+sumSortDesc.addEventListener('click', ()=>{ summarySort='desc'; page=1; applySummaryFiltersSort(); });
+thUsers.addEventListener('click', ()=>{ summarySort = summarySort==='asc' ? 'desc' : 'asc'; page=1; applySummaryFiltersSort(); });
+sumPageSizeEl.addEventListener('change', ()=>{ pageSize=parseInt(sumPageSizeEl.value,10)||10; page=1; applySummaryFiltersSort(); });
+sumPrev.addEventListener('click', ()=>{ if(page>1){ page--; applySummaryFiltersSort(); }});
+sumNext.addEventListener('click', ()=>{ const totalPages = Math.max(1, Math.ceil((filteredRows.length||0)/pageSize)); if(page<totalPages){ page++; applySummaryFiltersSort(); }});
+
+/* ---------- Queue ---------- */
+const RU_FIL_OPTIONS = [
+  'and 1=1',
+  "/* Узбекистан*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'uz'",
+  "/* Казахстан*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'kz'",
+  "/* Беларусь*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'by'",
+  "/*Армения*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'am'",
+  "/*Киргизия*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'kg'",
+  "/*Грузия*/ and custom_params.string_value[indexOf(custom_params.name, 'country')] = 'ge'",
+  "and has(custom_params. string_value",
+  "'ru') = 1"
+];
+function bodyStartQueue(p){
+  return {
+    onlyCache:false,dashboardId:0,metaOnly:false,widgetId:0,withLimitation:false,dataSourceId:DATASOURCE_ID,
+    queryParams:[
+      {id:19683,key:'interval',live:true,order:0,position:'atop',selectConfig:{cascadeColumns:[],columnAdditional:null,isCascade:false,isMultiselect:false,optionsArray:[]},serializationMethodId:'unquoted',typeId:'dateTimeRange',value:{start:getIntervalValue()}},
+      {id:34007,key:'platform',live:false,order:1,position:'atop',selectConfig:{isMultiselect:true,optionsArray:['iOS','Android'],optionsTypeId:'manual'},serializationMethodId:'singleQuoted',typeId:'select',value:[{label:p,value:p}]},
+      {id:37333,key:'ru_fil',live:false,order:2,position:'atop',selectConfig:{isMultiselect:false,optionsArray:RU_FIL_OPTIONS,optionsTypeId:'manual'},serializationMethodId:'unquoted',typeId:'select',value:[{label:'and 1=1',value:'and 1=1'}]},
+      {id:48021,key:'Версии',live:false,order:3,position:'atop',selectConfig:{cascadeColumns:[],columnAdditional:null,isCascade:false,isMultiselect:false,optionsArray:[]},serializationMethodId:'unquoted',typeId:'string',value:"'All'"}
+    ]
+  };
+}
+// Превращаем BI rows в {release, users, share}
+function rowsToRecords(rows){
+  if (!Array.isArray(rows)) return [];
+  return rows.map(r => {
+    // BI обычно отдаёт ["7.3.7001", 12640197, 66.2979...]
+    if (Array.isArray(r)) {
+      const [release, users, share] = r;
+      return {
+        release : String(release ?? ''),
+        users   : Number(users ?? 0),
+        share   : share == null ? null : Number(share)
+      };
+    }
+    // запасной вариант если внезапно пришёл объект
+    return {
+      release : String(r.release ?? r.ver ?? r.version ?? ''),
+      users   : Number(r.users ?? r.value ?? r.count ?? 0),
+      share   : r.share == null ? null : Number(r.share)
+    };
+  });
+} 
+async function runForPlatform(p){
+  setStatus('start '+p); log('['+p+'] POST /queue/ds');
+  const h1=headersCommon(); h1['Content-Type']='application/json';
+  const ck=cookieHeader(); if(ck) h1['X-Proxy-Cookie']=ck;
+  const b1=JSON.stringify(bodyStartQueue(p));
+  let r1;
+  for(let attempt=1; attempt<=3; attempt++){
+    r1=await http('POST', `${API_QUEUE}/datasource/${DATASOURCE_ID}`, h1, b1);
+    if(r1.ok) break;
+    log(`[${p}] queue POST ${r1.status}, попытка ${attempt}/3`); await sleep(800);
+  }
+  respEl.textContent='HTTP '+r1.status+'\n\n'+pretty(r1.text);
+  if(!r1.ok) throw new Error('['+p+'] Шаг 1 ошибка '+r1.status);
+
+  const requestId=find(r1.json,'requestId'); const key=find(r1.json,'key');
+  if(!requestId || !key) throw new Error('['+p+'] Нет requestId/key');
+  localStorage.setItem('bi_key_jwt',key); setJwtState();
+
+  const hs=headersCommon(); hs['Authorization']='Bearer '+key; hs['X-Authorization']='Bearer '+key;
+  const ck2=cookieHeader(); if(ck2) hs['X-Proxy-Cookie']=ck2;
+
+  const MAX_WAIT_MS=1800_000, POLL_MS=5000; const t0=Date.now();
+  while(true){
+    let rs; for(let a=1;a<=3;a++){ try{ rs=await http('GET', `${API_QUEUE_V1}/dbconn/${DBCONN_ID}/request/${encodeURIComponent(requestId)}/status`, hs); break; }catch(e){ if(a===3) throw e; await sleep(800);} }
+    if(!rs.ok){ await sleep(POLL_MS); continue; }
+    const obj=rs.json||{}; const st=String((obj.data&&obj.data.status)||obj.status||'').toUpperCase();
+    if(['RESOLVED','DONE','SUCCESS','READY','CACHE_READY'].includes(st)) break;
+    if(['FAILED','ERROR'].includes(st)) throw new Error('['+p+'] Статус '+st);
+    if(Date.now()-t0>MAX_WAIT_MS) throw new Error('['+p+'] Таймаут ожидания');
+    await sleep(POLL_MS);
+  }
+
+  const rr=await http('GET', `${API_CACHE}/result/request/${encodeURIComponent(requestId)}?onlyCache=false`, hs);
+  respEl.textContent='HTTP '+rr.status+'\n\n'+pretty(rr.text);
+  if(!rr.ok) throw new Error('['+p+'] Шаг 3 ошибка '+rr.status);
+
+  const rows=(rr.json&&rr.json.data&&rr.json.data.rows)||[];
+  return rowsToRecords(rows).map(x=>({ platform:p, release:x.release, users:x.users, share:x.share }));
+}
+async function runAll(){
+  try{
+    setStatus('running'); logsEl.textContent='—'; respEl.textContent='—';
+    const plats=getSelectedPlatforms(); if(plats.length===0) throw new Error('Выберите платформу');
+    const all=[]; for(const p of plats){ const recs=await runForPlatform(p); all.push(...recs); }
+    renderView(all);
+    await persistSnapshot(all);                 // теперь async и шлёт в JSONBin
+    buildSnapshotsDropdown(); updateSnapshotBadges(); buildReleasesDropdown(); drawCharts();
+    setStatus('ok');
+    cloudCacheSave().catch(()=>{});             // по желанию: сохраняем кеш тоже
+  }catch(e){ setStatus('error'); log('Ошибка: '+e.message); respEl.textContent='ERROR: '+e.message; }
+  finally { renderGrowth(); }
+}
+if(btnRunAll) btnRunAll.addEventListener('click', runAll);
+
+/* ---------- Persist snapshot (LOCAL + JSONBin) ---------- */
+async function persistSnapshot(records){
+  const snap = {
+    time: new Date().toISOString(),
+    records: (records||[]).map(r=>({ 
+      platform:String(r.platform||''), 
+      release:String(r.release||''), 
+      users:Number(r.users||0), 
+      share:(r.share==null?null:Number(r.share)) 
+    }))
+  };
+  const hist = getHistoryRaw();
+  hist.push(snap);
+  setHistory(hist);          // локально — для мгновенной отрисовки
+  try {
+    await cloudHistorySave(); // Drive
+  } catch(e) {
+    log('save→Drive err: ' + (e.message||e));
+  }
+}
+function chosenSnaps(){
+  const filtered = filterHistoryByDate(getHistory());
+  const chosenTimes = getSelectedSnapshotTimes();
+  let snaps;
+  if (chosenTimes.length){
+    const set = new Set(chosenTimes);
+    snaps = filtered.filter(s => set.has(s.time));
+    snaps.sort((a,b)=> new Date(a.time) - new Date(b.time));
+    snaps = snaps.slice(-SNAP_LIMIT);
+  } else {
+    snaps = filtered.slice(-SNAP_DEFAULT);
+  }
+  // ✅ оставляем только валидные снапшоты
+  return snaps.filter(s => s && Array.isArray(s.records) && s.records.length >= 0);
+}
+const btnApplySnapDates = document.getElementById('btnApplySnapDates');
+if (btnApplySnapDates) btnApplySnapDates.addEventListener('click', () => {
+  buildSnapshotsDropdown();
+  updateSnapshotBadges();
+  buildReleasesDropdown();
+  drawCharts();
+  renderGrowth();
+  renderViewFromHistory();
+});
+
+function updateSnapshotBadges(){
+  const snaps = chosenSnaps();
+  const cur  = snaps.at(-1) || null;
+  const prev = snaps.length > 1 ? snaps[snaps.length-2] : null;
+  const curTxt  = cur  ? new Date(cur.time).toLocaleString('ru-RU') : '—';
+  const prevTxt = prev ? new Date(prev.time).toLocaleString('ru-RU') : '—';
+  if (snapNow)    snapNow.textContent    = curTxt;
+  if (snapPrev)   snapPrev.textContent   = prevTxt;
+  if (snapNowDup) snapNowDup.textContent = curTxt;
+  if (snapPrevDup)snapPrevDup.textContent= prevTxt;
+}
+
+/* ---------- Trend utils ---------- */
+function calcTrend(history){
+  const labels=[], dts=[], ios=[], andr=[], total=[];
+  history.forEach(snap=>{
+    const t=new Date(snap.time); if(Number.isNaN(+t)) return;
+    dts.push(t);
+    let i=0,a=0;
+    (snap.records||[]).forEach(r=>{
+      if(r.platform==='iOS') i+=Number(r.users||0); else if(r.platform==='Android') a+=Number(r.users||0);
+    });
+    ios.push(i); andr.push(a); total.push(i+a);
+  });
+  const min=dts[0], max=dts[dts.length-1];
+  const spanDays = min && max ? ((max-min)/86400000) : 0;
+  const fmt = new Intl.DateTimeFormat('ru-RU', spanDays>=1
+    ? { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }
+    : { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  dts.forEach(t=>labels.push(fmt.format(t)));
+  return { labels, dts, ios, andr, total };
+}
+function shortVersion(ver){
+  if(!ver) return '';
+  const parts=String(ver).split('.');
+  if(parts.length<3) return ver;
+  const major=parts[0], minor=parts[1];
+  const patchDigits=(parts[2].match(/\d+/)||['0'])[0];
+  const th = patchDigits[0] || '0';
+  const un = patchDigits[3] || '';
+  const short = th + (un && un!=='0' ? un : '');
+  return `${major}${minor}${short}`;
+}
+function getChartPlatforms(){
+  const iosOn = document.getElementById('chkIOS')?.checked === true;
+  const andOn = document.getElementById('chkAndroid')?.checked === true;
+
+  // обе галки → всегда суммируем iOS+Android
+  if (iosOn && andOn) return new Set(['ios','android']);
+
+  // обе сняты → не рисуем
+  if (!iosOn && !andOn) return new Set(['__none__']);
+
+  // одна платформа
+  return new Set([ iosOn ? 'ios' : 'android' ]);
+}
+
+/* ---------- Releases: сбор и отрисовка ---------- */
+function getAllReleaseStatsFromSnaps(snaps, plats){
+  const score = new Map();
+  const totalLast = new Map();
+  const totalSum  = new Map();
+
+  const lastMap = snaps.at(-1)
+    ? snaps.at(-1).records.reduce((m,r)=>{
+        const rp = String(r.platform||'').toLowerCase();
+        if(plats.size && !plats.has(rp)) return m;
+        m.set(String(r.release||''),(m.get(String(r.release||''))||0)+Number(r.users||0));
+        return m;
+      }, new Map())
+    : new Map();
+
+  for(const snap of snaps){
+    for(const r of (snap.records||[])){
+      const rp = String(r.platform||'').toLowerCase();
+      if(plats.size && !plats.has(rp)) continue;
+      const rel = String(r.release||'');
+      totalSum.set(rel,(totalSum.get(rel)||0)+Number(r.users||0));
+    }
+  }
+
+  const names = new Set([ ...totalSum.keys(), ...lastMap.keys() ]);
+  names.forEach(n=>{
+    totalLast.set(n, Number(lastMap.get(n)||0));
+    score.set(n, Number(lastMap.get(n)||0) || Number(totalSum.get(n)||0));
+  });
+
+  const dir = orderDirectionEl.value==='asc' ? 1 : -1;
+  const sorted = [...names].sort((a,b)=>{
+    const s = (score.get(a)||0) - (score.get(b)||0);
+    if(s!==0) return dir*s;
+    return a.localeCompare(b, 'ru', { numeric:true, sensitivity:'base' }) * dir;
+  });
+
+  return { names: sorted, totalLast };
+}
+function renderReleasesList(fullNames, totals, mask){
+  const list = releasesList;
+  const counter = document.getElementById('releasesCounter');
+  const m = (mask||'').trim().toLowerCase();
+
+  const filtered = m
+    ? fullNames.filter(n=> n.toLowerCase().includes(m) || shortVersion(n).toLowerCase().includes(m))
+    : fullNames;
+
+  list.innerHTML = filtered.map(name=>{
+    const id = 'rel_' + btoa(unescape(encodeURIComponent(name))).replace(/=+/g,'');
+    const checked = selectedReleasesSet.has(name) ? 'checked' : '';
+    const users = totals.get(name)||0;
+    return `<label class="release-item" for="${id}" style="display:flex;align-items:center;gap:8не поpx">
+      <div>
+        <div class="release-name" style="font-weight:700;color:#2c1b33;font-size:13px">${esc(name)}</div>
+        <div class="release-sub" style="font-size:11px;color:#7a6f82">${num(users)} пользователей</div>
+      </div>
+      <input id="${id}" type="checkbox" value="${esc(name)}" ${checked}>
+    </label>`;
+  }).join('');
+
+  counter.textContent = filtered.length
+    ? `Показано: ${filtered.length} из ${fullNames.length}`
+    : 'Ничего не найдено';
+}
+function buildReleasesDropdown(){
+  const snaps = chosenSnaps();
+  releasesList.innerHTML='';
+  if (!snaps.length || !Array.isArray(snaps.at(-1)?.records)){
+    releasesSelectedText.textContent='Выберите релизы';
+    return;
+  }
+  selectedReleasesSet = getSelectedReleases();
+
+  const plats = getChartPlatforms();
+  const { names, totalLast } = getAllReleaseStatsFromSnaps(snaps, plats);
+
+  renderReleasesList(names, totalLast, relSearchEl?.value||'');
+  refreshReleasesCaption();
+
+  releasesList.onchange = (e)=>{
+    if(e.target && e.target.type==='checkbox'){
+      const v = e.target.value;
+      if(e.target.checked) selectedReleasesSet.add(v);
+      else selectedReleasesSet.delete(v);
+      refreshReleasesCaption(); drawCharts(); renderGrowth();
+      // если ничего не выбрано и latest пустой, пробуем взять первые из любого снапшота
+if (!releasesList.querySelector('input[type=checkbox]')) {
+  drawCharts(); // даст фолбэк из anyMap внутри chooseReleases()
+}
+    }
+  };
+}
+(function attachRelSearch(){
+  if(!relSearchEl) return;
+  let t;
+  relSearchEl.addEventListener('input', ()=>{
+    clearTimeout(t);
+    t = setTimeout(()=> buildReleasesDropdown(), 120);
+  });
+})();
+$('relSelectAll')?.addEventListener('click', ()=>{
+  releasesList.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.checked = true; selectedReleasesSet.add(cb.value);
+  });
+  refreshReleasesCaption(); drawCharts(); renderGrowth();
+});
+$('relClear')?.addEventListener('click', ()=>{
+  selectedReleasesSet.clear();
+  releasesList.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.checked=false);
+  refreshReleasesCaption(); drawCharts(); renderGrowth();
+});
+showCountEl.addEventListener('change', ()=>{ buildReleasesDropdown(); drawCharts(); renderGrowth(); });
+orderDirectionEl.addEventListener('change', ()=>{ buildReleasesDropdown(); drawCharts(); renderGrowth(); });
+
+/* ---------- Δ-метки ---------- */
+const DELTA_LABEL_FONT = '600 16px Inter, system-ui, -apple-system, Segoe UI, Roboto';
+const GROUP_SUM_LABEL_FONT = '700 12px Inter, system-ui, -apple-system, Segoe UI, Roboto';
+const VALUE_LABEL_FONT = '600 12px Inter, system-ui, -apple-system, Segoe UI, Roboto';
+const GROUP_SUM_LABEL_OFFSET = 10;
+const VALUE_LABEL_PAD = 4;
+
+function getLabelClipBounds(chart){
+  const { chartArea } = chart;
+  const pad = chart.options?.layout?.padding || {};
+  const topPad = Math.max(0, Number(pad.top) || 0);
+  const bottomPad = Math.max(0, Number(pad.bottom) || 0);
+  return {
+    left: chartArea.left,
+    top: Math.max(0, chartArea.top - topPad),
+    right: chartArea.right,
+    bottom: Math.min(chart.height, chartArea.bottom + bottomPad)
+  };
+}
+
+function getFontPixelSize(font, fallback = 12){
+  const match = String(font || '').match(/(\d+(?:\.\d+)?)px/);
+  return match ? Math.ceil(Number(match[1])) : fallback;
+}
+
+function measureFontHeight(ctx, font, fallback = 12){
+  const prevFont = ctx.font;
+  ctx.font = font;
+  const metrics = ctx.measureText('0123456789');
+  ctx.font = prevFont;
+  const height = Math.ceil((metrics.actualBoundingBoxAscent || 0) + (metrics.actualBoundingBoxDescent || 0));
+  return height || getFontPixelSize(font, fallback);
+}
+
+function DeltaLabelsPlugin() {
+  const cfg = { offset: 13, font: DELTA_LABEL_FONT,
+    capsule: { padX: 6, padY: 3, radius: 6 }, minTopPad: 64, gapAboveNominal: 4 };
+  function groupBox(rows, i){
+    let top=Infinity, left=Infinity, right=-Infinity, ok=false;
+    for (const arr of rows) {
+      const el = arr[i];
+      if (!el?.getProps) continue;
+      const p = el.getProps(['x','y','y2','base','width'], true);
+      const ys = [p.y, p.y2, p.base].map(v => Number.isFinite(v) ? v : null).filter(v => v!=null);
+      if (!ys.length || !Number.isFinite(p.x)) continue;
+      ok = true;
+      const yMin = Math.min(...ys);
+      const half = (p.width||0)/2;
+      top = Math.min(top, yMin);
+      left = Math.min(left, p.x-half);
+      right = Math.max(right, p.x+half);
+    }
+    return ok ? { top, left, right } : null;
+  }
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+  return {
+    id: 'deltaLabels',
+    beforeLayout(chart){
+      const pad = chart.options.layout?.padding || (chart.options.layout.padding = {});
+      if (typeof pad.top !== 'number' || pad.top < cfg.minTopPad) pad.top = cfg.minTopPad;
+    },
+    afterDatasetsDraw(chart){
+      const deltas = chart.$deltas || chart.options?.plugins?.deltaLabels?.deltas;
+      const aboveGroup = !!(chart.options?.plugins?.deltaLabels?.aboveGroup);
+      if (!Array.isArray(deltas) || !deltas.length) return;
+      const { ctx, chartArea, scales:{x} } = chart;
+      const clip = getLabelClipBounds(chart);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(clip.left, clip.top, clip.right-clip.left, clip.bottom-clip.top);
+      ctx.clip();
+      ctx.font = cfg.font;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const groupSumEnabled = !!(chart.options?.plugins?.groupSumLabels?.enabled);
+      const valueOpts = chart.options?.plugins?.valueLabels || {};
+      const targetDatasetIndex = valueOpts.datasetIndex ?? (chart.data.datasets.length - 1);
+      const valueMeta = chart.getDatasetMeta(targetDatasetIndex);
+      const valueDrawAbove = !!(chart.$valuesAbove ?? valueOpts.above);
+      const groupSumHeight = measureFontHeight(ctx, GROUP_SUM_LABEL_FONT, 12);
+      const valueHeight = measureFontHeight(ctx, VALUE_LABEL_FONT, 12);
+      const rows = chart.data.datasets.map((_,di)=>chart.getDatasetMeta(di)?.data || []);
+      for (let i=0;i<chart.data.labels.length;i++){
+        const d = Number(deltas[i]||0);
+        if (!Number.isFinite(d) || d===0) continue;
+        const g = groupBox(rows, i);
+        if (!g) continue;
+        const label = (d>0?'+':'−') + Math.abs(d).toLocaleString('ru-RU');
+        const textW = Math.ceil(ctx.measureText(label).width);
+        const w = textW + cfg.capsule.padX*2;
+        const h = 14 + cfg.capsule.padY*2;
+        const xC = Math.round(x.getPixelForValue(i));
+
+        let nominalTop = Math.round(g.top);
+        if (groupSumEnabled) {
+          const groupBaseline = Math.max(Math.round(g.top - GROUP_SUM_LABEL_OFFSET), chartArea.top + 2);
+          nominalTop = groupBaseline - groupSumHeight;
+        } else if (valueDrawAbove) {
+          const valueEl = valueMeta?.data?.[i];
+          if (valueEl?.getProps) {
+            const p = valueEl.getProps(['y','base'], true);
+            const valueBaseline = Math.max(Math.round(Math.min(p.y, p.base) - VALUE_LABEL_PAD - 4), clip.top + 2);
+            nominalTop = valueBaseline - valueHeight;
+          } else if (aboveGroup) {
+            nominalTop = Math.round(g.top - cfg.offset);
+          }
+        } else if (aboveGroup) {
+          nominalTop = Math.round(g.top - cfg.offset);
+        }
+
+        let rectY;
+        if (!aboveGroup) {
+          rectY = Math.round(g.top - cfg.offset - h);
+        } else {
+          rectY = Math.round(nominalTop - cfg.gapAboveNominal - h);
+        }
+
+        const minY = Math.round(clip.top + 2);
+        rectY = Math.max(rectY, minY);
+        const rect = { x: Math.round(xC - w/2), y: rectY, w, h };
+        ctx.fillStyle='rgba(255,255,255,.96)';
+        ctx.strokeStyle='rgba(0,0,0,.06)';
+        ctx.lineWidth=1;
+        roundRect(ctx, rect.x, rect.y, rect.w, rect.h, cfg.capsule.radius);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = d>0 ? '#2e7d32' : '#c62828';
+        ctx.fillText(label, rect.x + rect.w/2, rect.y + rect.h/2);
+      }
+      ctx.restore();
+    }
+  };
+}
+
+// === GroupSumLabelsPlugin: подписывает сумму пользователей над группой релизов, когда обе платформы активны ===
+function GroupSumLabelsPlugin(){
+  const cfg = { offset: GROUP_SUM_LABEL_OFFSET, font: GROUP_SUM_LABEL_FONT, color: '#111', minTopPad: 40 };
+  function groupBox(rows, i){
+    let top=Infinity, left=Infinity, right=-Infinity, ok=false;
+    for(const arr of rows){
+      const el = arr[i];
+      if(!el?.getProps) continue;
+      const p = el.getProps(['x','y','y2','base','width'], true);
+      const ys = [p.y,p.y2,p.base].map(v=>Number.isFinite(v)?v:null).filter(v=>v!=null);
+      if(!ys.length || !Number.isFinite(p.x)) continue;
+      ok=true;
+      const yMin = Math.min(...ys);
+      const half = (p.width||0)/2;
+      top   = Math.min(top, yMin);
+      left  = Math.min(left, p.x-half);
+      right = Math.max(right, p.x+half);
+    }
+    return ok ? { top, left, right } : null;
+  }
+  return {
+    id:'groupSumLabels',
+    beforeLayout(chart){
+      const pad = chart.options.layout?.padding || (chart.options.layout.padding = {});
+      if(typeof pad.top !== 'number' || pad.top < cfg.minTopPad) pad.top = cfg.minTopPad;
+    },
+    afterDatasetsDraw(chart){
+      const opts = chart.options?.plugins?.groupSumLabels || {};
+      if(!opts.enabled) return;
+      const values = Array.isArray(opts.values) ? opts.values : [];
+      if(!values.length) return;
+      const { ctx, chartArea, scales:{x} } = chart;
+      const clip = getLabelClipBounds(chart);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(clip.left, clip.top, clip.right-clip.left, clip.bottom-clip.top);
+      ctx.clip();
+      ctx.font = cfg.font;
+      ctx.textAlign='center';
+      ctx.textBaseline='bottom';
+      ctx.fillStyle = cfg.color;
+      const rows = chart.data.datasets.map((_,di)=>chart.getDatasetMeta(di)?.data || []);
+      for(let i=0;i<chart.data.labels.length;i++){
+        const g = groupBox(rows,i);
+        if(!g) continue;
+        const xC = Math.round(x.getPixelForValue(i));
+        const y  = Math.max(Math.round(g.top - cfg.offset), chartArea.top + 2);
+        const v  = Number(values[i]||0);
+        if(!Number.isFinite(v)) continue;
+        ctx.fillText(v.toLocaleString('ru-RU'), xC, y);
+      }
+      ctx.restore();
+    }
+  };
+}
+
+function ValueLabelsPlugin(){
+  const cfg = { font: VALUE_LABEL_FONT, pad: VALUE_LABEL_PAD, color: '#111', shadow: 'rgba(0,0,0,.12)' };
+  return {
+    id:'valueLabels',
+    afterDatasetsDraw(chart){
+      const values = chart.$values || chart.options?.plugins?.valueLabels?.values;
+      const targetDatasetIndex = chart.$valuesDatasetIndex ?? chart.options?.plugins?.valueLabels?.datasetIndex ?? (chart.data.datasets.length - 1);
+      const drawAbove = !!(chart.$valuesAbove ?? chart.options?.plugins?.valueLabels?.above);
+      if(!Array.isArray(values) || !values.length) return;
+      const meta = chart.getDatasetMeta(targetDatasetIndex);
+      if(!meta || !meta.data) return;
+      const {ctx} = chart;
+      const clip = getLabelClipBounds(chart);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(clip.left, clip.top, clip.right-clip.left, clip.bottom-clip.top);
+      ctx.clip();
+      ctx.font = cfg.font;
+      ctx.textAlign='center';
+      ctx.fillStyle = cfg.color;
+
+      for(let i=0;i<meta.data.length;i++){
+        const el = meta.data[i];
+        if(!el?.getProps) continue;
+        const p = el.getProps(['x','y','base'], true);
+        const v = Number(values[i]||0);
+        if(!Number.isFinite(v)) continue;
+
+        const x = Math.round(p.x);
+        let y;
+        if(drawAbove){
+          // над баром на 3–4px
+          y = Math.max(Math.round(Math.min(p.y, p.base)) - cfg.pad - 4, clip.top + 2);
+          ctx.textBaseline = 'bottom';
+        } else {
+          // внутри бара (fallback)
+          y = Math.max(Math.round(Math.min(p.y, p.base)) + cfg.pad, clip.top + 2);
+          ctx.textBaseline = 'top';
+        }
+        ctx.shadowColor = cfg.shadow; ctx.shadowBlur = 0.5; ctx.shadowOffsetY = 0.5;
+        ctx.fillText(v.toLocaleString('ru-RU'), x, y);
+        ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      }
+      ctx.restore();
+    }
+  };
+}
+
+/* ---------- Charts ---------- */
+let deltaChart=null, trendChart=null;
+
+function chooseReleases(maps, latestMap){
+  const mode = viewMode();
+  const chosen = getSelectedReleases();
+  let releases = [...latestMap.entries()].sort((a,b)=> orderDirectionEl.value==='asc' ? (a[1]-b[1]) : (b[1]-a[1]) ).map(([rel])=>rel);
+  const limit=parseInt(showCountEl.value,10)||10;
+  if(mode==='selected'){
+    if(chosen.size>0) releases = releases.filter(r=>chosen.has(r));
+    else releases = [];
+  } else if(mode==='top8'){
+    releases = releases.slice(0,8);
+  } else {
+    releases = releases.slice(0,limit);
+    if(chosen.size>0) releases = releases.filter(r=>chosen.has(r));
+  }
+  if(!releases.length){
+    const anyMap = maps.find(m => m && m.size) || new Map();
+    releases = [...anyMap.entries()].sort((a,b)=> orderDirectionEl.value==='asc' ? (a[1]-b[1]) : (b[1]-a[1]) ).slice(0,8).map(([r])=>r);
+  }
+  return releases;
+}
+function drawCharts(){
+  const hist = chosenSnaps();
+  if (!hist.length || !Array.isArray(hist.at(-1)?.records)){
+    if (deltaChart) deltaChart.destroy();
+    if (trendChart) trendChart.destroy();
+    return;
+  }
+  // отладка: видно ли данные
+  log(`[charts] snaps=${hist.length}, recs(t)=${(hist.at(-1)?.records||[]).length}`);
+  const plats = getChartPlatforms();
+  if(!hist.length){ if(deltaChart) deltaChart.destroy(); if(trendChart) trendChart.destroy(); return; }
+  const last4 = hist.slice(-CHART_SNAP_MAX);
+  const metaDates = last4.map(s=>new Date(s.time).toLocaleString('ru-RU'));
+const agg = snap => {
+  const m = new Map();
+  (snap.records || []).forEach(r => {
+    // нормализация "iOS"/"Android" → ios/android
+    const raw = String(r.platform ?? '').toLowerCase().trim();
+    let tag = '';
+    if (/android/.test(raw)) tag = 'android';
+    else if (/ios/.test(raw)) tag = 'ios';
+    else tag = raw || 'unknown';
+
+    // фильтр по чекбоксам
+    if (plats.size && !plats.has(tag)) return;
+
+    const rel = String(r.release || '');
+    const u = Number(r.users || 0) || 0;
+
+    // СУММА по платформам для одного релиза
+    m.set(rel, (m.get(rel) || 0) + u);
+  });
+  return m;
+};
+  const maps = last4.map(agg);
+  const latestMap = maps[maps.length-1] || new Map();
+  const releases = chooseReleases(maps, latestMap);
+  const seriesColors = ['#6f1d7a','#2e7d32','#1565c0','#ef6c00'];
+  const datasets = maps.map((snapMap, idx) => {
+    const label = idx === maps.length-1 ? `Текущий (${metaDates[idx]})` : `t-${maps.length-1-idx} (${metaDates[idx]})`;
+    const base = seriesColors[idx % seriesColors.length];
+    return {
+      label,
+      data: releases.map(r => snapMap.get(r) || 0),
+      backgroundColor: base + '22',
+      borderColor: base,
+      borderWidth: idx === maps.length-1 ? 1.8 : 1,
+      borderRadius: 6,
+      barPercentage: .9,
+      categoryPercentage: .6
+    };
+  });
+  // Адаптивный максимум по оси Y: берём максимум по всем столбцам и даём запас сверху
+  const allValues = datasets.reduce((acc, ds) => {
+    if (Array.isArray(ds.data)) acc.push(...ds.data);
+    return acc;
+  }, []);
+  const rawMax = allValues.length ? Math.max(...allValues) : 0;
+  const ySuggestedMax = rawMax > 0 ? Math.round(rawMax * 1.25) : undefined; // +25% воздуха
+  const deltas = (function(){
+    if(maps.length<2) return null;
+    const prevMap = maps[maps.length-2];
+    return releases.map(r => (latestMap.get(r)||0) - (prevMap.get(r)||0));
+  })();
+  // totals for current snapshot (value labels over green bars)
+  const valueLabels = releases.map(r => Number(latestMap.get(r) || 0));
+  const chkState = { ios: ($('chkIOS')?.checked === true), android: ($('chkAndroid')?.checked === true) };
+  const bothChecked = chkState.ios && chkState.android;
+  const groupSumEnabled = bothChecked;
+  if(deltaChart) deltaChart.destroy();
+  const deltaLabels = DeltaLabelsPlugin();
+  const groupSumLabels = GroupSumLabelsPlugin();
+  const fullByIndex = releases.map(r => r);
+  const shortByIndex = releases.map(r => shortVersion(r));
+  deltaChart=new Chart(document.getElementById('deltaChart'),{
+    type:'bar',
+    data:{ labels: shortByIndex, datasets },
+    options:{
+      responsive:true,animation:false,maintainAspectRatio:false,
+      devicePixelRatio: Math.min(window.devicePixelRatio||1,3),
+      layout:{ padding:{ top:48, bottom:40 } },
+      plugins:{
+        title:{ display:true, text:'Пользователи по релизам', align:'start', padding:{bottom:8}, font:{ size:16, weight:'700' } },
+        legend:{position:'bottom', labels:{font:{size:14}}},
+        tooltip:{
+          mode:'index',intersect:false,
+          titleFont:{size:14,weight:'700'},
+          bodyFont:{size:14},
+          callbacks:{ title:(items)=>{ const i=items?.[0]?.dataIndex??0; return fullByIndex[i] || ''; },
+                      label:(ctx)=>`${ctx.dataset.label}: ${num(ctx.raw||0)}` }
+        },
+        // Капсулы с Δ всегда над группой
+        deltaLabels:{ deltas, aboveGroup: true },
+        // Число пользователей: либо групповой лейбл над группой, либо подписи у столбцов
+        valueLabels:{ values: (groupSumEnabled ? [] : valueLabels), datasetIndex: datasets.length - 1, above: true },
+        groupSumLabels:{ enabled: groupSumEnabled, values: valueLabels }
+      },
+      scales:{
+        x:{ticks:{autoSkip:false,maxRotation:0,padding:8,font:{size:13},callback:(v,i)=> shortByIndex[i] || ''},grid:{display:false}},
+        y:{
+          beginAtZero:true,
+          suggestedMax: ySuggestedMax,
+          grace: '5%',
+          title:{display:true,text:'Пользователи',font:{size:14,weight:'700'}},
+          ticks:{font:{size:13},callback:v=>v.toLocaleString('ru-RU')},
+          grid:{drawBorder:false}
+        }
+      }
+    },
+    plugins:[ValueLabelsPlugin(), groupSumLabels, deltaLabels]
+  });
+  window.addEventListener('resize', ()=>{ if(deltaChart) deltaChart.update('none'); }, { passive:true });
+
+  const meta=$('deltaMeta');
+  if(meta){
+    const platsTxt=[...plats].join(', ')||'—';
+    meta.innerHTML =
+      `<span class="pill">Платформы: ${esc(platsTxt)}</span>`+
+      `<span class="pill">Снепшоты: ${metaDates.map(esc).join(' → ')}</span>`+
+      `<span class="pill">Ось X: короткие версии</span>`+
+      `<span class="pill">Режим: ${esc(viewMode())}</span>`+
+      `<span class="pill">Лимит: ${esc(showCountEl.value)}, порядок: ${esc(orderDirectionEl.value)}</span>`;
+  }
+
+  // Тренд должен учитывать выбранные снепшоты и диапазон дат
+  const trendAll = calcTrend(chosenSnaps());
+  if(trendChart) trendChart.destroy();
+// ---- Trend (sum by platforms) ----
+const platSetGlobal = new Set(getSelectedPlatforms().map(v => String(v).toLowerCase()));
+const chk = { ios: (document.getElementById('chkIOS')?.checked) === true,
+              android: (document.getElementById('chkAndroid')?.checked) === true };
+const showIOS = chk.ios && platSetGlobal.has('ios');
+const showAndroid = chk.android && platSetGlobal.has('android');
+
+// «Итого» — всегда сумма iOS + Android
+const totalSeries = trendAll.total.slice();
+
+// Плагин для подписей над точками (iOS/Android/Итого)
+function LineValueLabelsPlugin(){
+  return {
+    id: 'lineValueLabels',
+    afterDatasetsDraw(chart){
+      const { ctx, chartArea } = chart;
+      const fmt = (v)=>{
+        const n = Number(v||0);
+        const abs = Math.abs(n);
+        if (abs >= 1e9) return (n/1e9).toFixed(1).replace(/\.0$/,'') + 'B';
+        if (abs >= 1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'') + 'M';
+        if (abs >= 1e3) return (n/1e3).toFixed(1).replace(/\.0$/,'') + 'k';
+        return String(n);
+      };
+      chart.data.datasets.forEach((ds, di) => {
+        if (!chart.isDatasetVisible(di)) return;
+        const meta = chart.getDatasetMeta(di);
+        if(!meta || !meta.data) return;
+        const labelKey = String(ds.label || '').toLowerCase();
+        let offset = 8;
+        if (labelKey.includes('android')) offset = 18;
+        if (labelKey.includes('итого')) offset = 30;
+        ctx.save();
+        ctx.font = '700 14px Manrope, system-ui, -apple-system, Segoe UI, Roboto';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = ds.borderColor || '#111827';
+        for(let i=0;i<meta.data.length;i++){
+          const el = meta.data[i];
+          const v = ds.data?.[i];
+          if(!el || v == null) continue;
+          const x = Math.round(el.x);
+          const y = Math.max(Math.round(el.y) - offset, chartArea.top + 6);
+          ctx.fillText(fmt(v), x, y);
+        }
+        ctx.restore();
+      });
+    }
+  };
+}
+
+const trendDatasets = [];
+if (showIOS)      trendDatasets.push({ label: 'iOS',     data: trendAll.ios,  borderColor: '#a64bf4', backgroundColor: 'rgba(166,75,244,0.15)', tension: 0.3, pointRadius: 3 });
+if (showAndroid)  trendDatasets.push({ label: 'Android', data: trendAll.andr, borderColor: '#4bb543', backgroundColor: 'rgba(75,181,67,0.15)',  tension: 0.3, pointRadius: 3 });
+// Всегда показываем «Итого» как сумму iOS + Android
+trendDatasets.push({ label: 'Итого', data: totalSeries, borderColor: '#4287f5', backgroundColor: 'rgba(66,135,245,0.15)', tension: 0.3, borderWidth: 2, pointRadius: 4 });
+
+const yMaxTrend = Math.max(
+  0,
+  ...(showIOS ? trendAll.ios : []),
+  ...(showAndroid ? trendAll.andr : []),
+  ...totalSeries
+);
+
+trendChart = new Chart(document.getElementById('trendChart'),{
+  type:'line',
+  data:{ labels: trendAll.labels, datasets: trendDatasets },
+  options:{
+    responsive:true, animation:false, maintainAspectRatio:false,
+    devicePixelRatio: Math.min(window.devicePixelRatio||1,3),
+    plugins:{
+      title:{ display:true, text:'Тренд суммарных пользователей по платформам', align:'start', padding:{bottom:8}, font:{ size:16, weight:'700' } },
+      legend:{ position:'bottom', labels:{ font:{ size:12 } } }
+    },
+    layout:{ padding:{ top: 28, bottom: 34 } },
+    scales:{
+      x:{
+        ticks:{
+          autoSkip:false,
+          maxRotation:0,
+          padding:6,
+          font:{size:10},
+          callback:(v,i)=>{
+            const lbl = trendAll.labels[i] || '';
+            const parts = String(lbl).split(', ');
+            return parts.length>1 ? parts : lbl;
+          }
+        },
+        grid:{display:false}
+      },
+      y:{ beginAtZero:true,
+          suggestedMax: Math.ceil((yMaxTrend || 0) * 1.08),
+          title:{ display:true, text:'Пользователи', font:{ size:14, weight:'700' } },
+          ticks:{ font:{size:12}, callback:v => v.toLocaleString('ru-RU') },
+          grid:{ drawBorder:false } }
+    }
+  },
+  plugins:[ LineValueLabelsPlugin() ]
+});
+}
+
+/* ---------- View + CSV ---------- */
+
+function renderViewFromHistory(){
+  const hist=chosenSnaps(); if(!hist.length) return;
+  renderView(hist[hist.length-1].records);
+}
+function downloadCsv(rows, filename){
+  const csv = rows.map(r=>r.map(v=>'"'+String(v ?? '').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function exportSummaryCsv(){
+  const rows=[["platform","release","users","share"]];
+  const src = Array.isArray(filteredRows) ? filteredRows : [];
+  src.forEach(r=>{
+    rows.push([r.platform, r.release, String(Math.round(Number(r.users||0))), r.share==null?'':Number(r.share).toFixed(2)]);
+  });
+  downloadCsv(rows, 'bi_summary_top20.csv');
+}
+function exportGrowthCsv(){
+  const rows=[["platform","version","slice_1","slice_2","slice_3","slice_4","delta","delta_pct"]];
+  document.querySelectorAll('#growthTbl tbody tr').forEach(tr=>{
+    const tds = tr.querySelectorAll('td');
+    rows.push([
+      tds[0]?.textContent || '',
+      tds[1]?.textContent || '',
+      (tds[2]?.textContent || '').replace(/\s/g,''),
+      (tds[3]?.textContent || '').replace(/\s/g,''),
+      (tds[4]?.textContent || '').replace(/\s/g,''),
+      (tds[5]?.textContent || '').replace(/\s/g,''),
+      (tds[6]?.textContent || '').replace(/\s/g,''),
+      (tds[7]?.textContent || '').replace(/\s/g,'')
+    ]);
+  });
+  downloadCsv(rows, 'bi_growth_top4.csv');
+}
+if(btnExportCsv) btnExportCsv.addEventListener('click', exportSummaryCsv);
+if(btnExportSummaryCsv) btnExportSummaryCsv.addEventListener('click', exportSummaryCsv);
+if(btnExportGrowthCsv) btnExportGrowthCsv.addEventListener('click', exportGrowthCsv);
+if(btnSaveSettings) btnSaveSettings.addEventListener('click', saveSettings);
+
+// Загрузка сохранённых настроек при старте
+loadSettings();
+
+/* ---------- Misc ---------- */
+async function pingProxy(){
+  try{
+    const url=proxyBase.value.replace(/\/+$/,'')+'/health';
+    const r=await fetch(url,{mode:'cors'});
+    const ok=r.ok;
+    healthPill.textContent=ok?'proxy: ok':'proxy: down';
+    healthPill.style.background=ok?'rgba(22,139,88,.08)':'rgba(198,40,40,.08)';
+  }catch{
+    healthPill.textContent='proxy: ?';
+    healthPill.style.background='rgba(198,40,40,.08)';
+  }
+}
+['chkIOS','chkAndroid'].forEach(id=>{
+  document.addEventListener('change', e=>{
+    if(e.target && e.target.id===id){ renderViewFromHistory(); buildReleasesDropdown(); drawCharts(); renderGrowth(); }
+  });
+});
+document.addEventListener('change', e=>{
+  if(e.target.name==='viewMode' || e.target.closest('#platformDropdown') || e.target.closest('#intervalDropdown')){
+    renderViewFromHistory();
+    if(e.target.closest('#intervalDropdown')) intervalSelectedText.textContent=getIntervalValue();
+    buildReleasesDropdown();
+    drawCharts();
+    renderGrowth();
+  }
+});
+
+/* ---------- Growth (Δ-таблица) ---------- */
+const growthTblBody = document.querySelector('#growthTbl tbody');
+const growthKpis = $('growthKpis');
+const growthSnapsMeta = $('growthSnapsMeta');
+$('btnGrowthRecalc')?.addEventListener('click', renderGrowthFromSummary);
+
+function normalizeReleaseName(raw){
+  let s = String(raw || '').trim();
+  const inParens = s.match(/\(([^)]+)\)/);
+  if (inParens && inParens[1]) s = inParens[1].trim();
+  s = s.replace(/[™©®]/g,'').replace(/\s+/g,' ').trim();
+  s = s.replace(/\s*-\s*/g,'-');
+  return s;
+}
+function parseVersionSemver(raw){
+  const s = normalizeReleaseName(raw);
+  const m = s.match(/^(\d+(?:\.\d+){1,3})(?:-([\w.\-]+))?$/);
+  const core = m ? m[1] : s;
+  const tag  = m && m[2] ? m[2].toLowerCase() : '';
+  const nums = core.split('.').map(n => parseInt((n.match(/\d+/)||['0'])[0],10) || 0);
+  while (nums.length < 4) nums.push(0);
+  return { core, tag, nums, raw: s };
+}
+function cmpSemver(a,b){
+  const pa = parseVersionSemver(a), pb = parseVersionSemver(b);
+  const len = Math.max(pa.nums.length, pb.nums.length);
+  for (let i=0;i<len;i++){
+    const da = pa.nums[i]||0, db = pb.nums[i]||0;
+    if (da !== db) return da - db;
+  }
+  if (pa.tag !== pb.tag){
+    if (!pa.tag && pb.tag) return 1;
+    if (pa.tag && !pb.tag) return -1;
+    return pa.tag.localeCompare(pb.tag,'ru',{numeric:true,sensitivity:'base'});
+  }
+  return 0;
+}
+function isDummyNine(raw){
+  const { nums } = parseVersionSemver(raw);
+  return nums[0]===9 && nums[1]===9 && nums[2]===9999;
+}
+function aggregateSnapByReleasesNormalized(snap, plats){
+  const m = new Map();
+  (snap.records || []).forEach(r => {
+    const rp = String(r.platform || '').toLowerCase();
+    if (plats.size && !plats.has(rp)) return;
+    const key = normalizeReleaseName(r.release);
+    m.set(key, (m.get(key) || 0) + Number(r.users || 0));
+  });
+  return m;
+}
+function deltaStats(latestMap, prevMap){
+  let pos=0,neg=0,sumPos=0,sumNeg=0;
+  const u=new Set([...(latestMap?.keys()||[]),...(prevMap?.keys()||[])]);
+  u.forEach(n=>{
+    const d = Number(latestMap.get(n)||0) - Number(prevMap.get(n)||0);
+    if(d>0){pos++;sumPos+=d;} else if(d<0){neg++;sumNeg+=-d;}
+  });
+  return {pos,neg,sumPos,sumNeg};
+}
+function getTopReleasesFromSummaryNormalized(limit=4){
+  const rows = Array.isArray(filteredRows) ? filteredRows : [];
+  if(!rows.length) return [];
+  const acc = new Map();
+  for(const r of rows){
+    const key = normalizeReleaseName(r.release);
+    if(!/^\d+(?:\.\d+){2,3}(?:-[\w.\-]+)?$/.test(key)) continue;
+    if(isDummyNine(key)) continue;
+    acc.set(key, (acc.get(key)||0) + Number(r.users||0));
+  }
+  return [...acc.entries()]
+    .sort((a,b)=> b[1]-a[1] || -cmpSemver(a[0],b[0]))
+    .slice(0,limit)
+    .map(([k])=>k);
+}
+function getTopReleasesByPlatformFromSummaryNormalized(limit=4){
+  const rows = Array.isArray(filteredRows) ? filteredRows : [];
+  const acc = { ios: new Map(), android: new Map() };
+  for(const r of rows){
+    const p = String(r.platform || '').toLowerCase();
+    if(!(p in acc)) continue;
+    const key = normalizeReleaseName(r.release);
+    if(!/^\d+(?:\.\d+){2,3}(?:-[\w.\-]+)?$/.test(key)) continue;
+    if(isDummyNine(key)) continue;
+    const m = acc[p];
+    m.set(key, (m.get(key)||0) + Number(r.users||0));
+  }
+  const out = {};
+  Object.entries(acc).forEach(([p, m]) => {
+    out[p] = [...m.entries()]
+      .sort((a,b)=> b[1]-a[1] || -cmpSemver(a[0],b[0]))
+      .slice(0,limit)
+      .map(([k])=>k);
+  });
+  return out;
+}
+function renderGrowthFromSummary(){
+  const body = growthTblBody;
+  const kpis = growthKpis;
+  const snapsMeta = growthSnapsMeta;
+  body.innerHTML = '';
+  kpis.innerHTML = '';
+
+  const snaps = chosenSnaps();
+  const plats = getChartPlatforms();
+  if (!snaps.length){ snapsMeta.textContent='—'; return; }
+
+  const dates = snaps.map(s => new Date(s.time).toLocaleString('ru-RU'));
+  snapsMeta.textContent = dates.join(' → ');
+
+  const maps = snaps.map(s => aggregateSnapByReleasesNormalized(s, plats));
+  const latest = maps.at(-1) || new Map();
+  const prev   = maps.length>1 ? maps[maps.length-2] : new Map();
+
+ const mapsIOS   = snaps.map(s => aggregateSnapByReleasesNormalized(s, new Set(['ios'])));
+const mapsAND   = snaps.map(s => aggregateSnapByReleasesNormalized(s, new Set(['android'])));
+  const latestIOS = mapsIOS.at(-1) || new Map();
+  const prevIOS   = mapsIOS.length>1 ? mapsIOS[mapsIOS.length-2] : new Map();
+  const latestAND = mapsAND.at(-1) || new Map();
+  const prevAND   = mapsAND.length>1 ? mapsAND[mapsAND.length-2] : new Map();
+
+  const topByPlat = getTopReleasesByPlatformFromSummaryNormalized(4);
+  const getVal = (map, key) => Number((map && map.get(key)) || 0);
+  const platFilter = String(sumPlat.value || 'all').toLowerCase();
+  const platOrder = platFilter === 'all' ? ['ios','android'] : [platFilter];
+
+  const rows = [];
+  platOrder.forEach(p=>{
+    const mapsP = p === 'ios' ? mapsIOS : (p === 'android' ? mapsAND : maps);
+    const latestP = mapsP.at(-1) || new Map();
+    let names = (topByPlat[p] && topByPlat[p].length) ? topByPlat[p] : [];
+    if (!names.length){
+      names = [...latestP.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k])=>k);
+    }
+    names.forEach(key=>{
+      const t  = getVal(mapsP[mapsP.length-1], key);
+      const t1 = getVal(mapsP[mapsP.length-2], key);
+      const t2 = getVal(mapsP[mapsP.length-3], key);
+      const t3 = getVal(mapsP[mapsP.length-4], key);
+      const d  = t - t1;
+      const dp = (t1>0) ? (d/t1*100) : (t>0 ? 100 : null);
+      rows.push({ plat: p, key, t, t1, t2, t3, d, dp });
+    });
+  });
+
+  // Сортируем внутри платформ по текущему значению
+  const rowsSorted = rows.sort((a,b)=>{
+    if (a.plat !== b.plat) return a.plat.localeCompare(b.plat, 'ru');
+    return b.t - a.t;
+  });
+
+  for (const r of rowsSorted){
+    const cls = r.d>0 ? 'delta-pos' : (r.d<0 ? 'delta-neg' : '');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.plat === 'ios' ? 'iOS' : (r.plat === 'android' ? 'Android' : esc(r.plat))}</td>
+      <td>${esc(r.key)}</td>
+      <td>${num(r.t)}</td>
+      <td>${num(r.t1)}</td>
+      <td>${num(r.t2)}</td>
+      <td>${num(r.t3)}</td>
+      <td class="${cls}">${r.d>0?'+':''}${num(r.d)}</td>
+      <td class="${cls}">${r.dp==null ? '—' : ((r.dp>=0?'+':'') + r.dp.toFixed(2) + '%')}</td>
+    `;
+    body.appendChild(tr);
+  }
+
+  const sum = m => { let s=0; (m||new Map()).forEach(v=> s+=Number(v||0)); return s; };
+  const totalT  = sum(latest);
+  const totalT1 = sum(prev);
+  const totalD  = totalT - totalT1;
+  const totalP  = totalT1>0 ? (totalD/totalT1*100) : (totalT>0 ? 100 : null);
+
+  const totalIOS_t  = sum(latestIOS), totalIOS_t1 = sum(prevIOS);
+  const deltaIOS    = totalIOS_t - totalIOS_t1;
+  const pctIOS      = totalIOS_t1>0 ? (deltaIOS/totalIOS_t1*100) : (totalIOS_t>0 ? 100 : null);
+
+  const totalAND_t  = sum(latestAND), totalAND_t1 = sum(prevAND);
+  const deltaAND    = totalAND_t - totalAND_t1;
+  const pctAND      = totalAND_t1>0 ? (deltaAND/totalAND_t1*100) : (totalAND_t>0 ? 100 : null);
+
+  const allStats = deltaStats(latest, prev);
+  const iosStats = deltaStats(latestIOS, prevIOS);
+  const andStats = deltaStats(latestAND, prevAND);
+
+  const sortedLatest = [...latest.entries()].sort((a,b)=>b[1]-a[1]);
+  const top1Share = totalT>0 ? (sortedLatest[0]?.[1]||0)/totalT*100 : 0;
+  const top4Share = totalT>0 ? sortedLatest.slice(0,4).reduce((x, [,v])=>x+Number(v||0),0)/totalT*100 : 0;
+
+  let deltasAbs = [];
+  const union = new Set([...(latest?.keys()||[]), ...(prev?.keys()||[])]);
+  union.forEach(n => { const d = Number(latest.get(n)||0) - Number(prev.get(n)||0); deltasAbs.push(Math.abs(d)); });
+  deltasAbs.sort((a,b)=>a-b);
+  const medianAbs = deltasAbs.length
+    ? (deltasAbs.length%2 ? deltasAbs[(deltasAbs.length-1)/2]
+                          : (deltasAbs[deltasAbs.length/2-1]+deltasAbs[deltasAbs.length/2])/2)
+    : 0;
+
+  const k = (label, value, hint='') =>
+    `<div class="kpi"><div class="muted">${label}</div><div style="font-weight:800">${value}</div>${hint?`<div class="muted">${hint}</div>`:''}</div>`;
+  const dCls   = totalD>0?'delta-pos':(totalD<0?'delta-neg':'');
+  const dClsI  = deltaIOS>0?'delta-pos':(deltaIOS<0?'delta-neg':'');
+  const dClsA  = deltaAND>0?'delta-pos':(deltaAND<0?'delta-neg':'');
+
+  growthKpis.innerHTML =
+    k('Итого пользователей (t)', num(totalT)) +
+    `<div class="kpi"><div class="muted">Δ (t vs t−1)</div><div class="${dCls}" style="font-weight:800">${totalD>0?'+':''}${num(totalD)} ${totalP==null?'(—)':`(${totalP>=0?'+':''}${totalP.toFixed(2)}%)`}</div></div>` +
+    `<div class="kpi"><div class="muted">iOS (t)</div><div style="font-weight:800">${num(totalIOS_t)}</div><div class="muted ${dClsI}">${deltaIOS>0?'+':''}${num(deltaIOS)} ${pctIOS==null?'(—)':`(${pctIOS>=0?'+':''}${pctIOS.toFixed(2)}%)`} • рост/отток: ${iosStats.pos}/${iosStats.neg} (+${num(iosStats.sumPos)} / −${num(iosStats.sumNeg)})</div></div>` +
+    `<div class="kpi"><div class="muted">Android (t)</div><div style="font-weight:800">${num(totalAND_t)}</div><div class="muted ${dClsA}">${deltaAND>0?'+':''}${num(deltaAND)} ${pctAND==null?'(—)':`(${pctAND>=0?'+':''}${pctAND.toFixed(2)}%)`} • рост/отток: ${andStats.pos}/${andStats.neg} (+${num(andStats.sumPos)} / −${num(andStats.sumNeg)})</div></div>` +
+    k('Top-1 доля', `${top1Share.toFixed(2)}%`, esc(sortedLatest[0]?.[0]||'')) +
+    k('Top-4 доля', `${top4Share.toFixed(2)}%`) +
+    k('Рост / Отток', `${allStats.pos} / ${allStats.neg}`, `+${num(allStats.sumPos)} / −${num(allStats.sumNeg)} пользователей`) +
+    k('Медианный |Δ| по релизам', num(Math.round(medianAbs)));
+}
+
+/* обёртка */
+function renderGrowth(){ renderGrowthFromSummary(); }
+
+/* триггеры Δ-таблицы */
+['change','input','click'].forEach(evt=>{
+  document.addEventListener(evt, e=>{
+    if (
+      e.target === sumPlat || e.target === sumRel ||
+      e.target === sumPageSizeEl || e.target === sumPrev || e.target === sumNext ||
+      e.target === thUsers
+    ){
+      renderGrowthFromSummary();
+    }
+  });
+});
+
+
+/* ---------- PDF Export (charts) ---------- */
+async function exportChartsPdf(){
+  const btn = $('exportPdfBtn');
+  if (!window.jspdf || !window.jspdf.jsPDF){
+    alert('PDF библиотеки не загрузились.');
+    return;
+  }
+  const originalText = btn ? btn.textContent : '';
+  if (btn){ btn.textContent = 'Готовим PDF...'; btn.disabled = true; }
+  try{
+    const { jsPDF } = window.jspdf;
+    const A4 = [297, 210];
+    const CHART_ZOOM = 1.75; // 175% zoom for charts page
+    const CHART_FORMAT = [A4[0] * CHART_ZOOM, A4[1] * CHART_ZOOM];
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: CHART_FORMAT, compress: false });
+    const margin = 6;
+    let pageIndex = 0;
+
+    const charts = [
+      document.getElementById('deltaChart'),
+      document.getElementById('trendChart')
+    ].filter(Boolean);
+    if (!charts.length){
+      alert('Не найдено ни одного графика для экспорта.');
+      return;
+    }
+
+    const toImgData = (canvas, scale=2, mime='image/png', quality=1) => {
+      const tmp = document.createElement('canvas');
+      tmp.width = Math.max(1, Math.round(canvas.width * scale));
+      tmp.height = Math.max(1, Math.round(canvas.height * scale));
+      const ctx = tmp.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,tmp.width,tmp.height);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.drawImage(canvas, 0, 0);
+      return {
+        ratio: tmp.height / tmp.width,
+        data: tmp.toDataURL(mime, quality),
+        format: mime.includes('png') ? 'PNG' : 'JPEG'
+      };
+    };
+    const composeCharts = (list, scale=3, gap=18) => {
+      const valid = list.filter(Boolean);
+      const maxW = Math.max(...valid.map(c=>c.width));
+      const totalH = valid.reduce((sum,c)=> sum + c.height, 0) + gap * (valid.length - 1);
+      const tmp = document.createElement('canvas');
+      tmp.width = Math.max(1, Math.round(maxW * scale));
+      tmp.height = Math.max(1, Math.round(totalH * scale));
+      const ctx = tmp.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,tmp.width,tmp.height);
+      let y = 0;
+      valid.forEach((c) => {
+        const w = c.width * scale;
+        const h = c.height * scale;
+        const x = Math.round(((maxW - c.width) * scale) / 2);
+        ctx.drawImage(c, x, y, w, h);
+        y += h + gap * scale;
+      });
+      return {
+        ratio: tmp.height / tmp.width,
+        data: tmp.toDataURL('image/png', 1),
+        format: 'PNG'
+      };
+    };
+    const addImagePage = (img, opts = {}) => {
+      if (pageIndex > 0){
+        if (opts.format) pdf.addPage(opts.format, 'landscape');
+        else pdf.addPage();
+      }
+      const pdfW = pdf.internal.pageSize.getWidth();
+      const pdfH = pdf.internal.pageSize.getHeight();
+      const maxW = pdfW - margin*2;
+      const maxH = pdfH - margin*2;
+      pdf.setFillColor(255,255,255);
+      pdf.rect(0,0,pdfW,pdfH,'F');
+      let imgW = maxW;
+      let imgH = img.ratio * imgW;
+      if (imgH > maxH){
+        imgH = maxH;
+        imgW = imgH / img.ratio;
+      }
+      const x = Math.max(margin, (pdfW - imgW) / 2);
+      const y = Math.max(margin, (pdfH - imgH) / 2);
+      const fmt = img.format || 'PNG';
+      const compress = fmt === 'JPEG' ? 'FAST' : undefined;
+      pdf.addImage(img.data, fmt, x, y, imgW, imgH, undefined, compress);
+      pageIndex += 1;
+    };
+
+    // --- Charts: one page, higher quality ---
+    if (charts.length > 1){
+      addImagePage(composeCharts(charts, 3, 16));
+    } else {
+      charts.forEach((canvas) => {
+        addImagePage(toImgData(canvas, 3, 'image/png', 1));
+      });
+    }
+
+    // --- Summary & Analytics as PDF pages ---
+    if (window.html2canvas){
+      document.body.classList.add('pdf-export');
+      try{ await (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()); }catch{}
+
+      const makeSheet = (title, metaText, nodes=[], className='pdf-sheet') => {
+        const wrap = document.createElement('div');
+        wrap.className = className;
+        wrap.innerHTML = `<div class="pdf-title">${esc(title)}</div>` +
+          (metaText ? `<div class="pdf-meta">${esc(metaText)}</div>` : '');
+        nodes.forEach(n => { if (n) wrap.appendChild(n); });
+        wrap.style.position = 'fixed';
+        wrap.style.left = '-10000px';
+        wrap.style.top = '0';
+        document.body.appendChild(wrap);
+        return wrap;
+      };
+      const waitFrame = () => new Promise(r=>requestAnimationFrame(()=>r()));
+
+      // Summary sheet (top-20)
+      const tbl = document.getElementById('tbl');
+      const tblClone = tbl ? tbl.cloneNode(true) : null;
+      const summaryMeta = `Платформа: ${sumPlat.value}; Фильтр: ${sumRel.value || '—'}; Топ: ${SUMMARY_TOP_LIMIT}`;
+      const summarySheet = makeSheet('Сводная таблица по релизам (топ-20)', summaryMeta, [tblClone]);
+      await waitFrame();
+      const sumCanvas = await html2canvas(summarySheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+      addImagePage(toImgData(sumCanvas, 1, 'image/jpeg', 0.98), { format: A4 });
+      summarySheet.remove();
+
+      // Android summary (RuStore / Huawei / Google)
+      const androidCard = document.getElementById('androidSummaryCard');
+      const androidClone = androidCard ? androidCard.cloneNode(true) : null;
+      if (androidClone){
+        const androidSheet = makeSheet('Android — распределение по типу сборки', 'Доля от общего числа Android', [androidClone], 'pdf-sheet pdf-sheet--android');
+        await waitFrame();
+        const androidCanvas = await html2canvas(androidSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+        addImagePage(toImgData(androidCanvas, 1, 'image/jpeg', 0.98), { format: A4 });
+        androidSheet.remove();
+      }
+
+      // Growth sheet (top-4)
+      const kpis = document.getElementById('growthKpis');
+      const kpisClone = kpis ? kpis.cloneNode(true) : null;
+      const gtbl = document.getElementById('growthTbl');
+      const gtblClone = gtbl ? gtbl.cloneNode(true) : null;
+      const growthMeta = `Снепшоты: ${growthSnapsMeta?.textContent || '—'}`;
+      const growthSheet = makeSheet('Аналитика версий: прирост/убывание (топ-4)', growthMeta, [kpisClone, gtblClone]);
+      await waitFrame();
+      const growthCanvas = await html2canvas(growthSheet, { backgroundColor:'#ffffff', scale:2, useCORS:true, logging:false });
+      addImagePage(toImgData(growthCanvas, 1, 'image/jpeg', 0.98), { format: A4 });
+      growthSheet.remove();
+    }
+
+    const stamp = new Date().toISOString().slice(0,10);
+    pdf.save(`wb-bi-users-full-${stamp}.pdf`);
+  } finally {
+    document.body.classList.remove('pdf-export');
+    if (btn){ btn.textContent = originalText || 'Экспорт PDF'; btn.disabled = false; }
+  }
+}
+const exportPdfBtn = $('exportPdfBtn');
+if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportChartsPdf);
+
+/* ---------- Init ---------- */
+setJwtState(); pingProxy();
+
+(async function initFromHistory(){
+  logsEl.textContent='—'; respEl.textContent='—';
+
+  await cloudHistoryLoadMerge().catch(()=>{});
+  await cloudCacheLoadMerge().catch(()=>{}); // можно оставить как было
+
+  buildSnapshotsDropdown();
+  updateSnapshotBadges();
+
+  const hist = getHistory(); // уже Snapshot[]
+  if (hist.length){
+    renderView(hist.at(-1).records);   // таблица
+    buildReleasesDropdown();           // релизы
+    drawCharts();                      // графики
+  } else {
+    releasesList.innerHTML='';
+    releasesSelectedText.textContent='Выберите релизы';
+  }
+  renderGrowth();                      // Δ-таблица
+})();
+pingProxy();
+pingDrive();
+window.addEventListener('load', ()=>{ try{ pingDrive(); }catch(e){} });
+</script>
+</body>
+</html>

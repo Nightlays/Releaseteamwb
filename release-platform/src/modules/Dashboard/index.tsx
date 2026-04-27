@@ -58,6 +58,7 @@ Chart.register(DoughnutController, ArcElement, BarController, LineController, Li
 
 const DASHBOARD_SNAPSHOT_KEY = 'rp_dashboard_last_v1';
 const DASHBOARD_HISTORY_KEY = 'rp_dashboard_history_v1';
+const MOSCOW_UTC_OFFSET_MS = 3 * 3_600_000;
 
 interface DashboardChartPalette {
   text: string;
@@ -96,6 +97,9 @@ function sanitizeHistoryPoint(raw: unknown): DashboardHistoryPoint | null {
     total: Number(value.total || 0),
     finished: Number(value.finished || 0),
     manualFinished: Number(value.manualFinished || 0),
+    manualTimedFinished: Number(value.manualTimedFinished || 0),
+    manualWindowStartTs: value.manualWindowStartTs == null ? null : Number(value.manualWindowStartTs || 0),
+    manualWindowStopTs: value.manualWindowStopTs == null ? null : Number(value.manualWindowStopTs || 0),
     remaining: Number(value.remaining || 0),
     launches: Number(value.launches || 0),
     assigned: Number(value.assigned || 0),
@@ -110,6 +114,8 @@ function sanitizeHistoryPoint(raw: unknown): DashboardHistoryPoint | null {
     noPassedAlerts: Number(value.noPassedAlerts || 0),
     uwuTotal: Number(value.uwuTotal || 0),
     uwuLeft: Number(value.uwuLeft || 0),
+    activePeopleCount: Number(value.activePeopleCount || 0),
+    activePeopleLogins: Array.isArray(value.activePeopleLogins) ? value.activePeopleLogins.map(item => String(item || '').trim()).filter(Boolean) : [],
   };
 }
 
@@ -161,6 +167,13 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('ru-RU').format(Math.round(value || 0));
 }
 
+function formatPercent(value: number, fractionDigits = 1) {
+  return `${new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(Number.isFinite(value) ? value : 0)}%`;
+}
+
 function formatDelta(current: number, previous?: number | null) {
   if (previous == null) return 'нет прошлого среза';
   const delta = current - previous;
@@ -186,6 +199,35 @@ function formatDateTime(ts?: number | null) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(ts);
+}
+
+function formatDateTimeMsk(ts?: number | null) {
+  if (!ts) return '—';
+  return new Intl.DateTimeFormat('ru-RU', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Moscow',
+  }).format(ts);
+}
+
+function parseMoscowDateTimeLocal(value: string) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) return NaN;
+  const [, year, month, day, hour, minute] = match;
+  const utcTs = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    0,
+    0
+  );
+  return utcTs - MOSCOW_UTC_OFFSET_MS;
 }
 
 function formatLaunchStatus(status?: string | null) {
@@ -283,6 +325,9 @@ function buildHistorySnapshot(
   updatedAt: number,
   activePeopleCount = 0,
   activePeopleLogins: string[] = [],
+  manualTimedFinished = 0,
+  manualWindowStartTs: number | null = null,
+  manualWindowStopTs: number | null = null,
 ): DashboardHistoryPoint {
   const criticalLabels = DASHBOARD_ORDER.filter(label => label.includes('[High/Blocker]'));
   const selectiveLabels = DASHBOARD_ORDER.filter(label => label.includes('[Selective]'));
@@ -305,6 +350,9 @@ function buildHistorySnapshot(
     total,
     finished,
     manualFinished,
+    manualTimedFinished,
+    manualWindowStartTs,
+    manualWindowStopTs,
     remaining,
     launches: launchesCount,
     assigned,
@@ -482,7 +530,7 @@ function GroupDonut({ row }: { row: DashboardGroupCounts }) {
   const finished = Number(row.finished || 0);
   const left = Number(row.remaining_total || 0);
   const total = Math.max(0, finished + left);
-  const pct = total > 0 ? Math.round((finished / total) * 100) : 0;
+  const pct = total > 0 ? (finished / total) * 100 : 0;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -539,7 +587,7 @@ function GroupDonut({ row }: { row: DashboardGroupCounts }) {
           ctx.textBaseline = 'middle';
           ctx.fillStyle = palette.text;
           ctx.font = '700 18px Inter, system-ui';
-          ctx.fillText(`${pct}%`, x, y - 2);
+          ctx.fillText(formatPercent(pct), x, y - 2);
           ctx.fillStyle = palette.textSoft;
           ctx.font = '600 10px Inter, system-ui';
           ctx.fillText('готово', x, y + 16);
@@ -572,7 +620,7 @@ function GroupCard({
           <CardHint>{hasUwu ? 'Реальный exact-count + UwU по leaf/testcase overview' : 'Selective без UwU, как в legacy dashboard'}</CardHint>
         </div>
         <Badge color={row.total > 0 && row.finished / Math.max(1, row.total) >= 0.9 ? 'green' : row.total > 0 ? 'yellow' : 'gray'}>
-          {row.total > 0 ? `${Math.round((row.finished / Math.max(1, row.total)) * 100)}%` : '0%'}
+          {formatPercent(row.total > 0 ? (row.finished / Math.max(1, row.total)) * 100 : 0)}
         </Badge>
       </CardHeader>
       <CardBody style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 12, alignItems: 'center' }}>
@@ -601,9 +649,9 @@ function GroupCard({
                 <div style={{ marginTop: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>
                     <span>UwU прогресс</span>
-                    <span>{Math.round((uwu.done / Math.max(1, uwu.total)) * 100)}%</span>
+                    <span>{formatPercent((uwu.done / Math.max(1, uwu.total)) * 100)}</span>
                   </div>
-                  <Progress value={Math.round((uwu.done / Math.max(1, uwu.total)) * 100)} height={5} color={uwu.left === 0 ? 'green' : uwu.done / Math.max(1, uwu.total) >= 0.7 ? 'yellow' : 'red'} />
+                  <Progress value={(uwu.done / Math.max(1, uwu.total)) * 100} height={5} color={uwu.left === 0 ? 'green' : uwu.done / Math.max(1, uwu.total) >= 0.7 ? 'yellow' : 'red'} />
                 </div>
               )}
             </>
@@ -788,8 +836,8 @@ function PredictionCard({
                 </span>
               }
             />
-            <InfoRow label="Ориентировочное окончание ХБ" value={prediction.etaTs ? formatDateTime(prediction.etaTs) : 'недостаточно истории'} />
-            <InfoRow label="Дедлайн" value={formatDateTime(prediction.deadlineTs)} />
+            <InfoRow label="Ориентировочное окончание ХБ" value={prediction.etaTs ? formatDateTimeMsk(prediction.etaTs) : 'недостаточно истории'} />
+            <InfoRow label="Дедлайн" value={formatDateTimeMsk(prediction.deadlineTs)} />
             <InfoRow
               label="Наблюдаемый / прогнозный ручной темп"
               value={`${formatRate(prediction.observedVelocityPerHour)} / ${formatRate(prediction.forecastVelocityPerHour)}`}
@@ -1023,13 +1071,24 @@ function BurndownChart({ history, deadlineTs }: { history: DashboardHistoryPoint
   const chartRef = useRef<Chart | null>(null);
 
   const cleanHistory = useMemo(() => {
-    if (history.length < 2) return history;
-    const result: DashboardHistoryPoint[] = [history[0]];
-    for (let i = 1; i < history.length; i++) {
+    const baseHistory = (() => {
+      if (history.length >= 2) return history;
+      const single = history[0];
+      if (!single || single.manualFinished <= 0) return history;
+      const originTs = Number(single.manualWindowStartTs || 0);
+      if (!originTs || originTs >= single.updatedAt) return history;
+      return [
+        { ...single, updatedAt: originTs, manualFinished: 0, finished: 0 },
+        single,
+      ];
+    })();
+    if (baseHistory.length < 2) return baseHistory;
+    const result: DashboardHistoryPoint[] = [baseHistory[0]];
+    for (let i = 1; i < baseHistory.length; i++) {
       const prev = result[result.length - 1];
-      const cur = history[i];
-      const prevMax = Math.max(prev.finished, 1);
-      if (cur.finished < prevMax * 0.2 && prevMax > 500) continue;
+      const cur = baseHistory[i];
+      const prevMax = Math.max(prev.manualFinished, 1);
+      if (cur.manualFinished < prevMax * 0.2 && prevMax > 500) continue;
       result.push(cur);
     }
     return result;
@@ -1047,13 +1106,13 @@ function BurndownChart({ history, deadlineTs }: { history: DashboardHistoryPoint
 
     const allTs = cleanHistory.map(p => p.updatedAt);
     const labels = cleanHistory.map(p => makeBurndownLabel(p.updatedAt, allTs));
-    const finishedData = cleanHistory.map(p => p.finished);
+    const finishedData = cleanHistory.map(p => p.manualFinished);
     const totalRef = cleanHistory[cleanHistory.length - 1]?.total || 0;
 
     const forecastLabels = [...labels];
     // Начинаем прогноз с последней реальной точки чтобы не было разрыва на графике
     const forecastData: (number | null)[] = cleanHistory.map(() => null);
-    forecastData[cleanHistory.length - 1] = cleanHistory[cleanHistory.length - 1].finished;
+    forecastData[cleanHistory.length - 1] = cleanHistory[cleanHistory.length - 1].manualFinished;
 
     if (deadlineTs && cleanHistory.length >= 2) {
       const last = cleanHistory[cleanHistory.length - 1];
@@ -1063,7 +1122,7 @@ function BurndownChart({ history, deadlineTs }: { history: DashboardHistoryPoint
       for (let i = 1; i < cleanHistory.length; i++) {
         const dtH = (cleanHistory[i].updatedAt - cleanHistory[i - 1].updatedAt) / 3_600_000;
         if (dtH >= 1.0) {
-          totalDelta += Math.max(0, cleanHistory[i].finished - cleanHistory[i - 1].finished);
+          totalDelta += Math.max(0, cleanHistory[i].manualFinished - cleanHistory[i - 1].manualFinished);
           totalHours += dtH;
         }
       }
@@ -1079,7 +1138,7 @@ function BurndownChart({ history, deadlineTs }: { history: DashboardHistoryPoint
         for (let i = 1; i <= steps; i++) {
           const ts = allForecastTs[i];
           forecastLabels.push(makeBurndownLabel(ts, spanTs));
-          forecastData.push(Math.min(totalRef, Math.round(last.finished + velocity * (hoursLeft / steps) * i)));
+          forecastData.push(Math.min(totalRef, Math.round(last.manualFinished + velocity * (hoursLeft / steps) * i)));
         }
       }
     }
@@ -1580,7 +1639,7 @@ export function Dashboard() {
 
        const cachedDashboard = readCachedDashboardAggregate(version);
        const cachedReadiness = readCachedDashboardReadiness(version);
-       const customDeadlineTs = customDeadline ? new Date(customDeadline).getTime() : undefined;
+       const customDeadlineTs = customDeadline ? parseMoscowDateTimeLocal(customDeadline) : undefined;
 
        if (cachedDashboard) {
          setLaunches(cachedDashboard.launches);
@@ -1603,7 +1662,13 @@ export function Dashboard() {
              history: readHistory(version),
              nowTs: Date.now(),
              customDeadlineTs: customDeadlineTs && Number.isFinite(customDeadlineTs) ? customDeadlineTs : undefined,
+             activePeopleCount: cachedDashboard.activePeopleCount,
+             activePeopleLogins: cachedDashboard.activePeopleLogins,
+             manualTimedFinished: cachedDashboard.manualTimedFinished,
+             manualWindowStartTs: cachedDashboard.manualWindowStartTs,
+             manualWindowStopTs: cachedDashboard.manualWindowStopTs,
              gasConfig: { gasUrl: settings.gasUrl, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
+             launchCreatedTs: cachedDashboard.launchCreatedTs ?? undefined,
            }).then(nextPrediction => {
              setPrediction(nextPrediction);
            }).catch(() => {
@@ -1646,6 +1711,9 @@ export function Dashboard() {
         snapshotTs,
         dashboardData.activePeopleCount,
         dashboardData.activePeopleLogins,
+        dashboardData.manualTimedFinished,
+        dashboardData.manualWindowStartTs,
+        dashboardData.manualWindowStopTs,
       );
       const nextHistory = writeSnapshot(nextSnapshot);
       setHistory(nextHistory);
@@ -1665,6 +1733,9 @@ export function Dashboard() {
           customDeadlineTs: customDeadlineTs && Number.isFinite(customDeadlineTs) ? customDeadlineTs : undefined,
           activePeopleCount: dashboardData.activePeopleCount,
           activePeopleLogins: dashboardData.activePeopleLogins,
+          manualTimedFinished: dashboardData.manualTimedFinished,
+          manualWindowStartTs: dashboardData.manualWindowStartTs,
+          manualWindowStopTs: dashboardData.manualWindowStopTs,
           gasConfig: { gasUrl: settings.gasUrl, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
           launchCreatedTs: dashboardData.launchCreatedTs ?? undefined,
         });
@@ -1791,7 +1862,7 @@ export function Dashboard() {
             <Input value={version} onChange={event => setVersion(event.target.value)} placeholder="7.3.5420" style={{ width: 150 }} />
           </div>
           <div>
-            <FieldLabel>Дедлайн (вручную)</FieldLabel>
+            <FieldLabel>Дедлайн (вручную, МСК)</FieldLabel>
             <Input
               type="datetime-local"
               value={customDeadline}
@@ -1962,7 +2033,7 @@ export function Dashboard() {
       )}
 
       {/* A1: Burndown chart */}
-      {history.length >= 2 && (
+      {history.length >= 1 && (
         <Card>
           <CardHeader>
             <div>

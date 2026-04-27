@@ -48,6 +48,9 @@ export interface DashboardHistoryPoint {
   total: number;
   finished: number;
   manualFinished: number;
+  manualTimedFinished: number;
+  manualWindowStartTs: number | null;
+  manualWindowStopTs: number | null;
   remaining: number;
   launches: number;
   assigned: number;
@@ -78,6 +81,9 @@ export interface DashboardPredictionInput {
   peopleCount?: number;
   activePeopleCount?: number;
   activePeopleLogins?: string[];
+  manualTimedFinished?: number;
+  manualWindowStartTs?: number | null;
+  manualWindowStopTs?: number | null;
   gasConfig?: GasConfig;
   launchCreatedTs?: number | null;
 }
@@ -128,6 +134,59 @@ function getMoscowHour(ts: number) {
 function isBusinessSnapshotHour(ts: number) {
   const hour = getMoscowHour(ts);
   return hour >= 10 && hour < 22;
+}
+
+const BUSI_START_H = 10;
+const BUSI_END_H = 22;
+
+// Returns hours within the 10:00–22:00 MSK window between two timestamps.
+function businessHoursBetween(startTs: number, endTs: number): number {
+  if (endTs <= startTs) return 0;
+  const DAY_MS = 24 * 3_600_000;
+  const startMsk = startTs + MOSCOW_UTC_OFFSET_MS;
+  const endMsk = endTs + MOSCOW_UTC_OFFSET_MS;
+  const startDayBegin = Math.floor(startMsk / DAY_MS) * DAY_MS;
+  let totalMs = 0;
+  for (let day = startDayBegin; day < endMsk; day += DAY_MS) {
+    const bizStart = day + BUSI_START_H * 3_600_000;
+    const bizEnd = day + BUSI_END_H * 3_600_000;
+    const lo = Math.max(startMsk, bizStart);
+    const hi = Math.min(endMsk, bizEnd);
+    if (hi > lo) totalMs += hi - lo;
+  }
+  return totalMs / 3_600_000;
+}
+
+// Returns the wall-clock timestamp that is `bizHours` business hours after `fromTs`.
+function addBusinessHours(fromTs: number, bizHours: number): number {
+  if (bizHours <= 0) return fromTs;
+  const DAY_MS = 24 * 3_600_000;
+  const bizStartMs = BUSI_START_H * 3_600_000;
+  const bizEndMs = BUSI_END_H * 3_600_000;
+  let msk = fromTs + MOSCOW_UTC_OFFSET_MS;
+  let remaining = bizHours * 3_600_000;
+
+  // Fast-forward to next open business window if currently outside hours
+  const tod0 = msk % DAY_MS;
+  if (tod0 < bizStartMs) {
+    msk = msk - tod0 + bizStartMs;
+  } else if (tod0 >= bizEndMs) {
+    msk = msk - tod0 + DAY_MS + bizStartMs;
+  }
+
+  while (remaining > 0) {
+    const tod = msk % DAY_MS;
+    const untilEnd = bizEndMs - tod;
+    if (remaining <= untilEnd) {
+      msk += remaining;
+      remaining = 0;
+    } else {
+      remaining -= untilEnd;
+      msk = msk - tod + DAY_MS + bizStartMs;
+    }
+  }
+
+  return msk - MOSCOW_UTC_OFFSET_MS;
 }
 
 function getGroup(agg: Record<DashboardGroupLabel, DashboardGroupCounts>, label: DashboardGroupLabel) {
@@ -289,6 +348,9 @@ function createCurrentHistoryPoint(input: DashboardPredictionInput, nowTs: numbe
     total,
     finished,
     manualFinished,
+    manualTimedFinished: Math.max(0, Number(input.manualTimedFinished || 0)),
+    manualWindowStartTs: input.manualWindowStartTs == null ? null : Number(input.manualWindowStartTs || 0),
+    manualWindowStopTs: input.manualWindowStopTs == null ? null : Number(input.manualWindowStopTs || 0),
     remaining,
     launches: input.alerts.length,
     assigned,
@@ -337,19 +399,63 @@ function normalizeHistory(input: DashboardPredictionInput, current: DashboardHis
   return [...history, current].sort((left, right) => Number(left.updatedAt || 0) - Number(right.updatedAt || 0));
 }
 
-function getNextTuesdayDeadline(nowTs: number) {
-  const deadline = new Date(nowTs);
-  const currentDay = deadline.getDay();
-  let offset = (2 - currentDay + 7) % 7;
-  deadline.setHours(14, 0, 0, 0);
+function buildCurrentObservedVelocity(current: DashboardHistoryPoint, maxPlausibleRate: number) {
+  const timedFinished = Math.max(0, Number(current.manualTimedFinished || 0));
+  const windowStartTs = Number(current.manualWindowStartTs || 0);
+  const windowStopTs = Number(current.manualWindowStopTs || 0);
+  if (!timedFinished || !windowStartTs || !windowStopTs || windowStopTs <= windowStartTs) return null;
+  const dtHours = businessHoursBetween(windowStartTs, windowStopTs);
+  if (dtHours < 0.25) return null;
+  const rate = timedFinished / dtHours;
+  if (!Number.isFinite(rate) || rate <= 0 || rate > maxPlausibleRate) return null;
+  return rate;
+}
 
-  if (offset === 0 && deadline.getTime() <= nowTs) {
+function buildFallbackObservedVelocity(
+  current: DashboardHistoryPoint,
+  launchCreatedTs: number | null | undefined,
+  nowTs: number,
+  maxPlausibleRate: number,
+) {
+  const finished = Math.max(0, Number(current.manualTimedFinished || current.manualFinished || 0));
+  const startTs = Number(current.manualWindowStartTs || launchCreatedTs || 0);
+  const stopTs = Number(current.manualWindowStopTs || nowTs || 0);
+  if (!finished || !startTs || !stopTs || stopTs <= startTs) return null;
+  const dtHours = businessHoursBetween(startTs, stopTs);
+  if (dtHours < 0.25) return null;
+  const rate = finished / dtHours;
+  if (!Number.isFinite(rate) || rate <= 0 || rate > maxPlausibleRate) return null;
+  return rate;
+}
+
+function getNextTuesdayDeadline(nowTs: number) {
+  const local = new Date(nowTs + MOSCOW_UTC_OFFSET_MS);
+  const currentDay = local.getUTCDay();
+  let offset = (2 - currentDay + 7) % 7;
+  const deadlineMskTs = Date.UTC(
+    local.getUTCFullYear(),
+    local.getUTCMonth(),
+    local.getUTCDate() + offset,
+    14,
+    0,
+    0,
+    0
+  );
+
+  if (offset === 0 && deadlineMskTs - MOSCOW_UTC_OFFSET_MS <= nowTs) {
     offset = 7;
   }
 
-  deadline.setDate(deadline.getDate() + offset);
-  deadline.setHours(14, 0, 0, 0);
-  return deadline.getTime();
+  const nextDeadlineMskTs = Date.UTC(
+    local.getUTCFullYear(),
+    local.getUTCMonth(),
+    local.getUTCDate() + offset,
+    14,
+    0,
+    0,
+    0
+  );
+  return nextDeadlineMskTs - MOSCOW_UTC_OFFSET_MS;
 }
 
 function extractProbability(value: unknown): number | null {
@@ -694,7 +800,7 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
   const current = createCurrentHistoryPoint(input, nowTs);
   const history = normalizeHistory(input, current);
   const deadlineTs = input.customDeadlineTs || getNextTuesdayDeadline(nowTs);
-  const hoursToDeadline = Math.max(0, (deadlineTs - nowTs) / 3_600_000);
+  const hoursToDeadline = Math.max(0, businessHoursBetween(nowTs, deadlineTs));
   // Темп для ETA считаем только по ручному прохождению и только по дневным срезам:
   // ночные значения 22:00–10:00 по МСК не должны искажать картину.
   // Минимальный интервал 1 ч: более короткие срезы дают аномальный темп из-за шума API.
@@ -719,6 +825,9 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
       updatedAt: launchTs,
       finished: 0,
       manualFinished: 0,
+      manualTimedFinished: 0,
+      manualWindowStartTs: null,
+      manualWindowStopTs: null,
       remaining: current.total,
       inProgress: 0,
     };
@@ -734,29 +843,36 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
   const recentRates: number[] = [];
   for (let i = effectiveHistory.length - 1; i >= 1; i--) {
     const point = effectiveHistory[i];
-    // find the latest predecessor at least MIN_RATE_DT_HOURS before this point
+    // find the latest predecessor at least MIN_RATE_DT_HOURS of *business time* before this point
     let prev: DashboardHistoryPoint | null = null;
     for (let j = i - 1; j >= 0; j--) {
-      const dt = (Number(point.updatedAt || 0) - Number(effectiveHistory[j].updatedAt || 0)) / 3_600_000;
-      if (dt >= MIN_RATE_DT_HOURS) { prev = effectiveHistory[j]; break; }
+      const bizDt = businessHoursBetween(Number(effectiveHistory[j].updatedAt || 0), Number(point.updatedAt || 0));
+      if (bizDt >= MIN_RATE_DT_HOURS) { prev = effectiveHistory[j]; break; }
     }
     if (!prev) continue;
-    const dtHours = (Number(point.updatedAt || 0) - Number(prev.updatedAt || 0)) / 3_600_000;
+    const dtHours = businessHoursBetween(Number(prev.updatedAt || 0), Number(point.updatedAt || 0));
+    if (dtHours <= 0) continue;
     const delta = Math.max(0, Number(point.manualFinished || 0) - Number(prev.manualFinished || 0));
     const rate = delta / dtHours;
     if (Number.isFinite(rate) && rate <= maxPlausibleRate) recentRates.push(rate);
     if (recentRates.length >= 6) break; // keep last 6 windows
   }
 
-  const observedVelocityPerHour = recentRates.length ? weightedMean(recentRates.slice(-6)) : null;
+  const currentObservedVelocity =
+    buildCurrentObservedVelocity(current, maxPlausibleRate)
+    ?? buildFallbackObservedVelocity(current, input.launchCreatedTs, nowTs, maxPlausibleRate);
+  const effectiveRecentRates = recentRates.length
+    ? recentRates
+    : (currentObservedVelocity != null ? [currentObservedVelocity] : []);
+  const observedVelocityPerHour = effectiveRecentRates.length ? weightedMean(effectiveRecentRates.slice(-6)) : null;
   const criticalRemaining = Math.max(0, current.criticalTotal - current.criticalFinished);
   const selectiveRemaining = Math.max(0, current.selectiveTotal - current.selectiveFinished);
-  const requiredPerHour = criticalRemaining > 0 && hoursToDeadline > 0 ? criticalRemaining / hoursToDeadline : 0;
+  const requiredPerHour = criticalRemaining > 0 && hoursToDeadline > 0 ? criticalRemaining / hoursToDeadline : null;
   const {
     forecastVelocityPerHour,
     volatilityIndex,
     forecastPenalty,
-  } = buildForecastVelocity(current, recentRates, observedVelocityPerHour, requiredPerHour);
+  } = buildForecastVelocity(current, effectiveRecentRates, observedVelocityPerHour, requiredPerHour);
   const manualCapacityByDeadline = Math.max(0, Number(forecastVelocityPerHour || 0)) * hoursToDeadline;
   const criticalDoneGain = Math.min(criticalRemaining, manualCapacityByDeadline);
   const projectedCriticalFinishedByDeadline = Math.min(current.criticalTotal, current.criticalFinished + criticalDoneGain);
@@ -770,7 +886,7 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
   const etaTs = criticalRemaining <= 0
     ? nowTs
     : (forecastVelocityPerHour && forecastVelocityPerHour > 0.01
-        ? nowTs + (criticalRemaining / forecastVelocityPerHour) * 3_600_000
+        ? addBusinessHours(nowTs, criticalRemaining / forecastVelocityPerHour)
         : null);
   const leadHours = etaTs == null ? null : (deadlineTs - etaTs) / 3_600_000;
   const featureHistory = history.length ? history : [current];
@@ -817,7 +933,7 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
   const blendedForecastVelocity = (() => {
     if (historicalVelocityPerHour == null) return forecastVelocityPerHour;
     if (forecastVelocityPerHour == null) return historicalVelocityPerHour;
-    const observedWeight = Math.min(0.75, recentRates.length * 0.15);
+    const observedWeight = Math.min(0.75, effectiveRecentRates.length * 0.15);
     return forecastVelocityPerHour * observedWeight + historicalVelocityPerHour * (1 - observedWeight);
   })();
 
@@ -836,7 +952,7 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
   if (criticalRemaining <= 0 && current.criticalTotal > 0 && rawVersionHistory.length >= 1) {
     const runStart = rawVersionHistory[0];
     const startTs = Number(runStart.updatedAt || 0);
-    const durationHours = (nowTs - startTs) / 3_600_000;
+    const durationHours = Math.max(0.01, businessHoursBetween(startTs, nowTs));
     // Stable ID based on startTs so repeated refreshes don't create duplicates
     const alreadyRecorded = allRuns.some(r => r.version === input.version && r.startTs === startTs);
     if (durationHours >= 0.5 && !alreadyRecorded) {
@@ -879,7 +995,7 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
     etaTs: criticalRemaining <= 0
       ? nowTs
       : (effectiveForecast && effectiveForecast > 0.01
-          ? nowTs + (criticalRemaining / effectiveForecast) * 3_600_000
+          ? addBusinessHours(nowTs, criticalRemaining / effectiveForecast)
           : etaTs),
     status,
     engine: mlRisk == null ? 'operational' : 'catboost+operational',

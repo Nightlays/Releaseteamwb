@@ -1,0 +1,342 @@
+/* ─── DESIGN TOKENS ──────────────────────────────────────── */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg:         #0C0C11;
+  --surface:    #111118;
+  --panel:      #16161E;
+  --card:       #1C1C26;
+  --card-hi:    #21212D;
+  --sidebar-bg: #14141B;
+  --topbar-bg:  rgba(17,17,24,.94);
+  --border:     rgba(255,255,255,.07);
+  --border-hi:  rgba(255,255,255,.13);
+  --border-subtle: rgba(255,255,255,.04);
+
+  --text:       #EEEAF8;
+  --text-2:     #9D96B4;
+  --text-3:     #5F5878;
+
+  --surface-soft: rgba(255,255,255,.03);
+  --surface-soft-2: rgba(255,255,255,.04);
+  --surface-soft-3: rgba(255,255,255,.05);
+  --surface-soft-4: rgba(255,255,255,.06);
+  --surface-soft-5: rgba(255,255,255,.08);
+  --surface-soft-6: rgba(255,255,255,.10);
+  --backdrop:   rgba(0,0,0,.65);
+  --modal-shadow: 0 24px 64px rgba(0,0,0,.7);
+  --shadow-soft: 0 18px 48px rgba(0,0,0,.22);
+  --shadow-hard: 0 30px 80px rgba(0,0,0,.35);
+  --chart-grid: rgba(255,255,255,.05);
+  --chart-track: rgba(255,255,255,.06);
+  --chart-label-strong: #FFFFFF;
+  --hero-bg: radial-gradient(circle at top left, rgba(155,92,255,.22), transparent 40%), radial-gradient(circle at bottom right, rgba(203,17,171,.16), transparent 30%), #0C0C11;
+  --main-bg: radial-gradient(circle at top, rgba(155,92,255,.08), transparent 34%), #0C0C11;
+
+  --accent:     #9B5CFF;
+  --accent-2:   #CB11AB;
+  --grad:       linear-gradient(135deg, #9B5CFF 0%, #CB11AB 100%);
+
+  --green:      #22C55E;
+  --yellow:     #F59E0B;
+  --red:        #EF4444;
+  --blue:       #3B82F6;
+  --cyan:       #06B6D4;
+
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  14px;
+  --r-xl:  18px;
+
+  --sh-sm: 0 1px 3px rgba(0,0,0,.4);
+  --sh-md: 0 4px 16px rgba(0,0,0,.5);
+  --sh-lg: 0 12px 40px rgba(0,0,0,.6);
+
+  --sidebar-w:  228px;
+  --topbar-h:   56px;
+
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg:         #F4F7FB;
+  --surface:    #FFFFFF;
+  --panel:      #F8FAFC;
+  --card:       #FFFFFF;
+  --card-hi:    #F1F5F9;
+  --sidebar-bg: #FFFFFF;
+  --topbar-bg:  rgba(255,255,255,.92);
+  --border:     rgba(15,23,42,.08);
+  --border-hi:  rgba(15,23,42,.14);
+  --border-subtle: rgba(15,23,42,.06);
+
+  --text:       #0F172A;
+  --text-2:     #475569;
+  --text-3:     #64748B;
+
+  --surface-soft: rgba(15,23,42,.02);
+  --surface-soft-2: rgba(15,23,42,.035);
+  --surface-soft-3: rgba(15,23,42,.05);
+  --surface-soft-4: rgba(15,23,42,.07);
+  --surface-soft-5: rgba(15,23,42,.09);
+  --surface-soft-6: rgba(15,23,42,.12);
+  --backdrop:   rgba(15,23,42,.28);
+  --modal-shadow: 0 24px 64px rgba(15,23,42,.18);
+  --shadow-soft: 0 16px 36px rgba(15,23,42,.08);
+  --shadow-hard: 0 24px 52px rgba(15,23,42,.14);
+  --chart-grid: rgba(15,23,42,.08);
+  --chart-track: rgba(15,23,42,.08);
+  --chart-label-strong: #000000;
+  --hero-bg: radial-gradient(circle at top left, rgba(155,92,255,.14), transparent 42%), radial-gradient(circle at bottom right, rgba(203,17,171,.1), transparent 34%), #F4F7FB;
+  --main-bg: radial-gradient(circle at top, rgba(155,92,255,.06), transparent 30%), #F4F7FB;
+}
+
+/* ─── OLED ────────────────────────────────────────────────── */
+:root[data-theme='oled'] {
+  color-scheme: dark;
+  --bg:         #000000;
+  --surface:    #0A0A0A;
+  --panel:      #0F0F0F;
+  --card:       #141414;
+  --card-hi:    #181818;
+  --sidebar-bg: #080808;
+  --topbar-bg:  rgba(0,0,0,.97);
+  --border:     rgba(255,255,255,.09);
+  --border-hi:  rgba(255,255,255,.16);
+  --border-subtle: rgba(255,255,255,.05);
+
+  --text:       #F0ECF8;
+  --text-2:     #A89EC4;
+  --text-3:     #7A7294;
+
+  --surface-soft: rgba(255,255,255,.04);
+  --surface-soft-2: rgba(255,255,255,.055);
+  --surface-soft-3: rgba(255,255,255,.07);
+  --surface-soft-4: rgba(255,255,255,.09);
+  --surface-soft-5: rgba(255,255,255,.12);
+  --surface-soft-6: rgba(255,255,255,.15);
+  --backdrop:   rgba(0,0,0,.80);
+  --modal-shadow: 0 24px 64px rgba(0,0,0,.90);
+  --shadow-soft: 0 18px 48px rgba(0,0,0,.50);
+  --shadow-hard: 0 30px 80px rgba(0,0,0,.70);
+  --chart-grid: rgba(255,255,255,.07);
+  --chart-track: rgba(255,255,255,.08);
+  --chart-label-strong: #FFFFFF;
+  --hero-bg: radial-gradient(circle at top left, rgba(168,111,255,.28), transparent 40%), radial-gradient(circle at bottom right, rgba(214,32,188,.20), transparent 30%), #000000;
+  --main-bg: radial-gradient(circle at top, rgba(168,111,255,.10), transparent 34%), #000000;
+
+  --accent:     #A86FFF;
+  --accent-2:   #D620BC;
+  --grad:       linear-gradient(135deg, #A86FFF 0%, #D620BC 100%);
+
+  --green:      #22C55E;
+  --yellow:     #F59E0B;
+  --red:        #EF4444;
+  --blue:       #3B82F6;
+  --cyan:       #06B6D4;
+
+  --r-sm:  6px; --r-md:  10px; --r-lg:  14px; --r-xl:  18px;
+  --sh-sm: 0 1px 3px rgba(0,0,0,.6);
+  --sh-md: 0 4px 16px rgba(0,0,0,.7);
+  --sh-lg: 0 12px 40px rgba(0,0,0,.8);
+  --sidebar-w:  228px; --topbar-h:   56px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+/* ─── MIDNIGHT ─────────────────────────────────────────────── */
+:root[data-theme='midnight'] {
+  color-scheme: dark;
+  --bg:         #080C18;
+  --surface:    #0D1224;
+  --panel:      #111829;
+  --card:       #162032;
+  --card-hi:    #1B2740;
+  --sidebar-bg: #0A1020;
+  --topbar-bg:  rgba(8,12,24,.94);
+  --border:     rgba(140,180,255,.12);
+  --border-hi:  rgba(140,180,255,.20);
+  --border-subtle: rgba(140,180,255,.07);
+
+  --text:       #D8E8FF;
+  --text-2:     #90B2D8;
+  --text-3:     #6A88B0;
+
+  --surface-soft: rgba(140,180,255,.05);
+  --surface-soft-2: rgba(140,180,255,.07);
+  --surface-soft-3: rgba(140,180,255,.09);
+  --surface-soft-4: rgba(140,180,255,.12);
+  --surface-soft-5: rgba(140,180,255,.15);
+  --surface-soft-6: rgba(140,180,255,.19);
+  --backdrop:   rgba(4,8,18,.70);
+  --modal-shadow: 0 24px 64px rgba(4,8,20,.80);
+  --shadow-soft: 0 18px 48px rgba(4,8,20,.40);
+  --shadow-hard: 0 30px 80px rgba(4,8,20,.60);
+  --chart-grid: rgba(140,180,255,.11);
+  --chart-track: rgba(140,180,255,.11);
+  --chart-label-strong: #D8E8FF;
+  --hero-bg: radial-gradient(circle at top left, rgba(74,158,255,.22), transparent 40%), radial-gradient(circle at bottom right, rgba(0,212,170,.16), transparent 30%), #080C18;
+  --main-bg: radial-gradient(circle at top, rgba(74,158,255,.08), transparent 34%), #080C18;
+
+  --accent:     #4A9EFF;
+  --accent-2:   #00D4AA;
+  --grad:       linear-gradient(135deg, #4A9EFF 0%, #00D4AA 100%);
+
+  --green:      #2DD4AA;
+  --yellow:     #F59E0B;
+  --red:        #F04060;
+  --blue:       #4A9EFF;
+  --cyan:       #00D4AA;
+
+  --r-sm:  6px; --r-md:  10px; --r-lg:  14px; --r-xl:  18px;
+  --sh-sm: 0 1px 3px rgba(0,0,0,.5);
+  --sh-md: 0 4px 16px rgba(0,0,0,.6);
+  --sh-lg: 0 12px 40px rgba(0,0,0,.7);
+  --sidebar-w:  228px; --topbar-h:   56px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+/* ─── NORD ─────────────────────────────────────────────────── */
+:root[data-theme='nord'] {
+  color-scheme: dark;
+  --bg:         #1A1F2B;
+  --surface:    #222839;
+  --panel:      #252B3B;
+  --card:       #2B3346;
+  --card-hi:    #313A52;
+  --sidebar-bg: #1F2535;
+  --topbar-bg:  rgba(26,31,43,.94);
+  --border:     rgba(200,220,255,.09);
+  --border-hi:  rgba(200,220,255,.15);
+  --border-subtle: rgba(200,220,255,.05);
+
+  --text:       #ECEFF4;
+  --text-2:     #8FA8C8;
+  --text-3:     #4E6380;
+
+  --surface-soft: rgba(200,220,255,.03);
+  --surface-soft-2: rgba(200,220,255,.04);
+  --surface-soft-3: rgba(200,220,255,.055);
+  --surface-soft-4: rgba(200,220,255,.07);
+  --surface-soft-5: rgba(200,220,255,.09);
+  --surface-soft-6: rgba(200,220,255,.12);
+  --backdrop:   rgba(20,26,38,.65);
+  --modal-shadow: 0 24px 64px rgba(10,14,24,.70);
+  --shadow-soft: 0 18px 48px rgba(10,14,24,.30);
+  --shadow-hard: 0 30px 80px rgba(10,14,24,.50);
+  --chart-grid: rgba(200,220,255,.07);
+  --chart-track: rgba(200,220,255,.07);
+  --chart-label-strong: #ECEFF4;
+  --hero-bg: radial-gradient(circle at top left, rgba(136,192,208,.18), transparent 40%), radial-gradient(circle at bottom right, rgba(163,190,140,.14), transparent 30%), #1A1F2B;
+  --main-bg: radial-gradient(circle at top, rgba(136,192,208,.08), transparent 34%), #1A1F2B;
+
+  --accent:     #88C0D0;
+  --accent-2:   #A3BE8C;
+  --grad:       linear-gradient(135deg, #88C0D0 0%, #A3BE8C 100%);
+
+  --green:      #A3BE8C;
+  --yellow:     #EBCB8B;
+  --red:        #BF616A;
+  --blue:       #81A1C1;
+  --cyan:       #88C0D0;
+
+  --r-sm:  6px; --r-md:  10px; --r-lg:  14px; --r-xl:  18px;
+  --sh-sm: 0 1px 3px rgba(0,0,0,.4);
+  --sh-md: 0 4px 16px rgba(0,0,0,.5);
+  --sh-lg: 0 12px 40px rgba(0,0,0,.6);
+  --sidebar-w:  228px; --topbar-h:   56px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+/* ─── SEPIA ────────────────────────────────────────────────── */
+:root[data-theme='sepia'] {
+  color-scheme: light;
+  --bg:         #F2EDE0;
+  --surface:    #FAF7F2;
+  --panel:      #F6F1E8;
+  --card:       #FFFCF6;
+  --card-hi:    #F3EDE0;
+  --sidebar-bg: #FAF7F2;
+  --topbar-bg:  rgba(250,247,242,.93);
+  --border:     rgba(92,64,32,.09);
+  --border-hi:  rgba(92,64,32,.15);
+  --border-subtle: rgba(92,64,32,.05);
+
+  --text:       #2A1A0A;
+  --text-2:     #6B4C30;
+  --text-3:     #9C7B5A;
+
+  --surface-soft: rgba(92,64,32,.025);
+  --surface-soft-2: rgba(92,64,32,.04);
+  --surface-soft-3: rgba(92,64,32,.055);
+  --surface-soft-4: rgba(92,64,32,.075);
+  --surface-soft-5: rgba(92,64,32,.10);
+  --surface-soft-6: rgba(92,64,32,.13);
+  --backdrop:   rgba(42,26,10,.28);
+  --modal-shadow: 0 24px 64px rgba(42,26,10,.18);
+  --shadow-soft: 0 16px 36px rgba(42,26,10,.10);
+  --shadow-hard: 0 24px 52px rgba(42,26,10,.16);
+  --chart-grid: rgba(92,64,32,.08);
+  --chart-track: rgba(92,64,32,.08);
+  --chart-label-strong: #2A1A0A;
+  --hero-bg: radial-gradient(circle at top left, rgba(139,94,60,.16), transparent 42%), radial-gradient(circle at bottom right, rgba(193,116,53,.12), transparent 34%), #F2EDE0;
+  --main-bg: radial-gradient(circle at top, rgba(139,94,60,.08), transparent 30%), #F2EDE0;
+
+  --accent:     #8B5E3C;
+  --accent-2:   #C17435;
+  --grad:       linear-gradient(135deg, #8B5E3C 0%, #C17435 100%);
+
+  --green:      #4A7C4E;
+  --yellow:     #C17435;
+  --red:        #C0392B;
+  --blue:       #2980B9;
+  --cyan:       #1A7A8A;
+
+  --r-sm:  6px; --r-md:  10px; --r-lg:  14px; --r-xl:  18px;
+  --sh-sm: 0 1px 3px rgba(42,26,10,.12);
+  --sh-md: 0 4px 16px rgba(42,26,10,.14);
+  --sh-lg: 0 12px 40px rgba(42,26,10,.18);
+  --sidebar-w:  228px; --topbar-h:   56px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+/* ─── RESET ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color .18s ease, color .18s ease;
+}
+button  { font: inherit; cursor: pointer; border: none; background: none; }
+input, select, textarea { font: inherit; }
+a { color: inherit; text-decoration: none; }
+
+/* ─── SCROLLBAR ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(155,92,255,.3); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(155,92,255,.5); }
+
+/* ─── ANIMATIONS ──────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}

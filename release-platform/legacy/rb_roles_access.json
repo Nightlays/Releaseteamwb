@@ -1,0 +1,100 @@
+{
+  "roles": [
+    {
+      "id": "superadmin",
+      "label": "Суперадмин"
+    },
+    {
+      "id": "admin",
+      "label": "Администратор"
+    },
+    {
+      "id": "manager",
+      "label": "Менеджер"
+    },
+    {
+      "id": "analyst",
+      "label": "Аналитик"
+    },
+    {
+      "id": "viewer",
+      "label": "Наблюдатель"
+    }
+  ],
+  "users": [
+    {
+      "login": "Nightlays",
+      "pass": "P132868s",
+      "role": "superadmin"
+    },
+    {
+      "login": "Lena",
+      "pass": "qwerty",
+      "role": "manager"
+    },
+    {
+      "login": "Lesha",
+      "pass": "darowa",
+      "role": "analyst"
+    },
+    {
+      "login": "Nadya",
+      "pass": "P132868s",
+      "role": "manager"
+    },
+    {
+      "login": "Viktor",
+      "pass": "qwerty",
+      "role": "viewer"
+    },
+    {
+      "login": "Andrei",
+      "pass": "Pa$$w0rd",
+      "role": "admin"
+    },
+    {
+      "login": "Olesya",
+      "pass": "Pa$$w0rd",
+      "role": "analyst"
+    },
+    {
+      "login": "Daria",
+      "pass": "qwerty",
+      "role": "viewer"
+    }
+  ],
+  "roleAccess": {
+    "superadmin": [
+      "*"
+    ],
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "dashboard_run_module.html",
+      "Ванговатор.html",
+      "Создание рана.html",
+      "Сбор ЧП.html",
+      "ЧП за релиз диапазон.html",
+      "УВУ.html",
+      "BiUser.html",
+      "Популярные устройства.html",
+      "Графики.html",
+      "Анализ релизов за квартал.html",
+      "SWAT релиз.html",
+      "Копирование данных из YT.html"
+    ],
+    "analyst": [
+      "dashboard_run_module.html",
+      "Графики.html",
+      "Анализ релизов за квартал.html",
+      "ЧП за релиз диапазон.html",
+      "BiUser.html",
+      "Популярные устройства.html"
+    ],
+    "viewer": [
+      "dashboard_run_module.html"
+    ]
+  },
+  "userAccess": {}
+}

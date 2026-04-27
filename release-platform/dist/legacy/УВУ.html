@@ -1,0 +1,3210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>SWAT UwU отчёт (Allure)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      --wb-bg:#faf5ff; --wb-bg-2:#f8f7ff;
+      --wb-primary:#9b5cff; --wb-secondary:#ff5ac8; --wb-deep:#7c3aed;
+      --green:#22c55e; --red:#f43f5e;
+      --ring: 0 10px 30px rgba(155,92,255,.25);
+      --card: 0 12px 36px rgba(31,41,55,.08);
+      --r-xl:22px;
+    }
+    body{
+      background:
+        radial-gradient(1200px 600px at 0% -10%, rgba(155,92,255,.14), transparent 60%),
+        radial-gradient(900px 580px at 100% 0%, rgba(255,90,200,.10), transparent 55%),
+        var(--wb-bg);
+      color:#0f172a;
+      font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      -webkit-font-smoothing:antialiased;
+      -webkit-text-size-adjust:100%;
+    }
+    .brand-badge{display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;border-radius:999px;background:linear-gradient(180deg,#fff,#f8f7ff);box-shadow:var(--card)}
+    .brand-dot{width:14px;height:14px;border-radius:999px;background:radial-gradient(55% 55% at 35% 35%, #fff 0%, #ffd6f2 30%, var(--wb-primary) 100%);box-shadow:0 0 0 6px rgba(155,92,255,.15), 0 8px 22px rgba(155,92,255,.45) inset}
+    .card{background:linear-gradient(180deg,#fff 0%, #fbfbff 100%);border-radius:var(--r-xl);box-shadow:var(--card);border:1px solid #eeeeff}
+    .input{width:100%;padding:.7rem .9rem;border-radius:14px;background:#fff;border:1px solid #ecebff;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 20px rgba(124,58,237,.06);transition:.15s}
+    .input:focus{outline:0;border-color:#d8d6ff;box-shadow:0 0 0 4px rgba(155,92,255,.12)}
+    .tabs{display:flex;gap:.75rem;align-items:center;flex-wrap:nowrap}
+    .tab{
+      border:none; background:transparent; color:#6d28d9; padding:.35rem .9rem; font-weight:700; position:relative; font-size:.9rem; border-radius:999px; white-space:nowrap;
+    }
+    .tab[aria-selected="true"]{ color:#5b21b6; }
+    .tab[aria-selected="true"]::after{
+      content:""; position:absolute; left:12px; right:12px; bottom:-4px; height:2px;
+      background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));
+      border-radius:2px;
+    }
+    .btn{border:none;border-radius:16px;padding:.65rem 1rem;font-weight:700;transition:.15s;cursor:pointer}
+    .btn-ghost{background:#f5f3ff;color:#6d28d9;border:1px solid #ede9fe}
+    .btn-soft{background:#fff;border:1px solid #ede9fe;box-shadow:0 8px 22px rgba(124,58,237,.08);color:#6d28d9}
+    .btn-grad{background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));color:#fff;box-shadow:var(--ring)}
+    .btn-danger{
+      color:#fff;
+      background:linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95));
+      box-shadow:0 10px 30px rgba(244,63,94,.20);
+    }
+    button#runBtn,
+    button#filterSave{
+      -webkit-appearance:none;
+      appearance:none;
+      border:none;
+      background:#9b5cff !important;
+      background-image:linear-gradient(90deg,#9b5cff,#ff5ac8) !important;
+      color:#fff !important;
+      -webkit-text-fill-color:#fff;
+    }
+    button#stopBtn{
+      -webkit-appearance:none;
+      appearance:none;
+      border:none;
+      background:#f43f5e !important;
+      background-image:linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95)) !important;
+      color:#fff !important;
+      -webkit-text-fill-color:#fff;
+    }
+    .btn-danger:hover{filter:saturate(1.05);transform:translateY(-1px)}
+    .btn-circle{width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;border:1px solid #e5defe;background:#f9f8ff;color:#6d28d9;font-size:.78rem}
+    .chip{display:inline-block;padding:.15rem .6rem;border-radius:999px;font-size:.75rem;color:#fff;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary))}
+    .hint{font-size:.85rem;color:#7c7f8c}
+    table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+    thead th{background:#f7f5ff;border-bottom:1px solid #ecebff;padding:.7rem .8rem;font-weight:700;color:#5b21b6}
+    td{border-bottom:1px dashed #eeeef8;padding:.6rem .7rem;vertical-align:top}
+    tbody tr:hover td{background:#faf9ff}
+    .wrap{white-space:normal;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+
+    /* Чуть шире таблицы + весь текст в одну строку (ФИО/стрим не налезают на цифры) */
+    #summaryTable, #detailTablePersonStreams, #detailTablePersonCases, #detailTableStream{
+      table-layout:auto; width:max-content; min-width:100%;
+    }
+    #summaryTable th, #summaryTable td,
+    #detailTablePersonStreams th, #detailTablePersonStreams td,
+    #detailTablePersonCases th, #detailTablePersonCases td,
+    #detailTableStream th, #detailTableStream td{
+      white-space:nowrap; word-break:normal;
+    }
+    /* Перенос стримов на 2 строки (чтобы Ч/Ч не уезжало) */
+    #summaryTable td.wrap,
+    #detailTablePersonStreams td.wrap{
+      white-space:normal;
+      word-break:break-word;
+      max-width:250px;
+    }
+
+    #summaryTable th, #summaryTable td,
+    #detailTablePersonStreams th, #detailTablePersonStreams td,
+    #detailTablePersonCases th, #detailTablePersonCases td,
+    #detailTableStream th, #detailTableStream td{
+      text-align:center;
+    }
+    #summaryTable th:first-child, #summaryTable td:first-child,
+    #detailTablePersonStreams th:first-child, #detailTablePersonStreams td:first-child,
+    #detailTablePersonCases th:first-child, #detailTablePersonCases td:first-child,
+    #detailTableStream th:first-child, #detailTableStream td:first-child{
+      text-align:left;
+    }
+
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .bar{height:8px;background:#eae6ff;border-radius:999px;overflow:hidden}
+    .bar>div{height:100%;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));width:0%}
+    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.75rem 1rem;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s;z-index:50}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:40}
+    .popover{
+      position:fixed; background:#111827; color:#e5e7eb; border-radius:12px; padding:.5rem .75rem;
+      font-size:.75rem; max-width:260px; box-shadow:0 12px 30px rgba(15,23,42,.35); z-index:30;
+    }
+    .detail-tab-active{ background:#ede9fe; border-color:#c4b5fd; color:#4c1d95; }
+    .sort-arrows{ display:inline-flex; flex-direction:column; margin-left:4px; font-size:9px; line-height:9px; opacity:.35; vertical-align:middle; }
+    .sort-arrow{ transition:.15s; }
+    .sort-arrow.sort-active{ opacity:1; color:#6d28d9; }
+    .day-grid{ display:grid; grid-template-columns:repeat(1,minmax(0,1fr)); gap:14px; }
+    @media (min-width: 1024px){
+      .day-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+    .day-card{ border:1px solid #ecebff; border-radius:14px; background:#fff; overflow:hidden; }
+    .day-card h4{ padding:.65rem .85rem; margin:0; background:#f7f5ff; color:#5b21b6; font-weight:700; font-size:.9rem; }
+    .day-card table{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; }
+    .day-card th,.day-card td{ white-space:nowrap; }
+    .day-card th:first-child,.day-card td:first-child{ text-align:left; width:auto; }
+    .day-card th:nth-child(2),.day-card td:nth-child(2){ width:78px; text-align:right; color:#334155; }
+    .day-card th:nth-child(3),.day-card td:nth-child(3){ width:120px; text-align:right; font-variant-numeric:tabular-nums; }
+    .uwu-high{ color:#15803d; font-weight:700; }
+    .uwu-low{ color:#dc2626; font-weight:700; }
+    .threshold-cut td{ border-top:2px dashed #94a3b8 !important; }
+    .chart-shell{ position:relative; border:1px solid #ecebff; border-radius:14px; background:#fff; padding:10px 12px; }
+    .chart-shell .chart-title{ font-size:.9rem; font-weight:700; color:#5b21b6; margin-bottom:6px; }
+    .chart-shell canvas{ width:100%; height:300px; }
+    .day-chart-tooltip{
+      position:fixed; pointer-events:none; opacity:0; z-index:1200;
+      background:#1f2937; color:#fff; border:1px solid #334155; border-radius:10px;
+      box-shadow:0 10px 26px rgba(2,6,23,.35); padding:8px 10px; font-size:12px; line-height:1.35;
+      min-width:260px; max-width:360px;
+      font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      -webkit-font-smoothing:antialiased;
+      -webkit-text-fill-color:#fff;
+    }
+    .day-chart-tooltip .t-title{ color:#fff !important; -webkit-text-fill-color:#fff; font-weight:700; margin-bottom:6px; }
+    .day-chart-tooltip .t-table{ width:auto; border-collapse:collapse; table-layout:fixed; }
+    .day-chart-tooltip .t-table th{
+      color:#cbd5e1 !important; -webkit-text-fill-color:#cbd5e1; font-size:11px; font-weight:600; padding:0 0 4px 0;
+      background:transparent !important;
+      border-bottom:1px solid rgba(148,163,184,.35);
+    }
+    .day-chart-tooltip .t-table td{
+      color:#fff !important; -webkit-text-fill-color:#fff;
+      padding:1px 0; vertical-align:baseline;
+      background:transparent !important;
+      border-bottom:none !important;
+    }
+    .day-chart-tooltip .t-table th:first-child,
+    .day-chart-tooltip .t-table td:first-child{ text-align:left; padding-right:8px; }
+    .day-chart-tooltip .t-table th:nth-child(n+2),
+    .day-chart-tooltip .t-table td:nth-child(n+2){ text-align:center; }
+    .day-chart-tooltip .t-name{ color:#e5e7eb !important; -webkit-text-fill-color:#e5e7eb; white-space:normal; overflow-wrap:anywhere; word-break:break-word; display:inline-flex; align-items:center; }
+    .day-chart-tooltip .t-dot{ width:9px; height:9px; border-radius:2px; flex:0 0 9px; display:inline-block; margin-right:6px; }
+    .day-chart-tooltip .t-sum,
+    .day-chart-tooltip .t-delta,
+    .day-chart-tooltip .t-hours{
+      color:#fff !important; -webkit-text-fill-color:#fff; font-weight:600; font-family:ui-monospace,Menlo,Consolas,monospace;
+      font-variant-numeric:tabular-nums;
+    }
+    .day-chart-tooltip .t-delta,.day-chart-tooltip .t-hours{ color:#fff !important; -webkit-text-fill-color:#fff; }
+    .day-chart-tooltip .t-sep td{ border-top:2px dashed #94a3b8; padding-top:6px; }
+    .day-chart-card{ border:1px solid #ecebff; border-radius:14px; background:#fff; overflow:visible; }
+    .day-chart-card h4{ padding:.65rem .85rem; margin:0; background:#f7f5ff; color:#5b21b6; font-weight:700; font-size:.9rem; }
+    .day-chart-card .chart-shell{ border:none; border-radius:0; box-shadow:none; padding:8px 10px; }
+    .day-chart-card canvas{ width:100%; height:240px; }
+    .days-filter-row{ display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:0 2px; }
+    .days-filter-label{ font-size:12px; font-weight:700; color:#64748b; }
+    .days-filter-dropdown{
+      position:relative; width:240px; max-width:100%;
+      background:#fff; border:1px solid #ecebff; border-radius:12px; cursor:pointer;
+      box-shadow:0 6px 16px rgba(124,58,237,.08);
+    }
+    .days-filter-selected{
+      padding:8px 10px; font-size:13px; color:#334155; user-select:none;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .days-filter-list{
+      position:absolute; z-index:100; top:100%; left:auto; right:0; min-width:280px; max-width:380px;
+      max-height:280px; overflow:auto; background:#fff; border:1px solid #ecebff; border-top:none;
+      border-bottom-left-radius:12px; border-bottom-right-radius:12px;
+      box-shadow:0 10px 24px rgba(15,23,42,.16); display:none; padding:0;
+    }
+    .days-filter-dropdown.open .days-filter-list{ display:block; }
+    .days-filter-item{
+      display:flex; align-items:center; justify-content:space-between; gap:6px;
+      padding:6px 10px; line-height:1.3; cursor:pointer; user-select:none; margin:0;
+    }
+    .days-filter-item:hover{ background:#faf7fd; }
+    .days-filter-name{
+      flex:1 1 auto; min-width:0; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      color:#334155; font-size:13px;
+    }
+    .days-filter-check{
+      flex:0 0 16px; width:16px; height:16px; margin-left:10px; padding:0; appearance:auto; -webkit-appearance:auto;
+      border:none; background:transparent;
+    }
+    .days-filter-sep{ height:1px; background:#f1f5f9; margin:0; }
+    .days-filter-empty{ padding:10px; font-size:12px; color:#94a3b8; text-align:left; }
+    .days-filter-search{
+      display:flex; align-items:center; gap:6px; padding:6px 10px;
+      border-bottom:1px solid #f1f5f9; background:#fff;
+    }
+    .days-filter-search-icon{
+      width:14px; height:14px; color:#94a3b8; flex:0 0 14px; display:inline-flex; align-items:center; justify-content:center;
+    }
+    .days-filter-search-icon svg{ width:14px; height:14px; display:block; }
+    .days-filter-search-input{
+      width:100%; border:none; outline:none; background:transparent;
+      font-size:13px; color:#334155; line-height:1.2; padding:0; margin:0;
+    }
+    .days-filter-search-input::placeholder{ color:#94a3b8; }
+    .days-filter-empty-search{
+      display:none; padding:8px 10px; font-size:12px; color:#94a3b8; text-align:left;
+    }
+    #daysPrintTemp{ display:none; }
+    @media print{
+      @page{ size:A4 landscape; margin:10mm; }
+      body.print-days-mode > :not(#daysPrintTemp){ display:none !important; }
+      #daysPrintTemp{ display:block !important; background:#fff; color:#0f172a; }
+      #daysPrintTemp .day-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:12px; }
+      #daysPrintTemp .day-chart-card,#daysPrintTemp .day-card{
+        border:1px solid #dbe2f0; border-radius:10px; background:#fff; overflow:hidden; break-inside:avoid;
+      }
+      #daysPrintTemp .day-chart-card h4,#daysPrintTemp .day-card h4{
+        margin:0; padding:8px 10px; background:#f7f5ff; color:#5b21b6; font-size:14px;
+      }
+      #daysPrintTemp .chart-shell{ padding:8px 10px; border:none; }
+      #daysPrintTemp .chart-shell img{ width:100% !important; height:auto !important; display:block; }
+      #daysPrintTemp .overflow-auto{ overflow:visible !important; }
+      #daysPrintTemp table{ width:100%; border-collapse:collapse; font-size:12px; table-layout:auto; }
+      #daysPrintTemp th{
+        background:#f7f5ff; color:#5b21b6; font-weight:700; padding:6px 8px; border-bottom:1px solid #dbe2f0; text-align:left;
+      }
+      #daysPrintTemp td{ padding:6px 8px; border-bottom:1px dashed #dbe2f0; }
+      #daysPrintTemp th:nth-child(n+2),#daysPrintTemp td:nth-child(n+2){ text-align:right; }
+      #daysPrintTemp .uwu-high{ color:#15803d; font-weight:700; }
+      #daysPrintTemp .uwu-low{ color:#dc2626; font-weight:700; }
+      #daysPrintTemp .threshold-cut td{ border-top:2px dashed #94a3b8 !important; }
+      #daysPrintTemp .day-chart-tooltip{ display:none !important; }
+    }
+  
+    /* Убираем горизонтальные скроллы (оставляем вертикальный) */
+    .overflow-auto{ overflow-x:hidden; overflow-y:auto; }
+
+    /* На всякий случай: не даём странице уезжать по X */
+    html, body{ overflow-x:hidden; }
+</style>
+</head>
+
+<body>
+  <div class="max-w-none mx-auto p-6 space-y-6">
+    <div class="flex items-center gap-3">
+      <div class="brand-badge"><span class="brand-dot"></span><strong>WB</strong></div>
+      <h1 class="text-2xl font-semibold">SWAT UwU отчёт</h1>
+    </div>
+
+    <section class="grid lg:grid-cols-3 gap-6 items-start">
+      <!-- Настройки -->
+      <div class="card p-5 space-y-4 lg:col-span-1">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Настройки</h3>
+          <span class="chip">SWAT</span>
+        </div>
+
+        <label class="block text-sm">
+          Версия релиза
+          <input id="relVersion" class="input mt-1" placeholder="например 7.5.0000 или 755">
+        </label>
+
+        <label class="block text-sm">
+          API токен Allure
+          <input id="apiToken" type="password" class="input mt-1" placeholder="Api-Token ... или Bearer ...">
+        </label>
+
+        <div class="text-sm space-y-2">
+          <div class="text-xs">
+            SWAT получаем
+            <a href="https://docs.google.com/document/d/1AYHrg_w_aCdiunytlDVmbmyQAxiHRr51Z0Djju4GAnE/edit?usp=sharing"
+               target="_blank" rel="noopener noreferrer" class="text-indigo-700 underline"> отсюда </a>
+          </div>
+
+          <div class="mt-1 flex items-center gap-4 text-xs">
+            <label class="inline-flex items-center gap-1">
+              <input id="chkHighBlocker" type="checkbox" class="rounded border-[#d4d4ff]" checked>
+              <span>High/Blocker</span>
+            </label>
+            <label class="inline-flex items-center gap-1">
+              <input id="chkSelective" type="checkbox" class="rounded border-[#d4d4ff]">
+              <span>Selective</span>
+            </label>
+          </div>
+        </div>
+
+        <button id="runBtn" type="button" class="btn btn-grad w-full mt-2">
+          Запустить сбор UwU
+        </button>
+        <button id="stopBtn" type="button" class="btn btn-danger w-full mt-2 hidden">
+          Остановить сбор
+        </button>
+
+        <div class="bar mt-3"><div id="progressBar"></div></div>
+        <div id="statusText" class="text-sm text-slate-500 mt-1">—</div>
+      </div>
+
+      <!-- Результаты -->
+      <div class="card p-5 space-y-4 lg:col-span-2">
+        <div class="flex items-center gap-3 relative">
+          <h3 class="font-semibold">Итоги</h3>
+
+          <div class="tabs">
+            <button id="tabPeople" class="tab" type="button" aria-selected="true">По сотрудникам</button>
+            <button id="tabStreams" class="tab" type="button" aria-selected="false">По стримам</button>
+            <button id="tabDays" class="tab" type="button" aria-selected="false">По дням</button>
+          </div>
+
+          <button id="infoBtn" type="button" class="btn-circle"
+                  title="Клик по SWAT (ФИО) показывает детали его кейсов. Клик по стриму во вкладке «По стримам» показывает вклад SWAT в этом стриме.">
+            i
+          </button>
+          <div id="infoPopover" class="popover hidden"></div>
+
+          <div class="flex items-center gap-2 ml-auto">
+            <button id="exportExcelBtn" type="button" class="btn btn-soft text-xs px-3 py-1.5">Выгрузить Excel</button>
+            <button id="filterBtn" type="button" class="btn btn-soft text-sm">Фильтр</button>
+            <button id="filterResetInline" type="button" class="btn btn-ghost text-xs px-3 py-1.5 hidden">Сбросить</button>
+            <span id="filterBadge" class="w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
+          </div>
+        </div>
+
+        <div id="summaryPanel">
+          <div class="overflow-auto border border-[#ecebff] rounded-2xl">
+            <table id="summaryTable" class="text-sm">
+              <thead>
+                <tr>
+                  <th>SWAT (ФИО)</th>
+                  <th>Пройдено кейсов</th>
+                  <th>Сумма UwU</th>
+                  <th>% кейсов с UwU</th>
+                  <th>Дни</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="5" class="text-center text-slate-500 py-3">
+                    Пока нет данных — нажми «Запустить сбор UwU».
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="summaryTotals" class="mt-2 text-sm"></div>
+        </div>
+
+        <div id="daysPanel" class="hidden space-y-3">
+          <div class="days-filter-row">
+            <div class="days-filter-label">Фильтр</div>
+            <div id="daysFilterDropdown" class="days-filter-dropdown">
+              <div id="daysFilterSelectedText" class="days-filter-selected">Все сотрудники</div>
+              <div id="daysFilterList" class="days-filter-list"></div>
+            </div>
+          </div>
+          <div class="day-grid">
+            <div class="day-chart-card">
+              <h4 id="dayTitleFri">Пятница</h4>
+              <div class="chart-shell">
+                <canvas id="dayChartFri" aria-label="UwU Friday chart" role="img"></canvas>
+              </div>
+            </div>
+            <div class="day-chart-card">
+              <h4 id="dayTitleSat">Суббота</h4>
+              <div class="chart-shell">
+                <canvas id="dayChartSat" aria-label="UwU Saturday chart" role="img"></canvas>
+              </div>
+            </div>
+            <div class="day-chart-card">
+              <h4 id="dayTitleSun">Воскресенье</h4>
+              <div class="chart-shell">
+                <canvas id="dayChartSun" aria-label="UwU Sunday chart" role="img"></canvas>
+              </div>
+            </div>
+            <div class="day-chart-card">
+              <h4 id="dayTitleMon">Понедельник</h4>
+              <div class="chart-shell">
+                <canvas id="dayChartMon" aria-label="UwU Monday chart" role="img"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="day-grid">
+            <div class="day-card">
+              <h4 id="dayTableTitleFri">Пятница</h4>
+              <div class="overflow-auto"><table id="dayTableFri" class="text-sm"></table></div>
+            </div>
+            <div class="day-card">
+              <h4 id="dayTableTitleSat">Суббота</h4>
+              <div class="overflow-auto"><table id="dayTableSat" class="text-sm"></table></div>
+            </div>
+            <div class="day-card">
+              <h4 id="dayTableTitleSun">Воскресенье</h4>
+              <div class="overflow-auto"><table id="dayTableSun" class="text-sm"></table></div>
+            </div>
+            <div class="day-card">
+              <h4 id="dayTableTitleMon">Понедельник</h4>
+              <div class="overflow-auto"><table id="dayTableMon" class="text-sm"></table></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast">Готово</div>
+
+  <!-- Модальное окно фильтра -->
+  <div id="filterModal" class="overlay">
+    <div class="card w-full max-w-md p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="filterTitle" class="font-semibold text-sm">Фильтр</h3>
+        <button id="filterClose" class="btn btn-ghost text-xs px-3 py-1.5">Закрыть</button>
+      </div>
+
+      <div class="space-y-3 text-sm">
+        <div>
+          <label class="block mb-1">
+            <span id="filterNameLabel">SWAT (ФИО)</span>
+            <input id="filterNameInput" list="filterNameList" class="input mt-1"
+                   placeholder="Оставь пустым, чтобы не фильтровать по имени">
+            <datalist id="filterNameList"></datalist>
+          </label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            UwU от
+            <input id="filterUwuMin" type="number" step="1" class="input mt-1" placeholder="мин. сумма">
+          </label>
+          <label class="block">
+            UwU до
+            <input id="filterUwuMax" type="number" step="1" class="input mt-1" placeholder="макс. сумма">
+          </label>
+        </div>
+
+        <div class="mt-1">
+          <div class="text-xs mb-1">Платформа</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnPlatformAndroid" type="button" class="btn btn-ghost w-full justify-center text-xs">Android</button>
+            <button id="btnPlatformiOS" type="button" class="btn btn-ghost w-full justify-center text-xs">iOS</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center pt-2">
+        <button id="filterReset" class="btn btn-ghost text-xs px-3 py-1.5">Сбросить</button>
+        <button id="filterSave" class="btn btn-grad text-sm px-4 py-2">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно деталей -->
+  <div id="detailModal" class="overlay">
+    <div class="card w-full max-w-3xl h-[80vh] flex flex-col">
+      <div class="flex items-center gap-2 border-b border-[#ecebff] px-5 py-3">
+        <button id="detailBack" class="btn btn-ghost rounded-full w-8 h-8 flex items-center justify-center px-0 py-0 text-sm">←</button>
+        <div id="detailTitle" class="font-semibold text-sm"></div>
+        <button id="detailExport" class="btn btn-soft text-xs px-3 py-1.5 ml-auto">Скачать Excel</button>
+      </div>
+
+      <div class="px-5 pt-3 border-b border-[#ecebff] hidden" id="detailPersonTabs">
+        <div class="flex items-center gap-3 text-xs">
+          <button id="detailTabPersonStreams" type="button" class="btn btn-ghost px-3 py-1.5" data-selected="true">По стримам</button>
+          <button id="detailTabPersonCases" type="button" class="btn btn-ghost px-3 py-1.5" data-selected="false">По тест кейсам</button>
+          <div class="ml-auto text-xs text-slate-500 whitespace-nowrap" id="detailTargetStream"></div>
+        </div>
+      </div>
+
+      <div class="p-5 overflow-auto">
+        <!-- режим сотрудника -->
+        <div id="detailPerson" class="hidden space-y-4">
+          <div id="detailPersonStreams">
+            <table id="detailTablePersonStreams" class="text-sm"></table>
+            <div id="detailTotalsPersonStreams" class="mt-2 text-sm"></div>
+          </div>
+
+          <div id="detailPersonCases" class="hidden">
+            <table id="detailTablePersonCases" class="text-sm"></table>
+          </div>
+        </div>
+
+        <!-- режим стрима -->
+        <div id="detailStream" class="hidden">
+          <table id="detailTableStream" class="text-sm"></table>
+          <div id="detailTotalsStream" class="mt-2 text-sm"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const BASE_URL = 'https://allure-testops.wb.ru';
+  const PROJECT_ID = 7;
+  const PAGE_SIZE = 1000;
+  const KINDS = ['Smoke', 'Selective'];
+  const SWAT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwr0XB69uSvHtUDczPUq96NEpSwmcSuwj_KbZ3ULcu-2mVG9MtMcdH409dD-X6ozVL_Ug/exec';
+
+  const LS_TOKEN_KEY = 'swat_uwu_token';
+  const LS_RELEASE = 'swat_uwu_release';
+  const LS_FILTER_KEY = 'swat_uwu_filters';
+
+  const tokenInput = document.getElementById('apiToken');
+  const versionInput = document.getElementById('relVersion');
+  const chkHighBlocker = document.getElementById('chkHighBlocker');
+  const chkSelective = document.getElementById('chkSelective');
+
+  const btnPlatformAndroid = document.getElementById('btnPlatformAndroid');
+  const btnPlatformiOS = document.getElementById('btnPlatformiOS');
+
+  const runBtn = document.getElementById('runBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const progressBar = document.getElementById('progressBar');
+  const statusText = document.getElementById('statusText');
+
+  const summaryTable = document.getElementById('summaryTable');
+  const summaryHead = summaryTable.querySelector('thead tr');
+  const summaryBody = summaryTable.querySelector('tbody');
+
+  const toast = document.getElementById('toast');
+
+  const tabPeople = document.getElementById('tabPeople');
+  const tabStreams = document.getElementById('tabStreams');
+  const tabDays = document.getElementById('tabDays');
+  const summaryPanel = document.getElementById('summaryPanel');
+  const daysPanel = document.getElementById('daysPanel');
+  const dayTitleFri = document.getElementById('dayTitleFri');
+  const dayTitleSat = document.getElementById('dayTitleSat');
+  const dayTitleSun = document.getElementById('dayTitleSun');
+  const dayTitleMon = document.getElementById('dayTitleMon');
+  const dayTableTitleFri = document.getElementById('dayTableTitleFri');
+  const dayTableTitleSat = document.getElementById('dayTableTitleSat');
+  const dayTableTitleSun = document.getElementById('dayTableTitleSun');
+  const dayTableTitleMon = document.getElementById('dayTableTitleMon');
+  const dayChartFri = document.getElementById('dayChartFri');
+  const dayChartSat = document.getElementById('dayChartSat');
+  const dayChartSun = document.getElementById('dayChartSun');
+  const dayChartMon = document.getElementById('dayChartMon');
+  const dayTableFri = document.getElementById('dayTableFri');
+  const dayTableSat = document.getElementById('dayTableSat');
+  const dayTableSun = document.getElementById('dayTableSun');
+  const dayTableMon = document.getElementById('dayTableMon');
+  const daysFilterDropdown = document.getElementById('daysFilterDropdown');
+  const daysFilterSelectedText = document.getElementById('daysFilterSelectedText');
+  const daysFilterList = document.getElementById('daysFilterList');
+
+  const filterBtn = document.getElementById('filterBtn');
+  const filterBadge = document.getElementById('filterBadge');
+  const filterResetInline = document.getElementById('filterResetInline');
+
+  const filterModal = document.getElementById('filterModal');
+  const filterTitle = document.getElementById('filterTitle');
+  const filterNameLabel = document.getElementById('filterNameLabel');
+  const filterNameInput = document.getElementById('filterNameInput');
+  const filterNameList = document.getElementById('filterNameList');
+  const filterUwuMin = document.getElementById('filterUwuMin');
+  const filterUwuMax = document.getElementById('filterUwuMax');
+  const filterClose = document.getElementById('filterClose');
+  const filterSave = document.getElementById('filterSave');
+  const filterReset = document.getElementById('filterReset');
+
+  const detailModal = document.getElementById('detailModal');
+  const detailBack = document.getElementById('detailBack');
+  const detailTitle = document.getElementById('detailTitle');
+  const detailExport = document.getElementById('detailExport');
+
+  const detailPerson = document.getElementById('detailPerson');
+  const detailPersonTabs = document.getElementById('detailPersonTabs');
+  const detailTabPersonStreams = document.getElementById('detailTabPersonStreams');
+  const detailTabPersonCases = document.getElementById('detailTabPersonCases');
+  const detailTargetStream = document.getElementById('detailTargetStream');
+  const detailPersonStreams = document.getElementById('detailPersonStreams');
+  const detailPersonCases = document.getElementById('detailPersonCases');
+  const detailTablePersonStreams = document.getElementById('detailTablePersonStreams');
+  const detailTablePersonCases = document.getElementById('detailTablePersonCases');
+
+  const detailStream = document.getElementById('detailStream');
+  const detailTableStream = document.getElementById('detailTableStream');
+
+  const infoBtn = document.getElementById('infoBtn');
+  const infoPopover = document.getElementById('infoPopover');
+
+  const exportExcelBtn = document.getElementById('exportExcelBtn');
+
+  const summaryTotals = document.getElementById('summaryTotals');
+  const detailTotalsPersonStreams = document.getElementById('detailTotalsPersonStreams');
+  const detailTotalsStream = document.getElementById('detailTotalsStream');
+
+  let isRunning = false;
+  let activeTab = 'people'; // 'people' | 'streams' | 'days'
+  const uwuCache = new Map();
+
+  let gPeopleStats = new Map();
+  let gCaseDetails = new Map();
+  let gStreamStats = new Map();
+  let gStreamSwatStats = new Map();
+
+  let filters = {
+    people: { name: '', uwuMin: '', uwuMax: '' },
+    streams: { name: '', uwuMin: '', uwuMax: '' },
+    platform: null
+  };
+
+  let gSwatNameMap = new Map();
+  let gSwatTargetStreamMap = new Map();
+
+  let gSwatDaysMap = new Map();
+  let gWorkedHoursByDayLogin = new Map(); // dayKey -> Map(login -> hours)
+  let gCasesByDayLogin = new Map(); // dayKey -> Map(login -> count)
+  let gUwUByDayLogin = new Map();   // dayKey -> Map(login -> sumUwU)
+  let gUwUTimeEvents = [];          // { dayKey, login, uwuNum, hourFloat, timeLabel }
+  let gDayCharts = { fri: null, sat: null, sun: null, mon: null };
+  const DAYS_FILTER_STATE = { users: [], selectedLogins: new Set(), initialized: false, searchQuery: '' };
+  let detailContext = null; // {type:'person'|'stream', key:string}
+  let detailPersonActiveTab = 'streams';
+
+  let platformFilter = null; // 'Android' | 'iOS' | null
+  let modalPlatformFilter = null;
+
+  const sortState = {
+    'summary-people': { key: null, dir: null },
+    'summary-streams': { key: null, dir: null },
+    'detail-person-streams': { key: null, dir: null },
+    'detail-stream': { key: null, dir: null }
+  };
+
+  function setProgress(p) {
+    const v = Math.max(0, Math.min(100, p || 0));
+    progressBar.style.width = v + '%';
+  }
+
+  function setStatus(text) {
+    statusText.textContent = text || '—';
+  }
+
+  function showToast(msg) {
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  function setHidden(el, hidden) {
+    if (!el) return;
+    el.classList.toggle('hidden', !!hidden);
+  }
+
+  function setRunning(running) {
+    if (running) {
+      if (runBtn) runBtn.disabled = true;
+      if (runBtn) runBtn.classList.add('opacity-60', 'cursor-not-allowed');
+      setHidden(runBtn, true);
+      setHidden(stopBtn, false);
+      window.__swatAbort = new AbortController();
+    } else {
+      if (runBtn) runBtn.disabled = false;
+      if (runBtn) runBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+      setHidden(stopBtn, true);
+      setHidden(runBtn, false);
+      try { window.__swatAbort?.abort(); } catch (e) {}
+      window.__swatAbort = null;
+    }
+  }
+
+  function normalizeLogin(s) {
+    return (s || '').trim().toLowerCase();
+  }
+
+  function normalizeReleaseVersion(value) {
+    const raw = String(value || '').trim().replace(/,/g, '.').replace(/\s+/g, '');
+    if (!raw) return '';
+
+    const normalizeBuildPart = (build) => {
+      const digits = String(build || '').trim();
+      if (!digits) return '0000';
+      if (!/^\d{1,4}$/.test(digits)) return digits;
+      return digits.padEnd(4, '0');
+    };
+
+    let match = raw.match(/^(\d+)\.(\d+)\.(\d{4})$/);
+    if (match) {
+      return `${Number(match[1])}.${Number(match[2])}.${match[3]}`;
+    }
+
+    match = raw.match(/^(\d+)\.(\d+)(?:\.(\d{1,3}))?$/);
+    if (match) {
+      return `${Number(match[1])}.${Number(match[2])}.${normalizeBuildPart(match[3])}`;
+    }
+
+    match = raw.match(/^(\d)(\d)(\d)$/);
+    if (match) {
+      return `${Number(match[1])}.${Number(match[2])}.${normalizeBuildPart(match[3])}`;
+    }
+
+    return raw;
+  }
+
+  function applyReleaseVersionNormalization(saveToStorage = true) {
+    if (!versionInput) return '';
+    const normalized = normalizeReleaseVersion(versionInput.value || '');
+    versionInput.value = normalized;
+    if (saveToStorage) {
+      try { localStorage.setItem(LS_RELEASE, normalized); } catch (e) {}
+    }
+    return normalized;
+  }
+
+  function toMskDateKeyFromEpochMs(ms) {
+    const d = new Date((Number(ms) || 0) + 3 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function toMskHourFloat(ms) {
+    const d = new Date((Number(ms) || 0) + 3 * 60 * 60 * 1000);
+    return d.getUTCHours() + (d.getUTCMinutes() / 60);
+  }
+
+  function toMskTimeLabel(ms) {
+    const d = new Date((Number(ms) || 0) + 3 * 60 * 60 * 1000);
+    const hh = String(d.getUTCHours()).padStart(2, '0');
+    const mm = String(d.getUTCMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
+
+  function parseDayKeyToUtcDate(dayKey) {
+    return new Date(`${dayKey}T00:00:00Z`);
+  }
+
+  function normalizeDayKey(rawDay) {
+    const s = String(rawDay || '').trim();
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  }
+
+  function dayLabelWithDate(dayName, dayKey) {
+    if (!dayKey) return dayName;
+    const d = parseDayKeyToUtcDate(dayKey);
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    return `${dayName} (${dd}.${mm})`;
+  }
+
+  function latestDayKeyByWeekday(dayKeys, weekday) {
+    let best = null;
+    for (const key of dayKeys) {
+      const d = parseDayKeyToUtcDate(key);
+      if (d.getUTCDay() !== weekday) continue;
+      if (!best || key > best) best = key;
+    }
+    return best;
+  }
+
+  async function fetchTimeline(launchId, token, signal) {
+    return apiGet('/api/testresult/timeline', token, {
+      launchId,
+      label: 'host, thread'
+    }, signal);
+  }
+
+  function walkTimelineGroups(node, onLeaf) {
+    if (!node) return;
+    if (Array.isArray(node.leafs)) {
+      for (const leaf of node.leafs) onLeaf(leaf);
+    }
+    if (Array.isArray(node.groups)) {
+      for (const g of node.groups) walkTimelineGroups(g, onLeaf);
+    }
+  }
+
+  function incNestedMap(rootMap, dayKey, login, delta) {
+    if (!dayKey || !login) return;
+    let dayMap = rootMap.get(dayKey);
+    if (!dayMap) {
+      dayMap = new Map();
+      rootMap.set(dayKey, dayMap);
+    }
+    dayMap.set(login, (dayMap.get(login) || 0) + delta);
+  }
+
+  function parseSwat(text) {
+    const set = new Set();
+    const nameMap = new Map();
+    const daysMap = new Map();
+    (text || '').split(/\r?\n/).forEach(line => {
+      let t = line.trim();
+      if (!t) return;
+      t = t.replace(/^[-•]+/, '').trim();
+      if (!t) return;
+
+      const parts = t.split(/\s+/);
+      const loginRaw = (parts.shift() || '').replace(/^@/, '');
+      const loginNorm = normalizeLogin(loginRaw);
+      if (!loginNorm) return;
+
+      set.add(loginNorm);
+
+      // Новый формат: login + ФИО + days(число) в конце строки
+      let days = null;
+      if (parts.length) {
+        const maybeDays = parts[parts.length - 1];
+        if (/^-?\d+$/.test(maybeDays)) {
+          days = Number(parts.pop());
+        }
+      }
+
+      const displayName = parts.join(' ').trim();
+      if (displayName) {
+        nameMap.set(loginNorm, displayName);
+      } else if (!nameMap.has(loginNorm)) {
+        nameMap.set(loginNorm, loginRaw);
+      }
+
+      if (days !== null && Number.isFinite(days)) {
+        daysMap.set(loginNorm, days);
+      }
+    });
+    return { set, nameMap, daysMap };
+
+  }
+
+  function getSwatDisplayName(login) {
+    const key = normalizeLogin(login);
+    return gSwatNameMap.get(key) || login;
+  }
+
+  function authHeader(token) {
+    if (!token) return {};
+    token = token.trim();
+    if (/^(Api-Token|Bearer)\s/i.test(token)) {
+      return { 'Authorization': token };
+    }
+    return { 'Authorization': 'Api-Token ' + token };
+  }
+
+  function extractStreamName(launchName) {
+    if (!launchName) return '—';
+    const m = /Stream\s+([^\]]+)/i.exec(launchName);
+    if (m) return m[1].trim();
+    let n = String(launchName);
+    n = n.replace(/\[Android\]/gi,'')
+         .replace(/\[iOS\]/gi,'')
+         .replace(/\[High\/Blocker\]/gi,'')
+         .replace(/\[Selective\]/gi,'')
+         .replace(/\[DeployLab\]/gi,'')
+         .replace(/\[Smoke\]/gi,'')
+         .replace(/\[Regression\]/gi,'');
+    n = n.replace(/Stream/gi,'');
+    n = n.replace(/Регресс\s+[^\s]+/gi,'');
+    n = n.replace(/\s+/g,' ').trim();
+    return n || launchName;
+  }
+
+  // Платформа берётся из названия лаунча по приставке [Android]/[iOS]
+  function extractPlatformFromLaunchName(launchName) {
+    if (!launchName) return null;
+    if (/\[Android\]/i.test(launchName)) return 'Android';
+    if (/\[iOS\]/i.test(launchName)) return 'iOS';
+    return null;
+  }
+
+  async function apiGet(path, token, params = {}, signal = null) {
+    const url = new URL(BASE_URL + path);
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) url.searchParams.append(k, String(v));
+    });
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { 'Accept': 'application/json', ...authHeader(token) },
+      signal
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${path}`);
+    }
+    return res.json();
+  }
+
+  function buildSearch(term) {
+    const arr = [{ id: 'name', type: 'string', value: term }];
+    const json = JSON.stringify(arr);
+    return btoa(unescape(encodeURIComponent(json)));
+  }
+
+  async function findLaunches(version, token, signal) {
+    const launches = new Map();
+
+    const useHighBlocker = chkHighBlocker ? chkHighBlocker.checked : false;
+    const useSelective = chkSelective ? chkSelective.checked : false;
+
+    if (!useHighBlocker && !useSelective) {
+      setStatus('Не выбрано ни High/Blocker, ни Selective — лаунчи не будут найдены.');
+      return [];
+    }
+
+    const useLegacyLogic = useHighBlocker && useSelective;
+    const terms = [];
+
+    if (useLegacyLogic) {
+      for (const kind of KINDS) {
+        const t = [`[${kind}] Регресс ${version}`];
+        if (kind === 'Smoke') {
+          t.push(`[High/Blocker][DeployLab] Регресс ${version}`);
+        }
+        if (kind === 'Selective') {
+          t.push(`[Selective][DeployLab] Регресс ${version}`);
+        }
+        for (const s of t) terms.push(s);
+      }
+    } else {
+      if (useHighBlocker) terms.push(`[High/Blocker][DeployLab] Регресс ${version}`);
+      if (useSelective) terms.push(`[Selective][DeployLab] Регресс ${version}`);
+    }
+
+    for (const term of terms) {
+      let page = 0;
+      while (true) {
+        const data = await apiGet('/api/launch', token, {
+          page,
+          size: PAGE_SIZE,
+          search: buildSearch(term),
+          projectId: PROJECT_ID,
+          preview: 'true',
+          sort: 'createdDate,desc'
+        }, signal);
+        const content = (data && (data.content || data)) || [];
+        if (!Array.isArray(content) || content.length === 0) break;
+        for (const it of content) {
+          const id = Number(it.id);
+          if (!Number.isNaN(id)) launches.set(id, it);
+        }
+        if (content.length < PAGE_SIZE) break;
+        page += 1;
+      }
+    }
+
+    return Array.from(launches.values());
+  }
+
+  async function listLeaf(launchId, token, signal) {
+    let items = [];
+    let page = 0;
+    while (true) {
+      const data = await apiGet('/api/testresulttree/leaf', token, {
+        launchId,
+        sort: 'name,asc',
+        size: PAGE_SIZE,
+        page
+      }, signal);
+      const content = (data && data.content) || [];
+      if (!Array.isArray(content) || content.length === 0) break;
+      items = items.concat(content);
+      if (content.length < PAGE_SIZE) break;
+      page += 1;
+    }
+    return items;
+  }
+
+  async function getUwU(tcid, token, signal) {
+    if (uwuCache.has(tcid)) return uwuCache.get(tcid);
+
+    let uwuVal = null;
+    let platformVal = null;
+
+    try {
+      const data = await apiGet(`/api/testcase/${tcid}/overview`, token, {}, signal);
+      const fields = (data && data.customFields) || [];
+
+      for (const cf of fields) {
+        const cfInfo = cf.customField || {};
+        const cfName = (cfInfo.name || '').trim();
+
+        if (cfName === 'UwU') {
+          let v = cf.name;
+          if (!v) {
+            const vals = cf.values || [];
+            if (vals.length && vals[0]) v = vals[0].name;
+          }
+          if (v) uwuVal = String(v);
+        } else if (cfName === 'Platform') {
+          let p = cf.name;
+          if (!p) {
+            const vals = cf.values || [];
+            if (vals.length && vals[0]) p = vals[0].name;
+          }
+          if (p) platformVal = String(p);
+        }
+      }
+    } catch (e) {
+      console.error('UwU fetch error for', tcid, e);
+    }
+
+    const result = { uwuRaw: uwuVal, platform: platformVal };
+    uwuCache.set(tcid, result);
+    return result;
+  }
+
+  function parseUwUNumber(raw) {
+    if (raw === null || raw === undefined) return 0;
+    const s = String(raw).trim();
+    if (!s || s === '0') return 0;
+    const num = parseFloat(s.replace(',', '.'));
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  function addToPlatformStats(container, uwuNum, hasUwU, platformValue) {
+    container.totalCases = (container.totalCases || 0) + 1;
+    container.uwuSum = (container.uwuSum || 0) + uwuNum;
+    container.uwuPresent = (container.uwuPresent || 0) + hasUwU;
+
+    const platKey = platformValue || '—';
+    if (!container.byPlatform) container.byPlatform = {};
+    const current = container.byPlatform[platKey] || { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+    current.totalCases += 1;
+    current.uwuSum += uwuNum;
+    current.uwuPresent += hasUwU;
+    container.byPlatform[platKey] = current;
+  }
+
+  function addDurationStats(container, durationMs, platformValue) {
+    const dur = Number(durationMs) || 0;
+    if (!dur) return;
+    container.durTotalMs = (container.durTotalMs || 0) + dur;
+
+    const platKey = platformValue || '—';
+    if (!container.durByPlatform) container.durByPlatform = {};
+    const current = container.durByPlatform[platKey] || { durTotalMs: 0 };
+    current.durTotalMs += dur;
+    container.durByPlatform[platKey] = current;
+  }
+
+  function aggregateStats(stats, platform) {
+    if (!stats) {
+      return { totalCases: 0, uwuSum: 0, uwuPresent: 0, durTotalMs: 0 };
+    }
+    if (!platform || (!stats.byPlatform && !stats.durByPlatform)) {
+      return {
+        totalCases: stats.totalCases || 0,
+        uwuSum: stats.uwuSum || 0,
+        uwuPresent: stats.uwuPresent || 0,
+        durTotalMs: stats.durTotalMs || 0
+      };
+    }
+
+    let totalCases = 0;
+    let uwuSum = 0;
+    let uwuPresent = 0;
+
+    if (stats.byPlatform && stats.byPlatform[platform]) {
+      const s = stats.byPlatform[platform];
+      totalCases += s.totalCases || 0;
+      uwuSum += s.uwuSum || 0;
+      uwuPresent += s.uwuPresent || 0;
+    }
+
+    let durTotalMs = 0;
+    if (stats.durByPlatform && stats.durByPlatform[platform]) {
+      durTotalMs += stats.durByPlatform[platform].durTotalMs || 0;
+    }
+
+    return { totalCases, uwuSum, uwuPresent, durTotalMs };
+  }
+
+  function isFilterActive(tab) {
+    const f = filters[tab];
+    if (!f) return false;
+    return !!(f.name || f.uwuMin || f.uwuMax || filters.platform);
+  }
+
+  function updateFilterBadge() {
+    if (activeTab === 'days') {
+      filterBadge.classList.add('hidden');
+      filterResetInline.classList.add('hidden');
+      return;
+    }
+    const active = isFilterActive(activeTab);
+    if (active) {
+      filterBadge.classList.remove('hidden');
+      filterResetInline.classList.remove('hidden');
+    } else {
+      filterBadge.classList.add('hidden');
+      filterResetInline.classList.add('hidden');
+    }
+  }
+
+  function applyFilterRows(rows, tab) {
+    const f = filters[tab];
+    if (!f) return rows;
+
+    const nameKey = (f.name || '').trim().toLowerCase();
+    const min = f.uwuMin !== '' ? Number(f.uwuMin) : null;
+    const max = f.uwuMax !== '' ? Number(f.uwuMax) : null;
+
+    return rows.filter(r => {
+      if (nameKey) {
+        if (tab === 'people') {
+          const loginLower = r.login.toLowerCase();
+          const displayLower = getSwatDisplayName(r.login).toLowerCase();
+          if (loginLower !== nameKey && displayLower !== nameKey) return false;
+        } else {
+          if (r.stream.toLowerCase() !== nameKey) return false;
+        }
+      }
+      if (min !== null && r.uwuSum < min) return false;
+      if (max !== null && r.uwuSum > max) return false;
+      return true;
+    });
+  }
+
+  function formatUwU(value) {
+    const num = Number(value);
+    if (!num) return '-';
+    return num;
+  }
+
+  function formatHours(durMs) {
+    const ms = Number(durMs) || 0;
+    if (!ms) return '-';
+    const totalMinutes = Math.round(ms / 60000);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${h}.${String(m).padStart(2, '0')}`;
+  }
+
+  function sortRows(rows, scope) {
+    const state = sortState[scope];
+    if (!state || !state.key || !state.dir) return rows;
+
+    const dir = state.dir === 'asc' ? 1 : -1;
+    const key = state.key;
+    const arr = [...rows];
+
+    arr.sort((a, b) => {
+      if (key === 'name') {
+        const sa = (a && Object.prototype.hasOwnProperty.call(a, 'stream'))
+          ? String(a.stream || '').trim()
+          : String(getSwatDisplayName(a.login || '') || '').trim();
+
+        const sb = (b && Object.prototype.hasOwnProperty.call(b, 'stream'))
+          ? String(b.stream || '').trim()
+          : String(getSwatDisplayName(b.login || '') || '').trim();
+
+        return sa.localeCompare(sb, 'ru', { sensitivity: 'base' }) * dir;
+      }
+
+      let va = 0, vb = 0;
+      if (key === 'cases') {
+        va = Number(a.totalCases) || 0;
+        vb = Number(b.totalCases) || 0;
+      } else if (key === 'uwu') {
+        va = Number(a.uwuSum) || 0;
+        vb = Number(b.uwuSum) || 0;
+      } else if (key === 'percent') {
+        va = Number(a.percent) || 0;
+        vb = Number(b.percent) || 0;
+      } else if (key === 'hours') {
+        const hasDaysA = Object.prototype.hasOwnProperty.call(a || {}, 'days');
+        const hasDaysB = Object.prototype.hasOwnProperty.call(b || {}, 'days');
+        if (hasDaysA || hasDaysB) {
+          va = Number(a.days) || 0;
+          vb = Number(b.days) || 0;
+        } else {
+          va = Number(a.durMs) || 0;
+          vb = Number(b.durMs) || 0;
+        }
+      } else {
+        return 0;
+      }
+
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+
+    return arr;
+  }
+
+  // ===== ИТОГО: синхронизация ширин колонок (чтобы ровно под таблицей) =====
+  function syncTotalsColumns(mainTable, totalsContainer) {
+    if (!mainTable || !totalsContainer) return;
+    const totalsTable = totalsContainer.querySelector('table[data-totals-table="1"]');
+    if (!totalsTable) return;
+
+    const ths = Array.from(mainTable.querySelectorAll('thead th'));
+    if (!ths.length) return;
+
+    const widths = ths.map(th => Math.ceil(th.getBoundingClientRect().width));
+    const sum = widths.reduce((a, b) => a + b, 0);
+
+    let colgroup = totalsTable.querySelector('colgroup');
+    if (!colgroup) {
+      colgroup = document.createElement('colgroup');
+      totalsTable.insertBefore(colgroup, totalsTable.firstChild);
+    }
+    colgroup.innerHTML = widths.map(w => `<col style="width:${w}px">`).join('');
+    totalsTable.style.width = sum + 'px';
+  }
+
+  function updateTotalsContainer(container, rows, mainTable) {
+    if (!container) return;
+    if (!rows || !rows.length) {
+      container.innerHTML = '';
+      return;
+    }
+
+    let totalCases = 0;
+    let totalUwU = 0;
+    let totalUwuPresent = 0;
+    let totalDurMs = 0;
+
+    rows.forEach(r => {
+      totalCases += Number(r.totalCases) || 0;
+      totalUwU += Number(r.uwuSum) || 0;
+      totalUwuPresent += Number(r.uwuPresent) || 0;
+      totalDurMs += Number(r.durMs) || 0;
+    });
+
+    const percent = totalCases > 0 ? (totalUwuPresent / totalCases) * 100 : 0;
+    const uwuDisplay = formatUwU(totalUwU);
+    const hhmm = formatHours(totalDurMs);
+    const isPeopleSummary = (mainTable && mainTable.id === 'summaryTable' && activeTab === 'people');
+    const lastCellValue = isPeopleSummary ? '—' : hhmm;
+
+    container.innerHTML = `
+      <div class="overflow-hidden border border-[#ecebff] rounded-xl bg-[#f9f8ff]">
+       <table data-totals-table="1" class="text-sm" style="table-layout:fixed;width:100%">
+          <tbody>
+            <tr>
+              <td class="px-3 py-1.5 text-left whitespace-nowrap">Итого:</td>
+              <td class="px-3 py-1.5 text-center whitespace-nowrap">${totalCases}</td>
+              <td class="px-3 py-1.5 text-center whitespace-nowrap">${uwuDisplay}</td>
+              <td class="px-3 py-1.5 text-center whitespace-nowrap">${percent.toFixed(1)}%</td>
+              <td class="px-3 py-1.5 text-center whitespace-nowrap">${lastCellValue}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    // 2 кадра — чтобы точно после layout и подгонка была стабильнее
+    requestAnimationFrame(() => {
+      syncTotalsColumns(mainTable, container);
+      requestAnimationFrame(() => syncTotalsColumns(mainTable, container));
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    syncTotalsColumns(summaryTable, summaryTotals);
+    syncTotalsColumns(detailTablePersonStreams, detailTotalsPersonStreams);
+    syncTotalsColumns(detailTableStream, detailTotalsStream);
+  });
+
+  function attachSortHandlers(headRow, scope, rerenderFn) {
+    if (!headRow) return;
+
+    const applyIndicators = () => {
+      const state = sortState[scope];
+      headRow.querySelectorAll('th[data-sort-key]').forEach(th => {
+        const key = th.getAttribute('data-sort-key');
+        const up = th.querySelector('.sort-up');
+        const down = th.querySelector('.sort-down');
+        if (!up || !down) return;
+        const activeDir = state && state.key === key ? state.dir : null;
+        up.classList.toggle('sort-active', activeDir === 'asc');
+        down.classList.toggle('sort-active', activeDir === 'desc');
+      });
+    };
+
+    headRow.querySelectorAll('th[data-sort-key]').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', () => {
+        const key = th.getAttribute('data-sort-key');
+        const st = sortState[scope] || { key: null, dir: null };
+
+        if (st.key !== key) {
+          sortState[scope] = { key, dir: 'asc' };
+        } else if (st.dir === 'asc') {
+          sortState[scope] = { key, dir: 'desc' };
+        } else if (st.dir === 'desc') {
+          sortState[scope] = { key: null, dir: null };
+        } else {
+          sortState[scope] = { key, dir: 'asc' };
+        }
+
+        rerenderFn();
+      });
+    });
+
+    applyIndicators();
+  }
+
+  // ===== Показ сортировок сразу (без кликов по вкладкам) =====
+  function initSummarySortHeader() {
+    if (!summaryHead) return;
+
+    if (activeTab === 'people') {
+      summaryHead.innerHTML = `
+        <th data-sort-key="name">
+          SWAT (ФИО)
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="cases">
+          Пройдено кейсов
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="uwu">
+          Сумма UwU
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="percent">
+          % кейсов с UwU
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="hours">
+          Дни
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+      `;
+      attachSortHandlers(summaryHead, 'summary-people', renderCurrentTab);
+    } else {
+      // На случай если активная вкладка уже streams
+      summaryHead.innerHTML = `
+        <th data-sort-key="name">
+          Стрим
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="cases">
+          Пройдено кейсов
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="uwu">
+          Сумма UwU
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="percent">
+          % кейсов с UwU
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+        <th data-sort-key="hours">
+          Ч/Ч
+          <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span>
+        </th>
+      `;
+      attachSortHandlers(summaryHead, 'summary-streams', renderCurrentTab);
+    }
+  }
+
+  function renderPeopleSummary() {
+    summaryHead.innerHTML = `
+      <th data-sort-key="name">SWAT (ФИО) <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="cases">Пройдено кейсов <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="uwu">Сумма UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="percent">% кейсов с UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="hours">Дни <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+    `;
+    attachSortHandlers(summaryHead, 'summary-people', renderCurrentTab);
+
+    summaryBody.innerHTML = '';
+
+    const rows = [];
+    gPeopleStats.forEach((stats, login) => {
+      const agg = aggregateStats(stats, platformFilter);
+      const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+      rows.push({
+        login,
+        totalCases: agg.totalCases,
+        uwuSum: agg.uwuSum,
+        uwuPresent: agg.uwuPresent,
+        percent,
+        durMs: agg.durTotalMs || 0,
+        days: Number(gSwatDaysMap.get(login) ?? 0)
+      });
+    });
+
+    const filtered = applyFilterRows(rows, 'people')
+      .filter(r => r.totalCases > 0 || r.uwuSum > 0 || r.uwuPresent > 0 || r.durMs > 0);
+
+    const sorted = sortRows(filtered, 'summary-people');
+
+    if (!sorted.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="text-center text-slate-500 py-3">Данных нет</td>';
+      summaryBody.appendChild(tr);
+      updateTotalsContainer(summaryTotals, [], summaryTable);
+      return;
+    }
+
+    for (const r of sorted) {
+      const percentStr = r.totalCases > 0 ? (r.percent).toFixed(1) + '%' : '0.0%';
+      const displayName = getSwatDisplayName(r.login);
+      const days = Number(r.days ?? 0);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="mono text-indigo-700 cursor-pointer hover:underline whitespace-nowrap" data-login="${r.login}">${displayName}</td>
+        <td>${r.totalCases}</td>
+        <td>${formatUwU(r.uwuSum)}</td>
+        <td>${percentStr}</td>
+        <td>${days}</td>
+      `;
+      summaryBody.appendChild(tr);
+    }
+
+    summaryBody.querySelectorAll('td[data-login]').forEach(td => {
+      td.addEventListener('click', () => {
+        const login = td.getAttribute('data-login');
+        openPersonDetail(login);
+      });
+    });
+
+    updateTotalsContainer(summaryTotals, sorted, summaryTable);
+  }
+
+  function renderStreamSummary() {
+    summaryHead.innerHTML = `
+      <th data-sort-key="name">Стрим <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="cases">Пройдено кейсов <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="uwu">Сумма UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="percent">% кейсов с UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+      <th data-sort-key="hours">Ч/Ч <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+    `;
+    attachSortHandlers(summaryHead, 'summary-streams', renderCurrentTab);
+
+    summaryBody.innerHTML = '';
+
+    const rows = [];
+    gStreamStats.forEach((stats, stream) => {
+      const agg = aggregateStats(stats, platformFilter);
+      const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+      rows.push({
+        stream,
+        totalCases: agg.totalCases,
+        uwuSum: agg.uwuSum,
+        uwuPresent: agg.uwuPresent,
+        percent,
+        durMs: agg.durTotalMs || 0
+      });
+    });
+
+    const filtered = applyFilterRows(rows, 'streams')
+      .filter(r => r.totalCases > 0 || r.uwuSum > 0 || r.uwuPresent > 0 || r.durMs > 0);
+
+    const sorted = sortRows(filtered, 'summary-streams');
+
+    if (!sorted.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="text-center text-slate-500 py-3">Данных нет</td>';
+      summaryBody.appendChild(tr);
+      updateTotalsContainer(summaryTotals, [], summaryTable);
+      return;
+    }
+
+    for (const r of sorted) {
+      const percentStr = r.totalCases > 0 ? (r.percent).toFixed(1) + '%' : '0.0%';
+      const hhmm = formatHours(r.durMs);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="wrap cursor-pointer text-indigo-700 hover:underline" data-stream="${r.stream}">${r.stream}</td>
+        <td>${r.totalCases}</td>
+        <td>${formatUwU(r.uwuSum)}</td>
+        <td>${percentStr}</td>
+        <td>${hhmm}</td>
+      `;
+      summaryBody.appendChild(tr);
+    }
+
+    summaryBody.querySelectorAll('td[data-stream]').forEach(td => {
+      td.addEventListener('click', () => {
+        const stream = td.getAttribute('data-stream');
+        openStreamDetail(stream);
+      });
+    });
+
+    updateTotalsContainer(summaryTotals, sorted, summaryTable);
+  }
+
+  function renderCurrentTab() {
+    if (activeTab === 'people') {
+      renderPeopleSummary();
+    } else if (activeTab === 'streams') {
+      renderStreamSummary();
+    } else {
+      renderDaysSummary();
+    }
+    updateFilterBadge();
+  }
+
+  function thresholdForWeekday(weekday) {
+    return weekday === 5 ? 200 : 650;
+  }
+
+  function buildRowsForDay(dayKey) {
+    if (!dayKey) return [];
+    const caseMap = gCasesByDayLogin.get(dayKey) || new Map();
+    const uwuMap = gUwUByDayLogin.get(dayKey) || new Map();
+    const logins = new Set([...caseMap.keys(), ...uwuMap.keys()]);
+    const rows = [];
+    for (const login of logins) {
+      if (!isDayLoginAllowed(login)) continue;
+      const cases = Number(caseMap.get(login) || 0);
+      const uwu = Number(uwuMap.get(login) || 0);
+      if (!cases && !uwu) continue;
+      rows.push({ login, name: getSwatDisplayName(login), cases, uwu });
+    }
+    rows.sort((a, b) => (b.uwu - a.uwu) || (b.cases - a.cases) || a.name.localeCompare(b.name, 'ru'));
+    return rows;
+  }
+
+  function renderDayTable(tableEl, dayKey, threshold) {
+    if (!tableEl) return;
+    const rows = buildRowsForDay(dayKey);
+    if (!rows.length) {
+      tableEl.innerHTML = `
+        <thead>
+          <tr><th>SWAT (ФИО)</th><th>Кейсы</th><th>UwU</th></tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="3" class="text-center text-slate-500 py-3">Нет данных</td></tr>
+        </tbody>
+      `;
+      return;
+    }
+
+    const splitIndex = rows.findIndex(r => Number(r.uwu) < threshold);
+    const body = rows.map((r, idx) => {
+      const cls = Number(r.uwu) >= threshold ? 'uwu-high' : 'uwu-low';
+      const splitCls = (splitIndex >= 0 && idx === splitIndex) ? 'threshold-cut' : '';
+      return `
+        <tr class="${splitCls}">
+          <td class="mono whitespace-nowrap">${r.name}</td>
+          <td>${r.cases}</td>
+          <td class="${cls}">${formatUwU(r.uwu)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const thresholdTail = splitIndex < 0
+      ? `<tr class="threshold-cut"><td colspan="3" class="text-right text-slate-500">Порог ${threshold}</td></tr>`
+      : '';
+
+    tableEl.innerHTML = `
+      <colgroup>
+        <col>
+        <col style="width:90px">
+        <col style="width:130px">
+      </colgroup>
+      <thead>
+        <tr><th>SWAT (ФИО)</th><th>Кейсы</th><th>UwU</th></tr>
+      </thead>
+      <tbody>${body}${thresholdTail}</tbody>
+    `;
+  }
+
+  function destroyDayCharts() {
+    const keys = Object.keys(gDayCharts);
+    for (const k of keys) {
+      if (gDayCharts[k]) {
+        try { gDayCharts[k].destroy(); } catch (e) {}
+        gDayCharts[k] = null;
+      }
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function initDaysFilterDropdown() {
+    if (!daysFilterDropdown || !daysFilterSelectedText) return;
+    daysFilterSelectedText.addEventListener('click', (e) => {
+      e.stopPropagation();
+      daysFilterDropdown.classList.toggle('open');
+    });
+    if (daysFilterList) {
+      daysFilterList.addEventListener('click', (e) => e.stopPropagation());
+      daysFilterList.addEventListener('input', (e) => {
+        const t = e.target;
+        if (!(t instanceof HTMLInputElement)) return;
+        if (t.dataset.daysSearch === '1') {
+          applyDaysFilterSearch(t.value || '');
+        }
+      });
+      daysFilterList.addEventListener('change', (e) => {
+        const t = e.target;
+        if (!(t instanceof HTMLInputElement)) return;
+        if (t.dataset.daysSearch === '1') return;
+        if (t.dataset.all === '1') {
+          const on = !!t.checked;
+          daysFilterList.querySelectorAll('input[type=checkbox][data-login="1"]').forEach(cb => { cb.checked = on; });
+        }
+        updateDaysFilterFromUI();
+      });
+    }
+    document.addEventListener('click', (e) => {
+      if (!daysFilterDropdown.contains(e.target)) {
+        daysFilterDropdown.classList.remove('open');
+      }
+    });
+  }
+
+  function buildDaysFilterList(users) {
+    if (!daysFilterList) return;
+    daysFilterList.innerHTML = '';
+    if (!users.length) {
+      daysFilterList.innerHTML = '<div class="days-filter-empty">Нет сотрудников</div>';
+      return;
+    }
+
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'days-filter-search';
+    searchWrap.innerHTML = `
+      <span class="days-filter-search-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"></circle>
+          <path d="M20 20L16.65 16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+        </svg>
+      </span>
+      <input type="text" class="days-filter-search-input" data-days-search="1" placeholder="Поиск" value="${escapeHtml(DAYS_FILTER_STATE.searchQuery || '')}">
+    `;
+    daysFilterList.appendChild(searchWrap);
+
+    const allLabel = document.createElement('label');
+    allLabel.className = 'days-filter-item';
+    allLabel.innerHTML = `
+      <span class="days-filter-name">Все</span>
+      <input type="checkbox" class="days-filter-check" data-all="1" checked>
+    `;
+    daysFilterList.appendChild(allLabel);
+
+    const sep = document.createElement('div');
+    sep.className = 'days-filter-sep';
+    daysFilterList.appendChild(sep);
+
+    const noMatch = document.createElement('div');
+    noMatch.className = 'days-filter-empty-search';
+    noMatch.textContent = 'Совпадений нет';
+    daysFilterList.appendChild(noMatch);
+
+    users.forEach((u) => {
+      const loginNorm = normalizeLogin(u.login);
+      const displayName = String(u.full_name || u.login || '');
+      const nameNorm = normalizeDaysSearchQuery(displayName);
+      const label = document.createElement('label');
+      label.className = 'days-filter-item';
+      label.setAttribute('data-login-item', '1');
+      label.setAttribute('data-name-norm', nameNorm);
+      label.innerHTML = `
+        <span class="days-filter-name">${escapeHtml(displayName)}</span>
+        <input type="checkbox" class="days-filter-check" data-login="1" value="${escapeHtml(loginNorm)}" checked>
+      `;
+      daysFilterList.appendChild(label);
+    });
+
+    applyDaysFilterSearch(DAYS_FILTER_STATE.searchQuery || '');
+  }
+
+  function collectDaysFilterUsers() {
+    const set = new Set();
+    for (const k of gSwatNameMap.keys()) set.add(normalizeLogin(k));
+    for (const dayMap of gCasesByDayLogin.values()) for (const k of dayMap.keys()) set.add(normalizeLogin(k));
+    for (const dayMap of gUwUByDayLogin.values()) for (const k of dayMap.keys()) set.add(normalizeLogin(k));
+    const users = Array.from(set)
+      .filter(Boolean)
+      .map(login => ({ login, full_name: getSwatDisplayName(login) || login }));
+    users.sort((a, b) => String(a.full_name || a.login).localeCompare(String(b.full_name || b.login), 'ru', { sensitivity: 'base' }));
+    return users;
+  }
+
+  function normalizeDaysSearchQuery(s) {
+    return String(s || '')
+      .trim()
+      .replace(/^@+/, '')
+      .replace(/\s+/g, ' ')
+      .replace(/ё/gi, 'е')
+      .toLowerCase();
+  }
+
+  function applyDaysFilterSearch(rawQuery) {
+    if (!daysFilterList) return;
+    const q = normalizeDaysSearchQuery(rawQuery);
+    DAYS_FILTER_STATE.searchQuery = q;
+
+    const input = daysFilterList.querySelector('input[data-days-search="1"]');
+    if (input && input.value !== rawQuery) input.value = rawQuery;
+
+    const rows = Array.from(daysFilterList.querySelectorAll('label.days-filter-item[data-login-item="1"]'));
+    const qParts = q.split(' ').filter(Boolean);
+    let shown = 0;
+    for (const row of rows) {
+      const nameNode = row.querySelector('.days-filter-name');
+      const nameNorm = nameNode ? normalizeDaysSearchQuery(nameNode.textContent || '') : String(row.getAttribute('data-name-norm') || '');
+      const visible = !q || qParts.every(part => nameNorm.includes(part));
+      row.style.display = visible ? '' : 'none';
+      if (visible) shown += 1;
+    }
+
+    const noMatch = daysFilterList.querySelector('.days-filter-empty-search');
+    if (noMatch) noMatch.style.display = (rows.length && shown === 0) ? 'block' : 'none';
+  }
+
+  function refreshDaysFilterOptionsFromCurrentData() {
+    buildDaysFilterOptions(collectDaysFilterUsers());
+  }
+
+  function syncDaysFilterUiFromSelection() {
+    if (!daysFilterList) return;
+    const selected = DAYS_FILTER_STATE.selectedLogins || new Set();
+    const items = Array.from(daysFilterList.querySelectorAll('input[type=checkbox][data-login="1"]'));
+    items.forEach(cb => { cb.checked = selected.has(normalizeLogin(cb.value)); });
+    const allCb = daysFilterList.querySelector('input[type=checkbox][data-all="1"]');
+    if (allCb) allCb.checked = !!items.length && items.every(cb => cb.checked);
+  }
+
+  function refreshDaysFilterCaption() {
+    if (!daysFilterSelectedText) return;
+    const users = DAYS_FILTER_STATE.users || [];
+    const total = users.length;
+    const selectedCount = DAYS_FILTER_STATE.selectedLogins ? DAYS_FILTER_STATE.selectedLogins.size : 0;
+    let caption = '';
+    if (!total) {
+      caption = 'Нет сотрудников';
+    } else if (selectedCount <= 0) {
+      caption = 'Не выбрано';
+    } else if (selectedCount >= total) {
+      caption = 'Все сотрудники';
+    } else if (selectedCount === 1) {
+      const login = DAYS_FILTER_STATE.selectedLogins.values().next().value;
+      const user = users.find(u => u.login === login);
+      caption = user ? (user.full_name || user.login) : 'Выбрано: 1';
+    } else {
+      caption = `Выбрано: ${selectedCount}`;
+    }
+    daysFilterSelectedText.textContent = caption;
+  }
+
+  function buildDaysFilterOptions(users) {
+    const nextUsers = Array.isArray(users) ? users : [];
+    const prev = DAYS_FILTER_STATE.selectedLogins || new Set();
+    DAYS_FILTER_STATE.users = nextUsers;
+
+    let nextSel = new Set();
+    if (!DAYS_FILTER_STATE.initialized) {
+      nextSel = new Set(nextUsers.map(u => u.login));
+      // Считаем фильтр инициализированным только когда реально есть пользователи.
+      if (nextUsers.length > 0) DAYS_FILTER_STATE.initialized = true;
+    } else {
+      for (const u of nextUsers) {
+        if (prev.has(u.login)) nextSel.add(u.login);
+      }
+    }
+    DAYS_FILTER_STATE.selectedLogins = nextSel;
+    buildDaysFilterList(nextUsers);
+    syncDaysFilterUiFromSelection();
+    refreshDaysFilterCaption();
+  }
+
+  function updateDaysFilterFromUI() {
+    if (!daysFilterList) return;
+    const items = Array.from(daysFilterList.querySelectorAll('input[type=checkbox][data-login="1"]'));
+    const selected = items.filter(cb => cb.checked).map(cb => normalizeLogin(cb.value));
+    DAYS_FILTER_STATE.selectedLogins = new Set(selected);
+    syncDaysFilterUiFromSelection();
+    refreshDaysFilterCaption();
+    if (activeTab === 'days') renderDaysSummary();
+  }
+
+  function isDayLoginAllowed(login) {
+    const key = normalizeLogin(login);
+    const users = DAYS_FILTER_STATE.users || [];
+    const selected = DAYS_FILTER_STATE.selectedLogins || new Set();
+    if (!users.length) return true;
+    if (selected.size >= users.length) return true;
+    return selected.has(key);
+  }
+
+  initDaysFilterDropdown();
+
+  function getOrCreateDayTooltip(chart) {
+    const parent = chart && chart.canvas ? chart.canvas.parentNode : null;
+    if (!parent) return null;
+    let el = parent.querySelector('.day-chart-tooltip');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'day-chart-tooltip';
+      parent.appendChild(el);
+    }
+    return el;
+  }
+
+  function getWorkedDayHours(dayKey, login) {
+    const key = normalizeDayKey(dayKey);
+    if (!key) return null;
+    const dayMap = gWorkedHoursByDayLogin.get(key);
+    if (!dayMap) return null;
+    const v = dayMap.get(normalizeLogin(login));
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function formatWorkedDayHours(value) {
+    if (value === null || value === undefined) return '-';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '-';
+    if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+    return n.toFixed(2).replace(/\.?0+$/, '');
+  }
+
+  function renderSingleDayChart(canvas, dayKey, dayTitle, threshold) {
+    if (!canvas || typeof Chart === 'undefined') return null;
+    const points = gUwUTimeEvents
+      .filter(e => e.dayKey === dayKey && isDayLoginAllowed(e.login))
+      .map(e => ({
+        ...e,
+        hourFloatClamped: Math.max(10, Math.min(22, Number(e.hourFloat) || 0))
+      }))
+      .sort((a, b) => a.hourFloatClamped - b.hourFloatClamped);
+
+    const byLogin = new Map();
+    for (const p of points) {
+      let arr = byLogin.get(p.login);
+      if (!arr) {
+        arr = [];
+        byLogin.set(p.login, arr);
+      }
+      arr.push(p);
+    }
+
+    const palette = [
+      '#7c3aed', '#0ea5e9', '#22c55e', '#f97316', '#db2777', '#14b8a6',
+      '#eab308', '#6366f1', '#ef4444', '#06b6d4', '#84cc16', '#8b5cf6'
+    ];
+    const logins = Array.from(byLogin.keys()).sort((a, b) => {
+      const sa = getSwatDisplayName(a);
+      const sb = getSwatDisplayName(b);
+      return sa.localeCompare(sb, 'ru');
+    });
+
+    const hours = Array.from({ length: 13 }, (_, i) => 10 + i);
+    const hourLabels = hours.map(h => `${String(h).padStart(2, '0')}:00`);
+
+    let maxCumulative = 0;
+    const datasets = logins.map((login, idx) => {
+      const events = (byLogin.get(login) || []).sort((a, b) => a.hourFloatClamped - b.hourFloatClamped);
+      let evIdx = 0;
+      let cumulative = 0;
+      const series = hours.map((hour, i) => {
+        const prev = cumulative;
+        while (evIdx < events.length && Number(events[evIdx].hourFloatClamped) <= hour) {
+          cumulative += Number(events[evIdx].uwuNum) || 0;
+          evIdx += 1;
+        }
+        const delta = cumulative - prev;
+        if (cumulative > maxCumulative) maxCumulative = cumulative;
+        return {
+          x: hourLabels[i],
+          y: cumulative,
+          login,
+          hourLabel: hourLabels[i],
+          delta
+        };
+      });
+
+      return {
+        type: 'line',
+        label: getSwatDisplayName(login),
+        data: series,
+        showLine: true,
+        tension: 0.35,
+        cubicInterpolationMode: 'monotone',
+        stepped: false,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        borderColor: palette[idx % palette.length],
+        backgroundColor: palette[idx % palette.length],
+        borderWidth: 2
+      };
+    });
+
+    const yAxisMax = Math.max(maxCumulative, Number(threshold) || 0) + 200;
+
+    datasets.push({
+      type: 'line',
+      label: `Порог ${threshold}`,
+      data: hourLabels.map(lbl => ({ x: lbl, y: threshold, isThreshold: true })),
+      showLine: true,
+      pointRadius: 0,
+      borderColor: '#64748b',
+      borderWidth: 2,
+      borderDash: [6, 6],
+      order: 999
+    });
+
+    return new Chart(canvas, {
+      type: 'line',
+      data: { labels: hourLabels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          axis: 'x',
+          intersect: false
+        },
+        elements: {
+          line: { tension: 0.35 },
+          point: { radius: 0, hoverRadius: 0 }
+        },
+        scales: {
+          x: {
+            type: 'category',
+            title: { display: true, text: 'Время МСК' },
+            ticks: { autoSkip: false },
+            grid: { color: 'rgba(148,163,184,.25)' }
+          },
+          y: {
+            beginAtZero: true,
+            max: yAxisMax,
+            title: { display: true, text: 'Количество UwU' },
+            grid: { color: 'rgba(148,163,184,.25)' }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            enabled: false,
+            external: (context) => {
+              const { chart, tooltip } = context;
+              const el = getOrCreateDayTooltip(chart);
+              if (!el) return;
+              if (!tooltip || tooltip.opacity === 0) {
+                el.style.opacity = 0;
+                return;
+              }
+
+              const hour = tooltip.title && tooltip.title[0] ? String(tooltip.title[0]) : '';
+              const items = (tooltip.dataPoints || [])
+                .filter(dp => !(dp && dp.raw && dp.raw.isThreshold))
+                .sort((a, b) => Number((b.raw && b.raw.y) || 0) - Number((a.raw && a.raw.y) || 0));
+
+              let html = `
+                <div class="t-title">${escapeHtml(`${dayKey || dayTitle} ${hour}`.trim())}</div>
+                <table class="t-table">
+                  <colgroup>
+                    <col style="width:22.425ch">
+                    <col style="width:7ch">
+                    <col style="width:10ch">
+                    <col style="width:6ch">
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Сотрудник</th>
+                      <th>uWu</th>
+                      <th>Δ</th>
+                      <th>Часы</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+              `;
+              const splitIndex = items.findIndex(it => {
+                const raw = it && it.raw ? it.raw : null;
+                return raw ? Number(raw.y) < Number(threshold) : false;
+              });
+              items.forEach((it, idx) => {
+                const raw = it && it.raw ? it.raw : null;
+                if (!raw) return;
+                if (splitIndex > 0 && idx === splitIndex) html += `<tr class="t-sep"><td colspan="4"></td></tr>`;
+                const name = getSwatDisplayName(raw.login);
+                const y = Number(raw.y || 0);
+                const delta = Number(raw.delta || 0);
+                const sign = delta >= 0 ? '+' : '';
+                const hours = getWorkedDayHours(dayKey, raw.login);
+                const seriesColor = (it && it.dataset && it.dataset.borderColor) ? String(it.dataset.borderColor) : '#94a3b8';
+                html += `
+                  <tr>
+                    <td><span class="t-name"><span class="t-dot" style="background:${seriesColor}"></span>${escapeHtml(name)}</span></td>
+                    <td class="t-sum">${y}</td>
+                    <td class="t-delta">(${sign}${delta})</td>
+                    <td class="t-hours">${formatWorkedDayHours(hours)}</td>
+                  </tr>
+                `;
+              });
+              html += `</tbody></table>`;
+
+              el.innerHTML = html;
+
+              const rect = chart.canvas.getBoundingClientRect();
+              const leftBase = rect.left + tooltip.caretX + 12;
+              const topBase = rect.bottom + 8;
+              el.style.opacity = 1;
+              el.style.left = `${leftBase}px`;
+              el.style.top = `${topBase}px`;
+
+              const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+              const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+              const ew = el.offsetWidth || 0;
+              const eh = el.offsetHeight || 0;
+
+              let left = leftBase;
+              let top = topBase;
+              if (left + ew > vw - 8) left = Math.max(8, rect.left + tooltip.caretX - ew - 12);
+              if (top + eh > vh - 8) top = Math.max(8, vh - eh - 8);
+              el.style.left = `${left}px`;
+              el.style.top = `${top}px`;
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderDaysSummary() {
+    const allDayKeys = new Set([...gCasesByDayLogin.keys(), ...gUwUByDayLogin.keys()]);
+    const ordered = Array.from(allDayKeys).sort();
+    const selected = [
+      { key: 'fri', title: 'Пятница', weekday: 5, chartTitleEl: dayTitleFri, tableTitleEl: dayTableTitleFri, chartEl: dayChartFri, tableEl: dayTableFri },
+      { key: 'sat', title: 'Суббота', weekday: 6, chartTitleEl: dayTitleSat, tableTitleEl: dayTableTitleSat, chartEl: dayChartSat, tableEl: dayTableSat },
+      { key: 'sun', title: 'Воскресенье', weekday: 0, chartTitleEl: dayTitleSun, tableTitleEl: dayTableTitleSun, chartEl: dayChartSun, tableEl: dayTableSun },
+      { key: 'mon', title: 'Понедельник', weekday: 1, chartTitleEl: dayTitleMon, tableTitleEl: dayTableTitleMon, chartEl: dayChartMon, tableEl: dayTableMon }
+    ].map(meta => ({
+      ...meta,
+      dayKey: latestDayKeyByWeekday(ordered, meta.weekday),
+      threshold: thresholdForWeekday(meta.weekday)
+    }));
+
+    for (const slot of selected) {
+      const title = dayLabelWithDate(slot.title, slot.dayKey);
+      if (slot.chartTitleEl) slot.chartTitleEl.textContent = title;
+      if (slot.tableTitleEl) slot.tableTitleEl.textContent = `${title} · порог ${slot.threshold}`;
+    }
+
+    destroyDayCharts();
+    for (const slot of selected) {
+      gDayCharts[slot.key] = renderSingleDayChart(slot.chartEl, slot.dayKey || '', slot.title, slot.threshold);
+      renderDayTable(slot.tableEl, slot.dayKey, slot.threshold);
+    }
+  }
+
+  function updateMainExportButton() {
+    if (!exportExcelBtn) return;
+    exportExcelBtn.textContent = activeTab === 'days' ? 'Выгрузить PDF' : 'Выгрузить Excel';
+  }
+
+  function exportDaysPdf(version) {
+    if (!daysPanel || daysPanel.classList.contains('hidden')) {
+      alert('Открой вкладку «По дням», чтобы выгрузить PDF.');
+      return;
+    }
+    const hasCharts = Object.values(gDayCharts || {}).some(ch => !!ch);
+    if (!hasCharts) {
+      alert('Нет данных для выгрузки. Сначала запусти сбор UwU.');
+      return;
+    }
+
+    const clone = daysPanel.cloneNode(true);
+    clone.classList.remove('hidden');
+    clone.querySelectorAll('.day-chart-tooltip').forEach(t => t.remove());
+
+    const srcCanvases = Array.from(daysPanel.querySelectorAll('canvas'));
+    const cloneCanvases = Array.from(clone.querySelectorAll('canvas'));
+    cloneCanvases.forEach((canvasEl, idx) => {
+      const src = srcCanvases[idx];
+      if (!src) return;
+      let dataUrl = '';
+      try {
+        dataUrl = src.toDataURL('image/png');
+      } catch (e) {
+        return;
+      }
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.alt = src.getAttribute('aria-label') || 'chart';
+      const rect = src.getBoundingClientRect();
+      const w = Math.max(320, Math.round(rect.width || src.width || 640));
+      const h = Math.max(180, Math.round(rect.height || src.height || 240));
+      img.style.width = `${w}px`;
+      img.style.height = `${h}px`;
+      img.style.maxWidth = '100%';
+      img.style.display = 'block';
+      canvasEl.replaceWith(img);
+    });
+
+    const prevTemp = document.getElementById('daysPrintTemp');
+    if (prevTemp && prevTemp.parentNode) prevTemp.parentNode.removeChild(prevTemp);
+
+    const releaseLabel = (version || '').trim();
+    const pdfTitle = releaseLabel ? `${releaseLabel} uWu SWAT` : 'uWu SWAT';
+    const prevDocTitle = document.title;
+
+    const tempRoot = document.createElement('div');
+    tempRoot.id = 'daysPrintTemp';
+    tempRoot.innerHTML = clone.innerHTML;
+    document.body.appendChild(tempRoot);
+
+    const cleanup = () => {
+      document.body.classList.remove('print-days-mode');
+      const cur = document.getElementById('daysPrintTemp');
+      if (cur && cur.parentNode) cur.parentNode.removeChild(cur);
+      window.removeEventListener('afterprint', cleanup);
+      document.title = prevDocTitle;
+    };
+
+    window.addEventListener('afterprint', cleanup);
+    document.body.classList.add('print-days-mode');
+    document.title = pdfTitle;
+    setTimeout(() => {
+      try {
+        window.print();
+      } finally {
+        setTimeout(cleanup, 1500);
+      }
+    }, 60);
+  }
+
+  // ===== Excel =====
+  function ensureXlsx() {
+    if (typeof XLSX === 'undefined') {
+      alert('Библиотека XLSX не загружена, Excel сделать не могу.');
+      return false;
+    }
+    return true;
+  }
+
+  function buildGlobalExcel(version) {
+    if (!ensureXlsx()) return;
+    if (!gPeopleStats.size && !gStreamStats.size) {
+      alert('Нет данных для выгрузки. Сначала запусти сбор UwU.');
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // По сотрудникам
+    const allPeopleRows = [];
+    gPeopleStats.forEach((stats, login) => {
+      const agg = aggregateStats(stats, platformFilter);
+      const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+      allPeopleRows.push({ login, totalCases: agg.totalCases, uwuSum: agg.uwuSum, uwuPresent: agg.uwuPresent, percent });
+    });
+
+    const peopleRows = applyFilterRows(allPeopleRows, 'people')
+      .filter(r => r.totalCases > 0 || r.uwuSum > 0 || r.uwuPresent > 0);
+
+    peopleRows.sort((a, b) => b.uwuSum - a.uwuSum);
+
+    const aoaPeople = [['SWAT логин','SWAT ФИО','Пройдено кейсов','Сумма UwU','% кейсов с UwU']];
+    peopleRows.forEach(r => {
+      const percentRounded = Number(r.percent.toFixed(2));
+      aoaPeople.push([r.login, getSwatDisplayName(r.login), r.totalCases, r.uwuSum, percentRounded]);
+    });
+
+    const wsPeople = XLSX.utils.aoa_to_sheet(aoaPeople);
+    wsPeople['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 18 }, { wch: 12 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsPeople, 'По сотрудникам');
+
+    // По стримам
+    const allStreamRows = [];
+    gStreamStats.forEach((stats, stream) => {
+      const agg = aggregateStats(stats, platformFilter);
+      const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+      allStreamRows.push({ stream, totalCases: agg.totalCases, uwuSum: agg.uwuSum, uwuPresent: agg.uwuPresent, percent });
+    });
+
+    const streamRows = applyFilterRows(allStreamRows, 'streams')
+      .filter(r => r.totalCases > 0 || r.uwuSum > 0 || r.uwuPresent > 0);
+
+    streamRows.sort((a, b) => b.uwuSum - a.uwuSum);
+
+    const aoaStreams = [['Стрим','Пройдено кейсов','Сумма UwU','% кейсов с UwU']];
+    streamRows.forEach(r => {
+      const percentRounded = Number(r.percent.toFixed(2));
+      aoaStreams.push([r.stream, r.totalCases, r.uwuSum, percentRounded]);
+    });
+
+    const wsStreams = XLSX.utils.aoa_to_sheet(aoaStreams);
+    wsStreams['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsStreams, 'По стримам');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const ver = (version || 'unknown').replace(/[^\w.-]+/g,'_');
+
+    a.href = url;
+    a.download = `SWAT_UwU_${ver}_${stamp}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildPersonStreamsExcel(login) {
+    if (!ensureXlsx()) return;
+    const name = getSwatDisplayName(login);
+
+    const rows = [];
+    gStreamSwatStats.forEach((swMap, stream) => {
+      const stats = swMap.get(login);
+      if (stats) {
+        const agg = aggregateStats(stats, platformFilter);
+        if (agg.totalCases || agg.uwuSum || agg.uwuPresent) {
+          const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+          rows.push({ stream, totalCases: agg.totalCases, uwuSum: agg.uwuSum, uwuPresent: agg.uwuPresent, percent });
+        }
+      }
+    });
+
+    if (!rows.length) {
+      alert('Для этого SWAT нет данных по стримам.');
+      return;
+    }
+
+    rows.sort((a, b) => b.uwuSum - a.uwuSum);
+
+    const wb = XLSX.utils.book_new();
+    const aoa = [['SWAT логин','SWAT ФИО','Стрим','Пройдено кейсов','Сумма UwU','% кейсов с UwU']];
+    rows.forEach(r => {
+      const percentRounded = Number(r.percent.toFixed(2));
+      aoa.push([login, name, r.stream, r.totalCases, r.uwuSum, percentRounded]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Стримы SWAT');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const safeLogin = login.replace(/[^\w.-]+/g,'_');
+    a.href = url;
+    a.download = `SWAT_${safeLogin}_streams.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildPersonCasesExcel(login) {
+    if (!ensureXlsx()) return;
+    const details = gCaseDetails.get(login) || [];
+    if (!details.length) {
+      alert('Для этого SWAT нет данных по кейсам.');
+      return;
+    }
+
+    const name = getSwatDisplayName(login);
+    const wb = XLSX.utils.book_new();
+    const sorted = [...details].sort((a, b) => b.uwuNum - a.uwuNum);
+
+    const aoa = [['SWAT логин','SWAT ФИО','testCaseId','UwU']];
+    sorted.forEach(d => aoa.push([login, name, d.testCaseId, d.uwuNum]));
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 14 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Кейсы SWAT');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const safeLogin = login.replace(/[^\w.-]+/g,'_');
+    a.href = url;
+    a.download = `SWAT_${safeLogin}_cases.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildStreamExcel(stream) {
+    if (!ensureXlsx()) return;
+
+    const swMap = gStreamSwatStats.get(stream) || new Map();
+    if (!swMap.size) {
+      alert('Для этого стрима нет данных.');
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const aoa = [['Стрим','SWAT логин','SWAT ФИО','Пройдено кейсов','Сумма UwU','% кейсов с UwU']];
+
+    const rows = [];
+    swMap.forEach((stats, login) => {
+      const agg = aggregateStats(stats, platformFilter);
+      if (agg.totalCases || agg.uwuSum || agg.uwuPresent) {
+        const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+        rows.push({ login, totalCases: agg.totalCases, uwuSum: agg.uwuSum, uwuPresent: agg.uwuPresent, percent });
+      }
+    });
+
+    if (!rows.length) {
+      alert('Для этого стрима нет данных.');
+      return;
+    }
+
+    rows.sort((a, b) => b.uwuSum - a.uwuSum);
+    rows.forEach(r => {
+      const percentRounded = Number(r.percent.toFixed(2));
+      aoa.push([stream, r.login, getSwatDisplayName(r.login), r.totalCases, r.uwuSum, percentRounded]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 26 }, { wch: 18 }, { wch: 12 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'SWAT по стриму');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const safeStream = String(stream || 'stream').replace(/[^\w.-]+/g,'_');
+    a.href = url;
+    a.download = `SWAT_stream_${safeStream}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ===== Детали =====
+  const detailPersonTabsBlock = detailPersonTabs;
+
+  function setDetailPersonTab(tab) {
+    detailPersonActiveTab = tab;
+    if (!detailPersonTabsBlock) return;
+
+    if (tab === 'streams') {
+      detailPersonStreams.classList.remove('hidden');
+      detailPersonCases.classList.add('hidden');
+      detailTabPersonStreams.setAttribute('data-selected','true');
+      detailTabPersonCases.setAttribute('data-selected','false');
+      detailTabPersonStreams.classList.add('detail-tab-active');
+      detailTabPersonCases.classList.remove('detail-tab-active');
+      if (detailExport) detailExport.textContent = 'Скачать Excel (по стримам)';
+    } else {
+      detailPersonStreams.classList.add('hidden');
+      detailPersonCases.classList.remove('hidden');
+      detailTabPersonStreams.setAttribute('data-selected','false');
+      detailTabPersonCases.setAttribute('data-selected','true');
+      detailTabPersonStreams.classList.remove('detail-tab-active');
+      detailTabPersonCases.classList.add('detail-tab-active');
+      if (detailExport) detailExport.textContent = 'Скачать Excel (по тест кейсам)';
+    }
+  }
+
+  function openPersonDetail(login) {
+    const name = getSwatDisplayName(login);
+    detailContext = { type: 'person', key: login };
+    detailTitle.textContent = `Детали по SWAT: ${name}`;
+    if (detailTargetStream) {
+      const ts = gSwatTargetStreamMap.get(normalizeLogin(login)) || '—';
+      detailTargetStream.textContent = `Целевой стрим: ${ts}`;
+    }
+    if (detailExport) detailExport.textContent = 'Скачать Excel (по стримам)';
+
+    if (detailPersonTabsBlock) detailPersonTabsBlock.classList.remove('hidden');
+    detailPerson.classList.remove('hidden');
+    detailStream.classList.add('hidden');
+    setDetailPersonTab('streams');
+
+    // По стримам для конкретного SWAT
+    detailTablePersonStreams.innerHTML = `
+      <thead>
+        <tr>
+          <th data-sort-key="name">Стрим <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="cases">Пройдено кейсов <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="uwu">Сумма UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="percent">% кейсов с UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="hours">Ч/Ч <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const headStreams = detailTablePersonStreams.querySelector('thead tr');
+    attachSortHandlers(headStreams, 'detail-person-streams', () => {
+      if (detailContext && detailContext.type === 'person') {
+        openPersonDetail(detailContext.key);
+      }
+    });
+
+    const tbodyStreams = detailTablePersonStreams.querySelector('tbody');
+    const rows = [];
+
+    gStreamSwatStats.forEach((swMap, stream) => {
+      const stats = swMap.get(login);
+      if (stats) {
+        const agg = aggregateStats(stats, platformFilter);
+        if (agg.totalCases || agg.uwuSum || agg.uwuPresent || agg.durTotalMs) {
+          const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+          rows.push({
+            stream,
+            totalCases: agg.totalCases,
+            uwuSum: agg.uwuSum,
+            uwuPresent: agg.uwuPresent,
+            percent,
+            durMs: agg.durTotalMs || 0
+          });
+        }
+      }
+    });
+
+    const sortedStreams = sortRows(rows, 'detail-person-streams');
+
+    if (!sortedStreams.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="text-center text-slate-500 py-3">Данных нет</td>';
+      tbodyStreams.appendChild(tr);
+      updateTotalsContainer(detailTotalsPersonStreams, [], detailTablePersonStreams);
+    } else {
+      sortedStreams.forEach(r => {
+        const percentStr = r.totalCases > 0 ? (r.percent).toFixed(1) + '%' : '0.0%';
+        const hhmm = formatHours(r.durMs);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="wrap">${r.stream}</td>
+          <td>${r.totalCases}</td>
+          <td>${formatUwU(r.uwuSum)}</td>
+          <td>${percentStr}</td>
+          <td>${hhmm}</td>
+        `;
+        tbodyStreams.appendChild(tr);
+      });
+      updateTotalsContainer(detailTotalsPersonStreams, sortedStreams, detailTablePersonStreams);
+    }
+
+    // По тест кейсам (сортировка по убыванию UwU)
+    const details = gCaseDetails.get(login) || [];
+    const sortedDetails = [...details].sort((a, b) => b.uwuNum - a.uwuNum);
+
+    detailTablePersonCases.innerHTML = `
+      <thead>
+        <tr>
+          <th>SWAT (ФИО)</th>
+          <th>testCaseId</th>
+          <th>UwU</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const tbodyCases = detailTablePersonCases.querySelector('tbody');
+
+    if (!sortedDetails.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="3" class="text-center text-slate-500 py-3">Кейсов не найдено</td>';
+      tbodyCases.appendChild(tr);
+    } else {
+      sortedDetails.forEach(d => {
+        const allureUrl = `${BASE_URL}/project/${PROJECT_ID}/test-cases/${d.testCaseId}?treeId=14`;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="mono whitespace-nowrap">${name}</td>
+          <td><a href="${allureUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-700 hover:underline">${d.testCaseId}</a></td>
+          <td>${formatUwU(d.uwuNum)}</td>
+        `;
+        tbodyCases.appendChild(tr);
+      });
+    }
+
+    detailModal.style.display = 'flex';
+  }
+
+  function openStreamDetail(stream) {
+    const swMap = gStreamSwatStats.get(stream) || new Map();
+    detailContext = { type: 'stream', key: stream };
+
+    if (detailExport) detailExport.textContent = 'Скачать Excel';
+    detailTitle.textContent = `Детали по стриму: ${stream}`;
+
+    if (detailPersonTabsBlock) detailPersonTabsBlock.classList.add('hidden');
+    detailPerson.classList.add('hidden');
+    detailStream.classList.remove('hidden');
+
+    detailTableStream.innerHTML = `
+      <thead>
+        <tr>
+          <th data-sort-key="name">SWAT (ФИО) <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="cases">Пройдено кейсов <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="uwu">Сумма UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="percent">% кейсов с UwU <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+          <th data-sort-key="hours">Ч/Ч <span class="sort-arrows"><span class="sort-arrow sort-up">▲</span><span class="sort-arrow sort-down">▼</span></span></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const head = detailTableStream.querySelector('thead tr');
+    attachSortHandlers(head, 'detail-stream', () => {
+      if (detailContext && detailContext.type === 'stream') {
+        openStreamDetail(detailContext.key);
+      }
+    });
+
+    const tbody = detailTableStream.querySelector('tbody');
+    const rows = [];
+
+    swMap.forEach((stats, login) => {
+      const agg = aggregateStats(stats, platformFilter);
+      if (agg.totalCases || agg.uwuSum || agg.uwuPresent || agg.durTotalMs) {
+        const percent = agg.totalCases > 0 ? (agg.uwuPresent / agg.totalCases) * 100 : 0;
+        rows.push({
+          login,
+          totalCases: agg.totalCases,
+          uwuSum: agg.uwuSum,
+          uwuPresent: agg.uwuPresent,
+          percent,
+          durMs: agg.durTotalMs || 0
+        });
+      }
+    });
+
+    const sorted = sortRows(rows, 'detail-stream');
+
+    if (!sorted.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="5" class="text-center text-slate-500 py-3">Данных нет</td>';
+      tbody.appendChild(tr);
+      updateTotalsContainer(detailTotalsStream, [], detailTableStream);
+    } else {
+      sorted.forEach(r => {
+        const percentStr = r.totalCases > 0 ? (r.percent).toFixed(1) + '%' : '0.0%';
+        const displayName = getSwatDisplayName(r.login);
+        const hhmm = formatHours(r.durMs);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="mono whitespace-nowrap">${displayName}</td>
+          <td>${r.totalCases}</td>
+          <td>${formatUwU(r.uwuSum)}</td>
+          <td>${percentStr}</td>
+          <td>${hhmm}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      updateTotalsContainer(detailTotalsStream, sorted, detailTableStream);
+    }
+
+    detailModal.style.display = 'flex';
+  }
+
+  detailBack.addEventListener('click', () => {
+    detailModal.style.display = 'none';
+    detailContext = null;
+  });
+
+  if (detailModal) {
+    detailModal.addEventListener('click', (e) => {
+      if (e.target === detailModal) {
+        detailModal.style.display = 'none';
+        detailContext = null;
+      }
+    });
+  }
+
+  if (detailTabPersonStreams) {
+    detailTabPersonStreams.addEventListener('click', () => setDetailPersonTab('streams'));
+  }
+  if (detailTabPersonCases) {
+    detailTabPersonCases.addEventListener('click', () => setDetailPersonTab('cases'));
+  }
+
+  if (detailExport) {
+    detailExport.addEventListener('click', () => {
+      if (!detailContext) return;
+      if (detailContext.type === 'person') {
+        if (detailPersonActiveTab === 'streams') buildPersonStreamsExcel(detailContext.key);
+        else buildPersonCasesExcel(detailContext.key);
+      } else if (detailContext.type === 'stream') {
+        buildStreamExcel(detailContext.key);
+      }
+    });
+  }
+
+  // ===== Платформа в фильтрах =====
+  function updatePlatformButtons() {
+    if (!btnPlatformAndroid || !btnPlatformiOS) return;
+    btnPlatformAndroid.classList.toggle('detail-tab-active', modalPlatformFilter === 'Android');
+    btnPlatformiOS.classList.toggle('detail-tab-active', modalPlatformFilter === 'iOS');
+  }
+
+  if (btnPlatformAndroid) {
+    btnPlatformAndroid.addEventListener('click', () => {
+      modalPlatformFilter = modalPlatformFilter === 'Android' ? null : 'Android';
+      updatePlatformButtons();
+    });
+  }
+  if (btnPlatformiOS) {
+    btnPlatformiOS.addEventListener('click', () => {
+      modalPlatformFilter = modalPlatformFilter === 'iOS' ? null : 'iOS';
+      updatePlatformButtons();
+    });
+  }
+
+  // ===== Фильтр =====
+  function openFilterModal() {
+    if (activeTab === 'days') return;
+    const f = filters[activeTab] || { name: '', uwuMin: '', uwuMax: '' };
+    filterTitle.textContent = activeTab === 'people' ? 'Фильтр по сотрудникам' : 'Фильтр по стримам';
+    filterNameLabel.textContent = activeTab === 'people' ? 'SWAT (ФИО)' : 'Стрим';
+
+    filterNameInput.value = f.name || '';
+    filterUwuMin.value = f.uwuMin !== '' ? f.uwuMin : '';
+    filterUwuMax.value = f.uwuMax !== '' ? f.uwuMax : '';
+
+    filterNameList.innerHTML = '';
+    if (activeTab === 'people') {
+      gPeopleStats.forEach((_v, login) => {
+        const opt = document.createElement('option');
+        opt.value = getSwatDisplayName(login);
+        filterNameList.appendChild(opt);
+      });
+    } else {
+      gStreamStats.forEach((_v, stream) => {
+        const opt = document.createElement('option');
+        opt.value = stream;
+        filterNameList.appendChild(opt);
+      });
+    }
+
+    modalPlatformFilter = platformFilter;
+    updatePlatformButtons();
+    filterModal.style.display = 'flex';
+  }
+
+  function closeFilterModal() {
+    filterModal.style.display = 'none';
+  }
+
+  filterBtn.addEventListener('click', openFilterModal);
+  filterClose.addEventListener('click', closeFilterModal);
+
+  if (filterModal) {
+    filterModal.addEventListener('click', (e) => {
+      if (e.target === filterModal) closeFilterModal();
+    });
+  }
+
+  filterSave.addEventListener('click', () => {
+    const name = (filterNameInput.value || '').trim();
+    const uwuMin = filterUwuMin.value !== '' ? Number(filterUwuMin.value) : '';
+    const uwuMax = filterUwuMax.value !== '' ? Number(filterUwuMax.value) : '';
+
+    filters[activeTab] = { name, uwuMin, uwuMax };
+    platformFilter = modalPlatformFilter;
+    filters.platform = platformFilter;
+
+    try { localStorage.setItem(LS_FILTER_KEY, JSON.stringify(filters)); } catch(e) {}
+    closeFilterModal();
+    renderCurrentTab();
+  });
+
+  function resetCurrentFilter() {
+    if (activeTab === 'days') return;
+    filters[activeTab] = { name: '', uwuMin: '', uwuMax: '' };
+    platformFilter = null;
+    modalPlatformFilter = null;
+    filters.platform = null;
+
+    updatePlatformButtons();
+    try { localStorage.setItem(LS_FILTER_KEY, JSON.stringify(filters)); } catch(e) {}
+    renderCurrentTab();
+  }
+
+  filterReset.addEventListener('click', () => {
+    resetCurrentFilter();
+    closeFilterModal();
+  });
+
+  filterResetInline.addEventListener('click', resetCurrentFilter);
+
+  // ===== Вкладки =====
+  function setActiveTab(tab) {
+    activeTab = tab;
+    tabPeople.setAttribute('aria-selected', tab === 'people' ? 'true' : 'false');
+    tabStreams.setAttribute('aria-selected', tab === 'streams' ? 'true' : 'false');
+    if (tabDays) tabDays.setAttribute('aria-selected', tab === 'days' ? 'true' : 'false');
+    if (summaryPanel) summaryPanel.classList.toggle('hidden', tab === 'days');
+    if (daysPanel) daysPanel.classList.toggle('hidden', tab !== 'days');
+    if (filterBtn) filterBtn.classList.toggle('hidden', tab === 'days');
+    if (filterResetInline) filterResetInline.classList.toggle('hidden', tab === 'days');
+    if (daysFilterDropdown && tab !== 'days') daysFilterDropdown.classList.remove('open');
+    updateMainExportButton();
+    renderCurrentTab();
+  }
+
+  tabPeople.addEventListener('click', () => setActiveTab('people'));
+  tabStreams.addEventListener('click', () => setActiveTab('streams'));
+  if (tabDays) tabDays.addEventListener('click', () => setActiveTab('days'));
+
+  // ===== Основной запуск =====
+  async function run() {
+    if (isRunning) return;
+
+    const token = (tokenInput.value || '').trim();
+    const version = applyReleaseVersionNormalization();
+
+    if (!token || !version) {
+      alert('Нужны и версия релиза, и API токен.');
+      return;
+    }
+
+    try { localStorage.setItem(LS_TOKEN_KEY, token); } catch(e) {}
+    try { localStorage.setItem(LS_RELEASE, version); } catch(e) {}
+
+    isRunning = true;
+    const signal = window.__swatAbort?.signal || null;
+
+    setProgress(0);
+    setStatus('Читаю SWAT…');
+    uwuCache.clear();
+    gWorkedHoursByDayLogin = new Map();
+
+    try {
+      const swUrl = new URL(SWAT_ENDPOINT);
+      swUrl.searchParams.set('release', version);
+      const res = await fetch(swUrl.toString(), { signal });
+      if (!res.ok) {
+        throw new Error('Не удалось загрузить SWAT (HTTP ' + res.status + ')');
+      }
+
+      const swJson = await res.json();
+
+      const swatSet = new Set();
+      const swatNameMap = new Map();
+      const swatTargetStreamMap = new Map();
+      const swatDaysMap = new Map();
+      const workedHoursByDayLogin = new Map();
+
+      const swatList = (((swJson || {}).worked_SWAT || {}).login) || [];
+      if (Array.isArray(swatList)) {
+        for (const it of swatList) {
+          const loginNorm = normalizeLogin(it && it.login);
+          if (!loginNorm) continue;
+          swatSet.add(loginNorm);
+
+          const fullName = (it && it.full_name) ? String(it.full_name).trim() : '';
+          swatNameMap.set(loginNorm, fullName || String((it && it.login) || loginNorm));
+
+          const targetStream = (it && it.stream) ? String(it.stream).trim() : '';
+          if (targetStream) swatTargetStreamMap.set(loginNorm, targetStream);
+        }
+      }
+
+      const workedDays = (swJson && swJson.worked_days) ? swJson.worked_days : null;
+      if (workedDays && typeof workedDays === 'object') {
+        for (const [rawDay, dayObj] of Object.entries(workedDays)) {
+          const dayKey = normalizeDayKey(rawDay);
+          const loginsObj = dayObj && dayObj.login;
+          if (!loginsObj || typeof loginsObj !== 'object') continue;
+          for (const [k, h] of Object.entries(loginsObj)) {
+            const loginNorm = normalizeLogin(k);
+            if (!loginNorm) continue;
+            swatDaysMap.set(loginNorm, (swatDaysMap.get(loginNorm) || 0) + 1);
+            if (!dayKey) continue;
+            const hoursNum = Number(h);
+            if (!Number.isFinite(hoursNum)) continue;
+            let dayMap = workedHoursByDayLogin.get(dayKey);
+            if (!dayMap) {
+              dayMap = new Map();
+              workedHoursByDayLogin.set(dayKey, dayMap);
+            }
+            dayMap.set(loginNorm, hoursNum);
+          }
+        }
+      }
+
+      gSwatNameMap = swatNameMap;
+      gSwatTargetStreamMap = swatTargetStreamMap;
+      gSwatDaysMap = swatDaysMap;
+      gWorkedHoursByDayLogin = workedHoursByDayLogin;
+      // Показываем ФИО в фильтре "По дням" сразу после загрузки SWAT-списка.
+      refreshDaysFilterOptionsFromCurrentData();
+
+      if (!swatSet.size) {
+        if (!confirm('SWAT-список пустой, продолжать?')) {
+          setStatus('Операция отменена: пустой SWAT');
+          return;
+        }
+      }
+
+      setProgress(5);
+      setStatus('Ищу лаунчи Smoke/Selective…');
+
+      const launches = await findLaunches(version, token, signal);
+      if (!launches.length) {
+        setStatus('Лаунчи не найдены.');
+        gPeopleStats = new Map();
+        gStreamStats = new Map();
+        gCasesByDayLogin = new Map();
+        gUwUByDayLogin = new Map();
+        gUwUTimeEvents = [];
+        refreshDaysFilterOptionsFromCurrentData();
+        renderCurrentTab();
+        return;
+      }
+
+      const peopleStatsMap = new Map();
+      const caseDetails = new Map();
+      const streamStatsMap = new Map();
+      const streamSwatStats = new Map();
+      const timelineStartsByLaunchLogin = new Map(); // launchId -> Map(login -> [startMs...])
+      const casesByDayLogin = new Map();             // dayKey -> Map(login -> cases)
+      const uwuByDayLogin = new Map();               // dayKey -> Map(login -> sumUwU)
+      const uwuTimeEvents = [];                      // chart events
+
+      setStatus(`Найдено лаунчей: ${launches.length}. Читаю тест-кейсы…`);
+
+      let allLeaf = [];
+      let processedLaunches = 0;
+
+      for (const L of launches) {
+        const id = Number(L.id);
+        if (Number.isNaN(id)) continue;
+
+        const launchName = L.name || '';
+        const streamName = extractStreamName(launchName);
+        const platformName = extractPlatformFromLaunchName(launchName);
+
+        // Человек-часы по этому лаунчу
+        try {
+          const msData = await apiGet(`/api/launch/${id}/memberstats`, token, { size: 1000, page: 0 }, signal);
+          const members = (msData && msData.content) || [];
+
+          members.forEach(ms => {
+            const assignee = normalizeLogin(ms.assignee);
+            if (!assignee || !swatSet.has(assignee)) return;
+
+            const durMs = Number(ms.durationSum) || 0;
+            if (!durMs) return;
+
+            let pStats = peopleStatsMap.get(assignee);
+            if (!pStats) {
+              pStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+              peopleStatsMap.set(assignee, pStats);
+            }
+            addDurationStats(pStats, durMs, platformName);
+
+            let sStats = streamStatsMap.get(streamName);
+            if (!sStats) {
+              sStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+              streamStatsMap.set(streamName, sStats);
+            }
+            addDurationStats(sStats, durMs, platformName);
+
+            let swMap = streamSwatStats.get(streamName);
+            if (!swMap) {
+              swMap = new Map();
+              streamSwatStats.set(streamName, swMap);
+            }
+
+            let swStats = swMap.get(assignee);
+            if (!swStats) {
+              swStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+              swMap.set(assignee, swStats);
+            }
+            addDurationStats(swStats, durMs, platformName);
+          });
+        } catch(e) {
+          console.error('memberstats error for launch', id, e);
+        }
+
+        const items = await listLeaf(id, token, signal);
+        items.forEach(it => {
+          it._launchId = id;
+          it._launchName = launchName;
+          it._streamName = streamName;
+          it._platform = platformName;
+          it._launchStart = Number(L.start || L.startTime || L.createdDate || 0);
+        });
+
+        // Timeline (по аналогии с SWAT релиз) для агрегирования кейсов по дням.
+        try {
+          const tl = await fetchTimeline(id, token, signal);
+          const rootGroups = Array.isArray(tl && tl.groups) ? tl.groups : [];
+          const startsByLogin = new Map();
+          for (const g of rootGroups) {
+            walkTimelineGroups(g, (leaf) => {
+              const testedBy = normalizeLogin(leaf && leaf.testedBy);
+              if (!testedBy || !swatSet.has(testedBy)) return;
+              const startMs = Number(leaf && leaf.start) || 0;
+              if (!startMs) return;
+
+              let arr = startsByLogin.get(testedBy);
+              if (!arr) {
+                arr = [];
+                startsByLogin.set(testedBy, arr);
+              }
+              arr.push(startMs);
+            });
+          }
+          startsByLogin.forEach(arr => arr.sort((a, b) => a - b));
+          timelineStartsByLaunchLogin.set(id, startsByLogin);
+        } catch (e) {
+          console.error('timeline error for launch', id, e);
+        }
+
+        allLeaf = allLeaf.concat(items);
+        processedLaunches += 1;
+
+        const p = 5 + Math.round((processedLaunches / launches.length) * 25);
+        setProgress(p);
+        setStatus(`Читаю тест-кейсы… (${processedLaunches}/${launches.length})`);
+      }
+
+      setStatus(`Всего leaf-результатов: ${allLeaf.length}. Фильтрую SWAT…`);
+
+      const swatItems = allLeaf.filter(item => {
+        const tb = normalizeLogin(item.testedBy);
+        if (!tb || !swatSet.has(tb)) return false;
+        if (item.testCaseId == null) return false;
+        return true;
+      });
+
+      if (!swatItems.length) {
+        setStatus('SWAT-кейсов не найдено.');
+        gPeopleStats = new Map();
+        gStreamStats = new Map();
+        gCasesByDayLogin = new Map();
+        gUwUByDayLogin = new Map();
+        gUwUTimeEvents = [];
+        refreshDaysFilterOptionsFromCurrentData();
+        renderCurrentTab();
+        return;
+      }
+
+      setStatus(`SWAT-кейсов: ${swatItems.length}. Считаю UwU…`);
+
+      const concurrency = 10;
+      let index = 0;
+      let done = 0;
+
+      async function worker() {
+        while (true) {
+          const myIndex = index++;
+          if (myIndex >= swatItems.length) break;
+
+          const item = swatItems[myIndex];
+          const login = normalizeLogin(item.testedBy);
+          const tcid = Number(item.testCaseId);
+
+          if (!login || Number.isNaN(tcid)) {
+            done++;
+            continue;
+          }
+
+          const info = await getUwU(tcid, token, signal);
+          const uwuNum = parseUwUNumber(info.uwuRaw);
+          const hasUwU = uwuNum > 0 ? 1 : 0;
+
+          const platformValue = item._platform || null;
+          const streamName = item._streamName || extractStreamName(item._launchName || '');
+          const launchId = Number(item._launchId) || 0;
+
+          // Берём время кейса из leaf, либо из timeline очереди того же launch/login.
+          let startMs = Number(item.start || item.startTime || item.time || 0);
+          if (!startMs && launchId) {
+            const startsByLogin = timelineStartsByLaunchLogin.get(launchId);
+            const queue = startsByLogin ? startsByLogin.get(login) : null;
+            if (queue && queue.length) {
+              startMs = Number(queue.shift() || 0);
+            }
+          }
+          if (!startMs) {
+            startMs = Number(item._launchStart || 0);
+          }
+          if (startMs) {
+            const dayKey = toMskDateKeyFromEpochMs(startMs);
+            incNestedMap(casesByDayLogin, dayKey, login, 1);
+            incNestedMap(uwuByDayLogin, dayKey, login, uwuNum);
+
+            const hourFloat = toMskHourFloat(startMs);
+            if (uwuNum > 0 && hourFloat >= 10 && hourFloat <= 22) {
+              uwuTimeEvents.push({
+                dayKey,
+                login,
+                uwuNum,
+                hourFloat,
+                timeLabel: toMskTimeLabel(startMs)
+              });
+            }
+          }
+
+          let pStats = peopleStatsMap.get(login);
+          if (!pStats) {
+            pStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+            peopleStatsMap.set(login, pStats);
+          }
+          addToPlatformStats(pStats, uwuNum, hasUwU, platformValue);
+
+          let list = caseDetails.get(login);
+          if (!list) {
+            list = [];
+            caseDetails.set(login, list);
+          }
+          list.push({ testCaseId: tcid, uwuNum });
+
+          let sStats = streamStatsMap.get(streamName);
+          if (!sStats) {
+            sStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+            streamStatsMap.set(streamName, sStats);
+          }
+          addToPlatformStats(sStats, uwuNum, hasUwU, platformValue);
+
+          let swMap = streamSwatStats.get(streamName);
+          if (!swMap) {
+            swMap = new Map();
+            streamSwatStats.set(streamName, swMap);
+          }
+
+          let swStats = swMap.get(login);
+          if (!swStats) {
+            swStats = { totalCases: 0, uwuSum: 0, uwuPresent: 0 };
+            swMap.set(login, swStats);
+          }
+          addToPlatformStats(swStats, uwuNum, hasUwU, platformValue);
+
+          done++;
+          if (done % 10 === 0 || done === swatItems.length) {
+            const p = 30 + Math.round((done / swatItems.length) * 70);
+            setProgress(p);
+            setStatus(`Обработано SWAT-кейсов: ${done}/${swatItems.length}`);
+          }
+        }
+      }
+
+      const workers = [];
+      for (let i = 0; i < concurrency; i++) workers.push(worker());
+      await Promise.all(workers);
+
+      gPeopleStats = peopleStatsMap;
+      gCaseDetails = caseDetails;
+      gStreamStats = streamStatsMap;
+      gStreamSwatStats = streamSwatStats;
+      gCasesByDayLogin = casesByDayLogin;
+      gUwUByDayLogin = uwuByDayLogin;
+      gUwUTimeEvents = uwuTimeEvents;
+
+      refreshDaysFilterOptionsFromCurrentData();
+      setStatus('Готово. Можно смотреть отчёт и выгружать результат.');
+      renderCurrentTab();
+      showToast('UwU-отчёт собран');
+      setProgress(100);
+
+    } catch (e) {
+      const aborted = !!(e && (e.name === 'AbortError' || String(e).includes('Aborted')));
+      if (aborted) {
+        setStatus('Остановлено пользователем');
+        showToast('Сбор остановлен');
+      } else {
+        console.error(e);
+        setStatus('Ошибка: ' + e.message);
+        showToast('Ошибка при выполнении: ' + e.message);
+        setProgress(0);
+      }
+    } finally {
+      isRunning = false;
+    }
+  }
+
+  runBtn.addEventListener('click', async () => {
+    setRunning(true);
+    try {
+      await run();
+    } finally {
+      setRunning(false);
+    }
+  });
+
+  stopBtn?.addEventListener('click', () => {
+    try { window.__swatAbort?.abort(); } catch (e) {}
+  });
+
+  if (exportExcelBtn) {
+    exportExcelBtn.addEventListener('click', () => {
+      const version = applyReleaseVersionNormalization();
+      if (activeTab === 'days') exportDaysPdf(version);
+      else buildGlobalExcel(version);
+    });
+  }
+
+  tokenInput?.addEventListener('input', () => {
+    try { localStorage.setItem(LS_TOKEN_KEY, tokenInput.value || ''); } catch (e) {}
+  });
+  versionInput?.addEventListener('input', () => {
+    try { localStorage.setItem(LS_RELEASE, versionInput.value || ''); } catch (e) {}
+  });
+  versionInput?.addEventListener('blur', () => {
+    applyReleaseVersionNormalization();
+  });
+  versionInput?.addEventListener('change', () => {
+    applyReleaseVersionNormalization();
+  });
+
+  // Подсказка "i"
+  if (infoBtn && infoPopover) {
+    const msg = infoBtn.getAttribute('title') ||
+      'Клик по SWAT (ФИО) показывает детали его кейсов. Клик по стриму во вкладке «По стримам» показывает вклад SWAT в этом стриме.';
+    infoPopover.textContent = msg;
+
+    const hidePopover = () => infoPopover.classList.add('hidden');
+
+    infoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (infoPopover.classList.contains('hidden')) {
+        const rect = infoBtn.getBoundingClientRect();
+        const margin = 8;
+        let top = rect.bottom + margin;
+        let left = rect.left;
+
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+        const maxWidth = 260;
+
+        if (left + maxWidth + margin > viewportWidth) left = viewportWidth - maxWidth - margin;
+        if (left < margin) left = margin;
+
+        infoPopover.style.top = `${top}px`;
+        infoPopover.style.left = `${left}px`;
+        infoPopover.classList.remove('hidden');
+      } else {
+        hidePopover();
+      }
+    });
+
+    infoPopover.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', hidePopover);
+  }
+
+  // Init from storage
+  (function initFromStorage(){
+    try {
+      const savedToken = localStorage.getItem(LS_TOKEN_KEY);
+      if (savedToken) tokenInput.value = savedToken;
+    } catch(e) {}
+    try {
+      const savedRelease = localStorage.getItem(LS_RELEASE);
+      if (savedRelease) {
+        versionInput.value = savedRelease;
+        applyReleaseVersionNormalization();
+      }
+    } catch(e) {}
+
+    try {
+      const savedFilters = localStorage.getItem(LS_FILTER_KEY);
+      if (savedFilters) {
+        const obj = JSON.parse(savedFilters);
+        if (obj && obj.people && obj.streams) {
+          filters.people = obj.people;
+          filters.streams = obj.streams;
+          if (Object.prototype.hasOwnProperty.call(obj, 'platform')) {
+            filters.platform = obj.platform;
+            platformFilter = obj.platform;
+          }
+        }
+      }
+    } catch(e) {}
+
+    // сортировки должны быть видимы сразу (до кликов по вкладкам)
+    initSummarySortHeader();
+    refreshDaysFilterOptionsFromCurrentData();
+    updateMainExportButton();
+    updateFilterBadge();
+  })();
+})();
+</script>
+</body>
+</html>

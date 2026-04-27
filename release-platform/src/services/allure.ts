@@ -27,6 +27,7 @@ export interface AllureLaunchStatisticItem {
 
 export interface AllureLaunchMemberStatItem {
   id?: string;           // primary field in Allure TestOps (matches testedBy/assignee)
+  assignee?: string;     // primary assignee field in legacy memberstats
   login?: string;        // alternate
   displayName?: string;
   name?: string;         // alternate displayName
@@ -63,6 +64,9 @@ export interface DashboardAggregateResult {
   activePeopleCount: number;
   activePeopleLogins: string[];
   launchCreatedTs: number | null; // earliest createdDate of labeled launches
+  manualTimedFinished: number;
+  manualWindowStartTs: number | null;
+  manualWindowStopTs: number | null;
 }
 
 export interface ReadinessLaunchSummary {
@@ -94,6 +98,18 @@ interface DashboardLaunchCacheEntry {
   assignedUnfinished: number;
   manualFinished: number;
   uwu: DashboardUwuCounts | null;
+  activeTesterLogins: string[];
+  manualTimedFinished: number;
+  manualWindowStartTs: number | null;
+  manualWindowStopTs: number | null;
+}
+
+interface DashboardCachedManualActivity {
+  timedFinishedCount: number;
+  windowStartTs: number | null;
+  windowStopTs: number | null;
+  recentCompletedLogins: string[];
+  inProgressAssignedLogins: string[];
 }
 
 interface DashboardReleaseCache {
@@ -101,6 +117,7 @@ interface DashboardReleaseCache {
   savedAt: number;
   launches: Record<string, DashboardLaunchCacheEntry>;
   readiness?: ReadinessLaunchSummary[];
+  manualActivity?: DashboardCachedManualActivity;
 }
 
 function buildAllureHeaders(token: string, extra?: Record<string, string>) {
@@ -143,10 +160,22 @@ function normalizeStatus(raw: unknown) {
   return 'in_progress';
 }
 
+function looksLikeUserLogin(value: string): boolean {
+  if (!value || value.length < 2 || value.length > 64) return false;
+  if (/^\d+$/.test(value)) return false;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return false;
+  return /^[a-zA-Z][a-zA-Z0-9._\-@]{1,63}$/.test(value);
+}
+
+function normalizeUserLogin(value: unknown): string {
+  if (!value || typeof value !== 'string') return '';
+  const login = value.trim().toLowerCase();
+  return looksLikeUserLogin(login) ? login : '';
+}
+
 const COMPLETED_STATUSES = new Set(['passed', 'failed', 'broken', 'skipped']);
 const NON_COMPLETED_STATUSES = new Set(['in_progress']);
-const ALL_ASSIGNED_STATUSES = new Set(['passed', 'failed', 'broken', 'skipped', 'in_progress']);
-const DASHBOARD_RELEASE_CACHE_KEY = 'rp_dashboard_release_cache_v1';
+const DASHBOARD_RELEASE_CACHE_KEY = 'rp_dashboard_release_cache_v8';
 const DASHBOARD_RELEASE_CACHE_LIMIT = 8;
 const DASHBOARD_RELEASE_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14;
 
@@ -173,25 +202,6 @@ export function assignedUnfinishedFromMemberStats(memberStats: AllureLaunchMembe
   return (Array.isArray(memberStats) ? memberStats : []).reduce((sum, item) => {
     return sum + sumByStatuses(item?.statistic, NON_COMPLETED_STATUSES);
   }, 0);
-}
-
-export function completedFromMemberStats(memberStats: AllureLaunchMemberStatItem[] | undefined) {
-  return (Array.isArray(memberStats) ? memberStats : []).reduce((sum, item) => {
-    return sum + sumByStatuses(item?.statistic, COMPLETED_STATUSES);
-  }, 0);
-}
-
-export function activeLoginsFromMemberStats(memberStats: AllureLaunchMemberStatItem[] | undefined): string[] {
-  return (Array.isArray(memberStats) ? memberStats : [])
-    .filter(item => sumByStatuses(item?.statistic, ALL_ASSIGNED_STATUSES) > 0)
-    .map(item => String(item.id || item.login || item.displayName || item.name || '').trim())
-    .filter(Boolean);
-}
-
-export function countActivePeopleFromMemberStats(memberStats: AllureLaunchMemberStatItem[] | undefined): number {
-  return (Array.isArray(memberStats) ? memberStats : []).filter(
-    item => sumByStatuses(item?.statistic, ALL_ASSIGNED_STATUSES) > 0
-  ).length;
 }
 
 function dashboardLabelOf(name: string): DashboardGroupLabel | null {
@@ -242,6 +252,28 @@ function sanitizeDashboardLaunchCacheEntry(raw: unknown): DashboardLaunchCacheEn
     assignedUnfinished: Number(value.assignedUnfinished || 0),
     manualFinished: Number(value.manualFinished || 0),
     uwu: sanitizeDashboardUwu(value.uwu),
+    activeTesterLogins: Array.isArray(value.activeTesterLogins)
+      ? value.activeTesterLogins.map(item => normalizeUserLogin(item)).filter(Boolean)
+      : [],
+    manualTimedFinished: Number(value.manualTimedFinished || 0),
+    manualWindowStartTs: value.manualWindowStartTs == null ? null : Number(value.manualWindowStartTs || 0),
+    manualWindowStopTs: value.manualWindowStopTs == null ? null : Number(value.manualWindowStopTs || 0),
+  };
+}
+
+function sanitizeDashboardManualActivity(raw: unknown): DashboardCachedManualActivity | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const value = raw as Partial<DashboardCachedManualActivity>;
+  return {
+    timedFinishedCount: Number(value.timedFinishedCount || 0),
+    windowStartTs: value.windowStartTs == null ? null : Number(value.windowStartTs || 0),
+    windowStopTs: value.windowStopTs == null ? null : Number(value.windowStopTs || 0),
+    recentCompletedLogins: Array.isArray(value.recentCompletedLogins)
+      ? value.recentCompletedLogins.map(item => normalizeUserLogin(item)).filter(Boolean)
+      : [],
+    inProgressAssignedLogins: Array.isArray(value.inProgressAssignedLogins)
+      ? value.inProgressAssignedLogins.map(item => normalizeUserLogin(item)).filter(Boolean)
+      : [],
   };
 }
 
@@ -286,6 +318,7 @@ function readDashboardReleaseCache(version?: string): DashboardReleaseCache | nu
             .map(sanitizeReadinessSummaryItem)
             .filter((item): item is ReadinessLaunchSummary => Boolean(item))
         : undefined,
+      manualActivity: sanitizeDashboardManualActivity((matched as { manualActivity?: unknown }).manualActivity) ?? undefined,
     };
   } catch {
     return null;
@@ -439,6 +472,8 @@ export function readCachedDashboardAggregate(version?: string): DashboardAggrega
   const uwu = createEmptyDashboardUwuAgg();
   const alerts: DashboardAlertEntry[] = [];
 
+  let minLaunchCreatedTs: number | null = null;
+
   Object.values(cache.launches).forEach(entry => {
     const counts = sanitizeDashboardCounts(entry.counts);
     alerts.push({
@@ -449,18 +484,30 @@ export function readCachedDashboardAggregate(version?: string): DashboardAggrega
     });
 
     if (!entry.label) return;
+    if (entry.createdDate > 0 && (minLaunchCreatedTs === null || entry.createdDate < minLaunchCreatedTs)) {
+      minLaunchCreatedTs = entry.createdDate;
+    }
     mergeDashboardAggRow(agg[entry.label], counts, Number(entry.assignedUnfinished || 0), Number(entry.manualFinished || 0));
     mergeDashboardUwuRow(uwu[entry.label], entry.uwu);
   });
+
+  const manualActivity = cache.manualActivity;
+  const activePeopleLogins = [...new Set([
+    ...(manualActivity?.recentCompletedLogins || []),
+    ...(manualActivity?.inProgressAssignedLogins || []),
+  ])];
 
   return {
     launches,
     agg,
     uwu,
     alerts: alerts.sort((a, b) => b.id - a.id),
-    activePeopleCount: 0,
-    activePeopleLogins: [],
-    launchCreatedTs: null,
+    activePeopleCount: activePeopleLogins.length,
+    activePeopleLogins,
+    launchCreatedTs: minLaunchCreatedTs,
+    manualTimedFinished: Number(manualActivity?.timedFinishedCount || 0),
+    manualWindowStartTs: manualActivity?.windowStartTs ?? null,
+    manualWindowStopTs: manualActivity?.windowStopTs ?? null,
   };
 }
 
@@ -504,8 +551,176 @@ async function mapLimit<T, R>(items: T[], limit: number, worker: (item: T, index
 }
 
 interface AllureLeafItem {
+  id?: number;
   status?: string;
   testCaseId?: number;
+  manual?: boolean | null;
+  testedBy?: string | null;
+  assignee?: string | { id?: string | number; login?: string; displayName?: string; username?: string } | null;
+  start?: number;
+  startTime?: number;
+  time?: number;
+  stop?: number;
+  duration?: number;
+}
+
+function extractAssigneeLogin(leaf: AllureLeafItem): string {
+  if (!leaf.assignee) return '';
+  if (typeof leaf.assignee === 'string') return normalizeUserLogin(leaf.assignee);
+  const a = leaf.assignee;
+  return normalizeUserLogin(a.login) || normalizeUserLogin(a.username) || normalizeUserLogin(a.displayName);
+}
+
+function extractTestedByLogin(leaf: AllureLeafItem): string {
+  if (!leaf.testedBy) return '';
+  return normalizeUserLogin(leaf.testedBy);
+}
+
+function extractResponsibleLogin(leaf: AllureLeafItem): string {
+  const status = normalizeStatus(leaf?.status);
+  if (COMPLETED_STATUSES.has(status)) {
+    return extractTestedByLogin(leaf) || extractAssigneeLogin(leaf);
+  }
+  return extractAssigneeLogin(leaf) || extractTestedByLogin(leaf);
+}
+
+interface DashboardManualActivity {
+  completedCount: number;
+  timedFinishedCount: number;
+  windowStartTs: number | null;
+  windowStopTs: number | null;
+  recentCompletedLogins: string[];
+  inProgressAssignedLogins: string[];
+}
+
+const MOSCOW_UTC_OFFSET_MS = 3 * 3_600_000;
+const BUSINESS_START_HOUR = 10;
+const BUSINESS_END_HOUR = 22;
+
+function subtractBusinessHours(ts: number, businessHours: number) {
+  if (!Number.isFinite(ts) || ts <= 0 || businessHours <= 0) return ts;
+  const dayMs = 24 * 3_600_000;
+  const businessStartMs = BUSINESS_START_HOUR * 3_600_000;
+  const businessEndMs = BUSINESS_END_HOUR * 3_600_000;
+  let msk = ts + MOSCOW_UTC_OFFSET_MS;
+  let remaining = businessHours * 3_600_000;
+
+  const tod0 = ((msk % dayMs) + dayMs) % dayMs;
+  if (tod0 <= businessStartMs) {
+    msk = msk - tod0 - (dayMs - businessEndMs);
+  } else if (tod0 > businessEndMs) {
+    msk = msk - tod0 + businessEndMs;
+  }
+
+  while (remaining > 0) {
+    const tod = ((msk % dayMs) + dayMs) % dayMs;
+    const currentDayStart = msk - tod;
+    const businessStart = currentDayStart + businessStartMs;
+    const businessEnd = currentDayStart + businessEndMs;
+
+    if (tod <= businessStartMs) {
+      msk = currentDayStart - (dayMs - businessEndMs);
+      continue;
+    }
+
+    const available = Math.max(0, msk - businessStart);
+    if (available >= remaining) {
+      msk -= remaining;
+      remaining = 0;
+      break;
+    }
+
+    remaining -= available;
+    msk = currentDayStart - (dayMs - businessEndMs);
+  }
+
+  return msk - MOSCOW_UTC_OFFSET_MS;
+}
+
+function extractLeafStartTs(leaf: AllureLeafItem): number {
+  const candidates = [Number(leaf.start || 0), Number(leaf.startTime || 0), Number(leaf.time || 0)]
+    .filter(value => Number.isFinite(value) && value > 0);
+  return candidates.length ? Math.min(...candidates) : 0;
+}
+
+function extractLeafStopTs(leaf: AllureLeafItem, startTs: number): number {
+  const explicitStop = Number(leaf.stop || 0);
+  if (Number.isFinite(explicitStop) && explicitStop > 0) return explicitStop;
+  const duration = Number(leaf.duration || 0);
+  if (startTs > 0 && Number.isFinite(duration) && duration > 0) return startTs + duration;
+  return startTs;
+}
+
+interface ManualCompletionEvent {
+  login: string;
+  startTs: number;
+  stopTs: number;
+}
+
+function extractManualCompletionEvents(leaves: AllureLeafItem[]) {
+  const events: ManualCompletionEvent[] = [];
+  let completedCount = 0;
+
+  for (const leaf of Array.isArray(leaves) ? leaves : []) {
+    if (leaf?.manual !== true) continue;
+    const status = normalizeStatus(leaf.status);
+    if (!COMPLETED_STATUSES.has(status)) continue;
+
+    const login = extractTestedByLogin(leaf) || extractAssigneeLogin(leaf);
+    if (!login) continue;
+
+    completedCount += 1;
+
+    const startTs = extractLeafStartTs(leaf);
+    const stopTs = extractLeafStopTs(leaf, startTs);
+    if (!startTs || !stopTs || stopTs < startTs) continue;
+    events.push({ login, startTs, stopTs });
+  }
+
+  return { completedCount, events };
+}
+
+function extractAssignedManualLogins(leaves: AllureLeafItem[]) {
+  const logins = new Set<string>();
+  for (const leaf of Array.isArray(leaves) ? leaves : []) {
+    if (leaf?.manual !== true) continue;
+    const status = normalizeStatus(leaf.status);
+    if (COMPLETED_STATUSES.has(status)) continue;
+    const login = extractAssigneeLogin(leaf) || extractTestedByLogin(leaf);
+    if (login) logins.add(login);
+  }
+  return [...logins];
+}
+
+function collectGlobalDashboardManualActivity(
+  completedEvents: ManualCompletionEvent[],
+  inProgressAssignedLogins: Iterable<string>,
+): DashboardManualActivity {
+  const latestStopTs = completedEvents.reduce((max, item) => Math.max(max, item.stopTs), 0);
+  const recentWindowStartTs = latestStopTs > 0 ? subtractBusinessHours(latestStopTs, 8) : 0;
+  const recentCompletedEvents = latestStopTs > 0
+    ? completedEvents.filter(item => item.stopTs >= recentWindowStartTs)
+    : [];
+  const recentCompletedLogins = new Set<string>();
+  recentCompletedEvents.forEach(item => recentCompletedLogins.add(item.login));
+  const assignedLogins = new Set<string>();
+  for (const login of inProgressAssignedLogins) {
+    const normalized = normalizeUserLogin(login);
+    if (normalized) assignedLogins.add(normalized);
+  }
+
+  return {
+    completedCount: completedEvents.length,
+    timedFinishedCount: recentCompletedEvents.length,
+    windowStartTs: recentCompletedEvents.length
+      ? recentCompletedEvents.reduce((min, item) => Math.min(min, item.startTs), recentCompletedEvents[0].startTs)
+      : null,
+    windowStopTs: recentCompletedEvents.length
+      ? recentCompletedEvents.reduce((max, item) => Math.max(max, item.stopTs), recentCompletedEvents[0].stopTs)
+      : null,
+    recentCompletedLogins: [...recentCompletedLogins],
+    inProgressAssignedLogins: [...assignedLogins],
+  };
 }
 
 interface TestCaseCustomField {
@@ -599,15 +814,27 @@ export async function fetchLaunchStats(cfg: AllureConfig, launchId: number) {
   return allureFetch(cfg, `/api/launch/${launchId}/statistic`);
 }
 
-export async function fetchLaunchMemberStats(cfg: AllureConfig, launchId: number) {
-  const data = await allureFetch<{ content?: AllureLaunchMemberStatItem[] } | AllureLaunchMemberStatItem[]>(
-    cfg,
-    `/api/launch/${launchId}/memberstats`,
-    { size: 1000, page: 0 }
-  );
+export async function fetchLaunchMemberStats(cfg: AllureConfig, launchId: number): Promise<AllureLaunchMemberStatItem[]> {
+  const result: AllureLaunchMemberStatItem[] = [];
+  const pageSize = 500;
 
-  if (Array.isArray(data)) return data;
-  return Array.isArray(data?.content) ? data.content : [];
+  for (let page = 0; page < 20; page++) {
+    const data = await allureFetch<{ content?: AllureLaunchMemberStatItem[] } | AllureLaunchMemberStatItem[]>(
+      cfg,
+      `/api/launch/${launchId}/memberstats`,
+      { size: pageSize, page }
+    );
+    const items: AllureLaunchMemberStatItem[] = Array.isArray(data)
+      ? data
+      : (Array.isArray((data as { content?: AllureLaunchMemberStatItem[] })?.content)
+          ? (data as { content: AllureLaunchMemberStatItem[] }).content
+          : []);
+
+    result.push(...items);
+    if (items.length < pageSize) break;
+  }
+
+  return result;
 }
 
 async function fetchLaunchLeafItems(cfg: AllureConfig, launchId: number): Promise<AllureLeafItem[]> {
@@ -673,11 +900,10 @@ async function fetchTestCaseUwU(cfg: AllureConfig, testCaseId: number): Promise<
   return promise;
 }
 
-async function fetchLaunchUwuCounts(cfg: AllureConfig, launchId: number): Promise<DashboardUwuCounts> {
+async function computeLaunchUwuFromLeaves(cfg: AllureConfig, leaves: AllureLeafItem[]): Promise<DashboardUwuCounts> {
   const result: DashboardUwuCounts = { total: 0, done: 0, left: 0 };
-  const leafItems = await fetchLaunchLeafItems(cfg, launchId).catch(() => []);
 
-  await mapLimit(leafItems, 20, async leaf => {
+  await mapLimit(leaves, 20, async leaf => {
     const testCaseId = Number(leaf?.testCaseId || 0);
     if (!testCaseId) return;
 
@@ -693,6 +919,11 @@ async function fetchLaunchUwuCounts(cfg: AllureConfig, launchId: number): Promis
   });
 
   return result;
+}
+
+async function fetchLaunchUwuCounts(cfg: AllureConfig, launchId: number): Promise<DashboardUwuCounts> {
+  const leafItems = await fetchLaunchLeafItems(cfg, launchId).catch(() => []);
+  return computeLaunchUwuFromLeaves(cfg, leafItems);
 }
 
 /* Получить список версий для проекта */
@@ -922,8 +1153,8 @@ export async function fetchDashboardAggregate(
   const nextCacheLaunches = { ...(releaseCache?.launches || {}) };
   const currentLaunchIds = new Set<string>();
   const launchesToRefresh: AllureLaunch[] = [];
-  const allActiveLogins = new Set<string>();
-  let allActivePeopleRawCount = 0; // fallback when logins are empty
+  const refreshedCompletionEvents: ManualCompletionEvent[] = [];
+  const refreshedInProgressAssignedLogins = new Set<string>();
   let minLaunchCreatedTs: number | null = null; // earliest labeled launch creation time
 
   for (const rawLaunch of rawLaunches) {
@@ -954,6 +1185,10 @@ export async function fetchDashboardAggregate(
         assignedUnfinished: 0,
         manualFinished: 0,
         uwu: null,
+        activeTesterLogins: [],
+        manualTimedFinished: 0,
+        manualWindowStartTs: null,
+        manualWindowStopTs: null,
       };
       alerts.push({
         id: launchId,
@@ -994,13 +1229,16 @@ export async function fetchDashboardAggregate(
     const cachedEntry = sanitizeDashboardLaunchCacheEntry(nextCacheLaunches[launchKey]);
     const current = launchMap.get(launchId);
 
-    const [stat, memberStats, launchUwu] = await Promise.all([
+    const [stat, memberStats, labeledLeaves] = await Promise.all([
       fetchLaunchStats(cfg, launchId).catch(() => null),
       label ? fetchLaunchMemberStats(cfg, launchId).catch(() => null) : Promise.resolve(null),
-      label && label.includes('[High/Blocker]')
-        ? fetchLaunchUwuCounts(cfg, launchId).catch(() => null)
-        : Promise.resolve(null),
+      label ? fetchLaunchLeafItems(cfg, launchId).catch(() => [] as AllureLeafItem[]) : Promise.resolve([] as AllureLeafItem[]),
     ]);
+
+    // UwU only for High/Blocker — uses already-fetched leaves to avoid a second API call
+    const launchUwu = label?.includes('[High/Blocker]') && labeledLeaves.length > 0
+      ? await computeLaunchUwuFromLeaves(cfg, labeledLeaves).catch(() => null)
+      : null;
 
     const counts = Array.isArray(stat)
       ? computeLaunchCountsExact(stat)
@@ -1010,15 +1248,18 @@ export async function fetchDashboardAggregate(
       ? assignedUnfinishedFromMemberStats(memberStats)
       : Number(cachedEntry?.assignedUnfinished || 0);
 
-    const manualFinished = Array.isArray(memberStats)
-      ? completedFromMemberStats(memberStats)
+    const manualCompletions = extractManualCompletionEvents(labeledLeaves);
+    const leafAssignedLogins = extractAssignedManualLogins(labeledLeaves);
+    const manualFinished = manualCompletions.completedCount > 0
+      ? manualCompletions.completedCount
       : Number(cachedEntry?.manualFinished || 0);
 
-    if (Array.isArray(memberStats) && label) {
-      const logins = activeLoginsFromMemberStats(memberStats);
-      logins.forEach(login => allActiveLogins.add(login));
-      const rawCount = countActivePeopleFromMemberStats(memberStats);
-      allActivePeopleRawCount = Math.max(allActivePeopleRawCount, rawCount);
+    if (label) {
+      manualCompletions.events.forEach(event => refreshedCompletionEvents.push(event));
+      leafAssignedLogins.forEach(login => {
+        const normalized = normalizeUserLogin(login);
+        if (normalized) refreshedInProgressAssignedLogins.add(normalized);
+      });
     }
 
     if (label) {
@@ -1058,6 +1299,14 @@ export async function fetchDashboardAggregate(
       assignedUnfinished,
       manualFinished,
       uwu: resolvedUwu,
+      activeTesterLogins: [...new Set(leafAssignedLogins.map(normalizeUserLogin).filter(Boolean))],
+      manualTimedFinished: 0,
+      manualWindowStartTs: manualCompletions.events.length
+        ? manualCompletions.events.reduce((min, item) => Math.min(min, item.startTs), manualCompletions.events[0].startTs)
+        : null,
+      manualWindowStopTs: manualCompletions.events.length
+        ? manualCompletions.events.reduce((max, item) => Math.max(max, item.stopTs), manualCompletions.events[0].stopTs)
+        : null,
     };
   });
 
@@ -1068,15 +1317,32 @@ export async function fetchDashboardAggregate(
   });
 
   if (releaseVersion) {
+    const refreshedManualActivity = collectGlobalDashboardManualActivity(refreshedCompletionEvents, refreshedInProgressAssignedLogins);
     writeDashboardReleaseCache({
       version: releaseVersion,
       savedAt: Date.now(),
       launches: nextCacheLaunches,
       readiness: releaseCache?.readiness,
+      manualActivity: refreshedCompletionEvents.length || refreshedInProgressAssignedLogins.size
+        ? refreshedManualActivity
+        : (releaseCache?.manualActivity ?? undefined),
     });
   }
 
-  const activePeopleLogins = [...allActiveLogins];
+  const hasFreshManualSignals = refreshedCompletionEvents.length > 0 || refreshedInProgressAssignedLogins.size > 0;
+  const manualActivity = hasFreshManualSignals
+    ? collectGlobalDashboardManualActivity(refreshedCompletionEvents, refreshedInProgressAssignedLogins)
+    : (releaseCache?.manualActivity ?? {
+        timedFinishedCount: 0,
+        windowStartTs: null,
+        windowStopTs: null,
+        recentCompletedLogins: [],
+        inProgressAssignedLogins: [],
+      });
+  const activePeopleLogins = [...new Set([
+    ...manualActivity.recentCompletedLogins,
+    ...manualActivity.inProgressAssignedLogins,
+  ])];
 
   return {
     launches: [...launchMap.values()].sort((a, b) => Number(b.createdDate || 0) - Number(a.createdDate || 0)),
@@ -1084,8 +1350,11 @@ export async function fetchDashboardAggregate(
     uwu,
     alerts: alerts.sort((a, b) => b.id - a.id),
     // Prefer login-dedup Set; fall back to raw count if logins weren't populated by API
-    activePeopleCount: allActiveLogins.size > 0 ? allActiveLogins.size : allActivePeopleRawCount,
+    activePeopleCount: activePeopleLogins.length,
     activePeopleLogins,
     launchCreatedTs: minLaunchCreatedTs,
+    manualTimedFinished: manualActivity.timedFinishedCount,
+    manualWindowStartTs: manualActivity.windowStartTs,
+    manualWindowStopTs: manualActivity.windowStopTs,
   };
 }

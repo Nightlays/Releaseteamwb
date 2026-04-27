@@ -1,0 +1,1906 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Анализ релизов за квартал</title>
+  <style>
+    :root{
+      --bg:#f6f7fb;
+      --surface:#ffffff;
+      --surface-2:#f9fafb;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --line-strong:#cfd6e3;
+      --accent:#2563eb;
+      --accent-2:#cb11ab;
+      --ok:#059669;
+      --warn:#b45309;
+      --bad:#dc2626;
+      --chip:#eef2ff;
+      --shadow:0 12px 30px rgba(15,23,42,.08);
+    }
+    *{box-sizing:border-box}
+    html,body{min-height:100%}
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#f8fafc 0%,var(--bg) 100%);
+      color:var(--text);
+      font:14px/1.45 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    button:disabled{cursor:not-allowed;opacity:.64}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    .page{max-width:1540px;margin:0 auto;padding:20px}
+    .top{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      align-items:flex-start;
+      margin-bottom:16px;
+    }
+    .title-block h1{
+      margin:0;
+      font-size:28px;
+      line-height:1.05;
+      letter-spacing:0;
+    }
+    .title-block p{
+      margin:8px 0 0;
+      color:var(--muted);
+      max-width:860px;
+    }
+    .status-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-height:34px;
+      padding:7px 10px;
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:var(--surface);
+      color:var(--muted);
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .status-chip::before{
+      content:"";
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      background:var(--muted);
+    }
+    .status-chip.ok{color:var(--ok);border-color:#a7f3d0;background:#ecfdf5}
+    .status-chip.ok::before{background:var(--ok)}
+    .status-chip.warn{color:var(--warn);border-color:#fed7aa;background:#fffbeb}
+    .status-chip.warn::before{background:var(--warn)}
+    .status-chip.err{color:var(--bad);border-color:#fecaca;background:#fef2f2}
+    .status-chip.err::before{background:var(--bad)}
+    .panel{
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:8px;
+      box-shadow:var(--shadow);
+      margin-bottom:14px;
+    }
+    .panel-head{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      align-items:flex-start;
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+    }
+    .panel-head h2{margin:0;font-size:16px;line-height:1.2}
+    .panel-head p{margin:4px 0 0;color:var(--muted);font-size:13px}
+    .config-grid{
+      display:grid;
+      grid-template-columns:repeat(12,minmax(0,1fr));
+      gap:12px;
+      padding:16px;
+    }
+    .field{display:flex;flex-direction:column;gap:6px;min-width:0}
+    .field span{font-size:12px;font-weight:800;color:#374151}
+    .field input,.field select,.field textarea{
+      width:100%;
+      border:1px solid var(--line-strong);
+      border-radius:8px;
+      background:#fff;
+      min-height:38px;
+      padding:8px 10px;
+      color:var(--text);
+      outline:none;
+    }
+    .field textarea{min-height:76px;resize:vertical}
+    .field input:focus,.field select:focus,.field textarea:focus{
+      border-color:var(--accent);
+      box-shadow:0 0 0 3px rgba(37,99,235,.12);
+    }
+    .col-2{grid-column:span 2}
+    .col-3{grid-column:span 3}
+    .col-4{grid-column:span 4}
+    .col-6{grid-column:span 6}
+    .col-12{grid-column:1/-1}
+    .actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border-radius:8px;
+      border:1px solid var(--line-strong);
+      background:#fff;
+      color:#1f2937;
+      font-weight:800;
+    }
+    .btn:hover{border-color:#94a3b8;background:#f8fafc;text-decoration:none}
+    .btn-primary{border-color:var(--accent);background:var(--accent);color:white}
+    .btn-primary:hover{background:#1d4ed8;border-color:#1d4ed8}
+    .btn-danger{border-color:#fecaca;color:#b91c1c;background:#fff}
+    .tabs{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      padding:12px 16px 0;
+    }
+    .tab{
+      border:1px solid var(--line-strong);
+      background:#fff;
+      color:#374151;
+      border-radius:8px;
+      min-height:34px;
+      padding:7px 10px;
+      font-weight:800;
+    }
+    .tab.active{
+      color:#fff;
+      border-color:#111827;
+      background:#111827;
+    }
+    .month-tabs{
+      display:flex;
+      gap:6px;
+      overflow:auto;
+      padding:12px 16px;
+      border-top:1px solid var(--line);
+    }
+    .month-btn{
+      flex:0 0 auto;
+      min-height:32px;
+      padding:6px 9px;
+      border-radius:8px;
+      border:1px solid var(--line);
+      background:#fff;
+      color:#4b5563;
+      font-weight:800;
+    }
+    .month-btn.active{background:var(--chip);border-color:#c7d2fe;color:#3730a3}
+    .kpis{
+      display:grid;
+      grid-template-columns:repeat(5,minmax(0,1fr));
+      gap:10px;
+      padding:14px 16px;
+    }
+    .kpi{
+      border:1px solid var(--line);
+      background:var(--surface-2);
+      border-radius:8px;
+      padding:10px;
+      min-width:0;
+    }
+    .kpi-label{font-size:12px;color:var(--muted);font-weight:800}
+    .kpi-value{margin-top:4px;font-size:22px;line-height:1;font-weight:900}
+    .table-toolbar{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      padding:12px 16px;
+      border-top:1px solid var(--line);
+    }
+    .table-toolbar .hint{color:var(--muted);font-size:13px}
+    .table-wrap{
+      overflow:auto;
+      border-top:1px solid var(--line);
+    }
+    table{
+      width:100%;
+      min-width:1500px;
+      border-collapse:separate;
+      border-spacing:0;
+      font-size:12px;
+    }
+    th,td{
+      border-right:1px solid var(--line);
+      border-bottom:1px solid var(--line);
+      padding:8px 9px;
+      vertical-align:top;
+      background:#fff;
+    }
+    th:first-child,td:first-child{border-left:1px solid var(--line)}
+    thead th{
+      position:sticky;
+      top:0;
+      z-index:2;
+      background:#f8fafc;
+      color:#1f2937;
+      text-align:left;
+      font-weight:900;
+      white-space:normal;
+    }
+    thead tr:first-child th{
+      top:0;
+      background:#eef2ff;
+      color:#312e81;
+      text-align:center;
+      border-top:1px solid var(--line);
+    }
+    thead tr:nth-child(2) th{top:35px}
+    tbody tr:hover td{background:#fbfdff}
+    .mono{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace}
+    .muted{color:var(--muted)}
+    .dash{color:#9ca3af}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:2px 7px;
+      background:#fff;
+      font-size:11px;
+      font-weight:800;
+      white-space:nowrap;
+      margin:0 4px 4px 0;
+    }
+    .pill.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+    .pill.warn{border-color:#fed7aa;background:#fffbeb;color:#9a3412}
+    .pill.info{border-color:#bfdbfe;background:#eff6ff;color:#1e40af}
+    .cell-main{font-weight:800;color:#111827}
+    .cell-sub{margin-top:3px;color:var(--muted);font-size:11px}
+    .task-list{display:flex;flex-direction:column;gap:4px}
+    .task-item{line-height:1.25}
+    .hf-text{
+      max-width:260px;
+      white-space:pre-wrap;
+      line-height:1.3;
+    }
+    .empty-state{
+      padding:34px 16px;
+      text-align:center;
+      color:var(--muted);
+      border-top:1px solid var(--line);
+    }
+    .log{
+      max-height:220px;
+      overflow:auto;
+      padding:10px 16px 14px;
+      border-top:1px solid var(--line);
+      background:#0f172a;
+      color:#dbeafe;
+      font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+      font-size:12px;
+      white-space:pre-wrap;
+    }
+    .log-line.warn{color:#fed7aa}
+    .log-line.err{color:#fecaca}
+    .log-line.ok{color:#bbf7d0}
+    @media (max-width:1080px){
+      .top{flex-direction:column}
+      .config-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+      .col-2,.col-3,.col-4{grid-column:span 3}
+      .col-6{grid-column:1/-1}
+      .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:640px){
+      .page{padding:12px}
+      .config-grid{grid-template-columns:1fr}
+      .col-2,.col-3,.col-4,.col-6,.col-12{grid-column:1/-1}
+      .kpis{grid-template-columns:1fr}
+      .table-toolbar{align-items:flex-start;flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="top">
+      <div class="title-block">
+        <h1>Анализ релизов за квартал</h1>
+        <p>Сборка таблицы по хотфиксам Android и iOS: год, месяц, версия, задачи, тайминги сборки, отправки, проверки и раскатки.</p>
+      </div>
+      <div id="status" class="status-chip">Ожидаю запуск</div>
+    </header>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Параметры сбора</h2>
+          <p>Собранные строки остаются только на странице текущей вкладки.</p>
+        </div>
+        <div class="actions">
+          <button id="loadBtn" class="btn btn-primary" type="button">Собрать</button>
+          <button id="stopBtn" class="btn btn-danger" type="button" disabled>Остановить</button>
+          <button id="csvBtn" class="btn" type="button" disabled>CSV</button>
+        </div>
+      </div>
+      <div class="config-grid">
+        <label class="field col-2">
+          <span>Год</span>
+          <select id="yearSelect"></select>
+        </label>
+        <label class="field col-3">
+          <span>Мажорный релиз</span>
+          <input id="releaseInput" type="text" placeholder="7.5.6000" autocomplete="off" />
+        </label>
+        <label class="field col-3">
+          <span>Proxy base</span>
+          <input id="proxyBase" type="text" placeholder="http://127.0.0.1:8787" autocomplete="off" />
+        </label>
+        <label class="field col-4">
+          <span>Deploy-lab token</span>
+          <input id="deployToken" type="password" autocomplete="off" placeholder="Bearer ..." />
+        </label>
+        <label class="field col-4">
+          <span>GitLab PAT / cookies</span>
+          <input id="gitlabAuth" type="password" autocomplete="off" placeholder="glpat-... или _gitlab_session=..." />
+        </label>
+        <label class="field col-4">
+          <span>YouTrack token</span>
+          <input id="ytToken" type="password" autocomplete="off" placeholder="Bearer ..." />
+        </label>
+        <label class="field col-12">
+          <span>Band cookies</span>
+          <textarea id="bandCookies" placeholder="MMAUTHTOKEN=...; MMUSERID=...; MMCSRF=..."></textarea>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="tabs" role="tablist" aria-label="Платформа">
+        <button class="tab active" type="button" data-platform="android">Android</button>
+        <button class="tab" type="button" data-platform="ios">iOS</button>
+      </div>
+      <div id="monthTabs" class="month-tabs" aria-label="Месяц"></div>
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi-label">Строк</div>
+          <div id="kpiRows" class="kpi-value">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Хотфиксов</div>
+          <div id="kpiHotfix" class="kpi-value">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">С 1%</div>
+          <div id="kpiOne" class="kpi-value">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">С задачами</div>
+          <div id="kpiTasks" class="kpi-value">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">TBD</div>
+          <div id="kpiTbd" class="kpi-value">0</div>
+        </div>
+      </div>
+      <div class="table-toolbar">
+        <div id="tableHint" class="hint">Данные появятся после сбора.</div>
+        <div class="actions">
+          <button id="showAllMonthsBtn" class="btn" type="button">Все месяцы</button>
+        </div>
+      </div>
+      <div id="tableHost"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Лог</h2>
+          <p>Краткий ход чтения источников.</p>
+        </div>
+      </div>
+      <div id="log" class="log"></div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const MSK_TIMEZONE = 'Europe/Moscow';
+      const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
+      const DEFAULT_PROXY = 'http://127.0.0.1:8787';
+      const DEPLOY_BASE_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
+      const DEPLOY_DEPLOY_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/deploy';
+      const DEPLOY_ISSUES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/issues';
+      const YT_BASE_URL = 'https://youtrack.wildberries.ru';
+      const GITLAB_BASE_URL = 'https://gitlab.wildberries.ru';
+      const GITLAB_GRAPHQL_URL = `${GITLAB_BASE_URL}/api/graphql`;
+      const PAGE_SIZE = 30;
+      const PAGE_LIMIT = 400;
+      const GITLAB_PIPELINE_PAGE_SIZE = 100;
+      const BAND_CHANNELS = {
+        android: 'mccs6h69jtdhu8uzeeg3nz1wxa',
+        ios: 'kg4eed6pdpy1pfhhitjtmqqhpe'
+      };
+      const GITLAB_CONFIG = {
+        android: {
+          fullPath: 'mobile/androidnative/androidnative',
+          jobName: 'build_qa',
+          scope: 'all',
+          deployPrefix: 'ANDROID',
+          storeSection: 'Google Play',
+          label: 'Android'
+        },
+        ios: {
+          fullPath: 'mobile/ios/marketplace',
+          jobName: 'build_for_testflight',
+          scope: 'finished',
+          deployPrefix: 'IOS',
+          storeSection: 'AppStore',
+          label: 'iOS'
+        }
+      };
+      const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+      const MONTHS_SHORT = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+      const LOCOMOTIVE_TAGS = {
+        business: ['бизнес локомотив', 'business locomotive', 'business'],
+        product: ['продуктовый локомотив', 'продукт локомотив', 'product locomotive', 'product'],
+        technical: ['технический локомотив', 'тех локомотив', 'technical locomotive', 'technical']
+      };
+
+      const ui = {
+        status: document.getElementById('status'),
+        yearSelect: document.getElementById('yearSelect'),
+        releaseInput: document.getElementById('releaseInput'),
+        proxyBase: document.getElementById('proxyBase'),
+        deployToken: document.getElementById('deployToken'),
+        gitlabAuth: document.getElementById('gitlabAuth'),
+        ytToken: document.getElementById('ytToken'),
+        bandCookies: document.getElementById('bandCookies'),
+        loadBtn: document.getElementById('loadBtn'),
+        stopBtn: document.getElementById('stopBtn'),
+        csvBtn: document.getElementById('csvBtn'),
+        monthTabs: document.getElementById('monthTabs'),
+        tableHost: document.getElementById('tableHost'),
+        tableHint: document.getElementById('tableHint'),
+        showAllMonthsBtn: document.getElementById('showAllMonthsBtn'),
+        kpiRows: document.getElementById('kpiRows'),
+        kpiHotfix: document.getElementById('kpiHotfix'),
+        kpiOne: document.getElementById('kpiOne'),
+        kpiTasks: document.getElementById('kpiTasks'),
+        kpiTbd: document.getElementById('kpiTbd'),
+        log: document.getElementById('log')
+      };
+
+      const state = {
+        activePlatform: 'android',
+        selectedMonth: 'all',
+        rows: { android: [], ios: [] },
+        loading: false,
+        abortController: null,
+        startedAt: null
+      };
+
+      function escHtml(value){
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function normalizeText(value){
+        return String(value || '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/\r/g, '\n')
+          .replace(/[ \t]+\n/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      }
+
+      function safeJson(text){
+        try{ return JSON.parse(text); }catch(_){ return null; }
+      }
+
+      function logLine(message, tone){
+        const line = document.createElement('div');
+        line.className = `log-line ${tone || ''}`.trim();
+        const stamp = new Intl.DateTimeFormat('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }).format(new Date());
+        line.textContent = `[${stamp}] ${message}`;
+        ui.log.appendChild(line);
+        ui.log.scrollTop = ui.log.scrollHeight;
+      }
+
+      function setStatus(text, tone){
+        ui.status.textContent = text;
+        ui.status.className = `status-chip ${tone || ''}`.trim();
+      }
+
+      function readRuntimeProxyBase(){
+        try{
+          const q = new URLSearchParams(window.location.search);
+          const fromQuery = q.get('rbProxyBase');
+          if(fromQuery) return String(fromQuery).trim();
+        }catch(_){}
+        try{
+          const fromTop = window.top && window.top.__RB_PROXY_CONFIG && window.top.__RB_PROXY_CONFIG.base;
+          if(fromTop) return String(fromTop).trim();
+        }catch(_){}
+        try{
+          const raw = localStorage.getItem('rb_proxy_runtime_v1');
+          if(raw){
+            const parsed = JSON.parse(raw);
+            if(parsed && parsed.base) return String(parsed.base).trim();
+          }
+        }catch(_){}
+        return DEFAULT_PROXY;
+      }
+
+      function readSettings(){
+        return {
+          year: Number(ui.yearSelect.value) || new Date().getFullYear(),
+          release: ui.releaseInput.value.trim(),
+          proxyBase: ui.proxyBase.value.trim().replace(/\/+$/, '') || DEFAULT_PROXY,
+          deployToken: ui.deployToken.value.trim(),
+          gitlabAuth: ui.gitlabAuth.value.trim(),
+          ytToken: ui.ytToken.value.trim(),
+          bandCookies: ui.bandCookies.value.trim()
+        };
+      }
+
+      function initInputs(){
+        const nowYear = new Date().getFullYear();
+        const years = [];
+        for(let y = nowYear + 1; y >= nowYear - 4; y -= 1) years.push(y);
+        ui.yearSelect.innerHTML = years.map((year) => `<option value="${year}">${year}</option>`).join('');
+        ui.yearSelect.value = String(nowYear);
+        ui.proxyBase.value = readRuntimeProxyBase();
+        try{ ui.deployToken.value = localStorage.getItem('wb_all_table_deploy_token') || ''; }catch(_){}
+        try{ ui.gitlabAuth.value = localStorage.getItem('wb_all_table_gitlab_cookie') || ''; }catch(_){}
+        try{ ui.ytToken.value = localStorage.getItem('wb_all_table_yt_token') || ''; }catch(_){}
+        try{ ui.bandCookies.value = localStorage.getItem('wb_all_table_band_read_cookies') || localStorage.getItem('band_android_rollout_v1_band_cookies') || ''; }catch(_){}
+        renderMonthTabs();
+        renderTable();
+      }
+
+      function parseVersion(raw){
+        const match = String(raw || '').trim().match(/^(\d+)\.(\d+)\.(\d{1,4})$/);
+        if(!match) return null;
+        const major = Number(match[1]);
+        const minor = Number(match[2]);
+        let build = Number(match[3]);
+        if(!Number.isFinite(major) || !Number.isFinite(minor) || !Number.isFinite(build)) return null;
+        if(String(match[3]).length < 4) build *= Math.pow(10, 4 - String(match[3]).length);
+        return { major, minor, build };
+      }
+
+      function formatVersion(parts){
+        return `${parts.major}.${parts.minor}.${String(parts.build).padStart(4, '0')}`;
+      }
+
+      function compareVersions(a, b){
+        const pa = parseVersion(a);
+        const pb = parseVersion(b);
+        if(!pa || !pb) return String(a || '').localeCompare(String(b || ''), 'ru');
+        return pa.major - pb.major || pa.minor - pb.minor || pa.build - pb.build;
+      }
+
+      function releaseFamily(raw){
+        const parsed = parseVersion(raw);
+        if(!parsed) return '';
+        const familyBuild = Math.floor(parsed.build / 10) * 10;
+        return formatVersion({ ...parsed, build: familyBuild });
+      }
+
+      function buildHotfixCandidates(baseRelease){
+        const parsed = parseVersion(baseRelease);
+        if(!parsed) throw new Error('Мажорный релиз должен быть в формате 7.5.6000');
+        const baseBuild = Math.floor(parsed.build / 10) * 10;
+        const family = formatVersion({ ...parsed, build: baseBuild });
+        const out = [];
+        for(let offset = 1; offset <= 9; offset += 1){
+          out.push(formatVersion({ ...parsed, build: baseBuild + offset }));
+        }
+        return { family, candidates: out };
+      }
+
+      function previousVersion(version){
+        const parsed = parseVersion(version);
+        if(!parsed || parsed.build <= 0) return '';
+        return formatVersion({ ...parsed, build: parsed.build - 1 });
+      }
+
+      function formatMskDate(ms){
+        if(!Number.isFinite(ms)) return '';
+        return new Intl.DateTimeFormat('ru-RU', {
+          timeZone: MSK_TIMEZONE,
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }).format(new Date(ms));
+      }
+
+      function formatMskDateTime(ms){
+        if(!Number.isFinite(ms)) return '';
+        return new Intl.DateTimeFormat('ru-RU', {
+          timeZone: MSK_TIMEZONE,
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(new Date(ms)).replace(',', '');
+      }
+
+      function monthFromMs(ms){
+        if(!Number.isFinite(ms)) return null;
+        const value = new Intl.DateTimeFormat('en-US', {
+          timeZone: MSK_TIMEZONE,
+          month: 'numeric'
+        }).format(new Date(ms));
+        const month = Number(value) - 1;
+        return Number.isInteger(month) ? month : null;
+      }
+
+      function yearFromMs(ms){
+        if(!Number.isFinite(ms)) return null;
+        const value = new Intl.DateTimeFormat('en-US', {
+          timeZone: MSK_TIMEZONE,
+          year: 'numeric'
+        }).format(new Date(ms));
+        const year = Number(value);
+        return Number.isFinite(year) ? year : null;
+      }
+
+      function normalizeIsoForJS(value){
+        if(!value) return '';
+        let text = String(value).trim();
+        text = text.replace(/(\.\d{3})\d+(?=[Z+\-])/, '$1');
+        text = text.replace(/(\.\d{2})(?=[Z+\-])/, '$10');
+        text = text.replace(/(\.\d)(?=[Z+\-])/, '$100');
+        return text;
+      }
+
+      function isoToMs(value){
+        const norm = normalizeIsoForJS(value);
+        if(!norm) return NaN;
+        const ms = new Date(norm).getTime();
+        return Number.isFinite(ms) ? ms : NaN;
+      }
+
+      function buildProxyRequestUrl(targetUrl){
+        const base = readSettings().proxyBase;
+        const url = new URL(base);
+        if(!/\/proxy$/i.test(url.pathname)){
+          url.pathname = url.pathname.replace(/\/+$/, '') + '/proxy';
+        }
+        url.searchParams.set('url', targetUrl);
+        return url.toString();
+      }
+
+      async function proxyRequest(method, targetUrl, headers, body, signal){
+        const response = await fetch(buildProxyRequestUrl(targetUrl), {
+          method,
+          headers: headers || {},
+          body,
+          signal,
+          cache: 'no-store'
+        });
+        const text = await response.text();
+        if(!response.ok){
+          const parsed = safeJson(text);
+          const detail = parsed?.error || parsed?.message || text.slice(0, 180);
+          throw new Error(`Proxy HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+        }
+        const parsed = safeJson(text);
+        if(parsed !== null) return parsed;
+        return { raw: text };
+      }
+
+      async function checkProxy(signal){
+        const base = readSettings().proxyBase;
+        const url = new URL(base);
+        if(/\/proxy$/i.test(url.pathname)){
+          url.pathname = url.pathname.replace(/\/proxy$/i, '/health');
+        }else{
+          url.pathname = url.pathname.replace(/\/+$/, '') + '/health';
+        }
+        const response = await fetch(url.toString(), { signal, cache: 'no-store' });
+        const data = await response.json().catch(() => null);
+        if(!response.ok || !data?.ok) throw new Error(`Proxy health ${response.status}`);
+        return data;
+      }
+
+      function deployHeaders(){
+        const token = readSettings().deployToken.replace(/^Bearer\s+/i, '').trim();
+        const headers = {
+          'accept': '*/*',
+          'accept-language': 'ru,en;q=0.9'
+        };
+        if(token) headers['authorization-deploy-lab'] = `Bearer ${token}`;
+        return headers;
+      }
+
+      function bandHeaders(){
+        const cookies = readSettings().bandCookies;
+        if(!cookies) return null;
+        return {
+          'Accept': 'application/json',
+          'Accept-Language': 'ru',
+          'X-Requested-With': 'XMLHttpRequest',
+          [PROXY_COOKIE_HEADER]: cookies
+        };
+      }
+
+      function normalizeBearerToken(value){
+        return String(value || '').trim().replace(/^Bearer\s+/i, '').trim();
+      }
+
+      function ytHeaders(){
+        const token = normalizeBearerToken(readSettings().ytToken);
+        if(!token) return null;
+        return {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        };
+      }
+
+      function isGitlabCookieAuth(value){
+        const raw = String(value || '').trim();
+        if(!raw) return false;
+        if(/^(gitlab-|glpat-|Bearer\s+|PRIVATE-TOKEN\s+)/i.test(raw)) return false;
+        return /[A-Za-z0-9_.-]+=/.test(raw);
+      }
+
+      function normalizeGitlabToken(value){
+        return String(value || '').trim().replace(/^(Bearer|PRIVATE-TOKEN)\s+/i, '').trim();
+      }
+
+      function gitlabHeaderVariants(){
+        const raw = readSettings().gitlabAuth;
+        if(!raw) return [];
+        if(isGitlabCookieAuth(raw)){
+          return [{
+            'accept': 'application/json',
+            'x-requested-with': 'XMLHttpRequest',
+            [PROXY_COOKIE_HEADER]: raw
+          }];
+        }
+        const token = normalizeGitlabToken(raw);
+        if(!token) return [];
+        return [
+          { 'accept': 'application/json', 'PRIVATE-TOKEN': token },
+          { 'accept': 'application/json', 'Authorization': `Bearer ${token}` }
+        ];
+      }
+
+      async function proxyGitlabJson(targetUrl, signal){
+        const variants = gitlabHeaderVariants();
+        if(!variants.length) return null;
+        let last = null;
+        for(const headers of variants){
+          try{
+            return await proxyRequest('GET', targetUrl, headers, undefined, signal);
+          }catch(error){
+            last = error;
+          }
+        }
+        throw last || new Error('GitLab auth failed');
+      }
+
+      function unwrapBandPostsPayload(raw){
+        let node = raw;
+        for(let i = 0; i < 5; i += 1){
+          if(node && typeof node === 'object' && node.posts && typeof node.posts === 'object') return node;
+          if(node && typeof node === 'object' && node.body !== undefined){
+            if(typeof node.body === 'string'){
+              const parsed = safeJson(node.body);
+              if(parsed){ node = parsed; continue; }
+            }else if(node.body && typeof node.body === 'object'){
+              node = node.body;
+              continue;
+            }
+          }
+          if(node && typeof node === 'object' && node.data && typeof node.data === 'object'){
+            node = node.data;
+            continue;
+          }
+          break;
+        }
+        return raw && typeof raw === 'object' ? raw : {};
+      }
+
+      async function fetchBandChannelPostsSince(channelId, sinceMs, signal){
+        const headers = bandHeaders();
+        if(!headers) return [];
+        const postsById = new Map();
+        let beforeId = '';
+
+        for(let page = 0; page < PAGE_LIMIT; page += 1){
+          if(signal?.aborted) break;
+          const url = new URL(`https://band.wb.ru/api/v4/channels/${encodeURIComponent(channelId)}/posts`);
+          url.searchParams.set('page', '0');
+          url.searchParams.set('per_page', String(PAGE_SIZE));
+          if(beforeId) url.searchParams.set('before', beforeId);
+          url.searchParams.set('skipFetchThreads', 'false');
+          url.searchParams.set('collapsedThreads', 'true');
+          url.searchParams.set('collapsedThreadsExtended', 'false');
+
+          const payload = unwrapBandPostsPayload(await proxyRequest('GET', url.toString(), headers, undefined, signal));
+          const postsMap = payload?.posts && typeof payload.posts === 'object' ? payload.posts : {};
+          const order = Array.isArray(payload?.order) ? payload.order : Object.keys(postsMap);
+          if(!order.length && !Object.keys(postsMap).length) break;
+
+          const batch = [];
+          for(const id of order){
+            const post = postsMap[id];
+            if(post && typeof post === 'object'){
+              batch.push(post);
+              if(!postsById.has(String(id))) postsById.set(String(id), post);
+            }
+          }
+          for(const [id, post] of Object.entries(postsMap)){
+            if(post && typeof post === 'object' && !postsById.has(String(id))) postsById.set(String(id), post);
+          }
+
+          batch.sort((a, b) => (Number(b?.create_at) || 0) - (Number(a?.create_at) || 0));
+          const oldest = batch[batch.length - 1] || null;
+          const oldestId = String(oldest?.id || '').trim();
+          const oldestCreateAt = Number(oldest?.create_at || 0);
+          logLine(`${channelId}: страница ${page + 1}, +${batch.length} сообщений`, 'ok');
+          if(!oldestId || oldestId === beforeId) break;
+          beforeId = oldestId;
+          if(order.length < PAGE_SIZE) break;
+          if(Number.isFinite(sinceMs) && Number.isFinite(oldestCreateAt) && oldestCreateAt < sinceMs) break;
+        }
+
+        return Array.from(postsById.values())
+          .filter((post) => {
+            const deletedAt = Number(post?.delete_at || 0);
+            if(Number.isFinite(deletedAt) && deletedAt > 0) return false;
+            const createdAt = Number(post?.create_at || 0);
+            if(!Number.isFinite(createdAt) || createdAt <= 0) return false;
+            if(Number.isFinite(sinceMs) && createdAt < sinceMs) return false;
+            return true;
+          })
+          .sort((a, b) => (Number(a?.create_at) || 0) - (Number(b?.create_at) || 0));
+      }
+
+      function extractBandPostText(post){
+        const chunks = [];
+        const push = (value) => {
+          const text = normalizeText(
+            String(value || '')
+              .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2')
+              .replace(/\\([\\`*_{}\[\]()#+\-.!])/g, '$1')
+              .replace(/\*\*([^*]+)\*\*/g, '$1')
+              .replace(/\*([^\n*]+)\*/g, '$1')
+              .replace(/`([^`]+)`/g, '$1')
+          );
+          if(text) chunks.push(text);
+        };
+
+        push(post?.message || '');
+        const attachments = Array.isArray(post?.props?.attachments) ? post.props.attachments : [];
+        for(const attachment of attachments){
+          push(attachment?.pretext);
+          push(attachment?.title);
+          push(attachment?.text);
+          push(attachment?.fallback);
+          const fields = Array.isArray(attachment?.fields) ? attachment.fields : [];
+          for(const field of fields){
+            const title = normalizeText(field?.title || '');
+            const value = normalizeText(field?.value || '');
+            if(title && value) push(`${title}: ${value}`);
+            else{
+              push(title);
+              push(value);
+            }
+          }
+        }
+        return normalizeText(chunks.join('\n'));
+      }
+
+      function textHasVersion(text, version){
+        const escaped = String(version || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`(^|[^\\d])${escaped}([^\\d]|$)`).test(String(text || ''));
+      }
+
+      function extractReleaseVersion(text){
+        const direct = String(text || '').match(/версия\s+(\d+\.\d+\.\d{1,4})/i);
+        if(direct) return direct[1];
+        const generic = [...String(text || '').matchAll(/\b(\d+\.\d+\.\d{1,4})\b/g)];
+        if(generic.length) return generic[generic.length - 1][1];
+        return '';
+      }
+
+      function detectStore(platform, text){
+        const source = String(text || '').toLowerCase();
+        if(platform === 'ios') return /app\s*store|appstore/.test(source) ? 'app_store' : '';
+        if(/google play|play market|gplay/.test(source)) return 'google_play';
+        if(/rustore/.test(source)) return 'ru_store';
+        if(/appgallery|app gallery|huawei/.test(source)) return 'app_gallery';
+        return '';
+      }
+
+      function parseRolloutEvent(post, platform){
+        const text = extractBandPostText(post);
+        if(!text || /снят[ао] с раскатки/i.test(text)) return null;
+        const store = detectStore(platform, text);
+        if(!store) return null;
+        const version = extractReleaseVersion(text);
+        if(!version) return null;
+        const percentMatches = [...text.matchAll(/(\d{1,3})\s*%/g)];
+        const percent = percentMatches.length ? Number(percentMatches[percentMatches.length - 1][1]) : null;
+        const createdAt = Number(post?.create_at || 0);
+        if(!Number.isFinite(createdAt) || createdAt <= 0) return null;
+        return {
+          id: String(post?.id || ''),
+          rootId: String(post?.root_id || ''),
+          createdAt,
+          platform,
+          store,
+          version: formatVersion(parseVersion(version) || { major: 0, minor: 0, build: 0 }),
+          family: releaseFamily(version),
+          percent: Number.isFinite(percent) ? percent : null,
+          text
+        };
+      }
+
+      function parseBandMilestones(posts, platform, versions){
+        const versionSet = new Set(versions);
+        const milestones = new Map();
+        for(const version of versionSet){
+          milestones.set(version, {
+            buildTf: null,
+            okToSend: null,
+            sent: null,
+            enteredReview: null,
+            passedReview: null,
+            branchCut: null,
+            plannedHotfixSend: null
+          });
+        }
+
+        const pick = (current, candidate) => {
+          if(!candidate) return current;
+          if(!current) return candidate;
+          return candidate.createdAt < current.createdAt ? candidate : current;
+        };
+
+        for(const post of posts){
+          const text = extractBandPostText(post);
+          if(!text) continue;
+          const createdAt = Number(post?.create_at || 0);
+          if(!Number.isFinite(createdAt) || createdAt <= 0) continue;
+          const lower = text.toLowerCase();
+
+          for(const version of versionSet){
+            if(!textHasVersion(text, version)) continue;
+            const item = milestones.get(version);
+            const event = { createdAt, text, postId: String(post?.id || '') };
+            const plannedHotfixSendMs = parsePlannedHotfixSendDate(text);
+            if(Number.isFinite(plannedHotfixSendMs)){
+              item.plannedHotfixSend = pick(item.plannedHotfixSend, { ...event, createdAt: plannedHotfixSendMs });
+            }
+            if(platform === 'ios' && /(testflight|test flight|\btf\b|тест\s*флайт|загружен[ао]?.{0,40}(tf|testflight)|upload.{0,40}testflight)/i.test(text)){
+              item.buildTf = pick(item.buildTf, event);
+            }
+            if(platform === 'android' && /(qa\s*build|build_qa|собран[ао]?.{0,30}(qa|билд)|qa.{0,20}билд)/i.test(text)){
+              item.buildTf = pick(item.buildTf, event);
+            }
+            if(/((ок|окей|можно|разреш|готов).{0,60}(отправ|store|стор|review|провер)|отправля(й|ем|ть).{0,60}(store|стор|review|провер)|approve.{0,30}send)/i.test(text)){
+              item.okToSend = pick(item.okToSend, event);
+            }
+            if(/(отправлен[ао]?|уш[её]л|залит[ао]?|submit|submitted).{0,60}(store|стор|app\s*store|google\s*play|review|провер|модерац)/i.test(text)){
+              item.sent = pick(item.sent, event);
+            }
+            if(/(попал[аио]?|попали|находится|уш[её]л|отправлен[ао]?).{0,60}(провер|review|модерац)|in review/i.test(text)){
+              item.enteredReview = pick(item.enteredReview, event);
+            }
+            if(/(прош[её]л|прошли|одобрен|approved|ready for sale|модерац.{0,30}пройд)/i.test(text)){
+              item.passedReview = pick(item.passedReview, event);
+            }
+            if(/(ветк|branch).{0,50}(создан|отвед|created|cut)/i.test(lower)){
+              item.branchCut = pick(item.branchCut, event);
+            }
+          }
+        }
+        return milestones;
+      }
+
+      function parseRussianMonthIndex(raw){
+        const value = String(raw || '').trim().toLowerCase().replace(/ё/g, 'е');
+        const map = {
+          'января': 0, 'январь': 0, 'янв': 0,
+          'февраля': 1, 'февраль': 1, 'фев': 1,
+          'марта': 2, 'март': 2, 'мар': 2,
+          'апреля': 3, 'апрель': 3, 'апр': 3,
+          'мая': 4, 'май': 4,
+          'июня': 5, 'июнь': 5, 'июн': 5,
+          'июля': 6, 'июль': 6, 'июл': 6,
+          'августа': 7, 'август': 7, 'авг': 7,
+          'сентября': 8, 'сентябрь': 8, 'сен': 8, 'сент': 8,
+          'октября': 9, 'октябрь': 9, 'окт': 9,
+          'ноября': 10, 'ноябрь': 10, 'ноя': 10,
+          'декабря': 11, 'декабрь': 11, 'дек': 11
+        };
+        return Object.prototype.hasOwnProperty.call(map, value) ? map[value] : null;
+      }
+
+      function buildMskDateMs(year, monthIndex, day){
+        const utc = Date.UTC(year, monthIndex, day, 0, 0, 0, 0);
+        return utc - 3 * 60 * 60 * 1000;
+      }
+
+      function parsePlannedHotfixSendDate(text){
+        const source = normalizeText(text);
+        const trigger = source.search(/планов\w*\s+дат\w*\s+отправк\w*/i);
+        if(trigger < 0) return NaN;
+        const tail = source.slice(trigger, trigger + 180);
+
+        let match = tail.match(/(\d{1,2})[.\-/\s]+(\d{1,2})[.\-/\s]+(\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
+        if(match){
+          const day = Number(match[1]);
+          const monthIndex = Number(match[2]) - 1;
+          let year = Number(match[3]);
+          if(year < 100) year += 2000;
+          const hour = Number(match[4] || 0);
+          const minute = Number(match[5] || 0);
+          if(day >= 1 && day <= 31 && monthIndex >= 0 && monthIndex <= 11 && year >= 2000){
+            return buildMskDateMs(year, monthIndex, day) + (hour * 60 + minute) * 60_000;
+          }
+        }
+
+        match = tail.match(/(\d{1,2})\s+([А-Яа-яё]+)\s+(\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/i);
+        if(match){
+          const day = Number(match[1]);
+          const monthIndex = parseRussianMonthIndex(match[2]);
+          let year = Number(match[3]);
+          if(year < 100) year += 2000;
+          const hour = Number(match[4] || 0);
+          const minute = Number(match[5] || 0);
+          if(day >= 1 && day <= 31 && monthIndex !== null && year >= 2000){
+            return buildMskDateMs(year, monthIndex, day) + (hour * 60 + minute) * 60_000;
+          }
+        }
+
+        return NaN;
+      }
+
+      function collectRolloutEvents(posts, platform){
+        return posts.map((post) => parseRolloutEvent(post, platform)).filter(Boolean);
+      }
+
+      function firstOnePercent(events, version, platform){
+        const store = platform === 'ios' ? 'app_store' : 'google_play';
+        const exact = events
+          .filter((event) => event.version === version && event.store === store && event.percent !== null)
+          .sort((a, b) => a.createdAt - b.createdAt);
+        return exact.find((event) => event.percent === 1) || exact[0] || null;
+      }
+
+      function previousRolloutPercent(events, prevVersion, beforeMs, platform){
+        const store = platform === 'ios' ? 'app_store' : 'google_play';
+        const filtered = events
+          .filter((event) => event.version === prevVersion && event.store === store && event.percent !== null)
+          .filter((event) => !Number.isFinite(beforeMs) || event.createdAt <= beforeMs)
+          .sort((a, b) => a.createdAt - b.createdAt);
+        return filtered[filtered.length - 1] || null;
+      }
+
+      function extractEarliestNoteDate(deployObj, sectionKey){
+        const section = deployObj?.[sectionKey];
+        const notes = Array.isArray(section?.notes) ? section.notes : [];
+        const dates = [];
+        for(const note of notes){
+          const ms = isoToMs(note?.date);
+          if(Number.isFinite(ms)) dates.push(ms);
+        }
+        return dates.length ? Math.min(...dates) : NaN;
+      }
+
+      async function fetchDeployBundle(platform, version, signal){
+        if(!readSettings().deployToken) return { base: null, deploy: null, issues: [], dates: { cutoffMs: NaN, storeMs: NaN } };
+        const config = GITLAB_CONFIG[platform];
+        const prefix = config.deployPrefix;
+        const baseUrl = DEPLOY_BASE_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', version);
+        const deployUrl = DEPLOY_DEPLOY_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', version);
+        const issuesUrl = DEPLOY_ISSUES_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', version);
+        const result = { base: null, deploy: null, issues: [], dates: { cutoffMs: NaN, storeMs: NaN } };
+        try{
+          result.base = await proxyRequest('GET', baseUrl, deployHeaders(), undefined, signal);
+          const cutoffMs = isoToMs(result.base?.cutoff_date);
+          if(Number.isFinite(cutoffMs)) result.dates.cutoffMs = cutoffMs;
+        }catch(_){}
+        try{
+          result.deploy = await proxyRequest('GET', deployUrl, deployHeaders(), undefined, signal);
+          const storeMs = extractEarliestNoteDate(result.deploy, config.storeSection);
+          if(Number.isFinite(storeMs)) result.dates.storeMs = storeMs;
+        }catch(_){}
+        try{
+          const data = await proxyRequest('GET', issuesUrl, deployHeaders(), undefined, signal);
+          if(Array.isArray(data)) result.issues = data;
+          else if(Array.isArray(data?.data)) result.issues = data.data;
+          else if(Array.isArray(data?.content)) result.issues = data.content;
+        }catch(_){}
+        return result;
+      }
+
+      function buildGitlabPipelinesUrl(platform, release, page){
+        const config = GITLAB_CONFIG[platform];
+        const url = new URL(`${GITLAB_BASE_URL}/api/v4/projects/${encodeURIComponent(config.fullPath)}/pipelines`);
+        url.searchParams.set('page', String(page));
+        url.searchParams.set('ref', `release/${release}`);
+        url.searchParams.set('per_page', String(GITLAB_PIPELINE_PAGE_SIZE));
+        if(config.scope && config.scope !== 'all') url.searchParams.set('scope', config.scope);
+        return url.toString();
+      }
+
+      function buildGitlabPipelineJobsUrl(platform, iid, after){
+        const config = GITLAB_CONFIG[platform];
+        const query = [
+          'query getPipelineJobs($fullPath: ID!, $iid: ID!, $after: String) {',
+          'project(fullPath: $fullPath) {',
+          'pipeline(iid: $iid) {',
+          'jobs(after: $after, first: 40) {',
+          'pageInfo { hasNextPage endCursor }',
+          'nodes { name finishedAt }',
+          '}',
+          '}',
+          '}',
+          '}'
+        ].join(' ');
+        const url = new URL(GITLAB_GRAPHQL_URL);
+        url.searchParams.set('query', query);
+        url.searchParams.set('operationName', 'getPipelineJobs');
+        url.searchParams.set('variables', JSON.stringify({
+          fullPath: config.fullPath,
+          iid: String(iid),
+          after: after || null
+        }));
+        return url.toString();
+      }
+
+      async function fetchGitlabOldestPipeline(platform, version, signal){
+        if(!gitlabHeaderVariants().length) return null;
+        let oldest = null;
+        for(let page = 1; page <= 20; page += 1){
+          const data = await proxyGitlabJson(buildGitlabPipelinesUrl(platform, version, page), signal);
+          const pipelines = Array.isArray(data?.pipelines) ? data.pipelines : (Array.isArray(data) ? data : []);
+          if(!pipelines.length) break;
+          for(const pipeline of pipelines){
+            const createdMs = isoToMs(pipeline?.created_at || pipeline?.createdAt || pipeline?.created);
+            const iid = pipeline?.iid;
+            if(!Number.isFinite(createdMs) || iid === undefined || iid === null) continue;
+            if(!oldest || createdMs < oldest.createdMs){
+              oldest = { iid: String(iid), createdMs, createdAt: pipeline?.created_at || pipeline?.createdAt || '' };
+            }
+          }
+          if(pipelines.length < GITLAB_PIPELINE_PAGE_SIZE) break;
+        }
+        return oldest;
+      }
+
+      async function fetchGitlabPipelineJobFinishedAt(platform, iid, signal){
+        if(!gitlabHeaderVariants().length || !iid) return NaN;
+        const jobName = GITLAB_CONFIG[platform].jobName;
+        let after = null;
+        for(let page = 0; page < 20; page += 1){
+          const data = await proxyGitlabJson(buildGitlabPipelineJobsUrl(platform, iid, after), signal);
+          const jobs = data?.data?.project?.pipeline?.jobs;
+          const nodes = Array.isArray(jobs?.nodes) ? jobs.nodes : [];
+          const target = nodes.find((node) => String(node?.name || '').trim() === jobName);
+          if(target) return isoToMs(target.finishedAt);
+          if(!jobs?.pageInfo?.hasNextPage || !jobs?.pageInfo?.endCursor) break;
+          after = jobs.pageInfo.endCursor;
+        }
+        return NaN;
+      }
+
+      async function fetchGitlabBranchCommitTime(platform, version, signal){
+        if(!gitlabHeaderVariants().length) return NaN;
+        const config = GITLAB_CONFIG[platform];
+        const url = `${GITLAB_BASE_URL}/api/v4/projects/${encodeURIComponent(config.fullPath)}/repository/branches/${encodeURIComponent(`release/${version}`)}`;
+        try{
+          const data = await proxyGitlabJson(url, signal);
+          const candidates = [
+            data?.commit?.created_at,
+            data?.commit?.committed_date,
+            data?.commit?.authored_date
+          ];
+          for(const candidate of candidates){
+            const ms = isoToMs(candidate);
+            if(Number.isFinite(ms)) return ms;
+          }
+        }catch(_){}
+        return NaN;
+      }
+
+      function normalizeIssueKey(raw){
+        const match = String(raw || '').trim().match(/\b((?:ANDR|IOS)-\d+)\b/i);
+        return match ? match[1].toUpperCase() : '';
+      }
+
+      function extractIssueKey(issue){
+        const direct = [
+          issue?.key,
+          issue?.issue_key,
+          issue?.issueKey,
+          issue?.idReadable,
+          issue?.id_readable,
+          issue?.issue?.key,
+          issue?.task?.key
+        ];
+        for(const value of direct){
+          const key = normalizeIssueKey(value);
+          if(key) return key;
+        }
+        const text = [issue?.summary, issue?.title, issue?.name, issue?.url].filter(Boolean).join(' ');
+        return normalizeIssueKey(text);
+      }
+
+      function issueSummary(issue){
+        return String(issue?.summary || issue?.title || issue?.name || issue?.subject || issue?.issue?.summary || '').trim();
+      }
+
+      function extractTypeFromValue(value){
+        if(value == null) return '';
+        if(typeof value === 'string' || typeof value === 'number') return String(value);
+        if(Array.isArray(value)) return value.map(extractTypeFromValue).filter(Boolean).join(', ');
+        if(typeof value === 'object') return value.name || value.value || value.label || value.localizedName || value.presentation || '';
+        return '';
+      }
+
+      function pickDeployField(issue, names){
+        const directKeys = names.map((name) => name.toLowerCase().replace(/\s+/g, '_'));
+        for(const key of directKeys){
+          for(const [issueKey, value] of Object.entries(issue || {})){
+            const normalized = issueKey.toLowerCase();
+            if(normalized === key || normalized.replace(/_/g, '') === key.replace(/_/g, '')){
+              const text = extractTypeFromValue(value);
+              if(text) return text;
+            }
+          }
+        }
+        return '';
+      }
+
+      function ytIssueURL(key){
+        const fields = [
+          'idReadable',
+          'summary',
+          'description',
+          'tags(name)',
+          'fields(projectCustomField(field(name)),value(name,localizedName,presentation,text,markdownText,$type),$type)'
+        ].join(',');
+        return `${YT_BASE_URL}/api/issues/${encodeURIComponent(key)}?fields=${encodeURIComponent(fields)}&$top=-1`;
+      }
+
+      function issueFieldName(field){
+        return String(field?.name || field?.projectCustomField?.field?.name || '').trim();
+      }
+
+      function extractFieldText(value){
+        if(typeof value === 'string') return value;
+        if(!value) return '';
+        if(Array.isArray(value)) return value.map(extractFieldText).filter(Boolean).join(', ');
+        if(typeof value.text === 'string') return value.text;
+        if(typeof value.markdownText === 'string') return value.markdownText;
+        if(typeof value.name === 'string') return value.name;
+        if(typeof value.localizedName === 'string') return value.localizedName;
+        if(typeof value.presentation === 'string') return value.presentation;
+        return '';
+      }
+
+      function pickYtField(issue, targets){
+        const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+        const wanted = targets.map((item) => String(item).trim().toLowerCase());
+        for(const field of fields){
+          const name = issueFieldName(field).toLowerCase();
+          if(wanted.includes(name)){
+            const text = extractFieldText(field.value);
+            if(text) return text;
+          }
+        }
+        return '';
+      }
+
+      function readIssueDescription(issue){
+        if(typeof issue?.description === 'string') return issue.description.trim();
+        return pickYtField(issue, ['Description', 'Описание']);
+      }
+
+      const ytCache = new Map();
+      async function fetchYtMeta(key, signal){
+        const normalized = normalizeIssueKey(key);
+        if(!normalized || !ytHeaders()) return null;
+        if(ytCache.has(normalized)) return ytCache.get(normalized);
+        try{
+          const data = await proxyRequest('GET', ytIssueURL(normalized), ytHeaders(), undefined, signal);
+          const meta = {
+            key: normalized,
+            summary: data?.summary || '',
+            tags: Array.isArray(data?.tags) ? data.tags.map((tag) => String(tag?.name || '').trim()).filter(Boolean) : [],
+            stream: pickYtField(data, ['Stream', 'Стрим']),
+            substream: pickYtField(data, ['Substream', 'Sub stream', 'Сабстрим', 'Саб стрим', 'Подстрим']),
+            type: pickYtField(data, ['Type', 'Тип']),
+            description: readIssueDescription(data)
+          };
+          ytCache.set(normalized, meta);
+          return meta;
+        }catch(_){
+          ytCache.set(normalized, null);
+          return null;
+        }
+      }
+
+      function normalizeTag(value){
+        return String(value || '').trim().toLowerCase().replace(/ё/g, 'е');
+      }
+
+      function classifyLocomotiveTags(tags){
+        const result = { business: [], product: [], technical: [], any: [] };
+        const normalizedTags = (tags || []).map((tag) => ({ raw: tag, norm: normalizeTag(tag) }));
+        for(const item of normalizedTags){
+          const isLoco = item.norm.includes('локомотив') || item.norm.includes('locomotive');
+          if(isLoco) result.any.push(item.raw);
+          for(const [kind, needles] of Object.entries(LOCOMOTIVE_TAGS)){
+            if(needles.some((needle) => item.norm.includes(normalizeTag(needle))) && (isLoco || item.norm.includes('locomotive'))){
+              result[kind].push(item.raw);
+            }
+          }
+        }
+        return result;
+      }
+
+      function unique(list){
+        return Array.from(new Set((list || []).map((item) => String(item || '').trim()).filter(Boolean)));
+      }
+
+      function buildIssueModels(issues, metaByKey){
+        const models = [];
+        for(const issue of issues || []){
+          const key = extractIssueKey(issue);
+          const meta = key ? metaByKey.get(key) : null;
+          const tags = unique(meta?.tags || []);
+          const loco = classifyLocomotiveTags(tags);
+          models.push({
+            key,
+            summary: meta?.summary || issueSummary(issue),
+            stream: meta?.stream || pickDeployField(issue, ['stream', 'Стрим']) || '',
+            substream: meta?.substream || pickDeployField(issue, ['substream', 'sub_stream', 'Сабстрим', 'Саб стрим']) || '',
+            type: meta?.type || extractTypeFromValue(issue?.type || issue?.issueType || issue?.issue_type),
+            description: meta?.description || '',
+            tags,
+            locomotive: loco,
+            raw: issue
+          });
+        }
+        return models.filter((item) => item.key || item.summary);
+      }
+
+      function selectPrimaryIssue(issues){
+        return issues.find((issue) => issue.locomotive.any.length) || issues[0] || null;
+      }
+
+      function stripMarkdownNoise(value){
+        return normalizeText(value)
+          .replace(/^\s*#+\s*/gm, '')
+          .replace(/\*\*([^*]+)\*\*/g, '$1')
+          .replace(/\*([^*\n]+)\*/g, '$1')
+          .replace(/`([^`]+)`/g, '$1')
+          .trim();
+      }
+
+      function readHotfixDescriptionField(description, labelRegex){
+        const text = stripMarkdownNoise(description);
+        if(!text) return '';
+        const pattern = new RegExp(`${labelRegex}\\s*[:：]\\s*([\\s\\S]*?)(?=\\n\\s*(?:Причина\\s+ХФ|Детали\\s+ХФ)\\s*[:：]|$)`, 'i');
+        const match = text.match(pattern);
+        return normalizeText(match?.[1] || '').replace(/^[-–—]\s*/, '').trim();
+      }
+
+      function readHotfixInfoFromIssue(issue){
+        const description = issue?.description || '';
+        return {
+          reason: readHotfixDescriptionField(description, 'Причина\\s+ХФ'),
+          details: readHotfixDescriptionField(description, 'Детали\\s+ХФ')
+        };
+      }
+
+      function linkIssue(key){
+        const normalized = normalizeIssueKey(key);
+        if(!normalized) return escHtml(key || '');
+        return `<a href="${YT_BASE_URL}/issue/${encodeURIComponent(normalized)}/" target="_blank" rel="noreferrer">${escHtml(normalized)}</a>`;
+      }
+
+      function renderIssueCell(issue){
+        if(!issue) return '<span class="dash">—</span>';
+        const title = [issue.key ? linkIssue(issue.key) : '', escHtml(issue.summary || '')].filter(Boolean).join(' · ');
+        const tags = issue.locomotive.any.length ? `<div class="cell-sub">${escHtml(issue.locomotive.any.join(', '))}</div>` : '';
+        return `<div class="task-item">${title || '<span class="dash">—</span>'}${tags}</div>`;
+      }
+
+      function cellDateFromMs(ms, sub){
+        if(!Number.isFinite(ms)) return '<span class="dash">—</span>';
+        return `<div class="cell-main">${escHtml(formatMskDateTime(ms))}</div>${sub ? `<div class="cell-sub">${escHtml(sub)}</div>` : ''}`;
+      }
+
+      function valueOrDash(value){
+        const text = String(value || '').trim();
+        return text ? escHtml(text) : '<span class="dash">—</span>';
+      }
+
+      function taskListCell(issues){
+        if(!issues.length) return '<span class="dash">—</span>';
+        return `<div class="task-list">${issues.map(renderIssueCell).join('')}</div>`;
+      }
+
+      function tagCell(issues, kind){
+        const parts = [];
+        for(const issue of issues){
+          if(issue.locomotive[kind]?.length){
+            parts.push(`${issue.key || issue.summary}: ${issue.locomotive[kind].join(', ')}`);
+          }
+        }
+        if(!parts.length) return '<span class="dash">—</span>';
+        return parts.map((part) => `<span class="pill info">${escHtml(part)}</span>`).join('');
+      }
+
+      function rowAnchorMs(row){
+        const values = [
+          row.onePercentMs,
+          row.actualSendMs,
+          row.plannedHotfixMs,
+          row.buildMs,
+          row.branchCutMs
+        ].filter(Number.isFinite);
+        return values.length ? Math.min(...values) : NaN;
+      }
+
+      function buildCsv(rows){
+        const headers = [
+          'Платформа','Версия','Стрим','Сабстрим','Причина','Локомотивная задача','Вторичные задачи',
+          'Время сборки','% раскатки предыдущей версии','Плановая дата отправки хф',
+          'Время отведения ветки хотфикса','Фактическая дата отправки','Когда попали на проверку',
+          'Дата раскатки на 1%','Причина хф','Детали хф'
+        ];
+        const plainIssue = (issue) => issue ? [issue.key, issue.summary].filter(Boolean).join(' · ') : '';
+        const dt = (ms) => Number.isFinite(ms) ? formatMskDateTime(ms) : '';
+        const lines = [headers];
+        for(const row of rows){
+          lines.push([
+            row.platformLabel,
+            row.version,
+            row.stream,
+            row.substream,
+            row.reason,
+            plainIssue(row.primaryIssue),
+            row.secondaryIssues.map(plainIssue).join('; '),
+            dt(row.buildMs),
+            row.previousRolloutText,
+            dt(row.plannedHotfixMs),
+            dt(row.branchCutMs),
+            dt(row.actualSendMs),
+            dt(row.enteredReviewMs),
+            dt(row.onePercentMs),
+            row.hotfixReason,
+            row.hotfixDetails
+          ]);
+        }
+        return lines.map((line) => line.map((cell) => {
+          const text = String(cell ?? '');
+          return /[",\n;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        }).join(';')).join('\n');
+      }
+
+      function downloadCsv(){
+        const rows = getVisibleRows();
+        if(!rows.length) return;
+        const csv = buildCsv(rows);
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `quarter-release-analysis-${state.activePlatform}-${readSettings().release || 'release'}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      async function asyncPool(items, limit, worker){
+        const results = [];
+        let index = 0;
+        const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+          while(index < items.length){
+            const current = index;
+            index += 1;
+            results[current] = await worker(items[current], current);
+          }
+        });
+        await Promise.all(runners);
+        return results;
+      }
+
+      async function enrichIssuesWithYt(issues, signal){
+        const keys = unique((issues || []).map(extractIssueKey));
+        const metaByKey = new Map();
+        if(!ytHeaders() || !keys.length) return metaByKey;
+        await asyncPool(keys, 6, async (key) => {
+          const meta = await fetchYtMeta(key, signal);
+          if(meta) metaByKey.set(key, meta);
+        });
+        return metaByKey;
+      }
+
+      function eventMs(event){
+        return Number.isFinite(event?.createdAt) ? event.createdAt : NaN;
+      }
+
+      async function buildPlatformRow(platform, version, sources, signal){
+        const config = GITLAB_CONFIG[platform];
+        const milestones = sources.milestones.get(version) || {};
+        const deploy = await fetchDeployBundle(platform, version, signal);
+        const rollout = firstOnePercent(sources.rolloutEvents, version, platform);
+        const previous = previousRolloutPercent(sources.rolloutEvents, previousVersion(version), eventMs(rollout), platform);
+
+        let oldestPipeline = null;
+        let buildMs = NaN;
+        if(gitlabHeaderVariants().length){
+          try{
+            oldestPipeline = await fetchGitlabOldestPipeline(platform, version, signal);
+            if(oldestPipeline?.iid){
+              buildMs = await fetchGitlabPipelineJobFinishedAt(platform, oldestPipeline.iid, signal);
+            }
+          }catch(_){}
+        }
+
+        const metaByKey = await enrichIssuesWithYt(deploy.issues, signal);
+        const issueModels = buildIssueModels(deploy.issues, metaByKey);
+        const primaryIssue = selectPrimaryIssue(issueModels);
+        const secondaryIssues = issueModels.filter((issue) => issue !== primaryIssue);
+
+        const buildFromBand = eventMs(milestones.buildTf);
+        const enteredReviewMs = eventMs(milestones.enteredReview);
+        const plannedHotfixMs = eventMs(milestones.plannedHotfixSend);
+        const actualSendMs = deploy.dates.storeMs;
+        const finalBuildMs = platform === 'ios'
+          ? (Number.isFinite(buildFromBand) ? buildFromBand : buildMs)
+          : (Number.isFinite(buildMs) ? buildMs : buildFromBand);
+        const branchCutMs = deploy.dates.cutoffMs;
+
+        const hasAnySource = Boolean(
+          rollout ||
+          previous ||
+          deploy.base ||
+          deploy.deploy ||
+          deploy.issues.length ||
+          Number.isFinite(finalBuildMs) ||
+          Number.isFinite(branchCutMs) ||
+          Number.isFinite(actualSendMs) ||
+          Number.isFinite(enteredReviewMs) ||
+          Number.isFinite(plannedHotfixMs)
+        );
+        if(!hasAnySource) return null;
+
+        const stream = unique(issueModels.map((issue) => issue.stream)).join(', ');
+        const substream = unique(issueModels.map((issue) => issue.substream)).join(', ');
+        const previousRolloutText = previous
+          ? `${previous.percent}% · ${formatMskDateTime(previous.createdAt)}`
+          : '';
+        const hotfixInfo = readHotfixInfoFromIssue(primaryIssue);
+
+        return {
+          platform,
+          platformLabel: config.label,
+          version,
+          stream,
+          substream,
+          reason: 'TBD (-)',
+          primaryIssue,
+          secondaryIssues,
+          buildMs: finalBuildMs,
+          buildSource: platform === 'ios' && Number.isFinite(buildFromBand) ? 'Band TF' : (Number.isFinite(buildMs) ? 'GitLab' : ''),
+          previousRolloutText,
+          plannedHotfixMs,
+          branchCutMs,
+          actualSendMs,
+          enteredReviewMs,
+          onePercentMs: rollout?.createdAt || NaN,
+          onePercentValue: rollout?.percent ?? null,
+          hotfixReason: hotfixInfo.reason || 'TBD (-)',
+          hotfixDetails: hotfixInfo.details || 'TBD (-)',
+          issues: issueModels,
+          sourceCount: [
+            deploy.base,
+            deploy.deploy,
+            deploy.issues.length ? true : null,
+            rollout,
+            previous,
+            Number.isFinite(finalBuildMs),
+            Number.isFinite(branchCutMs),
+            Number.isFinite(plannedHotfixMs)
+          ].filter(Boolean).length,
+          anchorMs: NaN
+        };
+      }
+
+      function finalizeRow(row){
+        row.anchorMs = rowAnchorMs(row);
+        row.anchorYear = yearFromMs(row.anchorMs);
+        row.anchorMonth = monthFromMs(row.anchorMs);
+        return row;
+      }
+
+      async function loadData(){
+        if(state.loading) return;
+        ui.log.innerHTML = '';
+        state.rows = { android: [], ios: [] };
+        renderTable();
+
+        const settings = readSettings();
+        const { family, candidates } = buildHotfixCandidates(settings.release);
+        const selectedYear = settings.year;
+        const sinceMs = new Date(Date.UTC(selectedYear, 0, 1, 0, 0, 0)).getTime();
+        const signal = new AbortController();
+        state.abortController = signal;
+        state.loading = true;
+        state.startedAt = Date.now();
+        ui.loadBtn.disabled = true;
+        ui.stopBtn.disabled = false;
+        ui.csvBtn.disabled = true;
+        setStatus('Собираю источники', 'warn');
+        logLine(`Base-family: ${family}; кандидаты HF: ${candidates.join(', ')}`);
+
+        try{
+          await checkProxy(signal.signal);
+          logLine('Proxy доступен', 'ok');
+
+          const allVersions = [family, ...candidates];
+          const posts = { android: [], ios: [] };
+          if(settings.bandCookies){
+            const [androidPosts, iosPosts] = await Promise.all([
+              fetchBandChannelPostsSince(BAND_CHANNELS.android, sinceMs, signal.signal),
+              fetchBandChannelPostsSince(BAND_CHANNELS.ios, sinceMs, signal.signal)
+            ]);
+            posts.android = androidPosts;
+            posts.ios = iosPosts;
+            logLine(`Band: Android ${androidPosts.length}, iOS ${iosPosts.length} сообщений`, 'ok');
+          }else{
+            logLine('Band cookies не заданы: Band-тайминги будут пустыми', 'warn');
+          }
+
+          const sources = {
+            android: {
+              rolloutEvents: collectRolloutEvents(posts.android, 'android'),
+              milestones: parseBandMilestones(posts.android, 'android', allVersions)
+            },
+            ios: {
+              rolloutEvents: collectRolloutEvents(posts.ios, 'ios'),
+              milestones: parseBandMilestones(posts.ios, 'ios', allVersions)
+            }
+          };
+          logLine(`Rollout events: Android ${sources.android.rolloutEvents.length}, iOS ${sources.ios.rolloutEvents.length}`, 'ok');
+
+          const rowsByPlatform = { android: [], ios: [] };
+          for(const platform of ['android', 'ios']){
+            logLine(`${GITLAB_CONFIG[platform].label}: проверяю ${candidates.length} hotfix-кандидатов`);
+            const rows = await asyncPool(candidates, 2, async (version) => {
+              if(signal.signal.aborted) return null;
+              try{
+                const row = await buildPlatformRow(platform, version, sources[platform], signal.signal);
+                return row ? finalizeRow(row) : null;
+              }catch(error){
+                logLine(`${GITLAB_CONFIG[platform].label} ${version}: ${error.message || error}`, 'warn');
+                return null;
+              }
+            });
+            rowsByPlatform[platform] = rows.filter(Boolean).sort((a, b) => compareVersions(a.version, b.version));
+            logLine(`${GITLAB_CONFIG[platform].label}: найдено строк ${rowsByPlatform[platform].length}`, rowsByPlatform[platform].length ? 'ok' : 'warn');
+          }
+
+          state.rows = rowsByPlatform;
+          state.selectedMonth = 'all';
+          renderMonthTabs();
+          renderTable();
+          setStatus('Готово', 'ok');
+        }catch(error){
+          if(signal.signal.aborted){
+            setStatus('Остановлено', 'warn');
+            logLine('Сбор остановлен пользователем', 'warn');
+          }else{
+            setStatus('Ошибка сбора', 'err');
+            logLine(error.message || String(error), 'err');
+          }
+        }finally{
+          state.loading = false;
+          ui.loadBtn.disabled = false;
+          ui.stopBtn.disabled = true;
+          state.abortController = null;
+          ui.csvBtn.disabled = !getVisibleRows().length;
+        }
+      }
+
+      function stopLoad(){
+        state.abortController?.abort();
+      }
+
+      function getPlatformRows(){
+        return state.rows[state.activePlatform] || [];
+      }
+
+      function getVisibleRows(){
+        const settingsYear = Number(ui.yearSelect.value) || new Date().getFullYear();
+        return getPlatformRows().filter((row) => {
+          if(Number.isFinite(row.anchorYear) && row.anchorYear !== settingsYear) return false;
+          if(state.selectedMonth !== 'all' && row.anchorMonth !== Number(state.selectedMonth)) return false;
+          return true;
+        });
+      }
+
+      function availableMonths(){
+        const year = Number(ui.yearSelect.value) || new Date().getFullYear();
+        const months = new Set();
+        for(const row of getPlatformRows()){
+          if(row.anchorYear === year && Number.isInteger(row.anchorMonth)) months.add(row.anchorMonth);
+        }
+        return months;
+      }
+
+      function renderMonthTabs(){
+        const months = availableMonths();
+        const buttons = [
+          `<button class="month-btn ${state.selectedMonth === 'all' ? 'active' : ''}" type="button" data-month="all">Все</button>`,
+          ...MONTHS.map((month, index) => {
+            const active = state.selectedMonth === String(index);
+            const disabled = months.size && !months.has(index);
+            return `<button class="month-btn ${active ? 'active' : ''}" type="button" data-month="${index}" ${disabled ? 'disabled' : ''}>${month}</button>`;
+          })
+        ];
+        ui.monthTabs.innerHTML = buttons.join('');
+      }
+
+      function renderKpis(rows){
+        ui.kpiRows.textContent = String(rows.length);
+        ui.kpiHotfix.textContent = String(rows.length);
+        ui.kpiOne.textContent = String(rows.filter((row) => Number.isFinite(row.onePercentMs)).length);
+        ui.kpiTasks.textContent = String(rows.filter((row) => row.issues?.length).length);
+        ui.kpiTbd.textContent = String(rows.reduce((acc, row) => {
+          return acc
+            + (/TBD/i.test(row.reason || '') ? 1 : 0)
+            + (/TBD/i.test(row.hotfixReason || '') ? 1 : 0)
+            + (/TBD/i.test(row.hotfixDetails || '') ? 1 : 0);
+        }, 0));
+      }
+
+      function renderTable(){
+        const rows = getVisibleRows();
+        renderKpis(rows);
+        ui.csvBtn.disabled = !rows.length || state.loading;
+        ui.tableHint.textContent = rows.length
+          ? `${GITLAB_CONFIG[state.activePlatform].label}: ${rows.length} строк`
+          : 'Нет строк для выбранного года и месяца.';
+        if(!rows.length){
+          ui.tableHost.innerHTML = '<div class="empty-state">Пока нет данных. Запусти сбор или выбери другой год/месяц.</div>';
+          return;
+        }
+        ui.tableHost.innerHTML = `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2">Версия</th>
+                  <th colspan="5">Задачи</th>
+                  <th colspan="7">Тайминги</th>
+                  <th colspan="2">Хотфикс</th>
+                </tr>
+                <tr>
+                  <th>Стрим</th>
+                  <th>Сабстрим</th>
+                  <th>Причина</th>
+                  <th>Локомотивная задача</th>
+                  <th>Вторичные задачи</th>
+                  <th>Время сборки</th>
+                  <th>% раскатки предыдущей версии</th>
+                  <th>Плановая дата отправки хф</th>
+                  <th>Время отведения ветки хотфикса</th>
+                  <th>Фактическая дата отправки</th>
+                  <th>Когда попали на проверку</th>
+                  <th>Дата раскатки на 1%</th>
+                  <th>Причина хф</th>
+                  <th>Детали хф</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.map(renderTableRow).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      function renderTableRow(row){
+        return `
+          <tr>
+            <td>
+              <div class="cell-main mono">${escHtml(row.version)}</div>
+              <div class="cell-sub">${escHtml(row.platformLabel)} · источников: ${escHtml(row.sourceCount)}</div>
+            </td>
+            <td>${valueOrDash(row.stream)}</td>
+            <td>${valueOrDash(row.substream)}</td>
+            <td><span class="pill warn">${escHtml(row.reason)}</span></td>
+            <td>${renderIssueCell(row.primaryIssue)}</td>
+            <td>${taskListCell(row.secondaryIssues || [])}</td>
+            <td>${cellDateFromMs(row.buildMs, row.buildSource)}</td>
+            <td>${row.previousRolloutText ? `<span class="pill info">${escHtml(row.previousRolloutText)}</span>` : '<span class="dash">—</span>'}</td>
+            <td>${cellDateFromMs(row.plannedHotfixMs, 'Band thread')}</td>
+            <td>${cellDateFromMs(row.branchCutMs, 'DeployLab cutoff')}</td>
+            <td>${cellDateFromMs(row.actualSendMs, 'DeployLab store')}</td>
+            <td>${cellDateFromMs(row.enteredReviewMs, 'Band')}</td>
+            <td>${cellDateFromMs(row.onePercentMs, row.onePercentValue !== null ? `${row.onePercentValue}%` : '')}</td>
+            <td><div class="hf-text">${valueOrDash(row.hotfixReason)}</div></td>
+            <td><div class="hf-text">${valueOrDash(row.hotfixDetails)}</div></td>
+          </tr>
+        `;
+      }
+
+      document.querySelectorAll('[data-platform]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.activePlatform = button.dataset.platform || 'android';
+          document.querySelectorAll('[data-platform]').forEach((item) => item.classList.toggle('active', item === button));
+          state.selectedMonth = 'all';
+          renderMonthTabs();
+          renderTable();
+        });
+      });
+
+      ui.monthTabs.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-month]');
+        if(!button || button.disabled) return;
+        state.selectedMonth = button.dataset.month || 'all';
+        renderMonthTabs();
+        renderTable();
+      });
+
+      ui.showAllMonthsBtn.addEventListener('click', () => {
+        state.selectedMonth = 'all';
+        renderMonthTabs();
+        renderTable();
+      });
+      ui.yearSelect.addEventListener('change', () => {
+        state.selectedMonth = 'all';
+        renderMonthTabs();
+        renderTable();
+      });
+      ui.loadBtn.addEventListener('click', () => {
+        loadData().catch((error) => {
+          setStatus('Ошибка сбора', 'err');
+          logLine(error.message || String(error), 'err');
+          state.loading = false;
+          ui.loadBtn.disabled = false;
+          ui.stopBtn.disabled = true;
+        });
+      });
+      ui.stopBtn.addEventListener('click', stopLoad);
+      ui.csvBtn.addEventListener('click', downloadCsv);
+
+      initInputs();
+    })();
+  </script>
+</body>
+</html>
