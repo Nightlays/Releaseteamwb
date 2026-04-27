@@ -7,6 +7,8 @@ export interface User {
 }
 
 /* ─── SETTINGS ────────────────────────────────────────────── */
+export const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec';
+
 export interface AppSettings {
   proxyBase:    string;
   proxyMode:    'query' | 'prefix';
@@ -27,7 +29,6 @@ export interface AppSettings {
   wikiToken:     string;
   bandCookies:      string;
   bandCookiesAdmin: string;
-  gasUrl:           string;
 }
 
 export function normalizeGlmBase(value: unknown): string {
@@ -93,7 +94,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   wikiToken:     '',
   bandCookies:      '',
   bandCookiesAdmin: '',
-  gasUrl:           'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec',
 };
 
 export function normalizeSettings(input?: Partial<AppSettings> | null): AppSettings {
@@ -119,7 +119,6 @@ export function normalizeSettings(input?: Partial<AppSettings> | null): AppSetti
     wikiToken: typeof value.wikiToken === 'string' ? value.wikiToken : DEFAULT_SETTINGS.wikiToken,
     bandCookies: typeof value.bandCookies === 'string' ? value.bandCookies : DEFAULT_SETTINGS.bandCookies,
     bandCookiesAdmin: typeof value.bandCookiesAdmin === 'string' ? value.bandCookiesAdmin : DEFAULT_SETTINGS.bandCookiesAdmin,
-    gasUrl: typeof value.gasUrl === 'string' ? value.gasUrl : DEFAULT_SETTINGS.gasUrl,
   };
 }
 

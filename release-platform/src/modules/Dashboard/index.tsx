@@ -51,7 +51,7 @@ import {
   type DashboardHistoryPoint,
   type DashboardPrediction,
 } from '../../services/releasePrediction';
-import type { AllureLaunchResult } from '../../types';
+import { GOOGLE_APPS_SCRIPT_URL, type AllureLaunchResult } from '../../types';
 import { useApp, isDarkTheme, type ThemeMode } from '../../context/AppContext';
 
 Chart.register(DoughnutController, ArcElement, BarController, LineController, LineElement, PointElement, CategoryScale, LinearScale, BarElement, Filler, Tooltip, Legend);
@@ -1667,7 +1667,7 @@ export function Dashboard() {
              manualTimedFinished: cachedDashboard.manualTimedFinished,
              manualWindowStartTs: cachedDashboard.manualWindowStartTs,
              manualWindowStopTs: cachedDashboard.manualWindowStopTs,
-             gasConfig: { gasUrl: settings.gasUrl, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
+             gasConfig: { gasUrl: GOOGLE_APPS_SCRIPT_URL, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
              launchCreatedTs: cachedDashboard.launchCreatedTs ?? undefined,
            }).then(nextPrediction => {
              setPrediction(nextPrediction);
@@ -1736,7 +1736,7 @@ export function Dashboard() {
           manualTimedFinished: dashboardData.manualTimedFinished,
           manualWindowStartTs: dashboardData.manualWindowStartTs,
           manualWindowStopTs: dashboardData.manualWindowStopTs,
-          gasConfig: { gasUrl: settings.gasUrl, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
+          gasConfig: { gasUrl: GOOGLE_APPS_SCRIPT_URL, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
           launchCreatedTs: dashboardData.launchCreatedTs ?? undefined,
         });
         setPrediction(nextPrediction);

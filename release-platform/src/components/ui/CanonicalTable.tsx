@@ -181,6 +181,7 @@ export function CanonicalTable<T>({
                       borderRight: '1px solid var(--border-hi)',
                       borderBottom: '1.5px solid var(--border-hi)',
                       background: 'var(--card-hi)',
+                      backgroundClip: 'padding-box',
                       color: 'var(--text)',
                       fontSize: 11,
                       fontWeight: 800,
@@ -197,7 +198,7 @@ export function CanonicalTable<T>({
               {columns.map((column, columnIndex) => {
                 const stickyLeft = stickyLeftOffsets[columnIndex];
                 const isStickyLeft = typeof stickyLeft === 'number';
-                const stickyHeaderBg = 'var(--card-hi)';
+                const headerBg = 'var(--card-hi)';
                 return (
                 <th
                   key={column.id}
@@ -210,9 +211,9 @@ export function CanonicalTable<T>({
                     padding: '8px 10px',
                     borderRight: '1px solid var(--border-hi)',
                     borderBottom: '1.5px solid var(--border-hi)',
-                    background: isStickyLeft ? stickyHeaderBg : 'var(--surface-soft-2)',
+                    background: headerBg,
                     backgroundClip: 'padding-box',
-                    boxShadow: isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : undefined,
+                    boxShadow: isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : '0 2px 0 var(--border-hi)',
                     color: 'var(--text-2)',
                     fontSize: 10.5,
                     fontWeight: 800,

@@ -19,6 +19,7 @@ import {
   type RegressionBaseline,
   type RegressionRunRecord,
 } from './regressionHistory';
+import { GOOGLE_APPS_SCRIPT_URL } from '../types';
 const ML_FEATURE_KEYS = [
   'tc_total',
   'tc_total_delta',
@@ -915,7 +916,7 @@ export async function buildDashboardPrediction(input: DashboardPredictionInput):
   );
 
   // ── People-aware historical forecast ──────────────────────────────────────
-  const gasConfig: GasConfig = input.gasConfig ?? { gasUrl: '' };
+  const gasConfig: GasConfig = input.gasConfig ?? { gasUrl: GOOGLE_APPS_SCRIPT_URL };
   const allRuns = await loadRegressionRuns(gasConfig);
   const historicalBaseline = computeRegressionBaseline(allRuns);
 

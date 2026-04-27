@@ -12,7 +12,6 @@ const SECTIONS: Array<{ label: string; rows: Array<{ key: keyof AppSettings; lab
       { key: 'proxyMode', label: 'Режим proxy', type: 'select', options: [{ value: 'query', label: 'Query' }, { value: 'prefix', label: 'Prefix' }] },
       { key: 'useProxy', label: 'Использовать proxy', type: 'checkbox' },
       { key: 'mlHelperBase', label: 'ML Helper Base URL', placeholder: 'http://127.0.0.1:8788' },
-      { key: 'gasUrl', label: 'Google Apps Script URL (хранилище истории)', placeholder: 'https://script.google.com/macros/s/...' },
     ],
   },
   {
@@ -67,71 +66,73 @@ export function SettingsModal() {
 
   return (
     <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Общие настройки платформы" width={680}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxHeight: '70vh', overflowY: 'auto', paddingRight: 2 }}>
-        {SECTIONS.map(section => (
-          <div key={section.label}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--text-3)', marginBottom: 12 }}>
-              {section.label}
-            </div>
+      <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '70vh', minHeight: 0, background: 'var(--card)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minHeight: 0, overflowY: 'auto', paddingRight: 2 }}>
+          {SECTIONS.map(section => (
+            <div key={section.label}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--text-3)', marginBottom: 12 }}>
+                {section.label}
+              </div>
 
-            <div style={{ display: 'grid', gap: 10 }}>
-              {section.rows.map(field => (
-                <div key={String(field.key)}>
-                  <FieldLabel>{field.label}</FieldLabel>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {section.rows.map(field => (
+                  <div key={String(field.key)}>
+                    <FieldLabel>{field.label}</FieldLabel>
 
-                  {field.type === 'textarea' ? (
-                    <Textarea
-                      rows={3}
-                      value={String(draft[field.key] ?? '')}
-                      placeholder={field.placeholder}
-                      onChange={e => setField(field.key, e.target.value as AppSettings[keyof AppSettings])}
-                    />
-                  ) : field.type === 'select' ? (
-                    <Select
-                      value={String(draft[field.key])}
-                      onChange={e => setField(field.key, e.target.value as AppSettings[keyof AppSettings])}
-                    >
-                      {field.options?.map(option => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </Select>
-                  ) : field.type === 'checkbox' ? (
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '10px 12px',
-                      borderRadius: 12,
-                      border: '1px solid var(--border-hi)',
-                      background: 'var(--surface-soft)',
-                      color: 'var(--text-2)',
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(draft[field.key])}
-                        onChange={e => setField(field.key, e.target.checked as AppSettings[keyof AppSettings])}
+                    {field.type === 'textarea' ? (
+                      <Textarea
+                        rows={3}
+                        value={String(draft[field.key] ?? '')}
+                        placeholder={field.placeholder}
+                        onChange={e => setField(field.key, e.target.value as AppSettings[keyof AppSettings])}
                       />
-                      <span>Разрешить проксирование запросов для legacy-модулей</span>
-                    </label>
-                  ) : (
-                    <Input
-                      type={field.type === 'password' ? 'password' : 'text'}
-                      value={String(draft[field.key] ?? '')}
-                      placeholder={field.placeholder}
-                      autoComplete="off"
-                      onChange={e => setField(field.key, e.target.value as AppSettings[keyof AppSettings])}
-                    />
-                  )}
-                </div>
-              ))}
+                    ) : field.type === 'select' ? (
+                      <Select
+                        value={String(draft[field.key])}
+                        onChange={e => setField(field.key, e.target.value as AppSettings[keyof AppSettings])}
+                      >
+                        {field.options?.map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </Select>
+                    ) : field.type === 'checkbox' ? (
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        border: '1px solid var(--border-hi)',
+                        background: 'var(--surface-soft)',
+                        color: 'var(--text-2)',
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(draft[field.key])}
+                          onChange={e => setField(field.key, e.target.checked as AppSettings[keyof AppSettings])}
+                        />
+                        <span>Разрешить проксирование запросов для legacy-модулей</span>
+                      </label>
+                    ) : (
+                      <Input
+                        type={field.type === 'password' ? 'password' : 'text'}
+                        value={String(draft[field.key] ?? '')}
+                        placeholder={field.placeholder}
+                        autoComplete="off"
+                        onChange={e => setField(field.key, e.target.value as AppSettings[keyof AppSettings])}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <Divider style={{ marginTop: 14 }} />
             </div>
+          ))}
+        </div>
 
-            <Divider style={{ marginTop: 14 }} />
-          </div>
-        ))}
-
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <Button variant="ghost" size="sm" onClick={reset}>Сбросить</Button>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', background: 'var(--card)' }}>
+          <Button variant="danger" size="sm" onClick={reset}>Удалить</Button>
           <Button variant="secondary" size="sm" onClick={() => setSettingsOpen(false)}>Отмена</Button>
           <Button variant="primary" size="sm" onClick={onSave}>Сохранить и обновить модули</Button>
         </div>

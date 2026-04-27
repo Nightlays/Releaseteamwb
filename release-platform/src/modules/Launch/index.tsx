@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Card, CardHeader, CardTitle, CardBody, Divider, Badge, Button, Input, Select, FieldLabel, Textarea, LogView, Modal, Table, Th, Td, EmptyState } from '../../components/ui';
 import { useSettings } from '../../context/SettingsContext';
 
-import { RunMode, RUN_MODE_LABELS, StepStatus, DutyStream } from '../../types';
+import { GOOGLE_APPS_SCRIPT_URL, RunMode, RUN_MODE_LABELS, StepStatus, DutyStream } from '../../types';
 import {
   runCreatorScenario,
   bandPostMessage,
@@ -828,7 +828,7 @@ export function Launch() {
   const cookies = String(settings.bandCookies || '').trim();
   const adminCookies = String(settings.bandCookiesAdmin || '').trim();
   const proxyBase = String(settings.proxyBase || '').trim();
-  const gasUrl = String(settings.gasUrl || '').trim();
+  const gasUrl = GOOGLE_APPS_SCRIPT_URL;
 
   const log = useCallback((text: string, level: LogLevel = 'info') =>
     setLogs(prev => [...prev.slice(-300), { text: `[${new Date().toLocaleTimeString('ru-RU')}] ${text}`, level }]), []);

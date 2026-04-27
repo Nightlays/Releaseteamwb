@@ -1498,7 +1498,7 @@ export async function collectQuarterReleaseAnalysis(
 
     const primary = selectPrimaryIssueMeta(metas);
     const secondary = primary ? metas.filter(meta => meta !== primary) : metas.slice(1);
-    const month = monthFromMs(anchorMs);
+    const month = monthFromMs(buildMs) ?? monthFromMs(anchorMs);
     return {
       platform: job.platform,
       version: job.version,

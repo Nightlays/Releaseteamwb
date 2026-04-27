@@ -78,6 +78,28 @@ function secondaryTasksPreview(row: QuarterAnalysisRow) {
   );
 }
 
+function secondaryTasksCell(row: QuarterAnalysisRow) {
+  if (!row.secondaryTasks.length) return <span style={{ color: 'var(--text-3)' }}>-</span>;
+  return (
+    <span style={{ whiteSpace: 'normal' }}>
+      {row.secondaryTasks.map((issue, index) => (
+        <React.Fragment key={issue.key}>
+          {index > 0 && <><br /><br /></>}
+          <a
+            href={issue.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none', fontFamily: 'var(--mono)' }}
+          >
+            {issue.key}
+          </a>
+          {issue.summary ? ` ${issue.summary}` : ''}
+        </React.Fragment>
+      ))}
+    </span>
+  );
+}
+
 function taskCount(row: QuarterAnalysisRow) {
   return row.secondaryTasks.length + (row.primaryTask ? 1 : 0);
 }
@@ -282,7 +304,7 @@ export function ReleaseQuarterAnalysis() {
       group: 'Задачи',
       title: 'Вторичные задачи',
       width: 340,
-      render: row => <span style={{ whiteSpace: 'pre-wrap' }}>{secondaryTasksText(row)}</span>,
+      render: secondaryTasksCell,
       text: secondaryTasksText,
       preview: secondaryTasksPreview,
       lineClamp: 3,
