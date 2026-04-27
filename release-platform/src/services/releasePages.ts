@@ -70,6 +70,7 @@ const GITLAB_GRAPHQL = `${GITLAB_BASE}/api/graphql`;
 const GITLAB_PIPELINE_PAGE_SIZE = 100;
 const BAND_PAGE_SIZE = 30;
 const BAND_PAGE_LIMIT = 400;
+const BAND_CONTEXT_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
 const BAND_CHANNELS: Record<PlatformKey, string> = {
   android: 'mccs6h69jtdhu8uzeeg3nz1wxa',
   ios: 'kg4eed6pdpy1pfhhitjtmqqhpe',
@@ -311,6 +312,20 @@ function hotfixSummariesForFamily(items: DeployReleaseSummary[], family: string)
   return Array.from(byVersion.values());
 }
 
+function hotfixSummariesForFamilies(items: DeployReleaseSummary[], families: string[]) {
+  const byVersion = new Map<string, DeployReleaseSummary>();
+  families.forEach(family => {
+    hotfixSummariesForFamily(items, family).forEach(item => {
+      if (!byVersion.has(item.version)) byVersion.set(item.version, item);
+    });
+  });
+  return Array.from(byVersion.values()).sort((left, right) => compareRelease(left.version, right.version));
+}
+
+function deploySummaryAnchorMs(item: DeployReleaseSummary) {
+  return rowAnchorMs([item.dateMs, item.cutoffMs, item.deployMs]);
+}
+
 function previousVersion(version: string) {
   const parsed = parseRelease(version);
   if (!parsed || parsed.build <= 0) return '';
@@ -340,6 +355,16 @@ function formatDateTime(ms: number) {
   }).format(new Date(ms)).replace(',', '');
 }
 
+function formatDate(ms: number) {
+  if (!Number.isFinite(ms)) return '-';
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(ms));
+}
+
 function monthFromMs(ms: number) {
   if (!Number.isFinite(ms)) return null;
   const month = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Moscow', month: 'numeric' }).format(new Date(ms))) - 1;
@@ -350,6 +375,10 @@ function yearFromMs(ms: number) {
   if (!Number.isFinite(ms)) return null;
   const year = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Moscow', year: 'numeric' }).format(new Date(ms)));
   return Number.isFinite(year) ? year : null;
+}
+
+function currentMskYear() {
+  return yearFromMs(Date.now()) || new Date().getFullYear();
 }
 
 function normalizeText(value: unknown) {
@@ -685,7 +714,7 @@ function unwrapBandPostsPayload(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
 }
 
-async function fetchBandChannelPostsSince(cfg: ReleasePageConfig, channelId: string, sinceMs: number) {
+async function fetchBandChannelPostsSince(cfg: ReleasePageConfig, channelId: string, sinceMs: number, untilMs = Number.POSITIVE_INFINITY) {
   const headers = bandHeaders(cfg);
   if (!headers) return [] as BandPost[];
   const postsById = new Map<string, BandPost>();
@@ -737,6 +766,7 @@ async function fetchBandChannelPostsSince(cfg: ReleasePageConfig, channelId: str
       const createdAt = Number(post.create_at || 0);
       if (!Number.isFinite(createdAt) || createdAt <= 0) return false;
       if (Number.isFinite(sinceMs) && createdAt < sinceMs) return false;
+      if (Number.isFinite(untilMs) && createdAt > untilMs) return false;
       return true;
     })
     .sort((left, right) => Number(left.create_at || 0) - Number(right.create_at || 0));
@@ -1320,26 +1350,27 @@ async function mapLimit<T, R>(items: T[], limit: number, worker: (item: T, index
 
 export async function collectQuarterReleaseAnalysis(
   cfg: ReleasePageConfig,
-  release: string,
-  year: number
+  startRelease: string,
+  endRelease?: string
 ): Promise<QuarterAnalysisRow[]> {
   if (!cfg.settings.deployLabToken.trim()) throw new Error('Заполни DeployLab token в настройках.');
   if (!cfg.settings.ytToken.trim()) throw new Error('Заполни YouTrack token в настройках.');
-  const family = releaseFamily(release);
-  if (!family) throw new Error('Мажорный релиз должен быть в формате 7.5.6000');
+  const families = expandMajorReleaseRange(startRelease, endRelease || startRelease);
+  const familyLabel = families.length > 1 ? `${families[0]} - ${families[families.length - 1]}` : families[0];
+  cfg.onLog?.(`Диапазон мажорных релизов: ${familyLabel}`, 'info');
 
   const [androidReleaseSummaries, iosReleaseSummaries] = await Promise.all([
     fetchDeployReleaseSummaries(cfg, 'android'),
     fetchDeployReleaseSummaries(cfg, 'ios'),
   ]);
   const deployHotfixes: Record<PlatformKey, DeployReleaseSummary[]> = {
-    android: hotfixSummariesForFamily(androidReleaseSummaries, family),
-    ios: hotfixSummariesForFamily(iosReleaseSummaries, family),
+    android: hotfixSummariesForFamilies(androidReleaseSummaries, families),
+    ios: hotfixSummariesForFamilies(iosReleaseSummaries, families),
   };
   (['android', 'ios'] as PlatformKey[]).forEach(platform => {
     const versions = deployHotfixes[platform].map(item => item.version);
     cfg.onLog?.(
-      `DeployLab ${PLATFORM_META[platform].label}: ${versions.length ? `нашел ${versions.join(', ')}` : `хотфиксы для ${family} не найдены`}`,
+      `DeployLab ${PLATFORM_META[platform].label}: ${versions.length ? `нашел ${versions.join(', ')}` : `хотфиксы для ${familyLabel} не найдены`}`,
       versions.length ? 'ok' : 'warn'
     );
   });
@@ -1347,12 +1378,14 @@ export async function collectQuarterReleaseAnalysis(
   const jobs = (['android', 'ios'] as PlatformKey[]).flatMap(platform => (
     deployHotfixes[platform].map(summary => ({ platform, version: summary.version, summary }))
   ));
-  const allVersions = [family, ...jobs.map(job => job.version)].filter(Boolean);
+  const allVersions = [...families, ...jobs.map(job => job.version)].filter(Boolean);
   if (!jobs.length) {
     cfg.onProgress?.(100);
     return [];
   }
-  const sinceMs = Date.UTC(year, 0, 1, 0, 0, 0);
+  const summaryDates = jobs.map(job => deploySummaryAnchorMs(job.summary)).filter(Number.isFinite);
+  const fallbackSinceMs = buildMskDateMs(currentMskYear(), 0, 1);
+  const sinceMs = Math.max(0, (summaryDates.length ? Math.min(...summaryDates) : fallbackSinceMs) - BAND_CONTEXT_LOOKBACK_MS);
   const issueCache = new Map<string, ReleaseIssueMeta>();
   const sources: Record<PlatformKey, { rolloutEvents: RolloutEvent[]; milestones: Map<string, BandMilestones> }> = {
     android: { rolloutEvents: [], milestones: new Map() },
@@ -1466,8 +1499,6 @@ export async function collectQuarterReleaseAnalysis(
     const primary = selectPrimaryIssueMeta(metas);
     const secondary = primary ? metas.filter(meta => meta !== primary) : metas.slice(1);
     const month = monthFromMs(anchorMs);
-    const rowYear = yearFromMs(anchorMs) || year;
-    if (rowYear !== year) return null;
     return {
       platform: job.platform,
       version: job.version,
@@ -1480,7 +1511,7 @@ export async function collectQuarterReleaseAnalysis(
       secondaryTasks: secondary,
       buildTime: formatDateTime(buildMs),
       previousRolloutPercent: previous ? `${previous.percent}% ${previous.version} · ${formatDateTime(previous.createdAt)}` : '-',
-      plannedHotfixDate: formatDateTime(plannedHotfixMs),
+      plannedHotfixDate: formatDate(plannedHotfixMs),
       branchCutTime: formatDateTime(deploy.cutoffMs),
       actualSendTime: formatDateTime(eventMs(actualSend)),
       enteredReviewTime: formatDateTime(enteredReviewMs),

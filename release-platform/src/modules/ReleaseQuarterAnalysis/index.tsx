@@ -1,11 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
   Card,
   CardBody,
   CardHeader,
-  CardHint,
   CardTitle,
   CanonicalTable,
   type CanonicalTableColumn,
@@ -14,7 +13,6 @@ import {
   LogView,
   Progress,
   SegmentControl,
-  Select,
 } from '../../components/ui';
 import { useSettings } from '../../context/SettingsContext';
 import {
@@ -27,14 +25,20 @@ import {
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const SHOW_RELEASE_ANALYSIS_FLOATING_LOGS = true;
-
-function nowYear() {
-  return new Date().getFullYear();
-}
+const MAJOR_RELEASE_STORAGE_KEY = 'rp_release_quarter_major_release';
+const MAJOR_RELEASE_TO_STORAGE_KEY = 'rp_release_quarter_major_release_to';
 
 function dash(value: unknown) {
   const text = String(value || '').trim();
   return text || '-';
+}
+
+function readStoredRelease(key: string, fallback: string) {
+  try {
+    return String(localStorage.getItem(key) || '').trim() || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function issueCell(issue: QuarterAnalysisRow['primaryTask']) {
@@ -82,7 +86,7 @@ function versionText(row: QuarterAnalysisRow) {
   return `${row.version}\nЗадач: ${taskCount(row)}`;
 }
 
-function exportCsv(rows: QuarterAnalysisRow[], platform: PlatformKey, year: number) {
+function exportCsv(rows: QuarterAnalysisRow[], platform: PlatformKey, rangeLabel: string) {
   const headers = [
     'Платформа',
     'Версия',
@@ -95,7 +99,6 @@ function exportCsv(rows: QuarterAnalysisRow[], platform: PlatformKey, year: numb
     'Плановая дата отправки хф',
     'Время отведения хотфикса',
     'Фактическая дата отправки',
-    'Когда попали на проверку',
     'Дата раскатки на 1%',
     'Причина хф',
     'Детали хф',
@@ -112,7 +115,6 @@ function exportCsv(rows: QuarterAnalysisRow[], platform: PlatformKey, year: numb
     row.plannedHotfixDate,
     row.branchCutTime,
     row.actualSendTime,
-    row.enteredReviewTime,
     row.onePercentDate,
     row.hotfixReason,
     row.hotfixDetails,
@@ -122,20 +124,20 @@ function exportCsv(rows: QuarterAnalysisRow[], platform: PlatformKey, year: numb
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `release-quarter-${platform}-${year}.csv`;
+  link.download = `release-quarter-${platform}-${rangeLabel}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
 
 export function ReleaseQuarterAnalysis() {
   const { settings } = useSettings();
-  const [release, setRelease] = useState('7.5.6000');
-  const [year, setYear] = useState(String(nowYear()));
+  const [releaseFrom, setReleaseFrom] = useState(() => readStoredRelease(MAJOR_RELEASE_STORAGE_KEY, '7.5.6000'));
+  const [releaseTo, setReleaseTo] = useState(() => readStoredRelease(MAJOR_RELEASE_TO_STORAGE_KEY, readStoredRelease(MAJOR_RELEASE_STORAGE_KEY, '7.5.6000')));
   const [platform, setPlatform] = useState<PlatformKey>('android');
   const [month, setMonth] = useState('all');
   const [rows, setRows] = useState<QuarterAnalysisRow[]>([]);
   const [logs, setLogs] = useState<Array<{ text: string; level: LogLevel }>>([]);
-  const [status, setStatus] = useState('Укажи мажорный релиз и запусти сбор.');
+  const [status, setStatus] = useState('Укажи диапазон мажорных релизов и запусти сбор.');
   const [statusTone, setStatusTone] = useState<'neutral' | 'ok' | 'warn' | 'error'>('neutral');
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -146,6 +148,22 @@ export function ReleaseQuarterAnalysis() {
   const log = useCallback((message: string, level: LogLevel = 'info') => {
     setLogs(prev => [...prev.slice(-249), { text: `[${new Date().toLocaleTimeString('ru-RU')}] ${message}`, level }]);
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(MAJOR_RELEASE_STORAGE_KEY, releaseFrom.trim());
+    } catch {
+      /* ignore */
+    }
+  }, [releaseFrom]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(MAJOR_RELEASE_TO_STORAGE_KEY, releaseTo.trim());
+    } catch {
+      /* ignore */
+    }
+  }, [releaseTo]);
 
   const visibleRows = useMemo(() => rows.filter(row => {
     if (row.platform !== platform) return false;
@@ -172,8 +190,8 @@ export function ReleaseQuarterAnalysis() {
     try {
       const result = await collectQuarterReleaseAnalysis(
         { settings, signal: controller.signal, onLog: log, onProgress: setProgress },
-        release,
-        Number(year)
+        releaseFrom,
+        releaseTo || releaseFrom
       );
       setRows(result);
       setMonth('all');
@@ -190,7 +208,7 @@ export function ReleaseQuarterAnalysis() {
       if (abortRef.current === controller) abortRef.current = null;
       setBusy(false);
     }
-  }, [log, release, settings, year]);
+  }, [log, releaseFrom, releaseTo, settings]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -229,20 +247,15 @@ export function ReleaseQuarterAnalysis() {
     window.addEventListener('mouseup', onUp);
   }, [logPanelSize.height, logPanelSize.width]);
 
-  const years = useMemo(() => Array.from({ length: 6 }, (_, index) => nowYear() + 1 - index), []);
-  const platformRows = rows.filter(row => row.platform === platform);
-  const missingHotfixInfoCount = visibleRows.reduce((count, row) => (
-    count
-      + (!String(row.hotfixReason || '').trim() || row.hotfixReason === '-' ? 1 : 0)
-      + (!String(row.hotfixDetails || '').trim() || row.hotfixDetails === '-' ? 1 : 0)
-  ), 0);
   const progressColor = statusTone === 'ok' ? 'green' : statusTone === 'warn' ? 'yellow' : statusTone === 'error' ? 'red' : 'accent';
+  const csvRangeLabel = `${releaseFrom || 'start'}_${releaseTo || releaseFrom || 'end'}`.replace(/\s+/g, '');
   const tableColumns = useMemo<Array<CanonicalTableColumn<QuarterAnalysisRow>>>(() => [
     {
       id: 'version',
       group: 'Задачи',
       title: 'Версия',
       width: 150,
+      sticky: 'left',
       text: versionText,
       lineClamp: 3,
       render: row => (
@@ -269,19 +282,17 @@ export function ReleaseQuarterAnalysis() {
       group: 'Задачи',
       title: 'Вторичные задачи',
       width: 340,
-      render: row => row.secondaryTasks.length
-        ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{row.secondaryTasks.map(issue => <div key={issue.key}>{issueCell(issue)}</div>)}</div>
-        : '-',
+      render: row => <span style={{ whiteSpace: 'pre-wrap' }}>{secondaryTasksText(row)}</span>,
       text: secondaryTasksText,
       preview: secondaryTasksPreview,
       lineClamp: 3,
+      showOverflowMarker: false,
     },
     { id: 'buildTime', group: 'Тайминги', title: 'Время сборки', width: 150, text: row => dash(row.buildTime), lineClamp: 2 },
     { id: 'previousRolloutPercent', group: 'Тайминги', title: '% раскатки предыдущей версии', width: 220, text: row => dash(row.previousRolloutPercent), lineClamp: 2 },
     { id: 'plannedHotfixDate', group: 'Тайминги', title: 'Плановая дата отправки хф', width: 190, text: row => dash(row.plannedHotfixDate), lineClamp: 2 },
     { id: 'branchCutTime', group: 'Тайминги', title: 'Время отведения хотфикса', width: 180, text: row => dash(row.branchCutTime), lineClamp: 2 },
     { id: 'actualSendTime', group: 'Тайминги', title: 'Фактическая дата отправки', width: 170, text: row => dash(row.actualSendTime), lineClamp: 2 },
-    { id: 'enteredReviewTime', group: 'Тайминги', title: 'Когда попали на проверку', width: 170, text: row => dash(row.enteredReviewTime), lineClamp: 2 },
     { id: 'onePercentDate', group: 'Тайминги', title: 'Дата раскатки на 1%', width: 165, text: row => dash(row.onePercentDate), lineClamp: 2 },
     { id: 'hotfixReason', group: 'Хотфикс', title: 'Причина хф', width: 260, text: row => dash(row.hotfixReason), lineClamp: 3 },
     { id: 'hotfixDetails', group: 'Хотфикс', title: 'Детали хф', width: 340, text: row => dash(row.hotfixDetails), lineClamp: 3 },
@@ -295,25 +306,21 @@ export function ReleaseQuarterAnalysis() {
         <CardHeader>
           <div>
             <CardTitle>Параметры</CardTitle>
-            <CardHint>Токены DeployLab, YouTrack, GitLab, Band и proxy берутся из общих настроек платформы.</CardHint>
           </div>
-          <Badge color={busy ? 'purple' : rows.length ? 'green' : 'gray'}>{busy ? 'Сбор...' : rows.length ? 'Данные есть' : 'Ожидаю'}</Badge>
         </CardHeader>
         <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, alignItems: 'end' }}>
             <div>
-              <FieldLabel>Год</FieldLabel>
-              <Select value={year} onChange={event => setYear(event.target.value)}>
-                {years.map(item => <option key={item} value={item}>{item}</option>)}
-              </Select>
+              <FieldLabel>Релиз с</FieldLabel>
+              <Input value={releaseFrom} onChange={event => setReleaseFrom(event.target.value)} placeholder="7.5.6000" />
             </div>
             <div>
-              <FieldLabel>Мажорный релиз</FieldLabel>
-              <Input value={release} onChange={event => setRelease(event.target.value)} placeholder="7.5.6000" />
+              <FieldLabel>Релиз по</FieldLabel>
+              <Input value={releaseTo} onChange={event => setReleaseTo(event.target.value)} placeholder={releaseFrom || '7.5.6000'} />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               {busy ? <Button variant="danger" onClick={stop}>Остановить</Button> : <Button variant="primary" onClick={() => void run()}>Собрать</Button>}
-              <Button variant="secondary" disabled={!visibleRows.length} onClick={() => exportCsv(visibleRows, platform, Number(year))}>CSV</Button>
+              <Button variant="secondary" disabled={!visibleRows.length} onClick={() => exportCsv(visibleRows, platform, csvRangeLabel)}>CSV</Button>
             </div>
           </div>
           <div>
@@ -330,7 +337,6 @@ export function ReleaseQuarterAnalysis() {
         <CardHeader>
           <div>
             <CardTitle>Таблица</CardTitle>
-            <CardHint>Платформа, месяц и строки хотфиксов по выбранному году.</CardHint>
           </div>
           <Badge color={visibleRows.length ? 'purple' : 'gray'}>{visibleRows.length}</Badge>
         </CardHeader>
@@ -346,11 +352,6 @@ export function ReleaseQuarterAnalysis() {
               value={month}
               onChange={setMonth}
             />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
-            <Badge color="gray">Всего {platformLabel(platform)}: {platformRows.length}</Badge>
-            <Badge color="gray">С задачами: {visibleRows.filter(row => row.primaryTask).length}</Badge>
-            <Badge color={missingHotfixInfoCount ? 'yellow' : 'green'}>Не найдено: {missingHotfixInfoCount}</Badge>
           </div>
         </CardBody>
         <CanonicalTable

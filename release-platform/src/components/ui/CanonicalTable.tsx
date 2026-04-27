@@ -15,6 +15,8 @@ export interface CanonicalTableColumn<T> {
   headerStyle?: React.CSSProperties;
   lineClamp?: number;
   disablePreview?: boolean;
+  showOverflowMarker?: boolean;
+  sticky?: 'left';
 }
 
 export interface CanonicalTableProps<T> {
@@ -76,6 +78,15 @@ export function CanonicalTable<T>({
   const [clippedCells, setClippedCells] = useState<Set<string>>(() => new Set());
   const closeTimerRef = useRef<number | null>(null);
   const hasGroups = columns.some(column => column.group || column.groupKey);
+  const stickyLeftOffsets = useMemo(() => {
+    let left = 0;
+    return columns.map(column => {
+      if (column.sticky !== 'left') return null;
+      const offset = left;
+      left += typeof column.width === 'number' ? column.width : 0;
+      return offset;
+    });
+  }, [columns]);
 
   const updateClippedCell = (key: string, clipped: boolean) => {
     setClippedCells(prev => {
@@ -183,18 +194,25 @@ export function CanonicalTable<T>({
               </tr>
             )}
             <tr>
-              {columns.map(column => (
+              {columns.map((column, columnIndex) => {
+                const stickyLeft = stickyLeftOffsets[columnIndex];
+                const isStickyLeft = typeof stickyLeft === 'number';
+                const stickyHeaderBg = 'var(--card-hi)';
+                return (
                 <th
                   key={column.id}
                   style={{
                     position: 'sticky',
                     top: hasGroups ? 39 : 0,
-                    zIndex: 3,
+                    left: isStickyLeft ? stickyLeft : undefined,
+                    zIndex: isStickyLeft ? 7 : 3,
                     height: 40,
                     padding: '8px 10px',
                     borderRight: '1px solid var(--border-hi)',
                     borderBottom: '1.5px solid var(--border-hi)',
-                    background: 'var(--surface-soft-2)',
+                    background: isStickyLeft ? stickyHeaderBg : 'var(--surface-soft-2)',
+                    backgroundClip: 'padding-box',
+                    boxShadow: isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : undefined,
                     color: 'var(--text-2)',
                     fontSize: 10.5,
                     fontWeight: 800,
@@ -207,7 +225,8 @@ export function CanonicalTable<T>({
                 >
                   {column.title}
                 </th>
-              ))}
+              );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -228,7 +247,7 @@ export function CanonicalTable<T>({
             )}
             {rows.map((row, rowIndex) => (
               <tr key={getRowKey(row, rowIndex)} style={{ height: rowHeight }}>
-                {columns.map(column => {
+                {columns.map((column, columnIndex) => {
                   const rowKey = getRowKey(row, rowIndex);
                   const cellKey = `${String(rowKey)}:${column.id}`;
                   const rendered = column.render ? column.render(row) : column.text?.(row) || '';
@@ -237,6 +256,10 @@ export function CanonicalTable<T>({
                   const cellStyle = typeof column.cellStyle === 'function' ? column.cellStyle(row) : column.cellStyle;
                   const canPreview = !column.disablePreview && isMeaningfulPreview(previewBody);
                   const rowBg = rowIndex % 2 === 0 ? 'var(--card)' : 'var(--surface-soft)';
+                  const stickyRowBg = rowIndex % 2 === 0 ? 'var(--card)' : 'var(--card-hi)';
+                  const stickyLeft = stickyLeftOffsets[columnIndex];
+                  const isStickyLeft = typeof stickyLeft === 'number';
+                  const cellBg = isStickyLeft ? stickyRowBg : rowBg;
 
                   return (
                     <td
@@ -254,7 +277,9 @@ export function CanonicalTable<T>({
                       }}
                       onMouseLeave={scheduleClosePreview}
                       style={{
-                        position: 'relative',
+                        position: isStickyLeft ? 'sticky' : 'relative',
+                        left: isStickyLeft ? stickyLeft : undefined,
+                        zIndex: isStickyLeft ? 2 : 1,
                         height: rowHeight,
                         maxHeight: rowHeight,
                         padding: '8px 10px',
@@ -263,7 +288,9 @@ export function CanonicalTable<T>({
                         color: 'var(--text-2)',
                         fontSize: 12,
                         verticalAlign: 'top',
-                        background: rowBg,
+                        background: cellBg,
+                        backgroundClip: 'padding-box',
+                        boxShadow: isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : undefined,
                         textAlign: column.align || 'left',
                         ...cellStyle,
                       }}
@@ -290,7 +317,7 @@ export function CanonicalTable<T>({
                       >
                         {rendered || '-'}
                       </div>
-                      {canPreview && clippedCells.has(cellKey) && (
+                      {canPreview && column.showOverflowMarker !== false && clippedCells.has(cellKey) && (
                         <span
                           aria-hidden="true"
                           style={{
@@ -298,7 +325,7 @@ export function CanonicalTable<T>({
                             right: 6,
                             bottom: 5,
                             padding: '0 4px 1px 14px',
-                            background: `linear-gradient(90deg, rgba(255,255,255,0), ${rowBg} 38%)`,
+                            background: `linear-gradient(90deg, rgba(255,255,255,0), ${cellBg} 38%)`,
                             color: 'var(--text-3)',
                             fontWeight: 900,
                             fontSize: 13,
