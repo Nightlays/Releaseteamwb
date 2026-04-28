@@ -1,6 +1,7 @@
 import React, { ReactNode, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 export { CanonicalTable, type CanonicalTableColumn } from './CanonicalTable';
 export { ColumnFilterDropdown, type ColumnFilterDropdownProps } from './ColumnFilterDropdown';
+export { ColumnVisibilityDropdown, type ColumnVisibilityDropdownProps, type ColumnVisibilityOption } from './ColumnVisibilityDropdown';
 
 /* ─── BUTTON ─────────────────────────────────────────────── */
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'icon';

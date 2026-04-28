@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface CanonicalTableColumn<T> {
   id: string;
@@ -25,6 +25,7 @@ export interface CanonicalTableProps<T> {
   columns: Array<CanonicalTableColumn<T>>;
   getRowKey: (row: T, index: number) => React.Key;
   emptyText?: string;
+  emptyColumnsText?: ReactNode;
   rowHeight?: number;
   maxHeight?: number | string;
   minWidth?: number | string;
@@ -32,6 +33,9 @@ export interface CanonicalTableProps<T> {
   loading?: boolean;
   loadingText?: ReactNode;
   isRowHighlighted?: (row: T, index: number) => boolean;
+  columnResizeStorageKey?: string;
+  minColumnWidth?: number;
+  maxColumnWidth?: number;
 }
 
 interface TablePreview {
@@ -44,8 +48,28 @@ interface TablePreview {
 
 const GROUP_HEADER_HEIGHT = 38;
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function cssSize(value: number | string | undefined) {
   return typeof value === 'number' ? `${value}px` : value;
+}
+
+function readStoredColumnWidths(storageKey?: string): Record<string, number> {
+  if (!storageKey) return {};
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]))
+    );
+  } catch {
+    return {};
+  }
 }
 
 function textFromNode(value: ReactNode): string {
@@ -80,6 +104,7 @@ export function CanonicalTable<T>({
   columns,
   getRowKey,
   emptyText = 'Нет данных.',
+  emptyColumnsText = 'Не выбрано ни одной колонки',
   rowHeight = 72,
   maxHeight = '70vh',
   minWidth,
@@ -87,21 +112,79 @@ export function CanonicalTable<T>({
   loading = false,
   loadingText = 'Загружаю данные...',
   isRowHighlighted,
+  columnResizeStorageKey,
+  minColumnWidth = 72,
+  maxColumnWidth = 640,
 }: CanonicalTableProps<T>) {
   const [preview, setPreview] = useState<TablePreview | null>(null);
   const [clippedCells, setClippedCells] = useState<Set<string>>(() => new Set());
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => readStoredColumnWidths(columnResizeStorageKey));
   const closeTimerRef = useRef<number | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
-  const hasGroups = columns.some(column => column.group || column.groupKey);
+  const resizeStorageKeyRef = useRef(columnResizeStorageKey);
+  const tableColumns = useMemo(() => columns.map(column => {
+    const storedWidth = columnWidths[column.id];
+    return typeof storedWidth === 'number' ? { ...column, width: storedWidth } : column;
+  }), [columnWidths, columns]);
+  const hasGroups = tableColumns.some(column => column.group || column.groupKey);
   const stickyLeftOffsets = useMemo(() => {
     let left = 0;
-    return columns.map(column => {
+    return tableColumns.map(column => {
       if (column.sticky !== 'left') return null;
       const offset = left;
       left += typeof column.width === 'number' ? column.width : 0;
       return offset;
     });
-  }, [columns]);
+  }, [tableColumns]);
+
+  useEffect(() => {
+    resizeStorageKeyRef.current = columnResizeStorageKey;
+    setColumnWidths(readStoredColumnWidths(columnResizeStorageKey));
+  }, [columnResizeStorageKey]);
+
+  const persistColumnWidths = useCallback((widths: Record<string, number>) => {
+    const storageKey = resizeStorageKeyRef.current;
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(widths));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const startColumnResize = useCallback((column: CanonicalTableColumn<T>, event: React.MouseEvent<HTMLSpanElement>) => {
+    if (typeof column.width !== 'number') return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const header = event.currentTarget.closest('th') as HTMLTableCellElement | null;
+    const startWidth = header?.getBoundingClientRect().width || column.width;
+    const prevUserSelect = document.body.style.userSelect;
+    const prevCursor = document.body.style.cursor;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const nextWidth = Math.round(clamp(startWidth + moveEvent.clientX - startX, minColumnWidth, maxColumnWidth));
+      setColumnWidths(prev => {
+        if (prev[column.id] === nextWidth) return prev;
+        const next = { ...prev, [column.id]: nextWidth };
+        persistColumnWidths(next);
+        return next;
+      });
+    };
+
+    const onUp = () => {
+      document.body.style.userSelect = prevUserSelect;
+      document.body.style.cursor = prevCursor;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [maxColumnWidth, minColumnWidth, persistColumnWidths]);
 
   const updateClippedCell = (key: string, clipped: boolean) => {
     setClippedCells(prev => {
@@ -152,7 +235,7 @@ export function CanonicalTable<T>({
 
   const groups = useMemo(() => {
     const out: Array<{ key: string; label: ReactNode; span: number }> = [];
-    columns.forEach(column => {
+    tableColumns.forEach(column => {
       const key = column.groupKey || String(column.group || column.id);
       const label = column.group || column.title;
       const last = out[out.length - 1];
@@ -163,7 +246,7 @@ export function CanonicalTable<T>({
       }
     });
     return out;
-  }, [columns]);
+  }, [tableColumns]);
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -192,7 +275,7 @@ export function CanonicalTable<T>({
           }}
         >
           <colgroup>
-            {columns.map(column => (
+            {tableColumns.map(column => (
               <col key={column.id} style={{ width: cssSize(column.width) }} />
             ))}
           </colgroup>
@@ -228,7 +311,7 @@ export function CanonicalTable<T>({
               </tr>
             )}
             <tr>
-              {columns.map((column, columnIndex) => {
+              {tableColumns.map((column, columnIndex) => {
                 const stickyLeft = stickyLeftOffsets[columnIndex];
                 const isStickyLeft = typeof stickyLeft === 'number';
                 const headerBg = 'var(--card-hi)';
@@ -259,18 +342,56 @@ export function CanonicalTable<T>({
                     ...column.headerStyle,
                   }}
                 >
-                  {column.title}
-                </th>
-              );
+                    {column.title}
+                    {typeof column.width === 'number' && (
+                      <span
+                        role="separator"
+                        aria-label={`Изменить ширину колонки ${textFromNode(column.title) || column.id}`}
+                        title="Изменить ширину колонки"
+                        onMouseDown={event => startColumnResize(column, event)}
+                        onClick={event => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          right: -4,
+                          zIndex: 9,
+                          width: 8,
+                          height: '100%',
+                          cursor: 'col-resize',
+                          touchAction: 'none',
+                        }}
+                      />
+                    )}
+                  </th>
+                );
               })}
             </tr>
           </thead>
           <tbody>
-            {loading && !rows.length && (
+            {!tableColumns.length && (
+              <tr>
+                <td
+                  colSpan={1}
+                  style={{
+                    padding: 32,
+                    textAlign: 'center',
+                    color: 'var(--text-3)',
+                    borderTop: '1px solid var(--border)',
+                    background: 'var(--card)',
+                  }}
+                >
+                  {emptyColumnsText}
+                </td>
+              </tr>
+            )}
+            {tableColumns.length > 0 && loading && !rows.length && (
               <>
                 <tr>
                   <td
-                    colSpan={columns.length}
+                    colSpan={Math.max(1, tableColumns.length)}
                     style={{
                       padding: '22px 24px',
                       textAlign: 'center',
@@ -311,7 +432,7 @@ export function CanonicalTable<T>({
                 </tr>
                 {Array.from({ length: 5 }).map((_, skeletonRowIndex) => (
                   <tr key={`canonical-loader-${skeletonRowIndex}`} style={{ height: rowHeight }}>
-                    {columns.map((column, columnIndex) => {
+                    {tableColumns.map((column, columnIndex) => {
                       const stickyLeft = stickyLeftOffsets[columnIndex];
                       const isStickyLeft = typeof stickyLeft === 'number';
                       const rowBg = skeletonRowIndex % 2 === 0 ? 'var(--card)' : 'var(--card-hi)';
@@ -363,10 +484,10 @@ export function CanonicalTable<T>({
                 ))}
               </>
             )}
-            {!loading && !rows.length && (
+            {tableColumns.length > 0 && !loading && !rows.length && (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={Math.max(1, tableColumns.length)}
                   style={{
                     padding: 32,
                     textAlign: 'center',
@@ -378,9 +499,9 @@ export function CanonicalTable<T>({
                 </td>
               </tr>
             )}
-            {rows.map((row, rowIndex) => (
+            {tableColumns.length > 0 && rows.map((row, rowIndex) => (
               <tr key={getRowKey(row, rowIndex)} style={{ height: rowHeight }}>
-                {columns.map((column, columnIndex) => {
+                {tableColumns.map((column, columnIndex) => {
                   const rowKey = getRowKey(row, rowIndex);
                   const cellKey = `${String(rowKey)}:${column.id}`;
                   const rowHighlighted = Boolean(isRowHighlighted?.(row, rowIndex));

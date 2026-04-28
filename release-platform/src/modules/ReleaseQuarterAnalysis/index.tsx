@@ -6,6 +6,7 @@ import {
   CardBody,
   CanonicalTable,
   ColumnFilterDropdown,
+  ColumnVisibilityDropdown,
   type CanonicalTableColumn,
   FieldLabel,
   Input,
@@ -28,6 +29,24 @@ import type { Role } from '../../types';
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const SHOW_RELEASE_ANALYSIS_FLOATING_LOGS = true;
 const MAJOR_RELEASE_STORAGE_KEY = 'rp_release_quarter_major_release';
+const COLUMN_VISIBILITY_STORAGE_KEY = 'rp_release_quarter_visible_columns';
+const COLUMN_WIDTHS_STORAGE_KEY = 'rp_release_quarter_column_widths';
+const RELEASE_ANALYSIS_COLUMN_OPTIONS = [
+  { id: 'version', label: 'Версия' },
+  { id: 'stream', label: 'Стрим' },
+  { id: 'substream', label: 'Сабстрим' },
+  { id: 'primaryTask', label: 'Локомотивная задача' },
+  { id: 'secondaryTasks', label: 'Вторичные задачи' },
+  { id: 'buildTime', label: 'Время сборки' },
+  { id: 'previousRolloutPercent', label: '% раскатки предыдущей версии' },
+  { id: 'plannedHotfixDate', label: 'План дата отправки ХФ' },
+  { id: 'branchCutTime', label: 'Время отведения ХФ' },
+  { id: 'actualSendTime', label: 'Фактическая дата отправки' },
+  { id: 'onePercentDate', label: 'Дата раскатки на 1%' },
+  { id: 'hotfixReason', label: 'Причина ХФ' },
+  { id: 'hotfixDetails', label: 'Детали ХФ' },
+];
+const DEFAULT_VISIBLE_COLUMN_IDS = RELEASE_ANALYSIS_COLUMN_OPTIONS.map(column => column.id);
 
 interface ReleaseQuarterAnalysisProps {
   role?: Role;
@@ -46,6 +65,23 @@ function readStoredRelease(key: string, fallback: string) {
     return String(localStorage.getItem(key) || '').trim() || fallback;
   } catch {
     return fallback;
+  }
+}
+
+function sanitizeVisibleColumnIds(value: string[]) {
+  const selected = new Set(value);
+  return DEFAULT_VISIBLE_COLUMN_IDS.filter(id => selected.has(id));
+}
+
+function readStoredVisibleColumnIds() {
+  try {
+    const raw = localStorage.getItem(COLUMN_VISIBILITY_STORAGE_KEY);
+    if (!raw) return DEFAULT_VISIBLE_COLUMN_IDS;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_VISIBLE_COLUMN_IDS;
+    return sanitizeVisibleColumnIds(parsed.map(String));
+  } catch {
+    return DEFAULT_VISIBLE_COLUMN_IDS;
   }
 }
 
@@ -313,6 +349,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
   const [pendingRows, setPendingRows] = useState<QuarterAnalysisRow[]>([]);
   const [freshRowKeys, setFreshRowKeys] = useState<Set<string>>(() => new Set());
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>(() => emptyColumnFilters());
+  const [visibleColumnIds, setVisibleColumnIds] = useState<string[]>(() => readStoredVisibleColumnIds());
   const [logs, setLogs] = useState<Array<{ text: string; level: LogLevel }>>([]);
   const [status, setStatus] = useState('');
   const [statusTone, setStatusTone] = useState<'neutral' | 'ok' | 'warn' | 'error'>('neutral');
@@ -342,6 +379,14 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       /* ignore */
     }
   }, [releaseFrom]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLUMN_VISIBILITY_STORAGE_KEY, JSON.stringify(visibleColumnIds));
+    } catch {
+      /* ignore */
+    }
+  }, [visibleColumnIds]);
 
   useEffect(() => {
     let alive = true;
@@ -388,6 +433,10 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
 
   const setColumnFilter = useCallback((key: ColumnFilterKey, value: string[]) => {
     setColumnFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const updateVisibleColumnIds = useCallback((value: string[]) => {
+    setVisibleColumnIds(sanitizeVisibleColumnIds(value));
   }, []);
 
   const availableYears = useMemo(() => {
@@ -520,7 +569,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     justifyContent: 'center',
   }), []);
   const visibleTaskCount = useMemo(() => visibleRows.reduce((sum, row) => sum + taskCount(row), 0), [visibleRows]);
-  const tableColumns = useMemo<Array<CanonicalTableColumn<QuarterAnalysisRow>>>(() => [
+  const allTableColumns = useMemo<Array<CanonicalTableColumn<QuarterAnalysisRow>>>(() => [
     {
       id: 'version',
       group: 'Задачи',
@@ -612,6 +661,17 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     { id: 'hotfixDetails', group: 'Хотфикс', title: 'Детали ХФ', width: 260, text: row => dash(row.hotfixDetails), lineClamp: 3 },
   ], [columnFilterValues, columnFilters, setColumnFilter, timingHeaderStyle]);
 
+  const visibleTableColumns = useMemo(() => {
+    const visible = new Set(visibleColumnIds);
+    return allTableColumns.filter(column => visible.has(column.id));
+  }, [allTableColumns, visibleColumnIds]);
+
+  const visibleTableMinWidth = useMemo(() => {
+    if (!visibleTableColumns.length) return 720;
+    const width = visibleTableColumns.reduce((sum, column) => sum + (typeof column.width === 'number' ? column.width : 140), 0);
+    return Math.max(720, width + 24);
+  }, [visibleTableColumns]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>Анализ релизов за квартал</div>
@@ -667,6 +727,11 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
             style={filterSegmentStyle}
             buttonStyle={filterButtonStyle}
           />
+          <ColumnVisibilityDropdown
+            columns={RELEASE_ANALYSIS_COLUMN_OPTIONS}
+            visibleColumnIds={visibleColumnIds}
+            onChange={updateVisibleColumnIds}
+          />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginLeft: 'auto', maxWidth: '100%', flexWrap: 'wrap' }}>
             <Badge color={visibleTaskCount ? 'purple' : 'gray'} style={{ height: 32, padding: '0 10px', fontSize: 12, fontWeight: 700 }}>
               Задач: {visibleTaskCount}
@@ -690,16 +755,18 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
         </CardBody>
         <CanonicalTable
           rows={visibleRows}
-          columns={tableColumns}
+          columns={visibleTableColumns}
           getRowKey={quarterRowKey}
           isRowHighlighted={row => freshRowKeys.has(quarterRowKey(row))}
           rowHeight={74}
           maxHeight="72vh"
-          minWidth={2751}
+          minWidth={visibleTableMinWidth}
           overscanRight={18}
           loading={loadingSaved}
           loadingText="Загружаю сохраненные релизы..."
           emptyText="Данных по выбранному фильтру нет."
+          emptyColumnsText="Не выбрано ни одной колонки"
+          columnResizeStorageKey={COLUMN_WIDTHS_STORAGE_KEY}
         />
       </Card>
       {SHOW_RELEASE_ANALYSIS_FLOATING_LOGS && logs.length > 0 && !logPanelOpen && (
