@@ -5,8 +5,8 @@ import { Readable } from "node:stream";
 
 const PORT = Number(process.env.PORT || 8789);
 const HOST = process.env.HOST || "127.0.0.1";
-const DEFAULT_UPSTREAM_BASE = process.env.GLM_UPSTREAM_BASE || "https://corellm.wb.ru/glm-47/v1";
-const DEFAULT_MODEL = process.env.GLM_MODEL || "glm-4.7";
+const DEFAULT_UPSTREAM_BASE = process.env.GLM_UPSTREAM_BASE || "https://corellm.wb.ru/glm-51/v1";
+const DEFAULT_MODEL = process.env.GLM_MODEL || "glm-5.1";
 const ENV_API_KEY = String(process.env.GLM_API_KEY || "").trim();
 
 function getIncomingBearerToken(req) {

@@ -33,7 +33,7 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8789
-      GLM_UPSTREAM_BASE: "${GLM_UPSTREAM_BASE:-https://corellm.wb.ru/glm-47/v1}"
-      GLM_MODEL: "${GLM_MODEL:-glm-4.7}"
+      GLM_UPSTREAM_BASE: "${GLM_UPSTREAM_BASE:-https://corellm.wb.ru/glm-51/v1}"
+      GLM_MODEL: "${GLM_MODEL:-glm-5.1}"
       GLM_API_KEY: "${GLM_API_KEY}"
     restart: unless-stopped
