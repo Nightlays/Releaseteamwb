@@ -10,6 +10,7 @@ export interface WikiIntelligenceConfig {
   glmBase?: string;
   glmKey?: string;
   glmModel?: string;
+  webSearchKey?: string;
   signal?: AbortSignal;
 }
 
@@ -760,6 +761,103 @@ async function requestLlmWithContinuation(
   return sanitize ? sanitizeAnswerText(withSources) : String(withSources || '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/* ─── WEB SEARCH ─────────────────────────────────────────── */
+
+const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
+
+interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  content: string;
+}
+
+function htmlToText(html: string): string {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+async function fetchPageText(cfg: WikiIntelligenceConfig, url: string): Promise<string> {
+  try {
+    const response = await fetchWithRouting(cfg, url, {
+      headers: { Accept: 'text/html,application/xhtml+xml', 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) return '';
+    const html = await response.text().catch(() => '');
+    return htmlToText(html).slice(0, 6000);
+  } catch {
+    return '';
+  }
+}
+
+async function searchWeb(cfg: WikiIntelligenceConfig, query: string, count = 8): Promise<WebSearchResult[]> {
+  const key = String(cfg.webSearchKey || '').trim();
+  if (!key) return [];
+
+  const searchUrl = `${BRAVE_SEARCH_URL}?${new URLSearchParams({
+    q: query,
+    count: String(count),
+    country: 'ru',
+    search_lang: 'ru',
+    text_decorations: 'false',
+    result_filter: 'web',
+  })}`;
+
+  const response = await fetchWithRouting(cfg, searchUrl, {
+    headers: {
+      Accept: 'application/json',
+      'Accept-Encoding': 'gzip',
+      'X-Subscription-Token': key,
+    },
+  });
+
+  if (!response.ok) {
+    const text = String(await response.text().catch(() => '') || '').trim().slice(0, 220);
+    throw new Error(`Web search error: ${response.status}${text ? ` — ${text}` : ''}`);
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  const results: any[] = Array.isArray(payload?.web?.results) ? payload.web.results : [];
+
+  const hydrated = await Promise.all(
+    results.slice(0, 5).map(async (item: any) => {
+      const title = String(item?.title || '').trim();
+      const url = String(item?.url || '').trim();
+      const snippet = String(item?.description || '').trim();
+      let content = snippet;
+      const skip = !url || /youtube\.com|youtu\.be|twitter\.com|x\.com/i.test(url);
+      if (!skip) {
+        const pageText = await fetchPageText(cfg, url);
+        if (pageText.length > snippet.length) content = pageText.slice(0, 6000);
+      }
+      return { title, url, snippet, content };
+    })
+  );
+
+  for (const item of results.slice(5)) {
+    hydrated.push({
+      title: String(item?.title || '').trim(),
+      url: String(item?.url || '').trim(),
+      snippet: String(item?.description || '').trim(),
+      content: String(item?.description || '').trim(),
+    });
+  }
+
+  return hydrated.filter(r => r.title && r.url);
+}
+
+/* ─── WIKI SEARCH ────────────────────────────────────────── */
+
 async function searchWikiArticles(cfg: WikiIntelligenceConfig, question: string, plan: WikiAnswerPlan) {
   const headers = buildWikiHeaders(cfg.wikiToken);
   if (!headers) throw new Error('Wiki token не настроен');
@@ -874,7 +972,7 @@ async function searchWikiArticles(cfg: WikiIntelligenceConfig, question: string,
     .slice(0, plan.contextSourceLimit);
 }
 
-function buildPrompt(plan: WikiAnswerPlan, sources: WikiKnowledgeSource[], history: WikiChatTurn[]) {
+function buildPrompt(plan: WikiAnswerPlan, sources: WikiKnowledgeSource[], history: WikiChatTurn[], webResults: WebSearchResult[] = []) {
   const trimmedHistory = history.slice(-plan.historyLimit).map(turn => `${turn.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${turn.text}`);
   const keywordVariants = buildKeywordVariants(plan.effectiveQuestion, collectKeywords(plan.effectiveQuestion));
   const digest = buildSourceDigest(plan.effectiveQuestion, sources, plan.passageLimit);
@@ -893,10 +991,22 @@ function buildPrompt(plan: WikiAnswerPlan, sources: WikiKnowledgeSource[], histo
       ? 'Структура ответа должна быть в plain text и состоять из блоков: "Короткий ответ:", "Что важно на практике:", "На чём основан ответ:", "Расхождения и нюансы:", "Источники:".'
       : 'Пользователь явно просит более глубокий ответ. Не ограничивайся короткой выжимкой. Дай полноценный разбор по всем найденным статьям. Структура ответа должна быть в plain text и состоять из блоков: "Короткий ответ:", "Развернутый разбор:", "Что важно на практике и по шагам:", "Нюансы, риски и расхождения:", "Источники:".';
 
+  const hasWeb = webResults.length > 0;
+  const webSourceBlock = hasWeb
+    ? webResults.map((r, i) => [
+        `[Web${i + 1}] ${r.title}`,
+        `URL: ${r.url}`,
+        `Кратко: ${r.snippet}`,
+        r.content !== r.snippet ? `Содержание: ${r.content.slice(0, 800)}` : '',
+      ].filter(Boolean).join('\n')).join('\n\n')
+    : '';
+
   return {
     system: [
       'Ты аналитический помощник release-команды Wildberries.',
-      'Отвечай только на основе переданных wiki-источников.',
+      sources.length > 0
+        ? 'В контексте есть wiki-статьи и, возможно, веб-источники. Wiki-статьи приоритетны для внутренних процессов WB — используй их как основу. Веб-источники используй для дополнения и проверки.'
+        : 'В контексте только веб-источники из интернета. Используй их для ответа.',
       'Перед ответом сверь между собой все найденные источники, а не только первый документ.',
       'Сначала собери общий контекст, потом переходи к прямому ответу на вопрос.',
       'Если источников недостаточно, честно скажи, чего не хватает.',
@@ -906,7 +1016,7 @@ function buildPrompt(plan: WikiAnswerPlan, sources: WikiKnowledgeSource[], histo
       'В каждом блоке используй короткие абзацы или маркеры "•".',
       'На один тезис ставь не больше одной ссылки.',
       'Когда ссылаешься на источник, указывай прямую ссылку на статью в круглых скобках.',
-      'Не используй обозначения [W1], [W2] и подобные им метки.',
+      'Не используй обозначения [W1], [W2], [Web1] и подобные метки в тексте.',
       'В конце добавляй короткий блок "Источники" с прямыми URL статей.',
     ].join('\n'),
     user: [
@@ -914,22 +1024,25 @@ function buildPrompt(plan: WikiAnswerPlan, sources: WikiKnowledgeSource[], histo
       `Исходный запрос пользователя: ${plan.originalQuestion}`,
       plan.isFollowUp ? `Это follow-up к теме: ${plan.topicQuestion}` : '',
       `Рабочая формулировка вопроса для анализа: ${plan.effectiveQuestion}`,
-      `Контекст собран по ${sources.length} wiki-источникам.`,
+      sources.length > 0 ? `Контекст собран по ${sources.length} wiki-источникам.` : '',
+      hasWeb ? `Дополнительно: ${webResults.length} веб-источников из интернета.` : '',
       `Ключевые термины и варианты поиска: ${keywordVariants.slice(0, 12).join(', ')}`,
-      'Аналитический digest по источникам:',
-      digest,
-      'Найденные wiki-источники:',
-      sourceBlock,
+      sources.length > 0 ? 'Аналитический digest по wiki-источникам:' : '',
+      sources.length > 0 ? digest : '',
+      sources.length > 0 ? 'Найденные wiki-источники:' : '',
+      sources.length > 0 ? sourceBlock : '',
+      hasWeb ? 'Веб-источники из интернета:' : '',
+      hasWeb ? webSourceBlock : '',
       'Собери развернутый ответ по этим материалам.',
       plan.profile === 'brief'
         ? 'Нужно: коротко ответить на вопрос, не растекаться мыслью, но всё равно заземлить ответ в источниках.'
         : 'Нужно: ответить на вопрос, объяснить практический смысл, использовать весь собранный контекст, а не только первую статью, и отметить расхождения между статьями.',
-      'Если статьи противоречат друг другу, явно укажи это.',
+      'Если источники противоречат друг другу, явно укажи это.',
     ].filter(Boolean).join('\n\n'),
   };
 }
 
-function buildArticleDraftPrompt(command: WikiCreateCommand, sources: WikiKnowledgeSource[], history: WikiChatTurn[]) {
+function buildArticleDraftPrompt(command: WikiCreateCommand, sources: WikiKnowledgeSource[], history: WikiChatTurn[], webResults: WebSearchResult[] = []) {
   const trimmedHistory = history.slice(-8).map(turn => `${turn.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${turn.text}`);
   const topic = command.topic || command.title;
   const keywords = buildKeywordVariants(topic, collectKeywords(topic));
@@ -941,6 +1054,14 @@ function buildArticleDraftPrompt(command: WikiCreateCommand, sources: WikiKnowle
     `Фрагменты:`,
     ...extractPassages(source.content || source.excerpt || source.summary, keywords, 4).map(item => `- ${item}`),
   ].join('\n')).join('\n\n');
+  const webSourceBlock = webResults.length > 0
+    ? webResults.slice(0, 6).map((r, i) => [
+        `[Web${i + 1}] ${r.title}`,
+        `URL: ${r.url}`,
+        `Кратко: ${r.snippet}`,
+        r.content !== r.snippet ? `Содержание: ${r.content.slice(0, 800)}` : '',
+      ].filter(Boolean).join('\n')).join('\n\n')
+    : '';
 
   return {
     system: [
@@ -960,8 +1081,12 @@ function buildArticleDraftPrompt(command: WikiCreateCommand, sources: WikiKnowle
       `Тема и задача статьи: ${topic}`,
       'Аналитический digest:',
       digest,
-      'Материалы для статьи:',
-      sourceBlock,
+      sources.length > 0 ? 'Аналитический digest по wiki:' : '',
+      sources.length > 0 ? digest : '',
+      sources.length > 0 ? 'Wiki-материалы:' : '',
+      sources.length > 0 ? sourceBlock : '',
+      webSourceBlock ? 'Дополнительные веб-источники из интернета:' : '',
+      webSourceBlock || '',
       'Собери полноценный markdown-текст статьи.',
     ].filter(Boolean).join('\n\n'),
   };
@@ -1262,14 +1387,15 @@ async function generateArticleDraft(
   cfg: WikiIntelligenceConfig,
   command: WikiCreateCommand,
   sources: WikiKnowledgeSource[],
-  history: WikiChatTurn[]
+  history: WikiChatTurn[],
+  webResults: WebSearchResult[] = []
 ) {
   const glmBase = normalizeGlmBase(cfg.glmBase);
   if (!glmBase) return buildLocalArticleDraft(command, sources);
 
-  const prompt = buildArticleDraftPrompt(command, sources, history);
+  const prompt = buildArticleDraftPrompt(command, sources, history, webResults);
   const text = await requestLlmWithContinuation(cfg, {
-      model: String(cfg.glmModel || 'glm-4'),
+      model: String(cfg.glmModel || 'glm-5.1'),
       system: prompt.system,
       user: prompt.user,
       temperature: 0.2,
@@ -1389,12 +1515,33 @@ export async function answerWikiQuestion(
     draftPlan.contextSourceLimit = Math.max(draftPlan.contextSourceLimit, 14);
     draftPlan.passageLimit = Math.max(draftPlan.passageLimit, 8);
     draftPlan.maxTokens = Math.max(draftPlan.maxTokens, 3200);
-    const sources = await searchWikiArticles(cfg, draftPlan.effectiveQuestion, draftPlan);
-    if (!sources.length) {
-      throw new Error('Не удалось собрать wiki-контекст для создания статьи');
+
+    const hasWikiToken = Boolean(String(cfg.wikiToken || '').trim());
+    const hasWebKey = Boolean(String(cfg.webSearchKey || '').trim());
+
+    const [sources, draftWebResults] = await Promise.all([
+      hasWikiToken
+        ? searchWikiArticles(cfg, draftPlan.effectiveQuestion, draftPlan).catch(() => [] as WikiKnowledgeSource[])
+        : Promise.resolve([] as WikiKnowledgeSource[]),
+      hasWebKey
+        ? searchWeb(cfg, `${createCommand.title} ${createCommand.topic}`.trim()).catch(() => [] as WebSearchResult[])
+        : Promise.resolve([] as WebSearchResult[]),
+    ]);
+
+    if (!sources.length && !draftWebResults.length) {
+      throw new Error('Не удалось собрать контекст для создания статьи ни из Wiki, ни из интернета');
     }
 
-    const markdown = await generateArticleDraft(cfg, createCommand, sources, history);
+    const markdown = await generateArticleDraft(cfg, createCommand, sources, history, draftWebResults);
+    const allDraftSources = [
+      ...sources,
+      ...draftWebResults.map(r => ({
+        uid: `web:${r.url}`, id: r.url, title: `🌐 ${r.title}`, url: r.url,
+        apiUrl: r.url, spaceId: '', articleNumber: '',
+        summary: r.snippet, excerpt: r.snippet, content: r.content,
+        updatedAt: 0, author: '', score: 0,
+      } as WikiKnowledgeSource)),
+    ];
     return {
       answer: [
         `Подготовил draft статьи: ${createCommand.title}`,
@@ -1402,9 +1549,10 @@ export async function answerWikiQuestion(
         'Сначала проверь draft ниже. Если всё ок, нажми "Создать статью".',
         '',
         'Что использовал как основу:',
-        ...sources.slice(0, 5).map(source => `• ${source.title} (${source.url})`),
+        ...sources.slice(0, 4).map(source => `• ${source.title} (${source.url})`),
+        ...draftWebResults.slice(0, 3).map(r => `• 🌐 ${r.title} (${r.url})`),
       ].join('\n'),
-      sources,
+      sources: allDraftSources,
       draftAction: createCommand.target
         ? {
             type: 'create_wiki_article',
@@ -1418,22 +1566,45 @@ export async function answerWikiQuestion(
   }
 
   const plan = buildAnswerPlan(question, history);
-  const sources = await searchWikiArticles(cfg, plan.effectiveQuestion, plan);
-  if (!sources.length) {
-    throw new Error('Wiki не нашла подходящих статей по запросу');
+
+  const hasWikiTokenQA = Boolean(String(cfg.wikiToken || '').trim());
+  const hasWebKeyQA = Boolean(String(cfg.webSearchKey || '').trim());
+
+  const [sources, webResults] = await Promise.all([
+    hasWikiTokenQA
+      ? searchWikiArticles(cfg, plan.effectiveQuestion, plan).catch(() => [] as WikiKnowledgeSource[])
+      : Promise.resolve([] as WikiKnowledgeSource[]),
+    hasWebKeyQA
+      ? searchWeb(cfg, plan.effectiveQuestion).catch(() => [] as WebSearchResult[])
+      : Promise.resolve([] as WebSearchResult[]),
+  ]);
+
+  if (!sources.length && !webResults.length) {
+    throw new Error('Не нашли подходящих материалов ни в Wiki, ни в интернете');
   }
 
   const glmBase = normalizeGlmBase(cfg.glmBase);
+
+  const allSources: WikiKnowledgeSource[] = [
+    ...sources,
+    ...webResults.map(r => ({
+      uid: `web:${r.url}`, id: r.url, title: `🌐 ${r.title}`, url: r.url,
+      apiUrl: r.url, spaceId: '', articleNumber: '',
+      summary: r.snippet, excerpt: r.snippet, content: r.content,
+      updatedAt: 0, author: '', score: 0,
+    } as WikiKnowledgeSource)),
+  ];
+
   if (!glmBase) {
     return {
-      answer: buildLocalAnswer(plan, sources),
-      sources,
+      answer: buildLocalAnswer(plan, sources.length ? sources : allSources),
+      sources: allSources,
     };
   }
 
-  const prompt = buildPrompt(plan, sources, history);
+  const prompt = buildPrompt(plan, sources, history, webResults);
   const text = await requestLlmWithContinuation(cfg, {
-      model: String(cfg.glmModel || 'glm-4'),
+      model: String(cfg.glmModel || 'glm-5.1'),
       system: prompt.system,
       user: prompt.user,
       temperature: 0.15,
@@ -1442,7 +1613,7 @@ export async function answerWikiQuestion(
       replaceSourcesWith: sources,
   });
   return {
-    answer: ensureAnswerDepth(text, plan, sources) || buildLocalAnswer(plan, sources),
-    sources,
+    answer: ensureAnswerDepth(text, plan, sources.length ? sources : allSources) || buildLocalAnswer(plan, sources.length ? sources : allSources),
+    sources: allSources,
   };
 }

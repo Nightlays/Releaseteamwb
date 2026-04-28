@@ -43,10 +43,9 @@ function renderTextWithLinks(text: string) {
 }
 
 const SOURCES = [
-  { value: 'wiki',    label: 'Wiki WB' },
-  { value: 'youtrack',label: 'YouTrack' },
-  { value: 'gitlab',  label: 'GitLab' },
-  { value: 'all',     label: 'Все источники' },
+  { value: 'wiki', label: 'Wiki WB' },
+  { value: 'web',  label: 'Интернет' },
+  { value: 'all',  label: 'Все источники' },
 ];
 
 const SUGGESTED = [
@@ -225,19 +224,16 @@ export function WikiIntelligence() {
     setLoading(true);
 
     try {
-      if (source !== 'wiki' && source !== 'all') {
-        throw new Error('В новом UI grounded-поиск уже подключён для Wiki. Для точного ответа выберите "Wiki WB" или "Все источники".');
-      }
-
       const result = await answerWikiQuestion(
         {
           proxyBase: settings.proxyBase,
           proxyMode: settings.proxyMode,
           useProxy: settings.useProxy,
-          wikiToken: settings.wikiToken,
+          wikiToken: source === 'web' ? '' : settings.wikiToken,
           glmBase: settings.glmBase,
           glmKey: settings.glmKey,
           glmModel: settings.glmModel,
+          webSearchKey: source === 'wiki' ? '' : settings.webSearchKey,
         },
         text.trim(),
         messages.map(msg => ({ role: msg.role, text: msg.text }))
@@ -272,6 +268,7 @@ export function WikiIntelligence() {
           glmBase: settings.glmBase,
           glmKey: settings.glmKey,
           glmModel: settings.glmModel,
+          webSearchKey: settings.webSearchKey,
         },
         message.draftAction
       );
@@ -320,7 +317,7 @@ export function WikiIntelligence() {
       <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(155,92,255,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>◐</div>
         Wiki Intelligence
-        <Badge color="purple" style={{ marginLeft: 4 }}>GLM-4.7</Badge>
+        <Badge color="purple" style={{ marginLeft: 4 }}>{settings.glmModel || 'GLM'}</Badge>
       </div>
 
       {/* SOURCE SELECTOR */}
@@ -331,14 +328,19 @@ export function WikiIntelligence() {
               <FieldLabel>Источник знаний</FieldLabel>
               <SegmentControl items={SOURCES} value={source} onChange={setSource} />
             </div>
-            {!settings.wikiToken && (
+            {source !== 'web' && !settings.wikiToken && (
               <div style={{ fontSize: 11, color: '#F59E0B', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.18)', padding: '6px 12px', borderRadius: 8 }}>
-                ⚠ Wiki token не настроен — поиск по статьям не сработает
+                ⚠ Wiki token не настроен — поиск по wiki-статьям не сработает
               </div>
             )}
-            {settings.wikiToken && !normalizeGlmBase(settings.glmBase) && (
+            {source !== 'wiki' && !settings.webSearchKey && (
+              <div style={{ fontSize: 11, color: '#F59E0B', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.18)', padding: '6px 12px', borderRadius: 8 }}>
+                ⚠ Brave Search API key не настроен — веб-поиск не сработает
+              </div>
+            )}
+            {!normalizeGlmBase(settings.glmBase) && (
               <div style={{ fontSize: 11, color: '#64748B', background: 'rgba(100,116,139,.08)', border: '1px solid rgba(100,116,139,.18)', padding: '6px 12px', borderRadius: 8 }}>
-                LLM не настроен — будет локальная выжимка по найденным wiki-статьям
+                LLM не настроен — будет локальная выжимка по найденным источникам
               </div>
             )}
             {messages.length > 0 && (
