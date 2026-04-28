@@ -42,7 +42,8 @@ const SECTIONS: Array<{ label: string; rows: Array<{ key: keyof AppSettings; lab
       { key: 'glmBase', label: 'LLM Base URL', placeholder: 'http://localhost:8789/v1' },
       { key: 'glmKey', label: 'LLM API Key', type: 'password', placeholder: 'sk-...' },
       { key: 'glmModel', label: 'LLM Model', placeholder: 'glm-5.1' },
-      { key: 'webSearchKey', label: 'Brave Search API Key (веб-поиск)', type: 'password', placeholder: 'BSA...' },
+      { key: 'useWebSearch', label: 'Веб-поиск (DuckDuckGo, бесплатно)', type: 'checkbox' },
+      { key: 'webSearchKey', label: 'Brave Search API Key (опционально, лучше качество)', type: 'password', placeholder: 'BSA...' },
     ],
   },
 ];

@@ -233,6 +233,7 @@ export function WikiIntelligence() {
           glmBase: settings.glmBase,
           glmKey: settings.glmKey,
           glmModel: settings.glmModel,
+          useWebSearch: source !== 'wiki' && settings.useWebSearch,
           webSearchKey: source === 'wiki' ? '' : settings.webSearchKey,
         },
         text.trim(),
@@ -268,6 +269,7 @@ export function WikiIntelligence() {
           glmBase: settings.glmBase,
           glmKey: settings.glmKey,
           glmModel: settings.glmModel,
+          useWebSearch: settings.useWebSearch,
           webSearchKey: settings.webSearchKey,
         },
         message.draftAction
@@ -333,9 +335,19 @@ export function WikiIntelligence() {
                 ⚠ Wiki token не настроен — поиск по wiki-статьям не сработает
               </div>
             )}
-            {source !== 'wiki' && !settings.webSearchKey && (
+            {source !== 'wiki' && !settings.useWebSearch && !settings.webSearchKey && (
               <div style={{ fontSize: 11, color: '#F59E0B', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.18)', padding: '6px 12px', borderRadius: 8 }}>
-                ⚠ Brave Search API key не настроен — веб-поиск не сработает
+                ⚠ Веб-поиск отключён — включи в настройках или добавь Brave API Key
+              </div>
+            )}
+            {source !== 'wiki' && settings.useWebSearch && !settings.webSearchKey && (
+              <div style={{ fontSize: 11, color: '#22C55E', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.18)', padding: '6px 12px', borderRadius: 8 }}>
+                🌐 DuckDuckGo (бесплатно)
+              </div>
+            )}
+            {source !== 'wiki' && settings.webSearchKey && (
+              <div style={{ fontSize: 11, color: '#22C55E', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.18)', padding: '6px 12px', borderRadius: 8 }}>
+                🌐 Brave Search
               </div>
             )}
             {!normalizeGlmBase(settings.glmBase) && (

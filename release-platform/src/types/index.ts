@@ -27,6 +27,7 @@ export interface AppSettings {
   gitlabCookie:  string;
   gitlabToken:   string;
   wikiToken:     string;
+  useWebSearch:  boolean;
   webSearchKey:  string;
   bandCookies:      string;
   bandCookiesAdmin: string;
@@ -93,6 +94,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   gitlabCookie:  '',
   gitlabToken:   '',
   wikiToken:     '',
+  useWebSearch:  false,
   webSearchKey:  '',
   bandCookies:      '',
   bandCookiesAdmin: '',
@@ -119,6 +121,7 @@ export function normalizeSettings(input?: Partial<AppSettings> | null): AppSetti
     gitlabCookie: typeof value.gitlabCookie === 'string' ? value.gitlabCookie : DEFAULT_SETTINGS.gitlabCookie,
     gitlabToken: typeof value.gitlabToken === 'string' ? value.gitlabToken : DEFAULT_SETTINGS.gitlabToken,
     wikiToken: typeof value.wikiToken === 'string' ? value.wikiToken : DEFAULT_SETTINGS.wikiToken,
+    useWebSearch: typeof value.useWebSearch === 'boolean' ? value.useWebSearch : DEFAULT_SETTINGS.useWebSearch,
     webSearchKey: typeof value.webSearchKey === 'string' ? value.webSearchKey : DEFAULT_SETTINGS.webSearchKey,
     bandCookies: typeof value.bandCookies === 'string' ? value.bandCookies : DEFAULT_SETTINGS.bandCookies,
     bandCookiesAdmin: typeof value.bandCookiesAdmin === 'string' ? value.bandCookiesAdmin : DEFAULT_SETTINGS.bandCookiesAdmin,

@@ -10,6 +10,7 @@ export interface WikiIntelligenceConfig {
   glmBase?: string;
   glmKey?: string;
   glmModel?: string;
+  useWebSearch?: boolean;
   webSearchKey?: string;
   signal?: AbortSignal;
 }
@@ -800,10 +801,56 @@ async function fetchPageText(cfg: WikiIntelligenceConfig, url: string): Promise<
   }
 }
 
-async function searchWeb(cfg: WikiIntelligenceConfig, query: string, count = 8): Promise<WebSearchResult[]> {
-  const key = String(cfg.webSearchKey || '').trim();
-  if (!key) return [];
+async function searchWebDuckDuckGo(cfg: WikiIntelligenceConfig, query: string): Promise<WebSearchResult[]> {
+  const response = await fetchWithRouting(cfg, 'https://lite.duckduckgo.com/lite/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Mozilla/5.0 (compatible; WikiIntelligence/1.0)',
+      'Accept': 'text/html',
+      'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+    },
+    body: `q=${encodeURIComponent(query)}&kl=ru-ru`,
+  });
 
+  if (!response.ok) return [];
+  const html = await response.text().catch(() => '');
+
+  const results: WebSearchResult[] = [];
+
+  // DDG Lite: result links are <a class="result-link" href="...">Title</a>
+  const linkRe = /<a[^>]+class="result-link"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+  const snippetRe = /<td[^>]+class="result-snippet"[^>]*>([\s\S]*?)<\/td>/g;
+
+  const links: Array<{ url: string; title: string }> = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = linkRe.exec(html)) !== null && links.length < 10) {
+    let url = String(m[1] || '').trim();
+    if (url.includes('uddg=')) {
+      const uddg = url.match(/uddg=([^&]+)/)?.[1];
+      if (uddg) url = decodeURIComponent(uddg);
+    }
+    if (url.startsWith('http')) {
+      links.push({ url, title: htmlToText(m[2]) });
+    }
+  }
+
+  const snippets: string[] = [];
+  while ((m = snippetRe.exec(html)) !== null) {
+    snippets.push(htmlToText(m[1]));
+  }
+
+  for (let i = 0; i < Math.min(links.length, 8); i++) {
+    const snippet = snippets[i] || '';
+    results.push({ title: links[i].title, url: links[i].url, snippet, content: snippet });
+  }
+
+  return results.filter(r => r.title && r.url);
+}
+
+async function searchWebBrave(cfg: WikiIntelligenceConfig, query: string, count = 8): Promise<WebSearchResult[]> {
+  const key = String(cfg.webSearchKey || '').trim();
   const searchUrl = `${BRAVE_SEARCH_URL}?${new URLSearchParams({
     q: query,
     count: String(count),
@@ -823,37 +870,36 @@ async function searchWeb(cfg: WikiIntelligenceConfig, query: string, count = 8):
 
   if (!response.ok) {
     const text = String(await response.text().catch(() => '') || '').trim().slice(0, 220);
-    throw new Error(`Web search error: ${response.status}${text ? ` — ${text}` : ''}`);
+    throw new Error(`Brave Search error: ${response.status}${text ? ` — ${text}` : ''}`);
   }
 
   const payload = await response.json().catch(() => ({}));
-  const results: any[] = Array.isArray(payload?.web?.results) ? payload.web.results : [];
+  const items: any[] = Array.isArray(payload?.web?.results) ? payload.web.results : [];
+  return items.map((item: any) => ({
+    title: String(item?.title || '').trim(),
+    url: String(item?.url || '').trim(),
+    snippet: String(item?.description || '').trim(),
+    content: String(item?.description || '').trim(),
+  })).filter(r => r.title && r.url);
+}
 
+async function searchWeb(cfg: WikiIntelligenceConfig, query: string): Promise<WebSearchResult[]> {
+  const key = String(cfg.webSearchKey || '').trim();
+  const rawResults = key
+    ? await searchWebBrave(cfg, query)
+    : await searchWebDuckDuckGo(cfg, query);
+
+  // Fetch page content for top results in parallel
   const hydrated = await Promise.all(
-    results.slice(0, 5).map(async (item: any) => {
-      const title = String(item?.title || '').trim();
-      const url = String(item?.url || '').trim();
-      const snippet = String(item?.description || '').trim();
-      let content = snippet;
-      const skip = !url || /youtube\.com|youtu\.be|twitter\.com|x\.com/i.test(url);
-      if (!skip) {
-        const pageText = await fetchPageText(cfg, url);
-        if (pageText.length > snippet.length) content = pageText.slice(0, 6000);
-      }
-      return { title, url, snippet, content };
+    rawResults.slice(0, 5).map(async r => {
+      const skip = !r.url || /youtube\.com|youtu\.be|twitter\.com|x\.com/i.test(r.url);
+      if (skip) return r;
+      const pageText = await fetchPageText(cfg, r.url);
+      return pageText.length > r.snippet.length ? { ...r, content: pageText.slice(0, 6000) } : r;
     })
   );
 
-  for (const item of results.slice(5)) {
-    hydrated.push({
-      title: String(item?.title || '').trim(),
-      url: String(item?.url || '').trim(),
-      snippet: String(item?.description || '').trim(),
-      content: String(item?.description || '').trim(),
-    });
-  }
-
-  return hydrated.filter(r => r.title && r.url);
+  return [...hydrated, ...rawResults.slice(5)].filter(r => r.title && r.url);
 }
 
 /* ─── WIKI SEARCH ────────────────────────────────────────── */
@@ -1517,13 +1563,13 @@ export async function answerWikiQuestion(
     draftPlan.maxTokens = Math.max(draftPlan.maxTokens, 3200);
 
     const hasWikiToken = Boolean(String(cfg.wikiToken || '').trim());
-    const hasWebKey = Boolean(String(cfg.webSearchKey || '').trim());
+    const hasWebSearch = cfg.useWebSearch === true || Boolean(String(cfg.webSearchKey || '').trim());
 
     const [sources, draftWebResults] = await Promise.all([
       hasWikiToken
         ? searchWikiArticles(cfg, draftPlan.effectiveQuestion, draftPlan).catch(() => [] as WikiKnowledgeSource[])
         : Promise.resolve([] as WikiKnowledgeSource[]),
-      hasWebKey
+      hasWebSearch
         ? searchWeb(cfg, `${createCommand.title} ${createCommand.topic}`.trim()).catch(() => [] as WebSearchResult[])
         : Promise.resolve([] as WebSearchResult[]),
     ]);
@@ -1568,13 +1614,13 @@ export async function answerWikiQuestion(
   const plan = buildAnswerPlan(question, history);
 
   const hasWikiTokenQA = Boolean(String(cfg.wikiToken || '').trim());
-  const hasWebKeyQA = Boolean(String(cfg.webSearchKey || '').trim());
+  const hasWebSearchQA = cfg.useWebSearch === true || Boolean(String(cfg.webSearchKey || '').trim());
 
   const [sources, webResults] = await Promise.all([
     hasWikiTokenQA
       ? searchWikiArticles(cfg, plan.effectiveQuestion, plan).catch(() => [] as WikiKnowledgeSource[])
       : Promise.resolve([] as WikiKnowledgeSource[]),
-    hasWebKeyQA
+    hasWebSearchQA
       ? searchWeb(cfg, plan.effectiveQuestion).catch(() => [] as WebSearchResult[])
       : Promise.resolve([] as WebSearchResult[]),
   ]);
