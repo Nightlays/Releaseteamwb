@@ -33,7 +33,7 @@ trap cleanup INT TERM EXIT
 cd "$ROOT_DIR"
 
 HOST=127.0.0.1 PORT="$PROXY_PORT" node proxy-standalone.js &
-HOST=127.0.0.1 PORT="$LLM_PORT" GLM_API_KEY="$GLM_API_KEY" node glm-zai-local-adapter.mjs &
+HOST=127.0.0.1 PORT="$LLM_PORT" GLM_API_KEY="$GLM_API_KEY" node GLM/glm-zai-local-adapter.mjs &
 python3 -m http.server "$WEB_PORT" &
 
 echo "Web:   http://127.0.0.1:${WEB_PORT}/youtrack-wiki-v4.html"
