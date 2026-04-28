@@ -382,36 +382,36 @@ function buildAnswerPlan(question: string, history: WikiChatTurn[]): WikiAnswerP
 
   const profileMap: Record<WikiResponseProfile, Omit<WikiAnswerPlan, 'originalQuestion' | 'effectiveQuestion' | 'topicQuestion' | 'isFollowUp' | 'profile'>> = {
     brief: {
-      searchPageSize: 24,
-      hydrateLimit: 8,
-      contextSourceLimit: 6,
-      passageLimit: 3,
-      historyLimit: 6,
-      maxTokens: 1200,
+      searchPageSize: 16,
+      hydrateLimit: 4,
+      contextSourceLimit: 4,
+      passageLimit: 2,
+      historyLimit: 4,
+      maxTokens: 900,
     },
     standard: {
-      searchPageSize: BASE_SEARCH_PAGE_SIZE,
-      hydrateLimit: BASE_HYDRATE_LIMIT,
-      contextSourceLimit: BASE_CONTEXT_SOURCE_LIMIT,
-      passageLimit: BASE_PASSAGE_LIMIT,
+      searchPageSize: 20,
+      hydrateLimit: 6,
+      contextSourceLimit: 6,
+      passageLimit: 4,
+      historyLimit: 6,
+      maxTokens: 1600,
+    },
+    detailed: {
+      searchPageSize: 30,
+      hydrateLimit: 10,
+      contextSourceLimit: 8,
+      passageLimit: 5,
       historyLimit: 10,
       maxTokens: 2200,
     },
-    detailed: {
-      searchPageSize: 56,
-      hydrateLimit: 22,
-      contextSourceLimit: 14,
-      passageLimit: 8,
-      historyLimit: 14,
-      maxTokens: 3200,
-    },
     deep: {
-      searchPageSize: 64,
-      hydrateLimit: 26,
-      contextSourceLimit: 18,
-      passageLimit: 10,
-      historyLimit: 18,
-      maxTokens: 4200,
+      searchPageSize: 40,
+      hydrateLimit: 14,
+      contextSourceLimit: 10,
+      passageLimit: 6,
+      historyLimit: 12,
+      maxTokens: 3000,
     },
   };
 
@@ -553,7 +553,7 @@ function buildQueryCandidates(question: string, keywords: string[]) {
     queries.push('rollback релиз', 'откат релиза');
   }
 
-  return uniqueValues(queries.map(item => item.trim()).filter(Boolean)).slice(0, 20);
+  return uniqueValues(queries.map(item => item.trim()).filter(Boolean)).slice(0, 10);
 }
 
 function buildSourceDigest(question: string, sources: WikiKnowledgeSource[], passageLimit = BASE_PASSAGE_LIMIT) {
@@ -724,7 +724,7 @@ async function requestLlmWithContinuation(
   let combined = '';
   let finishReason = '';
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     const messages = attempt === 0
       ? [
           { role: 'system', content: system },
@@ -791,7 +791,7 @@ async function fetchPageText(cfg: WikiIntelligenceConfig, url: string): Promise<
   try {
     const response = await fetchWithRouting(cfg, url, {
       headers: { Accept: 'text/html,application/xhtml+xml', 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(3000),
     });
     if (!response.ok) return '';
     const html = await response.text().catch(() => '');
@@ -891,7 +891,7 @@ async function searchWeb(cfg: WikiIntelligenceConfig, query: string): Promise<We
 
   // Fetch page content for top results in parallel
   const hydrated = await Promise.all(
-    rawResults.slice(0, 5).map(async r => {
+    rawResults.slice(0, 3).map(async r => {
       const skip = !r.url || /youtube\.com|youtu\.be|twitter\.com|x\.com/i.test(r.url);
       if (skip) return r;
       const pageText = await fetchPageText(cfg, r.url);
@@ -944,21 +944,17 @@ async function searchWikiArticles(cfg: WikiIntelligenceConfig, question: string,
     }
   }
 
-  for (const query of queries) {
-    const payload = await fetchJson<any>(cfg, `${base}/api/v1/article_search`, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json;charset=UTF-8',
-      },
-      body: JSON.stringify({
-        query,
-        exact_match: false,
-        page: 1,
-        page_size: plan.searchPageSize,
-      }),
-    }).catch(() => null);
+  const searchResults = await Promise.all(
+    queries.map(query =>
+      fetchJson<any>(cfg, `${base}/api/v1/article_search`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json;charset=UTF-8' },
+        body: JSON.stringify({ query, exact_match: false, page: 1, page_size: plan.searchPageSize }),
+      }).catch(() => null).then(payload => ({ query, payload }))
+    )
+  );
 
+  for (const { query, payload } of searchResults) {
     const items = extractArticleList(payload);
     for (const item of items) {
       const ref = extractSpaceArticleRef(item);
