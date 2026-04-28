@@ -787,19 +787,6 @@ function htmlToText(html: string): string {
     .trim();
 }
 
-async function fetchPageText(cfg: WikiIntelligenceConfig, url: string): Promise<string> {
-  try {
-    const response = await fetchWithRouting(cfg, url, {
-      headers: { Accept: 'text/html,application/xhtml+xml', 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!response.ok) return '';
-    const html = await response.text().catch(() => '');
-    return htmlToText(html).slice(0, 6000);
-  } catch {
-    return '';
-  }
-}
 
 async function searchWebDuckDuckGo(cfg: WikiIntelligenceConfig, query: string): Promise<WebSearchResult[]> {
   const response = await fetchWithRouting(cfg, 'https://lite.duckduckgo.com/lite/', {
@@ -885,21 +872,10 @@ async function searchWebBrave(cfg: WikiIntelligenceConfig, query: string, count 
 
 async function searchWeb(cfg: WikiIntelligenceConfig, query: string): Promise<WebSearchResult[]> {
   const key = String(cfg.webSearchKey || '').trim();
-  const rawResults = key
+  const results = key
     ? await searchWebBrave(cfg, query)
     : await searchWebDuckDuckGo(cfg, query);
-
-  // Fetch page content for top results in parallel
-  const hydrated = await Promise.all(
-    rawResults.slice(0, 3).map(async r => {
-      const skip = !r.url || /youtube\.com|youtu\.be|twitter\.com|x\.com/i.test(r.url);
-      if (skip) return r;
-      const pageText = await fetchPageText(cfg, r.url);
-      return pageText.length > r.snippet.length ? { ...r, content: pageText.slice(0, 6000) } : r;
-    })
-  );
-
-  return [...hydrated, ...rawResults.slice(5)].filter(r => r.title && r.url);
+  return results.filter(r => r.title && r.url);
 }
 
 /* ─── WIKI SEARCH ────────────────────────────────────────── */
