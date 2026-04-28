@@ -805,27 +805,24 @@ async function searchWebDuckDuckGo(cfg: WikiIntelligenceConfig, query: string): 
 
   const results: WebSearchResult[] = [];
 
-  // DDG Lite: result links are <a class="result-link" href="...">Title</a>
-  const linkRe = /<a[^>]+class="result-link"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-  const snippetRe = /<td[^>]+class="result-snippet"[^>]*>([\s\S]*?)<\/td>/g;
+  // DDG Lite uses single quotes: href="URL" class='result-link'>Title</a>
+  // href comes before class in the actual markup
+  const linkRe = /href="(https?:\/\/[^"]+)"[^>]*class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/g;
+  const snippetRe = /<td[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/g;
 
   const links: Array<{ url: string; title: string }> = [];
   let m: RegExpExecArray | null;
 
   while ((m = linkRe.exec(html)) !== null && links.length < 10) {
-    let url = String(m[1] || '').trim();
-    if (url.includes('uddg=')) {
-      const uddg = url.match(/uddg=([^&]+)/)?.[1];
-      if (uddg) url = decodeURIComponent(uddg);
-    }
-    if (url.startsWith('http')) {
-      links.push({ url, title: htmlToText(m[2]) });
-    }
+    const url = String(m[1] || '').trim();
+    const title = htmlToText(m[2]).trim();
+    if (url && title) links.push({ url, title });
   }
 
   const snippets: string[] = [];
   while ((m = snippetRe.exec(html)) !== null) {
-    snippets.push(htmlToText(m[1]));
+    const text = htmlToText(m[1]).trim();
+    if (text) snippets.push(text);
   }
 
   for (let i = 0; i < Math.min(links.length, 8); i++) {
