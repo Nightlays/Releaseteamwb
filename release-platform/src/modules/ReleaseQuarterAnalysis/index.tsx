@@ -4,9 +4,8 @@ import {
   Button,
   Card,
   CardBody,
-  CardHeader,
-  CardTitle,
   CanonicalTable,
+  ColumnFilterDropdown,
   type CanonicalTableColumn,
   FieldLabel,
   Input,
@@ -17,6 +16,7 @@ import {
 import { useSettings } from '../../context/SettingsContext';
 import {
   collectQuarterReleaseAnalysis,
+  compareRelease,
   platformLabel,
   type LogLevel,
   type PlatformKey,
@@ -28,11 +28,13 @@ import type { Role } from '../../types';
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const SHOW_RELEASE_ANALYSIS_FLOATING_LOGS = true;
 const MAJOR_RELEASE_STORAGE_KEY = 'rp_release_quarter_major_release';
-const MAJOR_RELEASE_TO_STORAGE_KEY = 'rp_release_quarter_major_release_to';
 
 interface ReleaseQuarterAnalysisProps {
   role?: Role;
 }
+
+type ColumnFilterKey = 'version' | 'stream' | 'substream';
+type ColumnFilters = Record<ColumnFilterKey, string[]>;
 
 function dash(value: unknown) {
   const text = String(value || '').trim();
@@ -110,8 +112,60 @@ function taskCount(row: QuarterAnalysisRow) {
   return row.secondaryTasks.length + (row.primaryTask ? 1 : 0);
 }
 
+function columnFilterValue(row: QuarterAnalysisRow, key: ColumnFilterKey) {
+  if (key === 'version') return row.version;
+  if (key === 'stream') return dash(row.stream);
+  return dash(row.substream);
+}
+
+function splitColumnFilterValues(row: QuarterAnalysisRow, key: ColumnFilterKey) {
+  if (key === 'version') {
+    const version = row.version.trim();
+    return version && version !== '-' ? [version] : [];
+  }
+  return columnFilterValue(row, key)
+    .split(/[,;\n]+/u)
+    .map(item => item.trim())
+    .filter(item => item && item !== '-');
+}
+
+function uniqueColumnValues(rows: QuarterAnalysisRow[], key: ColumnFilterKey) {
+  return Array.from(new Set(rows.flatMap(row => splitColumnFilterValues(row, key)))).sort((left, right) => (
+    key === 'version' ? compareRelease(left, right) : left.localeCompare(right, 'ru')
+  ));
+}
+
+function emptyColumnFilters(): ColumnFilters {
+  return { version: [], stream: [], substream: [] };
+}
+
+function matchesColumnFilters(row: QuarterAnalysisRow, filters: ColumnFilters) {
+  return (Object.keys(filters) as ColumnFilterKey[]).every(key => {
+    const selected = filters[key];
+    if (!selected.length) return true;
+    const rowValues = splitColumnFilterValues(row, key);
+    return selected.some(value => rowValues.includes(value));
+  });
+}
+
 function versionText(row: QuarterAnalysisRow) {
   return `${row.version}\nЗадач: ${taskCount(row)}`;
+}
+
+function quarterRowKey(row: QuarterAnalysisRow) {
+  return `${row.platform}:${row.version}`;
+}
+
+function sortQuarterRows(rows: QuarterAnalysisRow[]) {
+  return [...rows].sort((left, right) => left.platform.localeCompare(right.platform) || compareRelease(left.version, right.version));
+}
+
+function mergeCollectedRowsTop(collectedRows: QuarterAnalysisRow[], currentRows: QuarterAnalysisRow[]) {
+  const collectedKeys = new Set(collectedRows.map(quarterRowKey));
+  return [
+    ...sortQuarterRows(collectedRows),
+    ...sortQuarterRows(currentRows.filter(row => !collectedKeys.has(quarterRowKey(row)))),
+  ];
 }
 
 function branchCutDateParts(row: QuarterAnalysisRow) {
@@ -167,15 +221,98 @@ function exportCsv(rows: QuarterAnalysisRow[], platform: PlatformKey, rangeLabel
   URL.revokeObjectURL(url);
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function exportPdf(rows: QuarterAnalysisRow[], platform: PlatformKey, rangeLabel: string) {
+  const popup = window.open('', '_blank');
+  if (!popup) return;
+
+  const headers = [
+    'Платформа',
+    'Версия',
+    'Стрим',
+    'Сабстрим',
+    'Локомотивная задача',
+    'Вторичные задачи',
+    'Время сборки',
+    '% раскатки предыдущей версии',
+    'План дата отправки ХФ',
+    'Время отведения ХФ',
+    'Фактическая дата отправки',
+    'Дата раскатки на 1%',
+    'Причина ХФ',
+    'Детали ХФ',
+  ];
+  const bodyRows = rows.map(row => [
+    platformLabel(row.platform),
+    row.version,
+    row.stream,
+    row.substream,
+    row.primaryTask ? `${row.primaryTask.key} ${row.primaryTask.summary}` : '-',
+    row.secondaryTasks.length ? row.secondaryTasks.map(issue => `${issue.key} ${issue.summary}`).join('\n') : '-',
+    row.buildTime,
+    row.previousRolloutPercent,
+    row.plannedHotfixDate,
+    row.branchCutTime,
+    row.actualSendTime,
+    row.onePercentDate,
+    row.hotfixReason,
+    row.hotfixDetails,
+  ]);
+  const title = `Анализ релизов за квартал · ${platformLabel(platform)} · ${rangeLabel}`;
+
+  popup.document.write(`<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; color: #111827; }
+    h1 { margin: 0 0 10px; font-size: 18px; }
+    .meta { margin: 0 0 14px; font-size: 11px; color: #64748b; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8.5px; }
+    th, td { border: 1px solid #cbd5e1; padding: 4px 5px; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }
+    th { background: #f1f5f9; text-align: center; font-weight: 700; }
+    tr:nth-child(even) td { background: #f8fafc; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="meta">Строк: ${rows.length} · сформировано ${new Date().toLocaleString('ru-RU')}</div>
+  <table>
+    <thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead>
+    <tbody>${bodyRows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>
+  <script>
+    window.addEventListener('load', () => {
+      window.focus();
+      setTimeout(() => window.print(), 200);
+    });
+  </script>
+</body>
+</html>`);
+  popup.document.close();
+}
+
 export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalysisProps) {
   const { settings } = useSettings();
   const canSaveRows = role !== 'viewer';
   const [releaseFrom, setReleaseFrom] = useState(() => readStoredRelease(MAJOR_RELEASE_STORAGE_KEY, '7.5.6000'));
-  const [releaseTo, setReleaseTo] = useState(() => readStoredRelease(MAJOR_RELEASE_TO_STORAGE_KEY, readStoredRelease(MAJOR_RELEASE_STORAGE_KEY, '7.5.6000')));
   const [platform, setPlatform] = useState<PlatformKey>('android');
   const [year, setYear] = useState('all');
   const [month, setMonth] = useState('all');
   const [rows, setRows] = useState<QuarterAnalysisRow[]>([]);
+  const [pendingRows, setPendingRows] = useState<QuarterAnalysisRow[]>([]);
+  const [freshRowKeys, setFreshRowKeys] = useState<Set<string>>(() => new Set());
+  const [columnFilters, setColumnFilters] = useState<ColumnFilters>(() => emptyColumnFilters());
   const [logs, setLogs] = useState<Array<{ text: string; level: LogLevel }>>([]);
   const [status, setStatus] = useState('');
   const [statusTone, setStatusTone] = useState<'neutral' | 'ok' | 'warn' | 'error'>('neutral');
@@ -191,6 +328,13 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     setLogs(prev => [...prev.slice(-249), { text: `[${new Date().toLocaleTimeString('ru-RU')}] ${message}`, level }]);
   }, []);
 
+  const updateRelease = useCallback((value: string) => {
+    setReleaseFrom(value);
+    setPendingRows([]);
+    setFreshRowKeys(new Set());
+    setColumnFilters(emptyColumnFilters());
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem(MAJOR_RELEASE_STORAGE_KEY, releaseFrom.trim());
@@ -198,14 +342,6 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       /* ignore */
     }
   }, [releaseFrom]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(MAJOR_RELEASE_TO_STORAGE_KEY, releaseTo.trim());
-    } catch {
-      /* ignore */
-    }
-  }, [releaseTo]);
 
   useEffect(() => {
     let alive = true;
@@ -232,13 +368,27 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     };
   }, [log]);
 
-  const visibleRows = useMemo(() => rows.filter(row => {
+  const baseFilteredRows = useMemo(() => rows.filter(row => {
     if (row.platform !== platform) return false;
     const branchCutDate = branchCutDateParts(row);
     if (year !== 'all' && branchCutDate?.year !== Number(year)) return false;
     if (month === 'all') return true;
     return branchCutDate?.month === Number(month);
   }), [month, platform, rows, year]);
+
+  const columnFilterValues = useMemo(() => ({
+    version: uniqueColumnValues(baseFilteredRows, 'version'),
+    stream: uniqueColumnValues(baseFilteredRows, 'stream'),
+    substream: uniqueColumnValues(baseFilteredRows, 'substream'),
+  }), [baseFilteredRows]);
+
+  const visibleRows = useMemo(() => (
+    baseFilteredRows.filter(row => matchesColumnFilters(row, columnFilters))
+  ), [baseFilteredRows, columnFilters]);
+
+  const setColumnFilter = useCallback((key: ColumnFilterKey, value: string[]) => {
+    setColumnFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
 
   const availableYears = useMemo(() => {
     const set = new Set(rows
@@ -266,7 +416,8 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     abortRef.current = controller;
     setBusy(true);
     setLogPanelOpen(false);
-    setRows([]);
+    setPendingRows([]);
+    setFreshRowKeys(new Set());
     setLogs([]);
     setProgress(0);
     setStatus('Собираю хотфиксы и задачи...');
@@ -274,13 +425,15 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     try {
       const result = await collectQuarterReleaseAnalysis(
         { settings, signal: controller.signal, onLog: log, onProgress: setProgress },
-        releaseFrom,
-        releaseTo || releaseFrom
+        releaseFrom
       );
-      setRows(result);
+      setRows(prev => mergeCollectedRowsTop(result, prev));
+      setPendingRows(result);
+      setFreshRowKeys(new Set(result.map(quarterRowKey)));
+      setColumnFilters(emptyColumnFilters());
       setYear('all');
       setMonth('all');
-      setStatus(`Готово: ${result.length} строк.`);
+      setStatus(result.length ? `Готово: ${result.length} строк. Можно записать.` : 'Готово: хотфиксы не найдены.');
       setStatusTone(result.length ? 'ok' : 'warn');
       setProgress(100);
     } catch (error) {
@@ -293,7 +446,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       if (abortRef.current === controller) abortRef.current = null;
       setBusy(false);
     }
-  }, [log, releaseFrom, releaseTo, settings]);
+  }, [log, releaseFrom, settings]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -304,15 +457,16 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
   }, []);
 
   const saveRows = useCallback(async () => {
-    if (!canSaveRows || !rows.length || saving) return;
+    if (!canSaveRows || !pendingRows.length || saving) return;
     setSaving(true);
     setStatus('Записываю найденные релизы в Supabase...');
     setStatusTone('neutral');
     try {
-      const result = await saveQuarterAnalysisRows(rows, releaseFrom, releaseTo || releaseFrom);
+      const result = await saveQuarterAnalysisRows(pendingRows, releaseFrom, releaseFrom);
       setStatus(`Записано в БД: Android ${result.android}, iOS ${result.ios}.`);
       setStatusTone(result.total ? 'ok' : 'warn');
       log(`Supabase: записано Android ${result.android}, iOS ${result.ios}`, result.total ? 'ok' : 'warn');
+      setPendingRows([]);
     } catch (error) {
       const message = (error as Error).message || 'Не удалось записать данные в Supabase.';
       setStatus(message);
@@ -321,7 +475,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     } finally {
       setSaving(false);
     }
-  }, [canSaveRows, log, releaseFrom, releaseTo, rows, saving]);
+  }, [canSaveRows, log, pendingRows, releaseFrom, saving]);
 
   const startLogPanelResize = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -353,17 +507,36 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
   }, [logPanelSize.height, logPanelSize.width]);
 
   const progressColor = statusTone === 'ok' ? 'green' : statusTone === 'warn' ? 'yellow' : statusTone === 'error' ? 'red' : 'accent';
-  const csvRangeLabel = `${releaseFrom || 'start'}_${releaseTo || releaseFrom || 'end'}`.replace(/\s+/g, '');
+  const csvRangeLabel = `${releaseFrom || 'release'}`.replace(/\s+/g, '');
   const showRunStatus = Boolean(status) || progress > 0 || busy || saving;
   const timingHeaderStyle = useMemo<React.CSSProperties>(() => ({ whiteSpace: 'nowrap' }), []);
+  const filterSegmentStyle = useMemo<React.CSSProperties>(() => ({ height: 32, padding: 2, alignItems: 'center' }), []);
+  const filterButtonStyle = useMemo<React.CSSProperties>(() => ({
+    height: 26,
+    minHeight: 26,
+    padding: '0 10px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }), []);
+  const visibleTaskCount = useMemo(() => visibleRows.reduce((sum, row) => sum + taskCount(row), 0), [visibleRows]);
   const tableColumns = useMemo<Array<CanonicalTableColumn<QuarterAnalysisRow>>>(() => [
     {
       id: 'version',
       group: 'Задачи',
-      title: 'Версия',
-      width: 76,
+      title: (
+        <ColumnFilterDropdown
+          label="Версия"
+          values={columnFilterValues.version}
+          selectedValues={columnFilters.version}
+          onChange={value => setColumnFilter('version', value)}
+        />
+      ),
+      width: 96,
       sticky: 'left',
       align: 'center',
+      headerStyle: { paddingLeft: 4, paddingRight: 4 },
+      previewTitle: () => 'Версия',
       text: versionText,
       lineClamp: 3,
       cellStyle: { paddingLeft: 6, paddingRight: 6 },
@@ -374,13 +547,43 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
         </div>
       ),
     },
-    { id: 'stream', group: 'Задачи', title: 'Стрим', width: 140, text: row => dash(row.stream), lineClamp: 3 },
-    { id: 'substream', group: 'Задачи', title: 'Сабстрим', width: 150, text: row => dash(row.substream), lineClamp: 3 },
+    {
+      id: 'stream',
+      group: 'Задачи',
+      title: (
+        <ColumnFilterDropdown
+          label="Стрим"
+          values={columnFilterValues.stream}
+          selectedValues={columnFilters.stream}
+          onChange={value => setColumnFilter('stream', value)}
+        />
+      ),
+      width: 140,
+      previewTitle: () => 'Стрим',
+      text: row => dash(row.stream),
+      lineClamp: 3,
+    },
+    {
+      id: 'substream',
+      group: 'Задачи',
+      title: (
+        <ColumnFilterDropdown
+          label="Сабстрим"
+          values={columnFilterValues.substream}
+          selectedValues={columnFilters.substream}
+          onChange={value => setColumnFilter('substream', value)}
+        />
+      ),
+      width: 150,
+      previewTitle: () => 'Сабстрим',
+      text: row => dash(row.substream),
+      lineClamp: 3,
+    },
     {
       id: 'primaryTask',
       group: 'Задачи',
       title: 'Локомотивная задача',
-      width: 300,
+      width: 280,
       render: row => issueCell(row.primaryTask),
       preview: row => row.primaryTask ? issueCell(row.primaryTask) : null,
       text: row => issueText(row.primaryTask),
@@ -407,44 +610,40 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     { id: 'onePercentDate', group: 'Тайминги', title: 'Дата раскатки на 1%', width: 175, text: row => dash(row.onePercentDate), lineClamp: 2, headerStyle: timingHeaderStyle },
     { id: 'hotfixReason', group: 'Хотфикс', title: 'Причина ХФ', width: 260, text: row => dash(row.hotfixReason), lineClamp: 3 },
     { id: 'hotfixDetails', group: 'Хотфикс', title: 'Детали ХФ', width: 260, text: row => dash(row.hotfixDetails), lineClamp: 3 },
-  ], [timingHeaderStyle]);
+  ], [columnFilterValues, columnFilters, setColumnFilter, timingHeaderStyle]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>Анализ релизов за квартал</div>
 
       <Card>
-        <CardHeader>
-          <div>
-            <CardTitle>Параметры</CardTitle>
-          </div>
-        </CardHeader>
-        <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, alignItems: 'end' }}>
+        <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 360px) 1fr', gap: 12, alignItems: 'end' }}>
             <div>
-              <FieldLabel>Релиз с</FieldLabel>
-              <Input value={releaseFrom} onChange={event => setReleaseFrom(event.target.value)} placeholder="7.5.6000" />
-            </div>
-            <div>
-              <FieldLabel>Релиз по</FieldLabel>
-              <Input value={releaseTo} onChange={event => setReleaseTo(event.target.value)} placeholder={releaseFrom || '7.5.6000'} />
+              <FieldLabel>Релиз:</FieldLabel>
+              <Input value={releaseFrom} onChange={event => updateRelease(event.target.value)} placeholder="7.5.6000" />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              {busy ? <Button variant="danger" onClick={stop}>Остановить</Button> : <Button variant="primary" disabled={loadingSaved} onClick={() => void run()}>Собрать</Button>}
+              {busy ? (
+                <Button variant="danger" onClick={stop}>Остановить</Button>
+              ) : (
+                <Button variant="primary" disabled={loadingSaved || pendingRows.length > 0} onClick={() => void run()}>Собрать</Button>
+              )}
               {canSaveRows && (
                 <Button
                   variant="secondary"
-                  disabled={!rows.length || busy || saving || loadingSaved}
+                  disabled={!pendingRows.length || busy || saving || loadingSaved}
                   onClick={() => void saveRows()}
                   style={{
-                    borderColor: rows.length ? 'rgba(34,197,94,.32)' : undefined,
-                    color: rows.length ? '#4ADE80' : undefined,
+                    borderColor: pendingRows.length ? 'rgba(34,197,94,.32)' : undefined,
+                    color: pendingRows.length ? '#4ADE80' : undefined,
                   }}
                 >
                   {saving ? 'Записываю...' : 'Записать'}
                 </Button>
               )}
               <Button variant="secondary" disabled={!visibleRows.length || loadingSaved} onClick={() => exportCsv(visibleRows, platform, csvRangeLabel)}>CSV</Button>
+              <Button variant="secondary" disabled={!visibleRows.length || loadingSaved} onClick={() => exportPdf(visibleRows, platform, csvRangeLabel)}>PDF</Button>
             </div>
           </div>
           {showRunStatus && (
@@ -460,37 +659,40 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       </Card>
 
       <Card>
-        <CardHeader>
-          <div>
-            <CardTitle>Таблица</CardTitle>
-          </div>
-          <Badge color={visibleRows.length ? 'purple' : 'gray'}>{visibleRows.length}</Badge>
-        </CardHeader>
-        <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+        <CardBody style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 10px' }}>
+          <SegmentControl
+            items={[{ label: 'Android', value: 'android' }, { label: 'iOS', value: 'ios' }]}
+            value={platform}
+            onChange={value => { setPlatform(value as PlatformKey); setYear('all'); setMonth('all'); }}
+            style={filterSegmentStyle}
+            buttonStyle={filterButtonStyle}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginLeft: 'auto', maxWidth: '100%', flexWrap: 'wrap' }}>
+            <Badge color={visibleTaskCount ? 'purple' : 'gray'} style={{ height: 32, padding: '0 10px', fontSize: 12, fontWeight: 700 }}>
+              Задач: {visibleTaskCount}
+            </Badge>
             <SegmentControl
-              items={[{ label: 'Android', value: 'android' }, { label: 'iOS', value: 'ios' }]}
-              value={platform}
-              onChange={value => { setPlatform(value as PlatformKey); setYear('all'); setMonth('all'); }}
+              items={[{ label: 'Все', value: 'all' }, ...availableMonths.map(index => ({ label: MONTHS[index], value: String(index) }))]}
+              value={month}
+              onChange={setMonth}
+              style={filterSegmentStyle}
+              buttonStyle={filterButtonStyle}
             />
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, marginLeft: 'auto', maxWidth: '100%' }}>
-              <SegmentControl
-                items={[{ label: 'Все', value: 'all' }, ...availableYears.map(item => ({ label: String(item), value: String(item) }))]}
-                value={year}
-                onChange={value => { setYear(value); setMonth('all'); }}
-              />
-              <SegmentControl
-                items={[{ label: 'Все', value: 'all' }, ...availableMonths.map(index => ({ label: MONTHS[index], value: String(index) }))]}
-                value={month}
-                onChange={setMonth}
-              />
-            </div>
+            <div aria-hidden="true" style={{ width: 1, height: 28, background: 'var(--border-hi)', margin: '0 2px' }} />
+            <SegmentControl
+              items={[{ label: 'Все', value: 'all' }, ...availableYears.map(item => ({ label: String(item), value: String(item) }))]}
+              value={year}
+              onChange={value => { setYear(value); setMonth('all'); }}
+              style={filterSegmentStyle}
+              buttonStyle={filterButtonStyle}
+            />
           </div>
         </CardBody>
         <CanonicalTable
           rows={visibleRows}
           columns={tableColumns}
-          getRowKey={row => `${row.platform}:${row.version}`}
+          getRowKey={quarterRowKey}
+          isRowHighlighted={row => freshRowKeys.has(quarterRowKey(row))}
           rowHeight={74}
           maxHeight="72vh"
           minWidth={2751}

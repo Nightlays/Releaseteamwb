@@ -1,5 +1,6 @@
 import React, { ReactNode, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 export { CanonicalTable, type CanonicalTableColumn } from './CanonicalTable';
+export { ColumnFilterDropdown, type ColumnFilterDropdownProps } from './ColumnFilterDropdown';
 
 /* ─── BUTTON ─────────────────────────────────────────────── */
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'icon';
@@ -172,9 +173,15 @@ export function Progress({ value, max = 100, color = 'accent', height = 5, style
 
 /* ─── SEGMENT CONTROL ────────────────────────────────────── */
 interface SegItem { label: string; value: string; }
-interface SegProps { items: SegItem[]; value: string; onChange: (v: string) => void; style?: React.CSSProperties; }
+interface SegProps {
+  items: SegItem[];
+  value: string;
+  onChange: (v: string) => void;
+  style?: React.CSSProperties;
+  buttonStyle?: React.CSSProperties;
+}
 
-export function SegmentControl({ items, value, onChange, style }: SegProps) {
+export function SegmentControl({ items, value, onChange, style, buttonStyle }: SegProps) {
   return (
     <div style={{
       display: 'inline-flex', background: 'var(--surface-soft-3)',
@@ -190,6 +197,7 @@ export function SegmentControl({ items, value, onChange, style }: SegProps) {
             background: value === item.value ? 'var(--card-hi)' : 'transparent',
             color:      value === item.value ? 'var(--text)' : 'var(--text-2)',
             boxShadow:  value === item.value ? 'var(--sh-sm)' : 'none',
+            ...buttonStyle,
           }}
         >
           {item.label}

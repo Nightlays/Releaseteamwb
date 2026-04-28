@@ -31,6 +31,7 @@ export interface CanonicalTableProps<T> {
   overscanRight?: number;
   loading?: boolean;
   loadingText?: ReactNode;
+  isRowHighlighted?: (row: T, index: number) => boolean;
 }
 
 interface TablePreview {
@@ -85,6 +86,7 @@ export function CanonicalTable<T>({
   overscanRight = 16,
   loading = false,
   loadingText = 'Загружаю данные...',
+  isRowHighlighted,
 }: CanonicalTableProps<T>) {
   const [preview, setPreview] = useState<TablePreview | null>(null);
   const [clippedCells, setClippedCells] = useState<Set<string>>(() => new Set());
@@ -166,6 +168,7 @@ export function CanonicalTable<T>({
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <div
+        data-canonical-table-scroll="true"
         aria-busy={loading}
         style={{
           width: '100%',
@@ -380,6 +383,7 @@ export function CanonicalTable<T>({
                 {columns.map((column, columnIndex) => {
                   const rowKey = getRowKey(row, rowIndex);
                   const cellKey = `${String(rowKey)}:${column.id}`;
+                  const rowHighlighted = Boolean(isRowHighlighted?.(row, rowIndex));
                   const rendered = column.render ? column.render(row) : column.text?.(row) || '';
                   const previewBody = column.preview ? column.preview(row) : column.text?.(row);
                   const title = column.previewTitle ? column.previewTitle(row) : column.title;
@@ -387,7 +391,9 @@ export function CanonicalTable<T>({
                   const canPreview = !column.disablePreview && isMeaningfulPreview(previewBody);
                   const previewTrigger = column.previewTrigger || 'hover';
                   const isButtonPreview = canPreview && previewTrigger === 'button';
-                  const rowBg = rowIndex % 2 === 0 ? 'var(--card)' : 'var(--card-hi)';
+                  const rowBg = rowHighlighted
+                    ? 'color-mix(in srgb, var(--accent) 13%, var(--card))'
+                    : (rowIndex % 2 === 0 ? 'var(--card)' : 'var(--card-hi)');
                   const stickyRowBg = rowBg;
                   const stickyLeft = stickyLeftOffsets[columnIndex];
                   const isStickyLeft = typeof stickyLeft === 'number';
@@ -423,6 +429,8 @@ export function CanonicalTable<T>({
                         background: cellBg,
                         backgroundClip: 'padding-box',
                         boxShadow: isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : undefined,
+                        animation: rowHighlighted ? 'pulse 1.8s ease-in-out 2' : undefined,
+                        transition: 'background .25s ease',
                         textAlign: column.align || 'left',
                         ...cellStyle,
                       }}
