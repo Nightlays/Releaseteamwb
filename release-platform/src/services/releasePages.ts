@@ -234,7 +234,7 @@ function formatRelease(parts: { major: number; minor: number; build: number }) {
   return `${parts.major}.${parts.minor}.${String(parts.build).padStart(4, '0')}`;
 }
 
-function compareRelease(left: string, right: string) {
+export function compareRelease(left: string, right: string) {
   const a = parseRelease(left);
   const b = parseRelease(right);
   if (!a || !b) return left.localeCompare(right, 'ru');
@@ -349,7 +349,7 @@ function formatDateTime(ms: number) {
     timeZone: 'Europe/Moscow',
     day: '2-digit',
     month: '2-digit',
-    year: 'numeric',
+    year: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(ms)).replace(',', '');
@@ -361,7 +361,7 @@ function formatDate(ms: number) {
     timeZone: 'Europe/Moscow',
     day: '2-digit',
     month: '2-digit',
-    year: 'numeric',
+    year: '2-digit',
   }).format(new Date(ms));
 }
 

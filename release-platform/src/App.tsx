@@ -45,7 +45,7 @@ const EMPTY_RBAC: RbacConfig = {
   userAccess: {},
 };
 
-function ModuleContent({ moduleId, refreshKey, rbac, onRbacChange }: { moduleId: ModuleId; refreshKey: number; rbac: RbacConfig; onRbacChange: (next: RbacConfig) => void }) {
+function ModuleContent({ moduleId, refreshKey, rbac, role, onRbacChange }: { moduleId: ModuleId; refreshKey: number; rbac: RbacConfig; role: Role; onRbacChange: (next: RbacConfig) => void }) {
   if (moduleId === 'band') {
     return <LegacyModuleFrame module={MODULE_BY_ID[moduleId]} refreshKey={refreshKey} />;
   }
@@ -70,7 +70,7 @@ function ModuleContent({ moduleId, refreshKey, rbac, onRbacChange }: { moduleId:
     case 'chp':
       return <div key={key}><ChpCollect /></div>;
     case 'releaseAnalysis':
-      return <div key={key}><ReleaseQuarterAnalysis /></div>;
+      return <div key={key}><ReleaseQuarterAnalysis role={role} /></div>;
     case 'chpRange':
       return <div key={key}><ChpReleaseRange /></div>;
     case 'swat':
@@ -500,7 +500,6 @@ function Layout() {
           theme={theme}
           onRefresh={() => setRefreshKey(prev => prev + 1)}
           onOpenLegacy={() => window.open(buildLegacyModuleUrl(currentModule, settings), '_blank', 'noopener')}
-          onOpenLaunch={() => handleActivate('launch')}
           onSetTheme={setTheme}
           showLegacyButton={currentModule.showLegacyButton !== false}
         />
@@ -513,7 +512,7 @@ function Layout() {
           background: 'var(--main-bg)',
         }}>
           <div style={{ maxWidth: isWideModule ? undefined : 1440, margin: '0 auto', width: '100%', height: '100%' }}>
-            <ModuleContent moduleId={currentModule.id} refreshKey={refreshKey} rbac={rbac} onRbacChange={setRbac} />
+            <ModuleContent moduleId={currentModule.id} refreshKey={refreshKey} rbac={rbac} role={auth.role} onRbacChange={setRbac} />
           </div>
         </main>
       </div>

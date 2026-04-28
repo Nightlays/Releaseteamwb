@@ -28,6 +28,8 @@ export interface CanonicalTableProps<T> {
   maxHeight?: number | string;
   minWidth?: number | string;
   overscanRight?: number;
+  loading?: boolean;
+  loadingText?: ReactNode;
 }
 
 interface HoverPreview {
@@ -36,6 +38,8 @@ interface HoverPreview {
   title: ReactNode;
   body: ReactNode;
 }
+
+const GROUP_HEADER_HEIGHT = 38;
 
 function cssSize(value: number | string | undefined) {
   return typeof value === 'number' ? `${value}px` : value;
@@ -52,11 +56,15 @@ function isMeaningfulPreview(value: ReactNode) {
   return value != null && value !== false && value !== '';
 }
 
-function getPreviewPosition(clientX: number, clientY: number) {
+function getPreviewPosition(clientX: number, clientY: number, anchorRect: DOMRect) {
   const width = Math.min(460, Math.max(280, window.innerWidth - 32));
   const height = 300;
   const gap = 12;
-  const left = Math.min(Math.max(16, clientX + gap), Math.max(16, window.innerWidth - width - 16));
+  const maxLeft = Math.max(16, window.innerWidth - width - 16);
+  const anchorLeft = anchorRect.left + gap;
+  const anchorRightAligned = anchorRect.right - width - gap;
+  const preferredLeft = anchorLeft + width <= window.innerWidth - 16 ? anchorLeft : anchorRightAligned;
+  const left = Math.min(Math.max(16, preferredLeft), maxLeft);
   const below = clientY + gap;
   const top = below + height <= window.innerHeight - 16
     ? below
@@ -73,6 +81,8 @@ export function CanonicalTable<T>({
   maxHeight = '70vh',
   minWidth,
   overscanRight = 16,
+  loading = false,
+  loadingText = 'Загружаю данные...',
 }: CanonicalTableProps<T>) {
   const [hover, setHover] = useState<HoverPreview | null>(null);
   const [clippedCells, setClippedCells] = useState<Set<string>>(() => new Set());
@@ -140,6 +150,7 @@ export function CanonicalTable<T>({
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <div
+        aria-busy={loading}
         style={{
           width: '100%',
           maxHeight,
@@ -177,16 +188,19 @@ export function CanonicalTable<T>({
                       position: 'sticky',
                       top: 0,
                       zIndex: 4,
+                      height: GROUP_HEADER_HEIGHT,
                       padding: '10px 12px',
                       borderRight: '1px solid var(--border-hi)',
                       borderBottom: '1.5px solid var(--border-hi)',
                       background: 'var(--card-hi)',
-                      backgroundClip: 'padding-box',
+                      backgroundClip: 'border-box',
+                      boxShadow: '0 3px 0 var(--card-hi), 0 4px 0 var(--border-hi)',
                       color: 'var(--text)',
                       fontSize: 11,
                       fontWeight: 800,
                       textTransform: 'uppercase',
                       textAlign: 'center',
+                      lineHeight: 1.1,
                     }}
                   >
                     {group.label}
@@ -204,7 +218,7 @@ export function CanonicalTable<T>({
                   key={column.id}
                   style={{
                     position: 'sticky',
-                    top: hasGroups ? 39 : 0,
+                    top: hasGroups ? GROUP_HEADER_HEIGHT : 0,
                     left: isStickyLeft ? stickyLeft : undefined,
                     zIndex: isStickyLeft ? 7 : 3,
                     height: 40,
@@ -212,8 +226,10 @@ export function CanonicalTable<T>({
                     borderRight: '1px solid var(--border-hi)',
                     borderBottom: '1.5px solid var(--border-hi)',
                     background: headerBg,
-                    backgroundClip: 'padding-box',
-                    boxShadow: isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : '0 2px 0 var(--border-hi)',
+                    backgroundClip: 'border-box',
+                    boxShadow: isStickyLeft
+                      ? '3px 0 0 var(--border-hi), 0 4px 0 var(--card-hi), 0 5px 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)'
+                      : '0 4px 0 var(--card-hi), 0 5px 0 var(--border-hi)',
                     color: 'var(--text-2)',
                     fontSize: 10.5,
                     fontWeight: 800,
@@ -231,7 +247,104 @@ export function CanonicalTable<T>({
             </tr>
           </thead>
           <tbody>
-            {!rows.length && (
+            {loading && !rows.length && (
+              <>
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    style={{
+                      padding: '22px 24px',
+                      textAlign: 'center',
+                      color: 'var(--text-2)',
+                      borderBottom: '1px solid var(--border-hi)',
+                      background: 'var(--card)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 10,
+                        padding: '10px 14px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 999,
+                        background: 'var(--surface-soft)',
+                        boxShadow: '0 10px 28px rgba(0,0,0,.08)',
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          border: '2px solid rgba(168,85,247,.22)',
+                          borderTopColor: 'var(--accent)',
+                          animation: 'spin .8s linear infinite',
+                        }}
+                      />
+                      <span>{loadingText}</span>
+                    </div>
+                  </td>
+                </tr>
+                {Array.from({ length: 5 }).map((_, skeletonRowIndex) => (
+                  <tr key={`canonical-loader-${skeletonRowIndex}`} style={{ height: rowHeight }}>
+                    {columns.map((column, columnIndex) => {
+                      const stickyLeft = stickyLeftOffsets[columnIndex];
+                      const isStickyLeft = typeof stickyLeft === 'number';
+                      const rowBg = skeletonRowIndex % 2 === 0 ? 'var(--card)' : 'var(--card-hi)';
+                      const widthSeed = ((skeletonRowIndex + 1) * (columnIndex + 3) * 17) % 36;
+                      const barWidth = `${58 + widthSeed}%`;
+
+                      return (
+                        <td
+                          key={column.id}
+                          style={{
+                            position: isStickyLeft ? 'sticky' : 'relative',
+                            left: isStickyLeft ? stickyLeft : undefined,
+                            zIndex: isStickyLeft ? 2 : 1,
+                            height: rowHeight,
+                            padding: '12px 10px',
+                            borderRight: '1px solid var(--border)',
+                            borderBottom: '1px solid var(--border-hi)',
+                            background: rowBg,
+                            backgroundClip: 'padding-box',
+                            boxShadow: isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : undefined,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: barWidth,
+                              height: 12,
+                              borderRadius: 999,
+                              background: 'linear-gradient(90deg, var(--surface-soft), var(--surface-soft-2), var(--surface-soft))',
+                              backgroundSize: '200% 100%',
+                              animation: 'shimmer 1.4s ease-in-out infinite',
+                            }}
+                          />
+                          <div
+                            style={{
+                              width: columnIndex % 3 === 0 ? '42%' : '68%',
+                              height: 10,
+                              marginTop: 10,
+                              borderRadius: 999,
+                              background: 'linear-gradient(90deg, var(--surface-soft), var(--surface-soft-2), var(--surface-soft))',
+                              backgroundSize: '200% 100%',
+                              animation: 'shimmer 1.4s ease-in-out infinite',
+                              opacity: 0.75,
+                            }}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </>
+            )}
+            {!loading && !rows.length && (
               <tr>
                 <td
                   colSpan={columns.length}
@@ -256,8 +369,8 @@ export function CanonicalTable<T>({
                   const title = column.previewTitle ? column.previewTitle(row) : column.title;
                   const cellStyle = typeof column.cellStyle === 'function' ? column.cellStyle(row) : column.cellStyle;
                   const canPreview = !column.disablePreview && isMeaningfulPreview(previewBody);
-                  const rowBg = rowIndex % 2 === 0 ? 'var(--card)' : 'var(--surface-soft)';
-                  const stickyRowBg = rowIndex % 2 === 0 ? 'var(--card)' : 'var(--card-hi)';
+                  const rowBg = rowIndex % 2 === 0 ? 'var(--card)' : 'var(--card-hi)';
+                  const stickyRowBg = rowBg;
                   const stickyLeft = stickyLeftOffsets[columnIndex];
                   const isStickyLeft = typeof stickyLeft === 'number';
                   const cellBg = isStickyLeft ? stickyRowBg : rowBg;
@@ -273,7 +386,7 @@ export function CanonicalTable<T>({
                           ? content.scrollHeight > content.clientHeight + 1 || content.scrollWidth > content.clientWidth + 1
                           : true;
                         if (!clipped) return;
-                        const position = getPreviewPosition(event.clientX, event.clientY);
+                        const position = getPreviewPosition(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
                         setHover({ ...position, title, body: previewBody });
                       }}
                       onMouseLeave={scheduleClosePreview}

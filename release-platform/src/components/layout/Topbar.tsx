@@ -11,7 +11,6 @@ interface TopbarProps {
   onSetTheme: (t: ThemeMode) => void;
   onRefresh: () => void;
   onOpenLegacy: () => void;
-  onOpenLaunch: () => void;
   showLegacyButton?: boolean;
 }
 
@@ -132,7 +131,7 @@ function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t
   );
 }
 
-export function Topbar({ module, proxyOnline, mlReady, theme, onSetTheme, onRefresh, onOpenLegacy, onOpenLaunch, showLegacyButton = true }: TopbarProps) {
+export function Topbar({ module, proxyOnline, mlReady, theme, onSetTheme, onRefresh, onOpenLegacy, showLegacyButton = true }: TopbarProps) {
   return (
     <header style={{
       height: 64,
@@ -158,7 +157,6 @@ export function Topbar({ module, proxyOnline, mlReady, theme, onSetTheme, onRefr
           <Button variant="ghost" size="sm" onClick={onOpenLegacy}>↗ Legacy</Button>
         )}
         <Button variant="secondary" size="sm" onClick={onRefresh}>⟳ Обновить</Button>
-        <Button variant="primary" size="sm" onClick={onOpenLaunch}>▷ Запуск релиза</Button>
       </div>
     </header>
   );

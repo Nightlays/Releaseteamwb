@@ -22,11 +22,17 @@ import {
   type PlatformKey,
   type QuarterAnalysisRow,
 } from '../../services/releasePages';
+import { loadQuarterAnalysisRows, saveQuarterAnalysisRows } from '../../services/releaseQuarterSupabase';
+import type { Role } from '../../types';
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const SHOW_RELEASE_ANALYSIS_FLOATING_LOGS = true;
 const MAJOR_RELEASE_STORAGE_KEY = 'rp_release_quarter_major_release';
 const MAJOR_RELEASE_TO_STORAGE_KEY = 'rp_release_quarter_major_release_to';
+
+interface ReleaseQuarterAnalysisProps {
+  role?: Role;
+}
 
 function dash(value: unknown) {
   const text = String(value || '').trim();
@@ -108,6 +114,16 @@ function versionText(row: QuarterAnalysisRow) {
   return `${row.version}\nЗадач: ${taskCount(row)}`;
 }
 
+function branchCutDateParts(row: QuarterAnalysisRow) {
+  const match = String(row.branchCutTime || '').match(/\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b/);
+  if (!match) return null;
+  const month = Number(match[2]) - 1;
+  const parsed = Number(match[3]);
+  const year = parsed < 100 ? 2000 + parsed : parsed;
+  if (!Number.isFinite(year) || month < 0 || month > 11) return null;
+  return { month, year };
+}
+
 function exportCsv(rows: QuarterAnalysisRow[], platform: PlatformKey, rangeLabel: string) {
   const headers = [
     'Платформа',
@@ -151,18 +167,22 @@ function exportCsv(rows: QuarterAnalysisRow[], platform: PlatformKey, rangeLabel
   URL.revokeObjectURL(url);
 }
 
-export function ReleaseQuarterAnalysis() {
+export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalysisProps) {
   const { settings } = useSettings();
+  const canSaveRows = role !== 'viewer';
   const [releaseFrom, setReleaseFrom] = useState(() => readStoredRelease(MAJOR_RELEASE_STORAGE_KEY, '7.5.6000'));
   const [releaseTo, setReleaseTo] = useState(() => readStoredRelease(MAJOR_RELEASE_TO_STORAGE_KEY, readStoredRelease(MAJOR_RELEASE_STORAGE_KEY, '7.5.6000')));
   const [platform, setPlatform] = useState<PlatformKey>('android');
+  const [year, setYear] = useState('all');
   const [month, setMonth] = useState('all');
   const [rows, setRows] = useState<QuarterAnalysisRow[]>([]);
   const [logs, setLogs] = useState<Array<{ text: string; level: LogLevel }>>([]);
-  const [status, setStatus] = useState('Укажи диапазон мажорных релизов и запусти сбор.');
+  const [status, setStatus] = useState('');
   const [statusTone, setStatusTone] = useState<'neutral' | 'ok' | 'warn' | 'error'>('neutral');
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [logPanelOpen, setLogPanelOpen] = useState(false);
   const [logPanelSize, setLogPanelSize] = useState({ width: 430, height: 330 });
   const abortRef = useRef<AbortController | null>(null);
@@ -187,16 +207,58 @@ export function ReleaseQuarterAnalysis() {
     }
   }, [releaseTo]);
 
+  useEffect(() => {
+    let alive = true;
+    setLoadingSaved(true);
+    loadQuarterAnalysisRows()
+      .then(savedRows => {
+        if (!alive) return;
+        setRows(savedRows);
+        setYear('all');
+        setMonth('all');
+      })
+      .catch(error => {
+        if (!alive) return;
+        const message = (error as Error).message || 'Не удалось загрузить данные из Supabase.';
+        setStatus(message);
+        setStatusTone('error');
+        log(message, 'error');
+      })
+      .finally(() => {
+        if (alive) setLoadingSaved(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [log]);
+
   const visibleRows = useMemo(() => rows.filter(row => {
     if (row.platform !== platform) return false;
+    const branchCutDate = branchCutDateParts(row);
+    if (year !== 'all' && branchCutDate?.year !== Number(year)) return false;
     if (month === 'all') return true;
-    return row.month === Number(month);
-  }), [month, platform, rows]);
+    return branchCutDate?.month === Number(month);
+  }), [month, platform, rows, year]);
 
-  const availableMonths = useMemo(() => {
-    const set = new Set(rows.filter(row => row.platform === platform && row.month != null).map(row => row.month as number));
+  const availableYears = useMemo(() => {
+    const set = new Set(rows
+      .filter(row => row.platform === platform)
+      .map(row => branchCutDateParts(row)?.year)
+      .filter((value): value is number => value != null));
     return Array.from(set).sort((a, b) => a - b);
   }, [platform, rows]);
+
+  const availableMonths = useMemo(() => {
+    const set = new Set(rows
+      .filter(row => {
+        if (row.platform !== platform) return false;
+        const branchCutDate = branchCutDateParts(row);
+        return branchCutDate != null && (year === 'all' || branchCutDate.year === Number(year));
+      })
+      .map(row => branchCutDateParts(row)?.month)
+      .filter((value): value is number => value != null));
+    return Array.from(set).sort((a, b) => a - b);
+  }, [platform, rows, year]);
 
   const run = useCallback(async () => {
     abortRef.current?.abort();
@@ -216,6 +278,7 @@ export function ReleaseQuarterAnalysis() {
         releaseTo || releaseFrom
       );
       setRows(result);
+      setYear('all');
       setMonth('all');
       setStatus(`Готово: ${result.length} строк.`);
       setStatusTone(result.length ? 'ok' : 'warn');
@@ -239,6 +302,26 @@ export function ReleaseQuarterAnalysis() {
     setStatus('Сбор остановлен.');
     setStatusTone('warn');
   }, []);
+
+  const saveRows = useCallback(async () => {
+    if (!canSaveRows || !rows.length || saving) return;
+    setSaving(true);
+    setStatus('Записываю найденные релизы в Supabase...');
+    setStatusTone('neutral');
+    try {
+      const result = await saveQuarterAnalysisRows(rows, releaseFrom, releaseTo || releaseFrom);
+      setStatus(`Записано в БД: Android ${result.android}, iOS ${result.ios}.`);
+      setStatusTone(result.total ? 'ok' : 'warn');
+      log(`Supabase: записано Android ${result.android}, iOS ${result.ios}`, result.total ? 'ok' : 'warn');
+    } catch (error) {
+      const message = (error as Error).message || 'Не удалось записать данные в Supabase.';
+      setStatus(message);
+      setStatusTone('error');
+      log(message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [canSaveRows, log, releaseFrom, releaseTo, rows, saving]);
 
   const startLogPanelResize = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -271,18 +354,22 @@ export function ReleaseQuarterAnalysis() {
 
   const progressColor = statusTone === 'ok' ? 'green' : statusTone === 'warn' ? 'yellow' : statusTone === 'error' ? 'red' : 'accent';
   const csvRangeLabel = `${releaseFrom || 'start'}_${releaseTo || releaseFrom || 'end'}`.replace(/\s+/g, '');
+  const showRunStatus = Boolean(status) || progress > 0 || busy || saving;
+  const timingHeaderStyle = useMemo<React.CSSProperties>(() => ({ whiteSpace: 'nowrap' }), []);
   const tableColumns = useMemo<Array<CanonicalTableColumn<QuarterAnalysisRow>>>(() => [
     {
       id: 'version',
       group: 'Задачи',
       title: 'Версия',
-      width: 150,
+      width: 76,
       sticky: 'left',
+      align: 'center',
       text: versionText,
       lineClamp: 3,
+      cellStyle: { paddingLeft: 6, paddingRight: 6 },
       render: row => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: 'var(--text)' }}>{row.version}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, width: '100%', textAlign: 'center' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap' }}>{row.version}</span>
           <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>Задач: {taskCount(row)}</span>
         </div>
       ),
@@ -310,15 +397,15 @@ export function ReleaseQuarterAnalysis() {
       lineClamp: 3,
       showOverflowMarker: false,
     },
-    { id: 'buildTime', group: 'Тайминги', title: 'Время сборки', width: 150, text: row => dash(row.buildTime), lineClamp: 2 },
-    { id: 'previousRolloutPercent', group: 'Тайминги', title: '% раскатки предыдущей версии', width: 220, text: row => dash(row.previousRolloutPercent), lineClamp: 2 },
-    { id: 'plannedHotfixDate', group: 'Тайминги', title: 'Плановая дата отправки хф', width: 190, text: row => dash(row.plannedHotfixDate), lineClamp: 2 },
-    { id: 'branchCutTime', group: 'Тайминги', title: 'Время отведения хотфикса', width: 180, text: row => dash(row.branchCutTime), lineClamp: 2 },
-    { id: 'actualSendTime', group: 'Тайминги', title: 'Фактическая дата отправки', width: 170, text: row => dash(row.actualSendTime), lineClamp: 2 },
-    { id: 'onePercentDate', group: 'Тайминги', title: 'Дата раскатки на 1%', width: 165, text: row => dash(row.onePercentDate), lineClamp: 2 },
-    { id: 'hotfixReason', group: 'Хотфикс', title: 'Причина хф', width: 260, text: row => dash(row.hotfixReason), lineClamp: 3 },
-    { id: 'hotfixDetails', group: 'Хотфикс', title: 'Детали хф', width: 340, text: row => dash(row.hotfixDetails), lineClamp: 3 },
-  ], []);
+    { id: 'buildTime', group: 'Тайминги', title: 'Время сборки', width: 150, text: row => dash(row.buildTime), lineClamp: 2, headerStyle: timingHeaderStyle },
+    { id: 'previousRolloutPercent', group: 'Тайминги', title: '% раскатки предыдущей версии', width: 240, text: row => dash(row.previousRolloutPercent), lineClamp: 2, headerStyle: timingHeaderStyle },
+    { id: 'plannedHotfixDate', group: 'Тайминги', title: 'План дата отправки ХФ', width: 205, text: row => dash(row.plannedHotfixDate), lineClamp: 2, headerStyle: timingHeaderStyle },
+    { id: 'branchCutTime', group: 'Тайминги', title: 'Время отведения ХФ', width: 180, text: row => dash(row.branchCutTime), lineClamp: 2, headerStyle: timingHeaderStyle },
+    { id: 'actualSendTime', group: 'Тайминги', title: 'Фактическая дата отправки', width: 205, text: row => dash(row.actualSendTime), lineClamp: 2, headerStyle: timingHeaderStyle },
+    { id: 'onePercentDate', group: 'Тайминги', title: 'Дата раскатки на 1%', width: 175, text: row => dash(row.onePercentDate), lineClamp: 2, headerStyle: timingHeaderStyle },
+    { id: 'hotfixReason', group: 'Хотфикс', title: 'Причина ХФ', width: 260, text: row => dash(row.hotfixReason), lineClamp: 3 },
+    { id: 'hotfixDetails', group: 'Хотфикс', title: 'Детали ХФ', width: 260, text: row => dash(row.hotfixDetails), lineClamp: 3 },
+  ], [timingHeaderStyle]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -341,17 +428,32 @@ export function ReleaseQuarterAnalysis() {
               <Input value={releaseTo} onChange={event => setReleaseTo(event.target.value)} placeholder={releaseFrom || '7.5.6000'} />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              {busy ? <Button variant="danger" onClick={stop}>Остановить</Button> : <Button variant="primary" onClick={() => void run()}>Собрать</Button>}
-              <Button variant="secondary" disabled={!visibleRows.length} onClick={() => exportCsv(visibleRows, platform, csvRangeLabel)}>CSV</Button>
+              {busy ? <Button variant="danger" onClick={stop}>Остановить</Button> : <Button variant="primary" disabled={loadingSaved} onClick={() => void run()}>Собрать</Button>}
+              {canSaveRows && (
+                <Button
+                  variant="secondary"
+                  disabled={!rows.length || busy || saving || loadingSaved}
+                  onClick={() => void saveRows()}
+                  style={{
+                    borderColor: rows.length ? 'rgba(34,197,94,.32)' : undefined,
+                    color: rows.length ? '#4ADE80' : undefined,
+                  }}
+                >
+                  {saving ? 'Записываю...' : 'Записать'}
+                </Button>
+              )}
+              <Button variant="secondary" disabled={!visibleRows.length || loadingSaved} onClick={() => exportCsv(visibleRows, platform, csvRangeLabel)}>CSV</Button>
             </div>
           </div>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color: statusTone === 'error' ? '#F87171' : statusTone === 'warn' ? '#FCD34D' : statusTone === 'ok' ? '#4ADE80' : 'var(--text-2)' }}>{status}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--mono)' }}>{progress}%</span>
+          {showRunStatus && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+                <span style={{ fontSize: 12, color: statusTone === 'error' ? '#F87171' : statusTone === 'warn' ? '#FCD34D' : statusTone === 'ok' ? '#4ADE80' : 'var(--text-2)' }}>{status}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--mono)' }}>{progress}%</span>
+              </div>
+              <Progress value={progress} color={progressColor} height={7} />
             </div>
-            <Progress value={progress} color={progressColor} height={7} />
-          </div>
+          )}
         </CardBody>
       </Card>
 
@@ -363,17 +465,24 @@ export function ReleaseQuarterAnalysis() {
           <Badge color={visibleRows.length ? 'purple' : 'gray'}>{visibleRows.length}</Badge>
         </CardHeader>
         <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
             <SegmentControl
               items={[{ label: 'Android', value: 'android' }, { label: 'iOS', value: 'ios' }]}
               value={platform}
-              onChange={value => { setPlatform(value as PlatformKey); setMonth('all'); }}
+              onChange={value => { setPlatform(value as PlatformKey); setYear('all'); setMonth('all'); }}
             />
-            <SegmentControl
-              items={[{ label: 'Все', value: 'all' }, ...availableMonths.map(index => ({ label: MONTHS[index], value: String(index) }))]}
-              value={month}
-              onChange={setMonth}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, marginLeft: 'auto', maxWidth: '100%' }}>
+              <SegmentControl
+                items={[{ label: 'Все', value: 'all' }, ...availableYears.map(item => ({ label: String(item), value: String(item) }))]}
+                value={year}
+                onChange={value => { setYear(value); setMonth('all'); }}
+              />
+              <SegmentControl
+                items={[{ label: 'Все', value: 'all' }, ...availableMonths.map(index => ({ label: MONTHS[index], value: String(index) }))]}
+                value={month}
+                onChange={setMonth}
+              />
+            </div>
           </div>
         </CardBody>
         <CanonicalTable
@@ -382,8 +491,10 @@ export function ReleaseQuarterAnalysis() {
           getRowKey={row => `${row.platform}:${row.version}`}
           rowHeight={74}
           maxHeight="72vh"
-          minWidth={2825}
+          minWidth={2751}
           overscanRight={18}
+          loading={loadingSaved}
+          loadingText="Загружаю сохраненные релизы..."
           emptyText="Данных по выбранному фильтру нет."
         />
       </Card>
