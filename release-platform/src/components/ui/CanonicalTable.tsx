@@ -15,6 +15,7 @@ export interface CanonicalTableColumn<T> {
   headerStyle?: React.CSSProperties;
   lineClamp?: number;
   disablePreview?: boolean;
+  previewTrigger?: 'hover' | 'button';
   showOverflowMarker?: boolean;
   sticky?: 'left';
 }
@@ -32,11 +33,12 @@ export interface CanonicalTableProps<T> {
   loadingText?: ReactNode;
 }
 
-interface HoverPreview {
+interface TablePreview {
   left: number;
   top: number;
   title: ReactNode;
   body: ReactNode;
+  mode: 'hover' | 'button';
 }
 
 const GROUP_HEADER_HEIGHT = 38;
@@ -84,9 +86,10 @@ export function CanonicalTable<T>({
   loading = false,
   loadingText = 'Загружаю данные...',
 }: CanonicalTableProps<T>) {
-  const [hover, setHover] = useState<HoverPreview | null>(null);
+  const [preview, setPreview] = useState<TablePreview | null>(null);
   const [clippedCells, setClippedCells] = useState<Set<string>>(() => new Set());
   const closeTimerRef = useRef<number | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const hasGroups = columns.some(column => column.group || column.groupKey);
   const stickyLeftOffsets = useMemo(() => {
     let left = 0;
@@ -117,13 +120,13 @@ export function CanonicalTable<T>({
 
   const closePreview = () => {
     clearCloseTimer();
-    setHover(null);
+    setPreview(null);
   };
 
   const scheduleClosePreview = () => {
     clearCloseTimer();
     closeTimerRef.current = window.setTimeout(() => {
-      setHover(null);
+      setPreview(prev => prev?.mode === 'button' ? prev : null);
       closeTimerRef.current = null;
     }, 120);
   };
@@ -131,6 +134,19 @@ export function CanonicalTable<T>({
   useEffect(() => () => {
     if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (preview?.mode !== 'button') return undefined;
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && previewRef.current?.contains(target)) return;
+      setPreview(null);
+    };
+
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [preview?.mode]);
 
   const groups = useMemo(() => {
     const out: Array<{ key: string; label: ReactNode; span: number }> = [];
@@ -369,6 +385,8 @@ export function CanonicalTable<T>({
                   const title = column.previewTitle ? column.previewTitle(row) : column.title;
                   const cellStyle = typeof column.cellStyle === 'function' ? column.cellStyle(row) : column.cellStyle;
                   const canPreview = !column.disablePreview && isMeaningfulPreview(previewBody);
+                  const previewTrigger = column.previewTrigger || 'hover';
+                  const isButtonPreview = canPreview && previewTrigger === 'button';
                   const rowBg = rowIndex % 2 === 0 ? 'var(--card)' : 'var(--card-hi)';
                   const stickyRowBg = rowBg;
                   const stickyLeft = stickyLeftOffsets[columnIndex];
@@ -380,14 +398,14 @@ export function CanonicalTable<T>({
                       key={column.id}
                       onMouseEnter={event => {
                         clearCloseTimer();
-                        if (!canPreview) return;
+                        if (!canPreview || previewTrigger !== 'hover') return;
                         const content = event.currentTarget.querySelector('[data-canonical-cell-content="true"]') as HTMLElement | null;
                         const clipped = content
                           ? content.scrollHeight > content.clientHeight + 1 || content.scrollWidth > content.clientWidth + 1
                           : true;
                         if (!clipped) return;
                         const position = getPreviewPosition(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
-                        setHover({ ...position, title, body: previewBody });
+                        setPreview({ ...position, title, body: previewBody, mode: 'hover' });
                       }}
                       onMouseLeave={scheduleClosePreview}
                       style={{
@@ -427,10 +445,47 @@ export function CanonicalTable<T>({
                           whiteSpace: 'normal',
                           overflowWrap: 'anywhere',
                           lineHeight: 1.38,
+                          paddingRight: isButtonPreview ? 28 : undefined,
                         }}
                       >
                         {rendered || '-'}
                       </div>
+                      {isButtonPreview && (
+                        <button
+                          type="button"
+                          title="Открыть подробности"
+                          aria-label="Открыть подробности"
+                          onClick={event => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            clearCloseTimer();
+                            const cell = event.currentTarget.closest('td') as HTMLTableCellElement | null;
+                            const anchorRect = cell?.getBoundingClientRect() || event.currentTarget.getBoundingClientRect();
+                            const position = getPreviewPosition(event.clientX, event.clientY, anchorRect);
+                            setPreview({ ...position, title, body: previewBody, mode: 'button' });
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: 6,
+                            right: 6,
+                            zIndex: 3,
+                            width: 22,
+                            height: 22,
+                            borderRadius: 7,
+                            border: '1px solid var(--border-hi)',
+                            background: 'var(--card)',
+                            color: 'var(--accent)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,.12)',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            fontWeight: 900,
+                            lineHeight: '20px',
+                            padding: 0,
+                          }}
+                        >
+                          ?
+                        </button>
+                      )}
                       {canPreview && column.showOverflowMarker !== false && clippedCells.has(cellKey) && (
                         <span
                           aria-hidden="true"
@@ -458,32 +513,72 @@ export function CanonicalTable<T>({
           </tbody>
         </table>
       </div>
-      {hover && (
+      {preview && (
         <div
+          ref={previewRef}
           onMouseEnter={clearCloseTimer}
-          onMouseLeave={closePreview}
+          onMouseLeave={() => {
+            if (preview.mode === 'hover') closePreview();
+          }}
           style={{
             position: 'fixed',
-            left: hover.left,
-            top: hover.top,
+            left: preview.left,
+            top: preview.top,
             zIndex: 600,
             width: 'min(460px, calc(100vw - 32px))',
             maxHeight: '300px',
-            overflow: 'auto',
+            overflow: 'hidden',
             pointerEvents: 'auto',
-            padding: 14,
             borderRadius: 10,
             border: '1.5px solid var(--border-hi)',
             background: 'var(--card)',
             boxShadow: '0 22px 70px rgba(0,0,0,.32)',
             color: 'var(--text)',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-3)', fontWeight: 800, textTransform: 'uppercase' }}>
-            {hover.title}
+          <div style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '12px 14px 8px',
+            borderBottom: preview.mode === 'button' ? '1px solid var(--border)' : undefined,
+            background: 'var(--card)',
+          }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 800, textTransform: 'uppercase' }}>
+              {preview.title}
+            </div>
+            {preview.mode === 'button' && (
+              <button
+                type="button"
+                onClick={closePreview}
+                title="Закрыть"
+                aria-label="Закрыть подсказку"
+                style={{
+                  width: 22,
+                  height: 22,
+                  flexShrink: 0,
+                  borderRadius: 7,
+                  border: '1px solid var(--border-hi)',
+                  background: 'var(--surface-soft)',
+                  color: 'var(--text-2)',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  lineHeight: '20px',
+                  padding: 0,
+                }}
+              >
+                x
+              </button>
+            )}
           </div>
-          <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 12.5, lineHeight: 1.55 }}>
-            {hover.body}
+          <div style={{ padding: '0 14px 14px', overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 12.5, lineHeight: 1.55 }}>
+            {preview.body}
           </div>
         </div>
       )}

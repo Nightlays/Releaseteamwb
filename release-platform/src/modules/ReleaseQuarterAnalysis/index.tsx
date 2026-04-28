@@ -385,6 +385,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       preview: row => row.primaryTask ? issueCell(row.primaryTask) : null,
       text: row => issueText(row.primaryTask),
       lineClamp: 3,
+      disablePreview: true,
     },
     {
       id: 'secondaryTasks',
@@ -394,6 +395,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       render: secondaryTasksCell,
       text: secondaryTasksText,
       preview: secondaryTasksPreview,
+      previewTrigger: 'button',
       lineClamp: 3,
       showOverflowMarker: false,
     },
