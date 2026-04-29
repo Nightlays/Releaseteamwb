@@ -474,7 +474,7 @@ function Layout() {
     : (currentModule.id === 'charts' || currentModule.id === 'goals') ? '0' : 16;
 
   return (
-    <div style={{
+    <div className="app-shell" style={{
       display: 'flex',
       height: '100vh',
       overflow: 'hidden',
@@ -492,7 +492,7 @@ function Layout() {
         onLogout={handleLogout}
       />
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="app-main-column" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Topbar
           module={currentModule}
           proxyOnline={proxyOnline}
@@ -504,7 +504,7 @@ function Layout() {
           showLegacyButton={currentModule.showLegacyButton !== false}
         />
 
-        <main style={{
+        <main className="app-main-content" style={{
           flex: 1,
           minHeight: 0,
           overflow: 'auto',

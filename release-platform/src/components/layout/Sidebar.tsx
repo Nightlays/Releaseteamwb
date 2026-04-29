@@ -69,7 +69,7 @@ export function Sidebar({
   }, [servicesOpen]);
 
   return (
-    <aside style={{
+    <aside className="app-sidebar" style={{
       width: 228,
       flexShrink: 0,
       height: '100vh',
@@ -105,10 +105,10 @@ export function Sidebar({
         }}>
           WB
         </div>
-        <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-.2px', color: 'var(--text)', flex: 1, minWidth: 0 }}>
+        <div className="app-sidebar__brand-text" style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-.2px', color: 'var(--text)', flex: 1, minWidth: 0 }}>
           Release Platform
         </div>
-        <div style={{
+        <div className="app-sidebar__version" style={{
           fontSize: 10,
           fontWeight: 600,
           color: 'var(--text-3)',
@@ -141,7 +141,7 @@ export function Sidebar({
             transition: 'background .12s, border-color .12s, color .12s',
           }}
         >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor" aria-hidden="true">
+          <svg className="app-sidebar__services-icon" width="13" height="13" viewBox="0 0 13 13" fill="currentColor" aria-hidden="true">
             <rect x="0" y="0" width="5.2" height="5.2" rx="1.2"/>
             <rect x="7.8" y="0" width="5.2" height="5.2" rx="1.2"/>
             <rect x="0" y="7.8" width="5.2" height="5.2" rx="1.2"/>
@@ -233,10 +233,10 @@ export function Sidebar({
       )}
 
 
-      <nav style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
+      <nav className="app-sidebar__nav" style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
         {sections.map(section => (
-          <div key={section.label} style={{ marginBottom: 18 }}>
-            <div style={{
+          <div className="app-sidebar__section" key={section.label} style={{ marginBottom: 18 }}>
+            <div className="app-sidebar__section-label" style={{
               fontSize: 10,
               fontWeight: 600,
               textTransform: 'uppercase',
@@ -290,7 +290,7 @@ export function Sidebar({
                     }} />
                   )}
 
-                  <span style={{
+                  <span className="app-sidebar__nav-icon" style={{
                     width: 16,
                     height: 16,
                     flexShrink: 0,
@@ -303,7 +303,7 @@ export function Sidebar({
                     {item.icon}
                   </span>
 
-                  <span style={{
+                  <span className="app-sidebar__nav-label" style={{
                     flex: 1,
                     minWidth: 0,
                     fontSize: 13,
@@ -317,7 +317,7 @@ export function Sidebar({
                   </span>
 
                   {item.badge && (
-                    <span style={{
+                    <span className="app-sidebar__nav-badge" style={{
                       marginLeft: 'auto',
                       fontSize: 10,
                       fontWeight: 700,
@@ -358,7 +358,7 @@ export function Sidebar({
           }}>
             {initials}
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="app-sidebar__profile-text" style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {currentUser}
             </div>
@@ -367,7 +367,7 @@ export function Sidebar({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div className="app-sidebar__profile-actions" style={{ display: 'flex', gap: 6 }}>
             <button
               onClick={onOpenSettings}
               title="Настройки"

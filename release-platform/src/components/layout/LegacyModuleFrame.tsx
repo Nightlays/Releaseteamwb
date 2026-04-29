@@ -3,7 +3,7 @@ import type { ModuleDefinition } from '../../config/modules';
 import { useSettings } from '../../context/SettingsContext';
 import { buildLegacyModuleUrl } from '../../services/legacy';
 
-export function LegacyModuleFrame({ module, refreshKey }: { module: ModuleDefinition; refreshKey: number }) {
+export function LegacyModuleFrame({ module, refreshKey, frameless = false }: { module: ModuleDefinition; refreshKey: number; frameless?: boolean }) {
   const { settings } = useSettings();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -20,11 +20,11 @@ export function LegacyModuleFrame({ module, refreshKey }: { module: ModuleDefini
       position: 'relative',
       height: '100%',
       minHeight: 520,
-      borderRadius: 24,
+      borderRadius: frameless ? 0 : 24,
       overflow: 'hidden',
       background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      boxShadow: '0 20px 60px rgba(0,0,0,.35)',
+      border: frameless ? 'none' : '1px solid var(--border)',
+      boxShadow: frameless ? 'none' : '0 20px 60px rgba(0,0,0,.35)',
     }}>
       {loading && (
         <div style={{

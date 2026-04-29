@@ -9,6 +9,32 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        if (window.location.protocol !== 'file:') return;
+
+        var params = new URLSearchParams(window.location.search || '');
+        var requestedModule = params.get('module') || '';
+        var root = document.getElementById('root');
+
+        if (requestedModule === 'charts' || requestedModule === 'Графики.html') {
+          window.location.replace(new URL('legacy/Графики.html' + window.location.search, window.location.href).toString());
+          return;
+        }
+
+        if (root) {
+          root.innerHTML = [
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif;background:#f7f2fb;color:#111827;padding:24px;">',
+            '<div style="max-width:520px;border:1px solid #e9ddfb;border-radius:24px;background:#fff;padding:24px;box-shadow:0 20px 60px rgba(88,28,135,.12);">',
+            '<h1 style="font-size:22px;margin:0 0 10px;">Release Platform нужно открыть через HTTP</h1>',
+            '<p style="font-size:14px;line-height:1.55;margin:0 0 16px;color:#475569;">Браузер блокирует module bundle при запуске dist/index.html через file://. Для графиков можно открыть legacy-экран напрямую.</p>',
+            '<a style="display:inline-flex;padding:11px 16px;border-radius:12px;background:#7c3aed;color:#fff;text-decoration:none;font-weight:700;" href="./legacy/Графики.html">Открыть графики</a>',
+            '</div>',
+            '</div>'
+          ].join('');
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

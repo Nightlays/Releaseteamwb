@@ -140,6 +140,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
+    entries: ['index.html'],
     exclude: ['onnxruntime-web'],
   },
 });

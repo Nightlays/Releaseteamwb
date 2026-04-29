@@ -30,7 +30,7 @@ function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t
   const current = THEME_LIST.find(t => t.id === theme) ?? THEME_LIST[0];
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} className="app-topbar__theme" style={{ position: 'relative' }}>
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
@@ -133,7 +133,7 @@ function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t
 
 export function Topbar({ module, proxyOnline, mlReady, theme, onSetTheme, onRefresh, onOpenLegacy, showLegacyButton = true }: TopbarProps) {
   return (
-    <header style={{
+    <header className="app-topbar" style={{
       height: 64,
       background: 'var(--topbar-bg)',
       borderBottom: '1px solid var(--border)',
@@ -144,12 +144,12 @@ export function Topbar({ module, proxyOnline, mlReady, theme, onSetTheme, onRefr
       flexShrink: 0,
       backdropFilter: 'blur(18px)',
     }}>
-      <div>
+      <div className="app-topbar__title">
         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.2px' }}>{module.label}</div>
         <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{module.sub}</div>
       </div>
 
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <div className="app-topbar__actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         <StatusPill status={proxyOnline ? 'live' : 'error'}>Proxy {proxyOnline ? 'online' : 'offline'}</StatusPill>
         <StatusPill status={mlReady ? 'live' : 'warn'}>ML {mlReady ? 'ready' : 'pending'}</StatusPill>
         <ThemeDropdown theme={theme} onSetTheme={onSetTheme} />

@@ -95,6 +95,21 @@ interface ChartMarker {
   tone: 'bad' | 'warn';
 }
 
+const CUT_TARGET_MIN = 14 * 60;
+const CUT_WINDOW_MIN = 10;
+const STORE_LATE_MIN = 18 * 60;
+
+function getCutClass(minutes: number | null | undefined): string {
+  const v = Number(minutes);
+  if (!Number.isFinite(v)) return '';
+  return v >= CUT_TARGET_MIN - CUT_WINDOW_MIN && v <= CUT_TARGET_MIN + CUT_WINDOW_MIN ? 'cut-on' : 'cut-late';
+}
+
+function isStoreLate(minutes: number | null | undefined): boolean {
+  const v = Number(minutes);
+  return Number.isFinite(v) && v > STORE_LATE_MIN;
+}
+
 function formatReleaseShort(value: string) {
   const raw = String(value || '').trim();
   if (!raw) return raw;
@@ -1799,73 +1814,90 @@ export function Charts() {
       );
     };
 
-    const inlineTable = (children: React.ReactNode) => (
-      <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
-        <Table>{children}</Table>
-      </div>
-    );
     return (
       <>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <Card>
             <CardHeader><CardTitle>Объём регресса</CardTitle><CardHint>Manual и Auto по релизам в текущей выборке.</CardHint></CardHeader>
             <CardBody>{renderPrimary(tcDatasets, true, value => Number(value).toLocaleString('ru-RU'), (value, label) => `${label}: ${Number(value).toLocaleString('ru-RU')}`, value => formatCountLabelCompact(value))}</CardBody>
-            {inlineTable(<>
-              <thead><tr><Th>Релиз</Th><Th>Manual</Th><Th>Auto</Th><Th>Всего</Th><Th>Δ</Th></tr></thead>
-              <tbody>{source.metrics.map(item => (
-                <tr key={`tc-${item.release}`}>
-                  <Td mono bold>{formatReleaseShort(item.release)}</Td>
-                  <Td mono>{item.tc_manual.toLocaleString('ru-RU')}</Td>
-                  <Td mono>{item.tc_auto.toLocaleString('ru-RU')}</Td>
-                  <Td mono>{item.tc_total.toLocaleString('ru-RU')}</Td>
-                  <Td mono style={{ color: item.tc_total_delta > 0 ? '#16A34A' : item.tc_total_delta < 0 ? '#DC2626' : 'var(--text-3)' }}>
-                    {item.tc_total_delta > 0 ? '+' : ''}{item.tc_total_delta.toLocaleString('ru-RU')}
-                  </Td>
-                </tr>
-              ))}</tbody>
-            </>)}
+            <div className="charts-data-table-wrap">
+              <table className="charts-data-table">
+                <thead><tr><th>Релиз</th><th>Ручные</th><th>Авто</th><th>Всего</th></tr></thead>
+                <tbody>{source.tcRows.map(row => (
+                  <tr key={`tc-${row.release}`}>
+                    <td>{formatReleaseShort(row.release)}</td>
+                    <td>{row.manual.toLocaleString('ru-RU')}</td>
+                    <td>{row.auto.toLocaleString('ru-RU')}</td>
+                    <td>{row.total.toLocaleString('ru-RU')}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
           </Card>
           <Card>
             <CardHeader><CardTitle>High / Blocker: SWAT vs Stream</CardTitle><CardHint>Сравнение критичных проверок SWAT и stream-команд.</CardHint></CardHeader>
             <CardBody>{renderPrimary(covDatasets, false, value => Number(value).toLocaleString('ru-RU'), (value, label) => `${label}: ${Number(value).toLocaleString('ru-RU')}`, value => formatCountLabelCompact(value))}</CardBody>
-            {inlineTable(<>
-              <thead><tr><Th>Релиз</Th><Th>HB SWAT</Th><Th>HB Stream</Th></tr></thead>
-              <tbody>{source.metrics.map(item => (
-                <tr key={`cov-${item.release}`}>
-                  <Td mono bold>{formatReleaseShort(item.release)}</Td>
-                  <Td mono>{item.cov_swat.toLocaleString('ru-RU')}</Td>
-                  <Td mono>{item.cov_stream.toLocaleString('ru-RU')}</Td>
-                </tr>
-              ))}</tbody>
-            </>)}
+            <div className="charts-data-table-wrap">
+              <table className="charts-data-table">
+                <thead><tr><th>Номер релиза</th><th>SWAT</th><th>SWAT (сотр.)</th><th>STREAM</th><th>Всего</th><th>Покрытие</th></tr></thead>
+                <tbody>{source.coverageRows.map(row => {
+                  const sum = (row.swatCount || 0) + (row.streamCount || 0);
+                  const swPct = sum ? Math.round((row.swatCount / sum) * 1000) / 10 : 0;
+                  const stPct = sum ? Math.round((row.streamCount / sum) * 1000) / 10 : 0;
+                  return (
+                    <tr key={`cov-${row.release}`}>
+                      <td>{formatReleaseShort(row.release)}</td>
+                      <td>{row.swatCount}</td>
+                      <td>{Number(row.swatPeople || 0)}</td>
+                      <td>{row.streamCount}</td>
+                      <td>{sum}</td>
+                      <td style={{ textAlign: 'left' }}>SWAT {swPct}% · STREAM {stPct}%</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
           </Card>
           <Card>
             <CardHeader><CardTitle>Selective: SWAT vs Stream</CardTitle><CardHint>Объём selective-проверок по двум контурам.</CardHint></CardHeader>
             <CardBody>{renderPrimary(selDatasets, false, value => Number(value).toLocaleString('ru-RU'), (value, label) => `${label}: ${Number(value).toLocaleString('ru-RU')}`, value => formatCountLabelCompact(value))}</CardBody>
-            {inlineTable(<>
-              <thead><tr><Th>Релиз</Th><Th>Selective SWAT</Th><Th>Selective Stream</Th></tr></thead>
-              <tbody>{source.metrics.map(item => (
-                <tr key={`sel-${item.release}`}>
-                  <Td mono bold>{formatReleaseShort(item.release)}</Td>
-                  <Td mono>{item.sel_swat.toLocaleString('ru-RU')}</Td>
-                  <Td mono>{item.sel_stream.toLocaleString('ru-RU')}</Td>
-                </tr>
-              ))}</tbody>
-            </>)}
+            <div className="charts-data-table-wrap">
+              <table className="charts-data-table">
+                <thead><tr><th>Номер релиза</th><th>SWAT</th><th>SWAT (сотр.)</th><th>STREAM</th><th>Всего</th><th>Покрытие</th></tr></thead>
+                <tbody>{source.selectiveRows.map(row => {
+                  const sum = (row.swatCount || 0) + (row.streamCount || 0);
+                  const swPct = sum ? Math.round((row.swatCount / sum) * 1000) / 10 : 0;
+                  const stPct = sum ? Math.round((row.streamCount / sum) * 1000) / 10 : 0;
+                  return (
+                    <tr key={`sel-${row.release}`}>
+                      <td>{formatReleaseShort(row.release)}</td>
+                      <td>{row.swatCount}</td>
+                      <td>{Number(row.swatPeople || 0)}</td>
+                      <td>{row.streamCount}</td>
+                      <td>{sum}</td>
+                      <td style={{ textAlign: 'left' }}>SWAT {swPct}% · STREAM {stPct}%</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Среднее время прохождения</CardTitle><CardHint>Обычное и взвешенное время прохождения кейсов.</CardHint></CardHeader>
+            <CardHeader><CardTitle>Среднее время прохождения</CardTitle><CardHint>Среднее время на кейс: SWAT, STREAM и общее.</CardHint></CardHeader>
             <CardBody>{renderPrimary(avgDatasets, false, value => formatMinutesToClock(value), value => `${formatMinutesPretty(value, 2)} · ${value.toFixed(2)} мин`, value => formatMinutesToClock(value))}</CardBody>
-            {inlineTable(<>
-              <thead><tr><Th>Релиз</Th><Th>Среднее</Th><Th>Взвешенное</Th></tr></thead>
-              <tbody>{source.metrics.map(item => (
-                <tr key={`avg-${item.release}`}>
-                  <Td mono bold>{formatReleaseShort(item.release)}</Td>
-                  <Td mono>{formatMinutesPretty(item.avg_total, 2)}</Td>
-                  <Td mono>{formatMinutesPretty(item.avg_weighted, 2)}</Td>
-                </tr>
-              ))}</tbody>
-            </>)}
+            <div className="charts-data-table-wrap">
+              <table className="charts-data-table">
+                <thead><tr><th>Номер релиза</th><th>SWAT</th><th>STREAM</th><th>Общее</th></tr></thead>
+                <tbody>{source.avgRows.map(row => (
+                  <tr key={`avg-${row.release}`}>
+                    <td>{formatReleaseShort(row.release)}</td>
+                    <td>{formatMinutesToClock(row.swatMs / 60000)}</td>
+                    <td>{formatMinutesToClock(row.streamMs / 60000)}</td>
+                    <td>{formatMinutesToClock(row.totalMs / 60000)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
           </Card>
         </div>
       </>
@@ -1985,21 +2017,18 @@ export function Charts() {
                   ? <BarChart labels={labels} datasets={chpDatasets.map(item => ({ label: item.label, data: item.data, color: item.color }))} palette={palette} markers={quietReleaseMarkers} yTickFormatter={value => Number(value).toLocaleString('ru-RU')} valueLabelFormatter={value => formatCountLabelCompact(value)} height={240} />
                   : <LineChart labels={labels} datasets={chpDatasets} palette={palette} markers={quietReleaseMarkers} yTickFormatter={value => Number(value).toLocaleString('ru-RU')} tooltipFormatter={(value, datasetLabel) => `${datasetLabel}: ${formatCountLabel(value)}`} valueLabelFormatter={value => formatCountLabelCompact(value)} valueLabelMode="all" height={240} />}
               </CardBody>
-              <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
-                <Table>
-                  <thead><tr><Th>Релиз</Th><Th>Всего</Th><Th>iOS</Th><Th>Android</Th><Th>Δ к базе</Th></tr></thead>
-                  <tbody>{source.metrics.map(item => (
-                    <tr key={`chp-${item.release}`}>
-                      <Td mono bold>{formatReleaseShort(item.release)}</Td>
-                      <Td mono>{item.chp_total.toLocaleString('ru-RU')}</Td>
-                      <Td mono>{item.chp_ios.toLocaleString('ru-RU')}</Td>
-                      <Td mono>{item.chp_android.toLocaleString('ru-RU')}</Td>
-                      <Td mono style={{ color: item.chp_total_delta > 0 ? '#DC2626' : item.chp_total_delta < 0 ? '#16A34A' : 'var(--text-3)' }}>
-                        {item.chp_total_delta > 0 ? '+' : ''}{formatMaybeNumber(item.chp_total_delta, 2)}
-                      </Td>
+              <div className="charts-data-table-wrap">
+                <table className="charts-data-table">
+                  <thead><tr><th>Номер релиза</th><th>iOS</th><th>Android</th><th>Всего</th></tr></thead>
+                  <tbody>{source.chpRows.map(row => (
+                    <tr key={`chp-${row.release}`}>
+                      <td>{formatReleaseShort(row.release)}</td>
+                      <td>{row.ios}</td>
+                      <td>{row.android}</td>
+                      <td>{row.total}</td>
                     </tr>
                   ))}</tbody>
-                </Table>
+                </table>
               </div>
             </Card>
           </div>
@@ -2040,19 +2069,19 @@ export function Charts() {
                       height={260}
                     />}
               </CardBody>
-              <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
-                <Table>
-                  <thead><tr><Th>Релиз</Th><Th>iOS Cutoff</Th><Th>Android Cutoff</Th><Th>iOS Store</Th><Th>Android Store</Th></tr></thead>
+              <div className="charts-data-table-wrap">
+                <table className="charts-data-table">
+                  <thead><tr><th>Номер релиза</th><th>iOS Cutoff</th><th>iOS Store</th><th>Android Cutoff</th><th>Android Store</th></tr></thead>
                   <tbody>{source.timings.map(row => (
                     <tr key={`cut-${row.release}`}>
-                      <Td mono bold>{formatReleaseShort(row.release)}</Td>
-                      <Td mono>{row.iosCutLabel || '—'}</Td>
-                      <Td mono>{row.androidCutLabel || '—'}</Td>
-                      <Td mono>{row.iosStoreLabel || '—'}</Td>
-                      <Td mono>{row.androidStoreLabel || '—'}</Td>
+                      <td>{formatReleaseShort(row.release)}</td>
+                      <td className={getCutClass(row.iosCutMinutes)}>{row.iosCutLabel || '—'}</td>
+                      <td className={isStoreLate(row.iosStoreMinutes) ? 'cut-store-late' : ''}>{row.iosStoreLabel || '—'}</td>
+                      <td className={getCutClass(row.androidCutMinutes)}>{row.androidCutLabel || '—'}</td>
+                      <td className={isStoreLate(row.androidStoreMinutes) ? 'cut-store-late' : ''}>{row.androidStoreLabel || '—'}</td>
                     </tr>
                   ))}</tbody>
-                </Table>
+                </table>
               </div>
             </Card>
           </div>
@@ -2083,19 +2112,17 @@ export function Charts() {
                       height={260}
                     />}
               </CardBody>
-              <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
-                <Table>
-                  <thead><tr><Th>Релиз</Th><Th>iOS Старт</Th><Th>Android Старт</Th><Th>Lag iOS</Th><Th>Lag Android</Th></tr></thead>
+              <div className="charts-data-table-wrap">
+                <table className="charts-data-table">
+                  <thead><tr><th>Релиз</th><th>Время старта iOS</th><th>Время старта Android</th></tr></thead>
                   <tbody>{source.timings.map(row => (
                     <tr key={`reg-${row.release}`}>
-                      <Td mono bold>{formatReleaseShort(row.release)}</Td>
-                      <Td mono>{row.iosRegressionLabel || '—'}</Td>
-                      <Td mono>{row.androidRegressionLabel || '—'}</Td>
-                      <Td mono>{row.iosLagMinutes == null ? '—' : formatMinutesPretty(row.iosLagMinutes, 1)}</Td>
-                      <Td mono>{row.androidLagMinutes == null ? '—' : formatMinutesPretty(row.androidLagMinutes, 1)}</Td>
+                      <td>{formatReleaseShort(row.release)}</td>
+                      <td>{row.iosRegressionLabel || '—'}</td>
+                      <td>{row.androidRegressionLabel || '—'}</td>
                     </tr>
                   ))}</tbody>
-                </Table>
+                </table>
               </div>
             </Card>
           </div>

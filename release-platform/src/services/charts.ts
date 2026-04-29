@@ -44,6 +44,35 @@ export interface ChartsChpTypeRow {
   crash: number;
 }
 
+export interface ChartsChpQuarterIssue {
+  key: string;
+  release: string;
+  quarter: string;
+  stream: string;
+  substream: string;
+  external: boolean;
+}
+
+export interface ChartsChpQuarterStream {
+  name: string;
+  count: number;
+  external: boolean;
+  topSubstream: { name: string; count: number } | null;
+}
+
+export interface ChartsChpQuarterRow {
+  quarter: string;
+  total: number;
+  streams: ChartsChpQuarterStream[];
+}
+
+export interface ChartsChpQuarterStats {
+  average: number;
+  releases: number;
+  quarters: ChartsChpQuarterRow[];
+  issues: ChartsChpQuarterIssue[];
+}
+
 export interface ChartsTcRow {
   release: string;
   manual: number;
@@ -410,6 +439,15 @@ export interface ChartsAiContext {
       ios: Array<{ release: string; product: number; vlet: number; bug: number; crash: number }>;
       android: Array<{ release: string; product: number; vlet: number; bug: number; crash: number }>;
     };
+    chpQuarterStats: {
+      average: number;
+      releases: number;
+      quarters: Array<{
+        quarter: string;
+        total: number;
+        streams: Array<{ name: string; count: number; external: boolean; topSubstream: { name: string; count: number } | null }>;
+      }>;
+    } | null;
     devDowntimeByRelease: {
       ios: Array<{ release: string; totalMinutes: number; days: number }>;
       android: Array<{ release: string; totalMinutes: number; days: number }>;
@@ -457,6 +495,7 @@ export interface ChartsReport {
     iosRows: ChartsChpTypeRow[];
     androidRows: ChartsChpTypeRow[];
   };
+  chpQuarterStats: ChartsChpQuarterStats | null;
   streamInsights: {
     hb: ChartsStreamInsightSummary | null;
     selective: ChartsStreamInsightSummary | null;
@@ -2565,6 +2604,121 @@ function isExternalStreamLabel(label: string) {
     .some(value => normalized === value || normalized.includes(value));
 }
 
+function quarterLabelFromMsLocal(msLocal: number | null | undefined) {
+  const ms = Number(msLocal);
+  if (!Number.isFinite(ms) || ms <= 0) return 'Без квартала';
+  const date = new Date(ms);
+  const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
+  return `Q${quarter} ${date.getUTCFullYear()}`;
+}
+
+function quarterSortValue(label: string) {
+  const match = String(label || '').match(/^Q(\d)\s+(\d{4})$/i);
+  if (!match) return Number.POSITIVE_INFINITY;
+  return Number(match[2]) * 10 + Number(match[1]);
+}
+
+function extractIssueSubstreamLabel(issue: DeployIssue) {
+  const source = (issue || {}) as Record<string, unknown>;
+  const streamInfo = source.streamInfo && typeof source.streamInfo === 'object'
+    ? source.streamInfo as Record<string, unknown>
+    : {};
+  const candidates = [
+    source.sub_stream,
+    source.subStream,
+    source.substream,
+    source.sub_stream_name,
+    source.subStreamName,
+    source.stream_sub,
+    source.stream_sub_name,
+    source.subteam,
+    source.subTeam,
+    source.sub_team,
+    streamInfo.sub_stream,
+    streamInfo.subStream,
+    streamInfo.substream,
+  ];
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (value && typeof value === 'object') {
+      const objectValue = value as Record<string, unknown>;
+      const text = String(objectValue.name || objectValue.title || objectValue.label || '').trim();
+      if (text) return text;
+    }
+  }
+  return 'Без сабстрима';
+}
+
+function buildChpQuarterIssue(release: string, quarter: string, issue: DeployIssue): ChartsChpQuarterIssue {
+  const stream = normalizeStreamLabel(issue?.stream);
+  return {
+    key: String(issue?.key || '').trim().toUpperCase(),
+    release,
+    quarter: quarter || 'Без квартала',
+    stream,
+    substream: extractIssueSubstreamLabel(issue),
+    external: isExternalStreamLabel(stream),
+  };
+}
+
+function buildChpQuarterStats(chpRows: ChartsChpRow[], issues: ChartsChpQuarterIssue[]): ChartsChpQuarterStats | null {
+  const rows = Array.isArray(chpRows) ? chpRows : [];
+  const entries = Array.isArray(issues) ? issues : [];
+  if (!rows.length && !entries.length) return null;
+
+  const buckets = new Map<string, { total: number; streams: Map<string, { name: string; count: number; external: boolean; substreams: Map<string, number> }> }>();
+  entries.forEach(issue => {
+    const quarter = issue.quarter || 'Без квартала';
+    if (!buckets.has(quarter)) {
+      buckets.set(quarter, { total: 0, streams: new Map() });
+    }
+    const bucket = buckets.get(quarter)!;
+    bucket.total += 1;
+    const streamName = normalizeStreamLabel(issue.stream);
+    if (!bucket.streams.has(streamName)) {
+      bucket.streams.set(streamName, {
+        name: streamName,
+        count: 0,
+        external: isExternalStreamLabel(streamName),
+        substreams: new Map(),
+      });
+    }
+    const stream = bucket.streams.get(streamName)!;
+    stream.count += 1;
+    const substream = String(issue.substream || 'Без сабстрима').trim() || 'Без сабстрима';
+    stream.substreams.set(substream, (stream.substreams.get(substream) || 0) + 1);
+  });
+
+  const average = rows.length
+    ? rows.reduce((sum, row) => sum + (Number(row?.total || 0) || 0), 0) / rows.length
+    : 0;
+  const quarters = Array.from(buckets.entries())
+    .sort((left, right) => quarterSortValue(left[0]) - quarterSortValue(right[0]) || left[0].localeCompare(right[0]))
+    .map(([quarter, data]) => ({
+      quarter,
+      total: Number(data.total || 0),
+      streams: Array.from(data.streams.values())
+        .map(stream => {
+          const topSubstream = Array.from(stream.substreams.entries())
+            .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0] || null;
+          return {
+            name: stream.name,
+            count: stream.count,
+            external: stream.external,
+            topSubstream: topSubstream ? { name: topSubstream[0], count: topSubstream[1] } : null,
+          };
+        })
+        .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
+    }));
+
+  return {
+    average,
+    releases: rows.length,
+    quarters,
+    issues: entries,
+  };
+}
+
 function buildLatestStreamDeltaSummary(
   series: Array<{ release: string; counts: Map<string, number> }>,
   unitLabel: string
@@ -3618,7 +3772,7 @@ export function buildChartsMlSummary(report: ChartsReport, compareMode: 'prev' |
 
   const recommendations: string[] = [];
   if (prediction.activeProbability != null && prediction.activeProbability >= 0.7) {
-    pushUniqueLine(recommendations, 'Перед следующим релизом проверь весь стек негативных дельт из ML summary и не ограничивайся только LLM-выводом.');
+    pushUniqueLine(recommendations, 'Перед следующим релизом проверь весь стек негативных дельт из ML-сводки и не ограничивайся только LLM-выводом.');
   }
   if (negativeMetrics.some(item => /Критичные проверки|Селективные проверки/i.test(item.label))) {
     pushUniqueLine(recommendations, 'Сверь полноту HB/Selective прогонов по стримам: просадка покрытия обычно требует ручной проверки состава тест-плана.');
@@ -3728,7 +3882,7 @@ export function buildChartsMlSummary(report: ChartsReport, compareMode: 'prev' |
 
   const overviewSection: ChartsMlSummarySection = {
     id: 'overview',
-    title: 'Общая саммаризация',
+    title: 'Общая сводка',
     subtitle: 'Сводный ML-взгляд по регрессу, релизу, типам, стримам и аномалиям.',
     tone: statusTone,
     overview,
@@ -3909,6 +4063,20 @@ function enrichChartsAiContext(context: ChartsAiContext, report: ChartsReport, s
         ios: report.chpTypes.iosRows.slice(-6).map(row => ({ release: row.release, product: row.product, vlet: row.vlet, bug: row.bug, crash: row.crash })),
         android: report.chpTypes.androidRows.slice(-6).map(row => ({ release: row.release, product: row.product, vlet: row.vlet, bug: row.bug, crash: row.crash })),
       },
+      chpQuarterStats: report.chpQuarterStats ? {
+        average: round(report.chpQuarterStats.average, 1),
+        releases: report.chpQuarterStats.releases,
+        quarters: report.chpQuarterStats.quarters.slice(-4).map(quarter => ({
+          quarter: quarter.quarter,
+          total: quarter.total,
+          streams: quarter.streams.slice(0, 5).map(stream => ({
+            name: stream.name,
+            count: stream.count,
+            external: stream.external,
+            topSubstream: stream.topSubstream,
+          })),
+        })),
+      } : null,
       devDowntimeByRelease: {
         ios: report.devDowntime.iosByRelease.slice(-6).map(row => ({ release: row.release, totalMinutes: row.totalMinutes, days: row.days })),
         android: report.devDowntime.androidByRelease.slice(-6).map(row => ({ release: row.release, totalMinutes: row.totalMinutes, days: row.days })),
@@ -4230,7 +4398,7 @@ export function buildChartsAiSummaryPrompt(context: ChartsAiContext) {
       'Ты senior release analyst по мобильным релизам.',
       'Анализируй только факты из переданного JSON.',
       'Учитывай все разделы JSON: keyMetrics, anomalies, streams, taskTypes, recentReleases, devDowntime, mlSummary и displayedTables.',
-      'Отдельно сверяй выводы с локальной ML-саммаризацией и вероятностью CatBoost/линейной модели. Если локальная саммаризация уже содержит риск, не игнорируй его.',
+      'Отдельно сверяй выводы с локальной ML-сводкой и вероятностью CatBoost/линейной модели. Если локальная ML-сводка уже содержит риск, не игнорируй его.',
       'Не придумывай причины, которых нет в данных.',
       'Пиши только на русском, как сильный аналитик и инженер, а не как маркетинговая выжимка.',
       'Не используй markdown-таблицы.',
@@ -4250,7 +4418,7 @@ export function buildChartsAiSummaryPrompt(context: ChartsAiContext) {
     ].join('\n'),
     user: [
       `Сделай аналитический вывод по текущему релизу ${context.releaseWindow.currentRelease || '—'}.`,
-      'Ниже сжатый агрегированный JSON из вкладки "Графики". Он уже содержит только важные сводки, top anomalies, top deltas и локальную ML-саммаризацию.',
+      'Ниже сжатый агрегированный JSON из вкладки "Графики". Он уже содержит только важные сводки, top anomalies, top deltas и локальную ML-сводку.',
       JSON.stringify(compactContext, null, 2),
     ].join('\n\n'),
   };
@@ -4264,13 +4432,13 @@ function buildLocalChartsAiSummaryText(context: ChartsAiContext) {
       '- Недостаточно данных для LLM-анализа, используем локальный fallback.',
       '',
       'Главные риски',
-      '- Локальная ML-саммаризация не была подготовлена.',
+      '- Локальная ML-сводка не была подготовлена.',
       '',
       'Что изменилось относительно базы',
-      '- Нет локального summary для сравнения.',
+      '- Нет локальной сводки для сравнения.',
       '',
       'Рекомендации на следующий релиз',
-      '- Проверь, что локальный ML summary сформировался после сбора данных.',
+      '- Проверь, что локальная ML-сводка сформировалась после сбора данных.',
       '',
       'Что проверить вручную',
       '- Сверь текущий релиз с вкладками Регресс, Релиз, Типы и Стримы вручную.',
@@ -4514,6 +4682,7 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
   const chpTypesRows: ChartsChpTypeRow[] = [];
   const chpTypesIosRows: ChartsChpTypeRow[] = [];
   const chpTypesAndroidRows: ChartsChpTypeRow[] = [];
+  const chpQuarterIssues: ChartsChpQuarterIssue[] = [];
   const releaseMarkersMap = new Map<string, { release: string; fromMs: number; toMs: number; sources: Set<string>; regressionFromMs: number; deployFromMs: number; deployToMs: number }>();
   const tcStreamByRelease: Array<{ release: string; counts: Map<string, { manual: number; auto: number; uwuManual: number; uwuAuto: number }> }> = [];
   const hbStreamByRelease: Array<{ release: string; counts: Map<string, number> }> = [];
@@ -4774,6 +4943,7 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
     const androidCut = yValueFromIsoCut(androidTiming.cutoff);
     const iosStore = yValueFromMsLocalCut(iosTiming.storeMsLocal);
     const androidStore = yValueFromMsLocalCut(androidTiming.storeMsLocal);
+    const releaseTimelineMs = Number(iosCut?.msLocal || androidCut?.msLocal || iosStore?.msLocal || androidStore?.msLocal || 0) || null;
     if (iosCut?.msLocal) collectReleaseMarker(releaseMarkersMap, release, iosCut.msLocal, 'deploy');
     if (androidCut?.msLocal) collectReleaseMarker(releaseMarkersMap, release, androidCut.msLocal, 'deploy');
     if (iosStore?.msLocal) collectReleaseMarker(releaseMarkersMap, release, iosStore.msLocal, 'deploy');
@@ -4815,6 +4985,10 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
     const androidChpIssues = uniqueIssuesByKey(androidIssues.filter(item => item?.merged_after_cutoff === true));
     const allIssues = uniqueIssuesByKey([...iosIssues, ...androidIssues]);
     const metaByKey = await fetchYtIssueMetaBatch(cfg, allIssues, options);
+    const releaseQuarter = quarterLabelFromMsLocal(releaseTimelineMs);
+    uniqueIssuesByKey([...iosChpIssues, ...androidChpIssues]).forEach(issue => {
+      chpQuarterIssues.push(buildChpQuarterIssue(release, releaseQuarter, issue));
+    });
 
     const releaseChpCounts = computeChpTypesCounts(uniqueIssuesByKey([...iosChpIssues, ...androidChpIssues]), metaByKey);
     const iosReleaseChpCounts = computeChpTypesCounts(iosChpIssues, metaByKey);
@@ -4908,6 +5082,7 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
       iosRows: chpTypesIosRows,
       androidRows: chpTypesAndroidRows,
     },
+    chpQuarterStats: buildChpQuarterStats(chpRows, chpQuarterIssues),
     streamInsights,
     streamDeltaRows,
   } as Omit<ChartsReport, 'metrics' | 'anomalies' | 'ml' | 'aiContext'>;
@@ -5079,7 +5254,7 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
         manualChecks: [],
         highlights: [],
         sections: {
-          overview: { id: 'overview', title: 'Общая саммаризация', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },
+          overview: { id: 'overview', title: 'Общая сводка', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },
           regress: { id: 'regress', title: 'Регресс', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },
           release: { id: 'release', title: 'Релиз', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },
           types: { id: 'types', title: 'Типы и ЧП', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },

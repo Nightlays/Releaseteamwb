@@ -394,7 +394,7 @@ function buildAnswerPlan(question: string, history: WikiChatTurn[], persona: Wik
 
   const topicQuestion = followUp ? previousTopic : originalQuestion;
 
-  const profileMap: Record<WikiResponseProfile, Omit<WikiAnswerPlan, 'originalQuestion' | 'effectiveQuestion' | 'topicQuestion' | 'isFollowUp' | 'profile'>> = {
+  const profileMap: Record<WikiResponseProfile, Omit<WikiAnswerPlan, 'originalQuestion' | 'effectiveQuestion' | 'topicQuestion' | 'isFollowUp' | 'profile' | 'persona'>> = {
     brief: {
       searchPageSize: 16,
       hydrateLimit: 4,

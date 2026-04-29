@@ -72,9 +72,9 @@ export function Badge({ color = 'gray', children, dot, style }: BadgeProps) {
 
 /* ─── CARD ───────────────────────────────────────────────── */
 interface CardProps { children: ReactNode; style?: React.CSSProperties; className?: string; }
-export function Card({ children, style }: CardProps) {
+export function Card({ children, style, className }: CardProps) {
   return (
-    <div style={{
+    <div className={className} style={{
       background: 'var(--card)', border: '1px solid var(--border)',
       borderRadius: 18, ...style,
     }}>
