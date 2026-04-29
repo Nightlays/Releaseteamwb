@@ -1,4 +1,4 @@
-import { compareRelease, type PlatformKey, type QuarterAnalysisRow, type ReleaseIssueMeta } from './releasePages';
+import { classifyLocomotiveTags, compareRelease, type PlatformKey, type QuarterAnalysisRow, type ReleaseIssueMeta } from './releasePages';
 
 const SUPABASE_URL = 'https://hjlnudkbdhovoaxglkmq.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_5FDmZ6-2PIyW3qo6IeYuAg_p20zTP_M';
@@ -37,16 +37,6 @@ function stringArray(value: unknown) {
   return Array.isArray(value) ? value.map(item => String(item || '').trim()).filter(Boolean) : [];
 }
 
-function locomotivePayload(value: unknown): ReleaseIssueMeta['locomotive'] {
-  const record = asRecord(value);
-  return {
-    business: stringArray(record.business),
-    product: stringArray(record.product),
-    technical: stringArray(record.technical),
-    any: stringArray(record.any),
-  };
-}
-
 function issueFromPayload(value: unknown, fallback?: {
   key?: unknown;
   summary?: unknown;
@@ -59,17 +49,18 @@ function issueFromPayload(value: unknown, fallback?: {
   const record = asRecord(value);
   const key = textOrEmpty(record.key ?? fallback?.key);
   if (!key) return null;
+  const tags = stringArray(record.tags);
   return {
     key,
     summary: textOrEmpty(record.summary ?? fallback?.summary),
     stream: text(record.stream ?? fallback?.stream),
     substream: text(record.substream ?? fallback?.substream),
     description: textOrEmpty(record.description),
-    tags: stringArray(record.tags),
+    tags,
     url: textOrEmpty(record.url ?? fallback?.url),
     hotfixReason: text(record.hotfixReason ?? fallback?.hotfixReason),
     hotfixDetails: text(record.hotfixDetails ?? fallback?.hotfixDetails),
-    locomotive: locomotivePayload(record.locomotive),
+    locomotive: classifyLocomotiveTags(tags),
   } satisfies ReleaseIssueMeta;
 }
 
@@ -113,7 +104,7 @@ function rowFromRecord(record: SupabaseQuarterRecord, platform: PlatformKey): Qu
   const payload = asRecord(record.row_payload);
   const version = textOrEmpty(payload.version ?? record.version);
   if (!version) return null;
-  const primaryTask = issueFromPayload(payload.primaryTask, {
+  const loadedPrimaryTask = issueFromPayload(payload.primaryTask, {
     key: record.primary_task_key,
     summary: record.primary_task_summary,
     url: record.primary_task_url,
@@ -126,16 +117,20 @@ function rowFromRecord(record: SupabaseQuarterRecord, platform: PlatformKey): Qu
   const secondaryTasks = Array.isArray(secondarySource)
     ? secondarySource.map(item => issueFromPayload(item)).filter(Boolean) as ReleaseIssueMeta[]
     : [];
+  const primaryTask = loadedPrimaryTask?.locomotive.any.length ? loadedPrimaryTask : null;
+  const normalizedSecondaryTasks = loadedPrimaryTask && !primaryTask && !secondaryTasks.some(item => item.key === loadedPrimaryTask.key)
+    ? [loadedPrimaryTask, ...secondaryTasks]
+    : secondaryTasks;
   return {
     platform,
     version,
     month: numberOrNull(payload.month ?? record.month),
     stream: text(payload.stream ?? record.stream),
     substream: text(payload.substream ?? record.substream),
-    hotfixReason: text(payload.hotfixReason ?? record.hotfix_reason),
-    hotfixDetails: text(payload.hotfixDetails ?? record.hotfix_details),
+    hotfixReason: primaryTask ? text(payload.hotfixReason ?? record.hotfix_reason) : '-',
+    hotfixDetails: primaryTask ? text(payload.hotfixDetails ?? record.hotfix_details) : '-',
     primaryTask,
-    secondaryTasks,
+    secondaryTasks: normalizedSecondaryTasks,
     buildTime: shortDateText(payload.buildTime ?? record.build_time),
     previousRolloutPercent: shortDateText(payload.previousRolloutPercent ?? record.previous_rollout_percent),
     plannedHotfixDate: shortDateText(payload.plannedHotfixDate ?? record.planned_hotfix_date),

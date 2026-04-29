@@ -614,7 +614,7 @@ function normalizeTag(value: string) {
   return String(value || '').trim().toLowerCase().replace(/ё/g, 'е');
 }
 
-function classifyLocomotiveTags(tags: string[]) {
+export function classifyLocomotiveTags(tags: string[]) {
   const result = { business: [] as string[], product: [] as string[], technical: [] as string[], any: [] as string[] };
   for (const raw of tags) {
     const norm = normalizeTag(raw);
@@ -681,7 +681,7 @@ async function fetchIssueMeta(cfg: ReleasePageConfig, key: string, cache: Map<st
 }
 
 function selectPrimaryIssueMeta(issues: ReleaseIssueMeta[]) {
-  return issues.find(issue => issue.locomotive.any.length) || issues[0] || null;
+  return issues.find(issue => issue.locomotive.any.length) || null;
 }
 
 function unwrapBandPostsPayload(raw: unknown): Record<string, unknown> {
@@ -1497,7 +1497,7 @@ export async function collectQuarterReleaseAnalysis(
     ) return null;
 
     const primary = selectPrimaryIssueMeta(metas);
-    const secondary = primary ? metas.filter(meta => meta !== primary) : metas.slice(1);
+    const secondary = primary ? metas.filter(meta => meta !== primary) : metas;
     const month = monthFromMs(buildMs) ?? monthFromMs(anchorMs);
     return {
       platform: job.platform,

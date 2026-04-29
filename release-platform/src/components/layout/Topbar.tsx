@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ModuleDefinition } from '../../config/modules';
 import { StatusPill, Button } from '../ui';
 import { THEME_LIST, type ThemeMode } from '../../context/AppContext';
@@ -16,15 +17,38 @@ interface TopbarProps {
 
 function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t: ThemeMode) => void }) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    const updatePosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMenuPosition({
+        top: rect.bottom + 6,
+        right: Math.max(12, window.innerWidth - rect.right),
+      });
     };
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        ref.current
+        && !ref.current.contains(target)
+        && !menuRef.current?.contains(target)
+      ) setOpen(false);
+    };
+    updatePosition();
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
   }, [open]);
 
   const current = THEME_LIST.find(t => t.id === theme) ?? THEME_LIST[0];
@@ -32,6 +56,7 @@ function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t
   return (
     <div ref={ref} className="app-topbar__theme" style={{ position: 'relative' }}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen(v => !v)}
         style={{
@@ -64,19 +89,20 @@ function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t
         <span style={{ fontSize: 9, opacity: .6, marginLeft: 1 }}>▾</span>
       </button>
 
-      {open && (
+      {open && menuPosition && createPortal((
         <div
+          ref={menuRef}
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            right: 0,
+            position: 'fixed',
+            top: menuPosition.top,
+            right: menuPosition.right,
             minWidth: 174,
             borderRadius: 12,
             border: '1px solid var(--border-hi)',
             background: 'var(--card)',
             boxShadow: 'var(--modal-shadow)',
             padding: '5px 0',
-            zIndex: 999,
+            zIndex: 5000,
             backdropFilter: 'blur(16px)',
           }}
         >
@@ -126,7 +152,7 @@ function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t
             );
           })}
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }
@@ -134,6 +160,8 @@ function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t
 export function Topbar({ module, proxyOnline, mlReady, theme, onSetTheme, onRefresh, onOpenLegacy, showLegacyButton = true }: TopbarProps) {
   return (
     <header className="app-topbar" style={{
+      position: 'relative',
+      zIndex: 1400,
       height: 64,
       background: 'var(--topbar-bg)',
       borderBottom: '1px solid var(--border)',

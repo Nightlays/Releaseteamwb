@@ -741,3 +741,31 @@ a { color: inherit; text-decoration: none; }
   color: rgba(155, 92, 255, .9);
   box-shadow: 0 1px 3px rgba(0,0,0,.08);
 }
+@keyframes release-chart-in {
+  0% { opacity: .62; transform: translateY(10px) scale(.985); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes release-row-in {
+  0% { opacity: .45; transform: translateX(-6px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes release-bar-grow {
+  0% { transform: scaleX(.04); opacity: .48; }
+  100% { transform: scaleX(1); opacity: 1; }
+}
+@keyframes release-value-pop {
+  0% { opacity: .45; transform: translateY(5px) scale(.94); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes release-line-in {
+  0% { opacity: .25; transform: translateY(7px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes release-area-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes release-donut-in {
+  0% { opacity: .45; transform: scale(.96) rotate(-4deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}

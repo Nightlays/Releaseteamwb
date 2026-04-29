@@ -26,7 +26,7 @@ export interface CanonicalTableProps<T> {
   getRowKey: (row: T, index: number) => React.Key;
   emptyText?: string;
   emptyColumnsText?: ReactNode;
-  rowHeight?: number;
+  rowHeight?: number | ((row: T, index: number) => number);
   maxHeight?: number | string;
   minWidth?: number | string;
   overscanRight?: number;
@@ -131,6 +131,10 @@ export function CanonicalTable<T>({
   const closeTimerRef = useRef<number | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const resizeStorageKeyRef = useRef(columnResizeStorageKey);
+  const skeletonRowHeight = typeof rowHeight === 'number' ? rowHeight : 72;
+  const getEffectiveRowHeight = useCallback((row: T, index: number) => (
+    typeof rowHeight === 'function' ? rowHeight(row, index) : rowHeight
+  ), [rowHeight]);
   const tableColumns = useMemo(() => columns.map(column => {
     const storedWidth = columnWidths[column.id];
     return typeof storedWidth === 'number' ? { ...column, width: storedWidth } : column;
@@ -440,7 +444,7 @@ export function CanonicalTable<T>({
                   </td>
                 </tr>
                 {Array.from({ length: 5 }).map((_, skeletonRowIndex) => (
-                  <tr key={`canonical-loader-${skeletonRowIndex}`} style={{ height: rowHeight }}>
+                  <tr key={`canonical-loader-${skeletonRowIndex}`} style={{ height: skeletonRowHeight }}>
                     {tableColumns.map((column, columnIndex) => {
                       const stickyLeft = stickyLeftOffsets[columnIndex];
                       const isStickyLeft = typeof stickyLeft === 'number';
@@ -455,7 +459,7 @@ export function CanonicalTable<T>({
                             position: isStickyLeft ? 'sticky' : 'relative',
                             left: isStickyLeft ? stickyLeft : undefined,
                             zIndex: isStickyLeft ? 2 : 1,
-                            height: rowHeight,
+                            height: skeletonRowHeight,
                             padding: '12px 10px',
                             borderRight: '1px solid var(--border)',
                             borderBottom: '1px solid var(--border-hi)',
@@ -510,9 +514,10 @@ export function CanonicalTable<T>({
             )}
             {tableColumns.length > 0 && rows.map((row, rowIndex) => {
               const rowKey = getRowKey(row, rowIndex);
+              const effectiveRowHeight = getEffectiveRowHeight(row, rowIndex);
               const rowStripe = stableStripe(rowKey);
               return (
-              <tr key={rowKey} style={{ height: rowHeight }}>
+              <tr key={rowKey} style={{ height: effectiveRowHeight }}>
                 {tableColumns.map((column, columnIndex) => {
                   const cellKey = `${String(rowKey)}:${column.id}`;
                   const rowHighlighted = Boolean(isRowHighlighted?.(row, rowIndex));
@@ -550,8 +555,8 @@ export function CanonicalTable<T>({
                         position: isStickyLeft ? 'sticky' : 'relative',
                         left: isStickyLeft ? stickyLeft : undefined,
                         zIndex: isStickyLeft ? 2 : 1,
-                        height: rowHeight,
-                        maxHeight: rowHeight,
+                        height: effectiveRowHeight,
+                        maxHeight: effectiveRowHeight,
                         padding: '8px 10px',
                         borderRight: '1px solid var(--border)',
                         borderBottom: '1px solid var(--border-hi)',
@@ -576,7 +581,7 @@ export function CanonicalTable<T>({
                           });
                         }}
                         style={{
-                          maxHeight: rowHeight - 16,
+                          maxHeight: effectiveRowHeight - 16,
                           overflow: 'hidden',
                           display: '-webkit-box',
                           WebkitLineClamp: column.lineClamp || 3,

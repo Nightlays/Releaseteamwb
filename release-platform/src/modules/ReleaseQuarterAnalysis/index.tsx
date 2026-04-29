@@ -8,7 +8,6 @@ import {
   ColumnFilterDropdown,
   ColumnVisibilityDropdown,
   type CanonicalTableColumn,
-  FieldLabel,
   Input,
   LogView,
   Progress,
@@ -36,6 +35,7 @@ const QUARTER_MONTHS: Record<number, number[]> = {
 };
 const SHOW_RELEASE_ANALYSIS_FLOATING_LOGS = true;
 const MAJOR_RELEASE_STORAGE_KEY = 'rp_release_quarter_major_release';
+const MAJOR_RELEASE_RANGE_TO_STORAGE_KEY = 'rp_release_quarter_major_release_to';
 const COLUMN_VISIBILITY_STORAGE_KEY = 'rp_release_quarter_visible_columns';
 const COLUMN_WIDTHS_STORAGE_KEY = 'rp_release_quarter_column_widths';
 const CURRENT_YEAR = new Date().getFullYear();
@@ -179,28 +179,38 @@ function SegmentLabel({ icon, children }: { icon: React.ReactNode; children: Rea
   );
 }
 
+function easeInOutCubic(progress: number) {
+  return progress < 0.5
+    ? 4 * progress * progress * progress
+    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+}
+
 function AnimatedCounter({ value }: { value: number }) {
   const [displayValue, setDisplayValue] = useState(value);
-  const previousValueRef = useRef(value);
+  const displayValueRef = useRef(value);
 
   useEffect(() => {
-    const from = previousValueRef.current;
+    const from = displayValueRef.current;
     if (from === value) {
+      displayValueRef.current = value;
       setDisplayValue(value);
       return undefined;
     }
 
     const start = performance.now();
-    const duration = 260;
+    const duration = 420;
     let frame = 0;
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(Math.round(from + (value - from) * eased));
+      const eased = easeInOutCubic(progress);
+      const nextValue = from + (value - from) * eased;
+      displayValueRef.current = nextValue;
+      setDisplayValue(Math.round(nextValue));
       if (progress < 1) {
         frame = window.requestAnimationFrame(tick);
       } else {
-        previousValueRef.current = value;
+        displayValueRef.current = value;
+        setDisplayValue(value);
       }
     };
 
@@ -210,9 +220,12 @@ function AnimatedCounter({ value }: { value: number }) {
 
   return (
     <span style={{
-      display: 'inline-block',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
       minWidth: 18,
-      textAlign: 'left',
+      textAlign: 'center',
+      lineHeight: 1,
       fontVariantNumeric: 'tabular-nums',
       animation: 'hotfix-count-pop .22s ease',
     }}>
@@ -352,13 +365,23 @@ function YearDropdown({
 function issueCell(issue: QuarterAnalysisRow['primaryTask']) {
   if (!issue) return <span style={{ color: 'var(--text-3)' }}>-</span>;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, lineHeight: 1.4, overflowWrap: 'anywhere' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
       <a href={issue.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none', fontFamily: 'var(--mono)' }}>
         {issue.key}
       </a>
-      <span style={{ color: 'var(--text-2)' }}>{issue.summary || '-'}</span>
+      <span style={{
+        color: 'var(--text-2)',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+      }}>
+        {issue.summary || '-'}
+      </span>
       {issue.locomotive.any.length > 0 && (
-        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{issue.locomotive.any.join(', ')}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {issue.locomotive.any.join(', ')}
+        </span>
       )}
     </div>
   );
@@ -378,33 +401,38 @@ function secondaryTasksText(row: QuarterAnalysisRow) {
 }
 
 function secondaryTasksPreview(row: QuarterAnalysisRow) {
-  if (!row.secondaryTasks.length) return null;
+  if (row.secondaryTasks.length <= 1) return null;
+  const hiddenTasks = row.secondaryTasks.slice(1);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {row.secondaryTasks.map(issue => <div key={issue.key}>{issueCell(issue)}</div>)}
+      {hiddenTasks.map(issue => <div key={issue.key}>{issueCell(issue)}</div>)}
     </div>
   );
 }
 
 function secondaryTasksCell(row: QuarterAnalysisRow) {
   if (!row.secondaryTasks.length) return <span style={{ color: 'var(--text-3)' }}>-</span>;
+  const issue = row.secondaryTasks[0];
   return (
-    <span style={{ whiteSpace: 'normal' }}>
-      {row.secondaryTasks.map((issue, index) => (
-        <React.Fragment key={issue.key}>
-          {index > 0 && <><br /><br /></>}
-          <a
-            href={issue.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none', fontFamily: 'var(--mono)' }}
-          >
-            {issue.key}
-          </a>
-          {issue.summary ? ` ${issue.summary}` : ''}
-        </React.Fragment>
-      ))}
-    </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, lineHeight: 1.35, whiteSpace: 'normal' }}>
+      <a
+        href={issue.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none', fontFamily: 'var(--mono)' }}
+      >
+        {issue.key}
+      </a>
+      <span style={{
+        color: 'var(--text-2)',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+      }}>
+        {issue.summary || '-'}
+      </span>
+    </div>
   );
 }
 
@@ -570,6 +598,74 @@ function truncateChartLabel(value: string, length = 22) {
   return value.length > length ? `${value.slice(0, length - 1)}...` : value;
 }
 
+function chartTickValues(maxValue: number, targetSteps = 4) {
+  const max = Math.max(1, Math.ceil(maxValue));
+  if (max <= targetSteps + 1) {
+    return Array.from({ length: max + 1 }, (_, index) => index);
+  }
+  const step = Math.max(1, Math.ceil(max / targetSteps));
+  const ticks: number[] = [];
+  for (let tick = 0; tick < max; tick += step) ticks.push(tick);
+  if (ticks[ticks.length - 1] !== max) ticks.push(max);
+  return Array.from(new Set(ticks));
+}
+
+function useAnimatedChartData(data: ChartDatum[], duration = 620, keepLeavingLabels = false) {
+  const [animatedData, setAnimatedData] = useState<ChartDatum[]>(data);
+  const animatedDataRef = useRef<ChartDatum[]>(data);
+  const frameRef = useRef(0);
+  const dataKey = useMemo(() => data.map(item => `${item.label}:${item.value}`).join('|'), [data]);
+
+  useEffect(() => {
+    window.cancelAnimationFrame(frameRef.current);
+    const currentData = animatedDataRef.current;
+    const targetLabels = new Set(data.map(item => item.label));
+    const leavingData = keepLeavingLabels
+      ? currentData
+        .filter(item => !targetLabels.has(item.label) && item.value > 0.01)
+        .map(item => ({ ...item, value: 0 }))
+      : [];
+    const targetData = [...data.map(item => ({ ...item })), ...leavingData];
+
+    if (!targetData.length) {
+      animatedDataRef.current = [];
+      setAnimatedData([]);
+      return undefined;
+    }
+
+    const fromValues = new Map(currentData.map(item => [item.label, item.value]));
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = easeInOutCubic(progress);
+      const nextData = targetData.map(item => {
+        const from = fromValues.get(item.label) ?? 0;
+        return {
+          ...item,
+          value: from + (item.value - from) * eased,
+        };
+      });
+      animatedDataRef.current = nextData;
+      setAnimatedData(nextData);
+
+      if (progress < 1) {
+        frameRef.current = window.requestAnimationFrame(tick);
+        return;
+      }
+
+      const settledData = data.map(item => ({ ...item }));
+      animatedDataRef.current = settledData;
+      setAnimatedData(settledData);
+    };
+
+    frameRef.current = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frameRef.current);
+  }, [dataKey, duration, keepLeavingLabels]);
+
+  return animatedData;
+}
+
 function exportCsv(rows: QuarterAnalysisRow[], platform: PlatformKey, rangeLabel: string) {
   const headers = [
     'Платформа',
@@ -704,186 +800,537 @@ interface QuarterChartBlock {
   reasons: ChartDatum[];
 }
 
-function HorizontalBarChart({ title, data, color }: { title: string; data: ChartDatum[]; color: string }) {
-  const max = Math.max(1, ...data.map(item => item.value));
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-  const width = 560;
-  const rowHeight = 28;
-  const chartHeight = Math.max(118, data.length * rowHeight + 34);
-  const labelWidth = 156;
-  const plotLeft = labelWidth;
-  const plotWidth = width - plotLeft - 48;
-  const plotTop = 16;
+function DashboardChartCard({
+  title,
+  count,
+  countColor = 'rgba(168,85,247,.12)',
+  countText = 'var(--accent)',
+  children,
+  style,
+}: {
+  title: string;
+  count?: React.ReactNode;
+  countColor?: string;
+  countText?: string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  const countNode = typeof count === 'number' ? <AnimatedCounter value={count} /> : count;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 850, color: 'var(--text)', textTransform: 'uppercase' }}>{title}</span>
-        <Badge color={total ? 'purple' : 'gray'} style={{ height: 22, padding: '0 7px', fontSize: 10 }}>
-          {total}
-        </Badge>
+    <div style={{
+      minWidth: 0,
+      border: '1px solid var(--border-hi)',
+      borderRadius: 8,
+      background: 'var(--card)',
+      boxShadow: '0 6px 18px rgba(15,23,42,.055)',
+      padding: '11px 11px',
+      ...style,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+        <span style={{ minWidth: 0, fontSize: 11, fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: 0 }}>{title}</span>
+        {count != null && (
+          <span style={{
+            minWidth: 42,
+            height: 24,
+            padding: '0 8px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            borderRadius: 6,
+            border: '1px solid color-mix(in srgb, currentColor 18%, transparent)',
+            background: countColor,
+            color: countText,
+            fontSize: 12,
+            fontWeight: 800,
+            lineHeight: 1,
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {countNode}
+          </span>
+        )}
       </div>
-      <div style={{
-        maxHeight: 240,
-        overflow: 'auto',
-        paddingRight: 4,
-      }}>
-        {data.length > 0 && (
-          <svg viewBox={`0 0 ${width} ${chartHeight}`} role="img" style={{ display: 'block', width: '100%', minWidth: 320, height: chartHeight }}>
-            <line x1={plotLeft} y1={8} x2={plotLeft} y2={chartHeight - 16} stroke="var(--chart-grid)" strokeWidth="1" />
-            <line x1={plotLeft} y1={chartHeight - 16} x2={width - 16} y2={chartHeight - 16} stroke="var(--chart-grid)" strokeWidth="1" />
-            {[0.25, 0.5, 0.75, 1].map(mark => (
-              <line
-                key={mark}
-                x1={plotLeft + plotWidth * mark}
-                y1={8}
-                x2={plotLeft + plotWidth * mark}
-                y2={chartHeight - 16}
-                stroke="var(--chart-grid)"
-                strokeWidth="1"
-                strokeDasharray="3 5"
-              />
-            ))}
-            {data.map((item, index) => {
-              const y = plotTop + index * rowHeight;
-              const barWidth = Math.max(5, (item.value / max) * plotWidth);
+      {children}
+    </div>
+  );
+}
+
+function DashboardEmptyChart({ minHeight = 170 }: { minHeight?: number }) {
+  return (
+    <div style={{
+      minHeight,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      border: '1px dashed var(--border-hi)',
+      borderRadius: 8,
+      color: 'var(--text-3)',
+      fontSize: 12,
+      fontWeight: 700,
+    }}>
+      Нет данных
+    </div>
+  );
+}
+
+function StreamIcon({ label, index }: { label: string; index: number }) {
+  const lower = label.toLowerCase();
+  const kind =
+    /vibes|вайб|love|серд/u.test(lower) ? 'heart' :
+    /кт|code|dev|тех/u.test(lower) ? 'code' :
+    /рекомен/u.test(lower) ? 'star' :
+    /release|релиз/u.test(lower) ? 'rocket' :
+    /поиск|каталог|search/u.test(lower) ? 'search' :
+    /чат|chat/u.test(lower) ? 'chat' :
+    /b2b|б2б|business/u.test(lower) ? 'briefcase' :
+    /кор|cart|корз/u.test(lower) ? 'crown' :
+    (['crown', 'heart', 'code', 'star', 'rocket', 'search', 'chat', 'briefcase'] as const)[index % 8];
+  const common = { stroke: 'currentColor', strokeWidth: 1.55, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' };
+  const icon = {
+    crown: <path {...common} d="M4 7.5 6.3 5l2.1 3.1L11.7 5 14 7.5l-1 4.5H5L4 7.5Z M5.5 14h7" />,
+    heart: <path {...common} d="M9 13.5s-5-3.2-5-6.3A2.5 2.5 0 0 1 8.3 5.5L9 6.2l.7-.7A2.5 2.5 0 0 1 14 7.2c0 3.1-5 6.3-5 6.3Z" />,
+    code: <path {...common} d="m7 5-3 4 3 4M11 5l3 4-3 4M9.8 4.8 8.2 13.2" />,
+    star: <path {...common} d="m9 4.2 1.35 2.9 3.15.38-2.32 2.14.62 3.1L9 11.15l-2.8 1.57.62-3.1L4.5 7.48l3.15-.38L9 4.2Z" />,
+    rocket: <path {...common} d="M9.5 12.7 6.3 9.5C7.1 6 9 4 13 3.5c-.5 4-2.5 5.9-6 6.7M5.8 10.2 4.5 13.5l3.3-1.3M10.9 5.7h.01" />,
+    search: <path {...common} d="M8.2 12a3.8 3.8 0 1 1 0-7.6 3.8 3.8 0 0 1 0 7.6ZM11.1 11.1 14 14" />,
+    chat: <path {...common} d="M4 5.8A2 2 0 0 1 6 3.8h6a2 2 0 0 1 2 2v3.5a2 2 0 0 1-2 2H8.2L5 14v-2.8A2 2 0 0 1 4 9.5V5.8Z" />,
+    briefcase: <path {...common} d="M5 6.5h8A1.5 1.5 0 0 1 14.5 8v4A1.5 1.5 0 0 1 13 13.5H5A1.5 1.5 0 0 1 3.5 12V8A1.5 1.5 0 0 1 5 6.5ZM7.3 6.3V5.5a1 1 0 0 1 1-1h1.4a1 1 0 0 1 1 1v.8" />,
+  }[kind];
+
+  return (
+    <span style={{
+      width: 23,
+      height: 23,
+      borderRadius: 6,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'var(--accent)',
+      background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
+      border: '1px solid color-mix(in srgb, var(--accent) 14%, transparent)',
+      flexShrink: 0,
+    }}>
+      <svg viewBox="0 0 18 18" width="15" height="15" aria-hidden="true">{icon}</svg>
+    </span>
+  );
+}
+
+function StreamDashboardChart({ data }: { data: ChartDatum[] }) {
+  const animatedData = useAnimatedChartData(data, 620, true);
+  const [tooltip, setTooltip] = useState<{ text: string; left: number; top: number } | null>(null);
+  const max = Math.max(1, ...data.map(item => item.value), ...animatedData.map(item => item.value));
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const ticks = chartTickValues(max, 5);
+  return (
+    <>
+      <DashboardChartCard title="Задачи по стримам" count={total} style={{ height: 286, overflow: 'hidden' }}>
+        {!data.length && !animatedData.length ? <DashboardEmptyChart /> : (
+          <div style={{ display: 'flex', flexDirection: 'column', height: 222, minHeight: 0, paddingTop: 2 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'auto', paddingRight: 3 }}>
+              {animatedData.map((item, index) => {
+                const barWidth = Math.max(0, (item.value / max) * 100);
+                return (
+                  <div key={item.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(74px, 96px) minmax(46px,1fr) 22px', gap: 7, alignItems: 'center', animation: 'release-row-in .32s ease both' }}>
+                    <div
+                      onMouseEnter={event => {
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        setTooltip({ text: item.label, left: rect.left + rect.width / 2, top: rect.top - 8 });
+                      }}
+                      onMouseLeave={() => setTooltip(null)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}
+                    >
+                      <StreamIcon label={item.label} index={index} />
+                      <span title={item.label} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-2)', fontSize: 12, fontWeight: 620 }}>
+                        {truncateChartLabel(item.label, 16)}
+                      </span>
+                    </div>
+                    <div style={{ position: 'relative', height: 12 }}>
+                      <div style={{ position: 'absolute', inset: '3px 0', borderRadius: 3, background: 'var(--surface-soft-4)' }} />
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 3,
+                        height: 6,
+                        width: `${barWidth}%`,
+                        borderRadius: 3,
+                        background: 'var(--accent)',
+                        boxShadow: 'none',
+                        transformOrigin: 'left center',
+                        animation: 'release-bar-grow .46s cubic-bezier(.2,.8,.2,1) both',
+                        transition: 'width .08s linear',
+                      }} />
+                    </div>
+                    <span style={{ color: 'var(--text)', fontSize: 12, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                      {Math.max(0, Math.round(item.value))}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(74px, 96px) 1fr 22px', gap: 7, alignItems: 'center', paddingTop: 8, flexShrink: 0 }}>
+              <span />
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-3)', fontSize: 10, fontWeight: 650 }}>
+                {ticks.map(tick => <span key={tick}>{tick}</span>)}
+              </div>
+              <span />
+            </div>
+          </div>
+        )}
+      </DashboardChartCard>
+      {tooltip && (
+        <div style={{
+          position: 'fixed',
+          left: tooltip.left,
+          top: tooltip.top,
+          transform: 'translate(-50%, -100%)',
+          zIndex: 1800,
+          maxWidth: 280,
+          padding: '7px 9px',
+          borderRadius: 7,
+          border: '1px solid var(--border-hi)',
+          background: 'var(--card)',
+          color: 'var(--text)',
+          boxShadow: '0 14px 32px rgba(15,23,42,.18)',
+          fontSize: 12,
+          fontWeight: 700,
+          lineHeight: 1.35,
+          pointerEvents: 'none',
+          whiteSpace: 'normal',
+        }}>
+          {tooltip.text}
+        </div>
+      )}
+    </>
+  );
+}
+
+const LOCOMOTIVE_COLORS: Record<string, string> = {
+  'Технический': '#7C3AED',
+  'Продукт': '#2EA8D8',
+  'Бизнес': '#36A852',
+};
+
+function locomotiveDonutLayout(quarterCount: number) {
+  const count = Math.min(4, Math.max(1, quarterCount || 1)) as 1 | 2 | 3 | 4;
+  const layouts = {
+    1: { cardHeight: 352, svgHeight: 180, maxWidth: 260, radius: 82, trackStroke: 46, segmentStroke: 42, centerRadius: 60, totalFont: 34, labelFont: 14, valueFont: 18, legendMaxHeight: 92 },
+    2: { cardHeight: 326, svgHeight: 158, maxWidth: 230, radius: 72, trackStroke: 44, segmentStroke: 40, centerRadius: 52, totalFont: 31, labelFont: 13.5, valueFont: 17, legendMaxHeight: 84 },
+    3: { cardHeight: 306, svgHeight: 140, maxWidth: 206, radius: 64, trackStroke: 42, segmentStroke: 38, centerRadius: 46, totalFont: 28, labelFont: 13, valueFont: 16, legendMaxHeight: 78 },
+    4: { cardHeight: 286, svgHeight: 124, maxWidth: 184, radius: 58, trackStroke: 40, segmentStroke: 36, centerRadius: 42, totalFont: 26, labelFont: 13, valueFont: 15, legendMaxHeight: 74 },
+  };
+  return layouts[count];
+}
+
+function polarPoint(cx: number, cy: number, radius: number, angle: number) {
+  return {
+    x: cx + Math.cos(angle) * radius,
+    y: cy + Math.sin(angle) * radius,
+  };
+}
+
+function donutArcPath(cx: number, cy: number, radius: number, startAngle: number, endAngle: number) {
+  const start = polarPoint(cx, cy, radius, startAngle);
+  const end = polarPoint(cx, cy, radius, endAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+}
+
+function LocomotiveDonutChart({ data, quarterCount }: { data: ChartDatum[]; quarterCount: number }) {
+  const animatedData = useAnimatedChartData(data, 620, true);
+  const layout = locomotiveDonutLayout(quarterCount);
+  const order = ['Технический', 'Продукт', 'Бизнес'];
+  const prepared = order
+    .map(label => ({ label, value: animatedData.find(item => item.label === label)?.value || 0, color: LOCOMOTIVE_COLORS[label] }))
+    .filter(item => item.value > 0.01);
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const animatedTotal = prepared.reduce((sum, item) => sum + item.value, 0);
+  const radius = layout.radius;
+  let angleOffset = -Math.PI / 2;
+
+  return (
+    <DashboardChartCard title="Типы локомотивов" count={total} countColor="rgba(14,165,233,.10)" countText="#2EA8D8" style={{ height: layout.cardHeight, overflow: 'hidden' }}>
+      {!data.length && !prepared.length ? <DashboardEmptyChart /> : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: quarterCount <= 2 ? 10 : 8, alignItems: 'center', minHeight: 0 }}>
+          <svg viewBox="0 0 220 220" width="100%" height={layout.svgHeight} role="img" style={{ display: 'block', maxWidth: layout.maxWidth, justifySelf: 'center', transition: 'height .26s ease, max-width .26s ease' }}>
+            <circle cx="110" cy="110" r={radius} fill="none" stroke="var(--surface-soft-4)" strokeWidth={layout.trackStroke} />
+            {prepared.map(item => {
+              const startAngle = angleOffset;
+              const endAngle = startAngle + (animatedTotal > 0 ? (item.value / animatedTotal) * Math.PI * 2 : 0);
+              angleOffset = endAngle;
+              const isFullCircle = endAngle - startAngle >= Math.PI * 2 - 0.001;
+              const element = (
+                isFullCircle ? (
+                  <circle
+                    key={item.label}
+                    cx="110"
+                    cy="110"
+                    r={radius}
+                    fill="none"
+                    stroke={item.color}
+                    strokeWidth={layout.segmentStroke}
+                    strokeLinecap="butt"
+                    style={{
+                      transformOrigin: '110px 110px',
+                      animation: 'release-donut-in .48s cubic-bezier(.2,.8,.2,1) both',
+                    }}
+                  />
+                ) : (
+                <path
+                  key={item.label}
+                  d={donutArcPath(110, 110, radius, startAngle, endAngle)}
+                  fill="none"
+                  stroke={item.color}
+                  strokeWidth={layout.segmentStroke}
+                  strokeLinecap="butt"
+                  style={{
+                    transformOrigin: '110px 110px',
+                    animation: 'release-donut-in .48s cubic-bezier(.2,.8,.2,1) both',
+                    transition: 'd .08s linear',
+                  }}
+                />
+                )
+              );
+              return element;
+            })}
+            <circle cx="110" cy="110" r={layout.centerRadius} fill="var(--card)" />
+            <text x="110" y="105" textAnchor="middle" fill="var(--text-2)" fontSize={layout.labelFont} fontWeight="620">Всего</text>
+            <text x="110" y="132" textAnchor="middle" fill="var(--text)" fontSize={layout.totalFont} fontWeight="820">{Math.round(animatedTotal)}</text>
+            {prepared.map((item, itemIndex) => {
+              const before = prepared.slice(0, itemIndex).reduce((sum, current) => sum + current.value, 0);
+              const middle = animatedTotal > 0 ? ((before + item.value / 2) / animatedTotal) * Math.PI * 2 - Math.PI / 2 : -Math.PI / 2;
+              const x = 110 + Math.cos(middle) * radius;
+              const y = 110 + Math.sin(middle) * radius;
               return (
-                <g key={item.label}>
-                  <title>{`${item.label}: ${item.value}`}</title>
-                  <text x={0} y={y + 14} fill="var(--text-2)" fontSize="12" fontWeight="650">
-                    {truncateChartLabel(item.label)}
-                  </text>
-                  <rect x={plotLeft} y={y + 3} width={plotWidth} height={12} rx={6} fill="var(--chart-track)" />
-                  <rect x={plotLeft} y={y + 3} width={barWidth} height={12} rx={6} fill={color} />
-                  <text x={Math.min(width - 18, plotLeft + barWidth + 8)} y={y + 14} fill="var(--chart-label-strong)" fontSize="12" fontWeight="850">
-                    {item.value}
-                  </text>
-                </g>
+                <text key={`${item.label}-value`} x={x} y={y + 5} textAnchor="middle" fill="#fff" fontSize={layout.valueFont} fontWeight="800" style={{ animation: 'release-value-pop .24s ease both' }}>
+                  {Math.max(0, Math.round(item.value))}
+                </text>
               );
             })}
           </svg>
-        )}
-        {!data.length && (
-          <div style={{
-            minHeight: 42,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '1px dashed var(--border-hi)',
-            borderRadius: 8,
-            color: 'var(--text-3)',
-            fontSize: 12,
-          }}>
-            Нет данных
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minWidth: 0, maxHeight: layout.legendMaxHeight, overflow: 'auto', paddingRight: 2 }}>
+            {prepared.map(item => (
+              <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '13px minmax(0, 1fr) auto', gap: 7, alignItems: 'center', minWidth: 0, animation: 'release-row-in .32s ease both' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: item.color, boxShadow: 'none' }} />
+                <span title={item.label} style={{ color: 'var(--text-2)', fontSize: 12, fontWeight: 620, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                <span style={{ color: 'var(--text)', fontSize: 12, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                  {Math.max(0, Math.round(item.value))}
+                </span>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </DashboardChartCard>
   );
 }
 
-function MonthLineChart({ title, data, color }: { title: string; data: ChartDatum[]; color: string }) {
-  const width = 560;
-  const height = 214;
-  const pad = { left: 42, right: 20, top: 34, bottom: 38 };
-  const max = Math.max(1, ...data.map(item => item.value));
+function ReasonDashboardChart({ data }: { data: ChartDatum[] }) {
+  const animatedData = useAnimatedChartData(data, 620, true);
+  const max = Math.max(1, ...data.map(item => item.value), ...animatedData.map(item => item.value));
   const total = data.reduce((sum, item) => sum + item.value, 0);
+  const ticks = chartTickValues(max, 2);
+  return (
+    <DashboardChartCard title="Причины ХФ" count={total} countColor="rgba(50,199,79,.10)" countText="#22C55E" style={{ gridColumn: '1 / -1', height: 176, overflow: 'hidden' }}>
+      {!data.length && !animatedData.length ? <DashboardEmptyChart minHeight={90} /> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 116, overflow: 'auto', paddingRight: 3 }}>
+          {animatedData.map(item => {
+            const barWidth = Math.max(0, (item.value / max) * 100);
+            return (
+              <div key={item.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(42px, 70px) minmax(54px, 1fr) 24px', gap: 8, alignItems: 'center', animation: 'release-row-in .32s ease both' }}>
+                <span title={item.label} style={{ color: 'var(--text)', fontSize: 13, fontWeight: 620, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {truncateChartLabel(item.label, 14)}
+                </span>
+                <div style={{ position: 'relative', height: 16 }}>
+                  <div style={{ position: 'absolute', inset: '5px 0', borderRadius: 3, background: 'var(--surface-soft-4)' }} />
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 5,
+                    height: 6,
+                    width: `${barWidth}%`,
+                    borderRadius: 3,
+                    background: '#36A852',
+                    boxShadow: 'none',
+                    transformOrigin: 'left center',
+                    animation: 'release-bar-grow .46s cubic-bezier(.2,.8,.2,1) both',
+                    transition: 'width .08s linear',
+                  }} />
+                </div>
+                <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                  {Math.max(0, Math.round(item.value))}
+                </span>
+              </div>
+            );
+          })}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(42px, 70px) minmax(54px, 1fr) 24px', gap: 8, alignItems: 'center' }}>
+            <span />
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-3)', fontSize: 11, fontWeight: 650 }}>
+              {ticks.map(tick => <span key={tick}>{tick}</span>)}
+            </div>
+            <span />
+          </div>
+        </div>
+      )}
+    </DashboardChartCard>
+  );
+}
+
+function MonthDashboardChart({ data, axisScopeKey }: { data: ChartDatum[]; axisScopeKey: string }) {
+  const animatedData = useAnimatedChartData(data);
+  const axisScopeRef = useRef(axisScopeKey);
+  const stableMaxRef = useRef(1);
+  const gradientIdRef = useRef('');
+  if (!gradientIdRef.current) {
+    gradientIdRef.current = `monthArea-${Math.random().toString(36).slice(2)}`;
+  }
+  const width = 360;
+  const height = 206;
+  const pad = { left: 38, right: 16, top: 32, bottom: 34 };
+  const liveMaxValue = Math.max(1, ...data.map(item => item.value), ...animatedData.map(item => item.value));
+  if (axisScopeRef.current !== axisScopeKey) {
+    axisScopeRef.current = axisScopeKey;
+    stableMaxRef.current = liveMaxValue;
+  } else if (liveMaxValue > stableMaxRef.current) {
+    stableMaxRef.current = liveMaxValue;
+  }
+  const maxValue = stableMaxRef.current;
+  const max = Math.max(3, Math.ceil((maxValue * 1.25) / 3) * 3);
+  const yTicks = chartTickValues(max, 4);
   const plotWidth = width - pad.left - pad.right;
   const plotHeight = height - pad.top - pad.bottom;
   const yFor = (value: number) => pad.top + plotHeight - (value / max) * plotHeight;
-  const xFor = (index: number) => data.length <= 1 ? pad.left + plotWidth / 2 : pad.left + (plotWidth / (data.length - 1)) * index;
-  const points = data.map((item, index) => ({ x: xFor(index), y: yFor(item.value), ...item }));
-  const yTicks = Array.from(new Set([0, Math.ceil(max / 2), max]));
+  const xFor = (index: number) => animatedData.length <= 1 ? pad.left + plotWidth / 2 : pad.left + (plotWidth / (animatedData.length - 1)) * index;
+  const points = animatedData.map((item, index) => ({ x: xFor(index), y: yFor(item.value), ...item }));
+  const linePoints = points.map(point => `${point.x},${point.y}`).join(' ');
+  const areaPoints = points.length
+    ? `${pad.left},${pad.top + plotHeight} ${linePoints} ${width - pad.right},${pad.top + plotHeight}`
+    : '';
+  const gradientId = gradientIdRef.current;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 850, color: 'var(--text)', textTransform: 'uppercase' }}>{title}</span>
-        <Badge color={total ? 'blue' : 'gray'} style={{ height: 22, padding: '0 7px', fontSize: 10 }}>
-          {total}
-        </Badge>
-      </div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" style={{ display: 'block', width: '100%', minWidth: 320, height }}>
-        <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + plotHeight} stroke="var(--chart-grid)" strokeWidth="1.2" />
-        <line x1={pad.left} y1={pad.top + plotHeight} x2={width - pad.right} y2={pad.top + plotHeight} stroke="var(--chart-grid)" strokeWidth="1.2" />
-        {yTicks.map(tick => {
-          const y = yFor(tick);
-          return (
-            <g key={tick}>
-              <line x1={pad.left} y1={y} x2={width - pad.right} y2={y} stroke="var(--chart-grid)" strokeWidth="1" strokeDasharray={tick === 0 ? undefined : '3 5'} />
-              <text x={pad.left - 10} y={y + 4} textAnchor="end" fill="var(--text-3)" fontSize="11" fontWeight="700">
-                {tick}
+    <DashboardChartCard title="Количество ХФ по месяцам" style={{ gridColumn: '1 / -1', height: 246, paddingBottom: 10, overflow: 'hidden' }}>
+      {!data.length ? <DashboardEmptyChart minHeight={170} /> : (
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" style={{ display: 'block', width: '100%', minWidth: 0, height: 188 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity=".14" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {yTicks.map(tick => {
+            const y = yFor(tick);
+            return (
+              <g key={tick}>
+                <line x1={pad.left} y1={y} x2={width - pad.right} y2={y} stroke="var(--chart-grid)" strokeWidth="1" strokeDasharray={tick === 0 ? undefined : '4 5'} />
+                <text x={pad.left - 10} y={y + 4} textAnchor="end" fill="var(--text-3)" fontSize="10" fontWeight="650">
+                  {tick}
+                </text>
+              </g>
+            );
+          })}
+          <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + plotHeight} stroke="var(--border-hi)" strokeWidth="1.2" />
+          <line x1={pad.left} y1={pad.top + plotHeight} x2={width - pad.right} y2={pad.top + plotHeight} stroke="var(--text-3)" strokeOpacity=".48" strokeWidth="1.2" />
+          <text x={13} y={pad.top + plotHeight / 2} transform={`rotate(-90 13 ${pad.top + plotHeight / 2})`} textAnchor="middle" fill="var(--text-3)" fontSize="9" fontWeight="800" letterSpacing="1">
+            кол-во
+          </text>
+          {areaPoints && <polygon points={areaPoints} fill={`url(#${gradientId})`} style={{ animation: 'release-area-in .46s ease both' }} />}
+          <polyline points={linePoints} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" style={{ animation: 'release-line-in .46s cubic-bezier(.2,.8,.2,1) both' }} />
+          {points.map(point => (
+            <g key={point.label} style={{ animation: 'release-value-pop .34s ease both' }}>
+              <text x={point.x} y={height - 12} textAnchor="middle" fill="var(--text-2)" fontSize="10.5" fontWeight="760">
+                {point.label}
+              </text>
+              <circle cx={point.x} cy={point.y} r="7.5" fill="var(--accent)" opacity=".10" />
+              <circle cx={point.x} cy={point.y} r="4.8" fill="var(--card)" stroke="var(--accent)" strokeWidth="2.2" />
+              <text x={point.x} y={Math.max(15, point.y - 12)} textAnchor="middle" fill="var(--accent)" fontSize="12" fontWeight="850">
+                {Math.max(0, Math.round(point.value))}
               </text>
             </g>
-          );
-        })}
-        <text x={15} y={pad.top + plotHeight / 2} transform={`rotate(-90 15 ${pad.top + plotHeight / 2})`} textAnchor="middle" fill="var(--text-3)" fontSize="10" fontWeight="800">
-          кол-во
-        </text>
-        <polyline
-          points={points.map(point => `${point.x},${point.y}`).join(' ')}
-          fill="none"
-          stroke={color}
-          strokeWidth="3"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-        {points.map(point => (
-          <g key={point.label}>
-            <line x1={point.x} y1={pad.top + plotHeight} x2={point.x} y2={pad.top + plotHeight + 5} stroke="var(--chart-grid)" strokeWidth="1" />
-            <text x={point.x} y={height - 13} textAnchor="middle" fill="var(--text-2)" fontSize="12" fontWeight="750">
-              {point.label}
-            </text>
-            <circle cx={point.x} cy={point.y} r="5.5" fill="var(--card)" stroke={color} strokeWidth="3" />
-            <text x={point.x} y={Math.max(12, point.y - 11)} textAnchor="middle" fill="var(--chart-label-strong)" fontSize="12" fontWeight="900">
-              {point.value}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </div>
+          ))}
+        </svg>
+      )}
+    </DashboardChartCard>
   );
 }
 
-function QuarterChartsView({ blocks }: { blocks: QuarterChartBlock[] }) {
+function DashboardBadgeIcon({ type }: { type: 'hotfix' | 'task' }) {
+  return (
+    <svg viewBox="0 0 18 18" width="15" height="15" aria-hidden="true">
+      {type === 'hotfix' ? (
+        <path d="m10.2 1.8-5.6 7h4L7.8 16l5.8-8.5H9.5l.7-5.7Z" fill="currentColor" />
+      ) : (
+        <>
+          <rect x="3.4" y="3.4" width="11.2" height="11.2" rx="2.2" fill="currentColor" opacity=".18" />
+          <path d="m6.3 9 1.8 1.8 3.7-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function QuarterChartsView({ blocks, scopeKey }: { blocks: QuarterChartBlock[]; scopeKey: string }) {
   const visibleBlocks = blocks.filter(block => block.hotfixCount > 0);
+  const quarterMinWidth = visibleBlocks.length >= 4 ? '230px' : visibleBlocks.length === 3 ? '280px' : '320px';
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+      gridTemplateColumns: `repeat(auto-fit, minmax(${quarterMinWidth}, 1fr))`,
       gap: 12,
-      padding: '0 10px 10px',
+      padding: '0 8px 12px',
+      alignItems: 'start',
     }}>
       {visibleBlocks.map(block => (
         <section
           key={block.quarter}
           style={{
             minWidth: 0,
-            border: '1.5px solid var(--border-hi)',
-            borderRadius: 10,
-            background: 'var(--card)',
-            overflow: 'hidden',
+            animation: 'release-chart-in .38s cubic-bezier(.2,.8,.2,1) both',
           }}
         >
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 10,
-            padding: '10px 12px',
-            borderBottom: '1px solid var(--border)',
-            background: 'var(--card-hi)',
-          }}>
-            <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text)' }}>{quarterLabel(block.quarter)}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Badge color={block.hotfixCount ? 'blue' : 'gray'}>ХФ: {block.hotfixCount}</Badge>
-              <Badge color={block.taskCount ? 'purple' : 'gray'}>Задач: {block.taskCount}</Badge>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, margin: '4px 2px 10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 28, lineHeight: 1, fontWeight: 850, color: 'var(--text)', letterSpacing: 0 }}>{quarterLabel(block.quarter)}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{
+                height: 28,
+                padding: '0 9px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                borderRadius: 7,
+                border: '1px solid color-mix(in srgb, var(--accent) 18%, transparent)',
+                background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
+                color: 'var(--accent)',
+                fontSize: 12,
+                fontWeight: 800,
+                boxShadow: 'none',
+              }}>
+                <DashboardBadgeIcon type="hotfix" />
+                ХФ: <AnimatedCounter value={block.hotfixCount} />
+              </span>
+              <span style={{
+                height: 28,
+                padding: '0 9px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                borderRadius: 7,
+                border: '1px solid rgba(14,165,233,.22)',
+                background: 'rgba(14,165,233,.08)',
+                color: '#147AC4',
+                fontSize: 12,
+                fontWeight: 800,
+                boxShadow: 'none',
+              }}>
+                <DashboardBadgeIcon type="task" />
+                Задач: <AnimatedCounter value={block.taskCount} />
+              </span>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 12 }}>
-            <MonthLineChart title="Количество ХФ по месяцам" data={block.monthlyCounts} color="#A855F7" />
-            <HorizontalBarChart title="Задачи по стримам" data={block.streams} color="#8B5CF6" />
-            <HorizontalBarChart title="Типы локомотивов" data={block.locomotiveTypes} color="#06B6D4" />
-            <HorizontalBarChart title="Причины ХФ" data={block.reasons} color="#22C55E" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
+            <MonthDashboardChart data={block.monthlyCounts} axisScopeKey={`${scopeKey}:${block.quarter}`} />
+            <StreamDashboardChart data={block.streams} />
+            <LocomotiveDonutChart data={block.locomotiveTypes} quarterCount={visibleBlocks.length} />
+            <ReasonDashboardChart data={block.reasons} />
           </div>
         </section>
       ))}
@@ -895,7 +1342,7 @@ function QuarterChartsView({ blocks }: { blocks: QuarterChartBlock[] }) {
           alignItems: 'center',
           justifyContent: 'center',
           border: '1.5px dashed var(--border-hi)',
-          borderRadius: 10,
+          borderRadius: 12,
           color: 'var(--text-3)',
           background: 'var(--card)',
           fontSize: 13,
@@ -912,6 +1359,8 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
   const { settings } = useSettings();
   const canSaveRows = role !== 'viewer';
   const [releaseFrom, setReleaseFrom] = useState(() => readStoredRelease(MAJOR_RELEASE_STORAGE_KEY, '7.5.6000'));
+  const [releaseTo, setReleaseTo] = useState(() => readStoredRelease(MAJOR_RELEASE_RANGE_TO_STORAGE_KEY, releaseFrom));
+  const [rangeEnabled, setRangeEnabled] = useState(false);
   const [platform, setPlatform] = useState<PlatformKey>('android');
   const [activeTab, setActiveTab] = useState<AnalysisTab>('table');
   const [year, setYear] = useState(CURRENT_YEAR_VALUE);
@@ -938,12 +1387,28 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     setLogs(prev => [...prev.slice(-249), { text: `[${new Date().toLocaleTimeString('ru-RU')}] ${message}`, level }]);
   }, []);
 
-  const updateRelease = useCallback((value: string) => {
-    setReleaseFrom(value);
+  const resetCollectedDraft = useCallback(() => {
     setPendingRows([]);
     setFreshRowKeys(new Set());
     setColumnFilters(emptyColumnFilters());
   }, []);
+
+  const updateRelease = useCallback((value: string) => {
+    setReleaseFrom(value);
+    if (!rangeEnabled) setReleaseTo(value);
+    resetCollectedDraft();
+  }, [rangeEnabled, resetCollectedDraft]);
+
+  const updateReleaseTo = useCallback((value: string) => {
+    setReleaseTo(value);
+    resetCollectedDraft();
+  }, [resetCollectedDraft]);
+
+  const updateRangeEnabled = useCallback((value: boolean) => {
+    setRangeEnabled(value);
+    if (!value) setReleaseTo(releaseFrom);
+    resetCollectedDraft();
+  }, [releaseFrom, resetCollectedDraft]);
 
   useEffect(() => {
     try {
@@ -952,6 +1417,14 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       /* ignore */
     }
   }, [releaseFrom]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(MAJOR_RELEASE_RANGE_TO_STORAGE_KEY, releaseTo.trim());
+    } catch {
+      /* ignore */
+    }
+  }, [releaseTo]);
 
   useEffect(() => {
     try {
@@ -999,8 +1472,11 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
   const chartSourceRows = useMemo(() => rows.filter(row => {
     if (row.platform !== platform) return false;
     const branchCutDate = branchCutDateParts(row);
-    return year === 'all' || branchCutDate?.year === Number(year);
-  }), [platform, rows, year]);
+    if (year !== 'all' && branchCutDate?.year !== Number(year)) return false;
+    if (quarter !== 'all' && branchCutDate?.quarter !== Number(quarter)) return false;
+    if (selectedMonths != null && !selectedMonths.includes(branchCutDate?.month ?? -1)) return false;
+    return true;
+  }), [platform, quarter, rows, selectedMonths, year]);
 
   const columnFilterValues = useMemo(() => ({
     version: uniqueColumnValues(baseFilteredRows, 'version'),
@@ -1110,9 +1586,11 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     setStatus('Собираю хотфиксы и задачи...');
     setStatusTone('neutral');
     try {
+      const releaseEnd = rangeEnabled ? releaseTo : releaseFrom;
       const result = await collectQuarterReleaseAnalysis(
         { settings, signal: controller.signal, onLog: log, onProgress: setProgress },
-        releaseFrom
+        releaseFrom,
+        releaseEnd
       );
       setRows(prev => mergeCollectedRowsTop(result, prev));
       setPendingRows(result);
@@ -1134,7 +1612,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       if (abortRef.current === controller) abortRef.current = null;
       setBusy(false);
     }
-  }, [log, releaseFrom, settings]);
+  }, [log, rangeEnabled, releaseFrom, releaseTo, settings]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -1150,7 +1628,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     setStatus('Записываю найденные релизы в Supabase...');
     setStatusTone('neutral');
     try {
-      const result = await saveQuarterAnalysisRows(pendingRows, releaseFrom, releaseFrom);
+      const result = await saveQuarterAnalysisRows(pendingRows, releaseFrom, rangeEnabled ? releaseTo : releaseFrom);
       setStatus(`Записано в БД: Android ${result.android}, iOS ${result.ios}.`);
       setStatusTone(result.total ? 'ok' : 'warn');
       log(`Supabase: записано Android ${result.android}, iOS ${result.ios}`, result.total ? 'ok' : 'warn');
@@ -1163,7 +1641,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
     } finally {
       setSaving(false);
     }
-  }, [canSaveRows, log, pendingRows, releaseFrom, saving]);
+  }, [canSaveRows, log, pendingRows, rangeEnabled, releaseFrom, releaseTo, saving]);
 
   const startLogPanelResize = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -1195,7 +1673,9 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
   }, [logPanelSize.height, logPanelSize.width]);
 
   const progressColor = statusTone === 'ok' ? 'green' : statusTone === 'warn' ? 'yellow' : statusTone === 'error' ? 'red' : 'accent';
-  const csvRangeLabel = `${releaseFrom || 'release'}`.replace(/\s+/g, '');
+  const activeReleaseTo = rangeEnabled ? releaseTo : releaseFrom;
+  const csvRangeLabel = `${releaseFrom || 'release'}${rangeEnabled ? `-${activeReleaseTo || 'release'}` : ''}`.replace(/\s+/g, '');
+  const canRunCollection = Boolean(releaseFrom.trim()) && (!rangeEnabled || Boolean(releaseTo.trim()));
   const showRunStatus = Boolean(status) || progress > 0 || busy || saving;
   const timingHeaderStyle = useMemo<React.CSSProperties>(() => ({ whiteSpace: 'nowrap' }), []);
   const activeControlStyle = useMemo<React.CSSProperties>(() => ({
@@ -1388,7 +1868,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       render: row => issueCell(row.primaryTask),
       preview: row => row.primaryTask ? issueCell(row.primaryTask) : null,
       text: row => issueText(row.primaryTask),
-      lineClamp: 3,
+      lineClamp: 4,
       disablePreview: true,
     },
     {
@@ -1425,21 +1905,61 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
   }, [visibleTableColumns]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>Анализ релизов за квартал</div>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <Card>
-        <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 360px) 1fr', gap: 12, alignItems: 'end' }}>
-            <div>
-              <FieldLabel>Релиз:</FieldLabel>
-              <Input value={releaseFrom} onChange={event => updateRelease(event.target.value)} placeholder="7.5.6000" />
+        <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: 12, alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>Релиз:</span>
+              <Input
+                value={releaseFrom}
+                onChange={event => updateRelease(event.target.value)}
+                placeholder="7.5.6000"
+                style={{ width: 112, height: 34, padding: '6px 10px', minWidth: 0 }}
+              />
+              <label
+                title="Собирать несколько мажорных релизов"
+                style={{
+                  height: 34,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  padding: '0 9px',
+                  borderRadius: 8,
+                  border: `1.5px solid ${rangeEnabled ? 'rgba(168,85,247,.46)' : 'var(--border-hi)'}`,
+                  background: 'var(--card)',
+                  color: rangeEnabled ? 'var(--accent)' : 'var(--text-2)',
+                  fontSize: 11,
+                  fontWeight: 650,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={rangeEnabled}
+                  onChange={event => updateRangeEnabled(event.target.checked)}
+                  style={{ margin: 0, accentColor: 'var(--accent)' }}
+                />
+                <span>Диапазон</span>
+              </label>
+              {rangeEnabled && (
+                <>
+                  <span style={{ fontSize: 11, fontWeight: 650, color: 'var(--text-3)' }}>по</span>
+                  <Input
+                    value={releaseTo}
+                    onChange={event => updateReleaseTo(event.target.value)}
+                    placeholder="7.6.0000"
+                    style={{ width: 112, height: 34, padding: '6px 10px', minWidth: 0 }}
+                  />
+                </>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               {busy ? (
                 <Button variant="danger" onClick={stop}>Остановить</Button>
               ) : (
-                <Button variant="primary" disabled={loadingSaved || pendingRows.length > 0} onClick={() => void run()}>Собрать</Button>
+                <Button variant="primary" disabled={loadingSaved || pendingRows.length > 0 || !canRunCollection} onClick={() => void run()}>Собрать</Button>
               )}
               {canSaveRows && (
                 <Button
@@ -1471,21 +1991,21 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
       </Card>
 
       <Card style={{
-        borderRadius: 14,
+        borderRadius: 10,
         border: '1.5px solid var(--border-hi)',
-        boxShadow: '0 14px 36px rgba(15,23,42,.08)',
+        boxShadow: '0 8px 22px rgba(15,23,42,.06)',
         overflow: 'visible',
       }}>
         <CardBody style={{
-          display: 'grid',
-          gridTemplateColumns: '240px 356px minmax(548px, 1fr) 126px',
+          display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'start',
           gap: 12,
           minHeight: 84,
           padding: '12px 16px',
-          overflow: 'hidden',
+          overflow: 'visible',
         }}>
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 0, width: 240, paddingRight: 12, borderRight: '1.5px solid var(--border-hi)', boxSizing: 'border-box' }}>
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 220, flex: '0 1 240px', paddingRight: 12, borderRight: '1.5px solid var(--border-hi)', boxSizing: 'border-box' }}>
             <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text)', letterSpacing: 0 }}>Платформа</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flexWrap: 'nowrap' }}>
               <SegmentControl
@@ -1515,7 +2035,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
             </div>
           </section>
 
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 0, width: 356, paddingRight: 12, borderRight: '1.5px solid var(--border-hi)', boxSizing: 'border-box' }}>
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 310, flex: '1 1 340px', paddingRight: 12, borderRight: '1.5px solid var(--border-hi)', boxSizing: 'border-box' }}>
             <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text)', letterSpacing: 0 }}>Режим</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'nowrap' }}>
               <SegmentControl
@@ -1537,9 +2057,9 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
             </div>
           </section>
 
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 548, paddingRight: 12, borderRight: '1.5px solid var(--border-hi)', boxSizing: 'border-box' }}>
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 420, flex: '999 1 520px', paddingRight: 12, borderRight: '1.5px solid var(--border-hi)', boxSizing: 'border-box' }}>
             <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text)', letterSpacing: 0 }}>Период</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flexWrap: 'nowrap', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flexWrap: 'wrap', overflow: 'visible' }}>
               <SegmentControl
                 items={[
                   { label: 'Все', value: 'all' },
@@ -1601,7 +2121,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
           </section>
 
           {availableYears.length > 0 && (
-            <section style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 0, width: 126 }}>
+            <section style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 112, flex: '0 0 112px' }}>
               <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text)', letterSpacing: 0 }}>Год</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <button
@@ -1640,7 +2160,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
             columns={visibleTableColumns}
             getRowKey={quarterRowKey}
             isRowHighlighted={row => freshRowKeys.has(quarterRowKey(row))}
-            rowHeight={74}
+            rowHeight={row => row.primaryTask?.locomotive.any.length ? 92 : 74}
             maxHeight="72vh"
             minWidth={visibleTableMinWidth}
             overscanRight={18}
@@ -1651,7 +2171,10 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
             columnResizeStorageKey={COLUMN_WIDTHS_STORAGE_KEY}
           />
         ) : (
-          <QuarterChartsView blocks={quarterChartBlocks} />
+          <QuarterChartsView
+            blocks={quarterChartBlocks}
+            scopeKey={`${platform}:${year}:${quarter}`}
+          />
         )}
       </Card>
       {SHOW_RELEASE_ANALYSIS_FLOATING_LOGS && logs.length > 0 && !logPanelOpen && (
