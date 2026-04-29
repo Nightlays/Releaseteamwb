@@ -12,6 +12,7 @@ export interface ColumnVisibilityDropdownProps {
   onChange: (value: string[]) => void;
   allLabel?: string;
   boundarySelector?: string;
+  buttonStyle?: React.CSSProperties;
 }
 
 function labelToText(value: ReactNode) {
@@ -44,6 +45,7 @@ export function ColumnVisibilityDropdown({
   onChange,
   allLabel = 'Все',
   boundarySelector,
+  buttonStyle,
 }: ColumnVisibilityDropdownProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ left: 0, top: 0 });
@@ -121,6 +123,7 @@ export function ColumnVisibilityDropdown({
           boxShadow: active ? '0 0 0 2px rgba(168,85,247,.08)' : 'none',
           cursor: 'pointer',
           padding: 0,
+          ...buttonStyle,
         }}
       >
         <EyeIcon active={active} />

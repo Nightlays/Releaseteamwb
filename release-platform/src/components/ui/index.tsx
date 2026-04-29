@@ -1,4 +1,4 @@
-import React, { ReactNode, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import React, { ReactNode, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, useLayoutEffect, useRef, useState } from 'react';
 export { CanonicalTable, type CanonicalTableColumn } from './CanonicalTable';
 export { ColumnFilterDropdown, type ColumnFilterDropdownProps } from './ColumnFilterDropdown';
 export { ColumnVisibilityDropdown, type ColumnVisibilityDropdownProps, type ColumnVisibilityOption } from './ColumnVisibilityDropdown';
@@ -173,38 +173,177 @@ export function Progress({ value, max = 100, color = 'accent', height = 5, style
 }
 
 /* ─── SEGMENT CONTROL ────────────────────────────────────── */
-interface SegItem { label: string; value: string; }
+interface SegItem { label: ReactNode; value: string; disabled?: boolean; title?: string; }
 interface SegProps {
   items: SegItem[];
   value: string;
   onChange: (v: string) => void;
   style?: React.CSSProperties;
   buttonStyle?: React.CSSProperties;
+  activeButtonStyle?: React.CSSProperties;
+  inactiveButtonStyle?: React.CSSProperties;
+  activeMode?: 'fill' | 'underline';
+  indicatorStyle?: React.CSSProperties;
+  showSeparators?: boolean;
 }
 
-export function SegmentControl({ items, value, onChange, style, buttonStyle }: SegProps) {
+export function SegmentControl({
+  items,
+  value,
+  onChange,
+  style,
+  buttonStyle,
+  activeButtonStyle,
+  inactiveButtonStyle,
+  activeMode = 'fill',
+  indicatorStyle,
+  showSeparators = true,
+}: SegProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+  const [tooltip, setTooltip] = useState<{ left: number; top: number; text: string } | null>(null);
+  const underline = activeMode === 'underline';
+
+  useLayoutEffect(() => {
+    if (!underline) return undefined;
+
+    const updateIndicator = () => {
+      const root = rootRef.current;
+      const button = buttonRefs.current[value];
+      if (!root || !button) {
+        setIndicator(null);
+        return;
+      }
+      const rootRect = root.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+      const target = button.querySelector<HTMLElement>('[data-segment-indicator-target="true"]');
+      const targetRect = target?.getBoundingClientRect();
+      const targetPadding = 8;
+      const width = targetRect
+        ? Math.max(18, Math.min(buttonRect.width - 10, targetRect.width + targetPadding))
+        : Math.max(18, buttonRect.width - 18);
+      setIndicator({
+        left: targetRect
+          ? targetRect.left - rootRect.left - (width - targetRect.width) / 2
+          : buttonRect.left - rootRect.left + (buttonRect.width - width) / 2,
+        width,
+      });
+    };
+
+    updateIndicator();
+    const frame = window.requestAnimationFrame(updateIndicator);
+    const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateIndicator) : null;
+    if (resizeObserver && rootRef.current) resizeObserver.observe(rootRef.current);
+    window.addEventListener('resize', updateIndicator);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updateIndicator);
+    };
+  }, [items, underline, value]);
+
   return (
-    <div style={{
-      display: 'inline-flex', background: 'var(--surface-soft-3)',
-      border: '1px solid var(--border)', borderRadius: 10, padding: 3, gap: 2, ...style,
-    }}>
-      {items.map(item => (
-        <button
-          key={item.value}
-          onClick={() => onChange(item.value)}
+    <>
+      <div ref={rootRef} style={{
+        position: 'relative',
+        display: 'inline-flex', background: 'var(--surface-soft-3)',
+        border: '1px solid var(--border)', borderRadius: 10, padding: 3, gap: 2, ...style,
+      }}>
+        {underline && indicator && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: 0,
+              bottom: 3,
+              width: indicator.width,
+              height: 3,
+              borderRadius: 99,
+              background: 'linear-gradient(90deg,var(--accent),var(--accent-2))',
+              boxShadow: '0 4px 12px rgba(155,92,255,.34)',
+              transform: `translateX(${indicator.left}px)`,
+              transition: 'transform .24s cubic-bezier(.2,.8,.2,1), width .24s cubic-bezier(.2,.8,.2,1)',
+              pointerEvents: 'none',
+              ...indicatorStyle,
+            }}
+          />
+        )}
+        {items.map((item, index) => {
+          const active = value === item.value;
+          const disabled = Boolean(item.disabled);
+          const label = typeof item.label === 'string' || typeof item.label === 'number'
+            ? <span data-segment-indicator-target="true">{item.label}</span>
+            : item.label;
+          return (
+            <button
+              key={item.value}
+              ref={element => {
+                buttonRefs.current[item.value] = element;
+              }}
+              type="button"
+              aria-disabled={disabled}
+              tabIndex={disabled ? -1 : undefined}
+              onMouseEnter={event => {
+                if (!disabled || !item.title) return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                setTooltip({ text: item.title, left: rect.left + rect.width / 2, top: rect.bottom + 7 });
+              }}
+              onMouseLeave={() => setTooltip(null)}
+              onClick={() => {
+                if (!disabled) onChange(item.value);
+              }}
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
+                border: 'none', fontFamily: 'inherit', transition: 'color .16s ease, background .16s ease, opacity .16s ease',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                background: underline ? 'transparent' : active ? 'var(--card-hi)' : 'transparent',
+                color: active ? (underline ? 'var(--accent)' : 'var(--text)') : 'var(--text-2)',
+                boxShadow: underline ? 'none' : active ? 'var(--sh-sm)' : 'none',
+                ...buttonStyle,
+                ...(active ? activeButtonStyle : inactiveButtonStyle),
+                ...(showSeparators && index < items.length - 1 && underline ? { borderRight: '1px solid var(--border)' } : {}),
+                ...(disabled ? {
+                  background: 'var(--surface-soft-4)',
+                  color: 'var(--text-3)',
+                  borderColor: 'var(--border)',
+                  boxShadow: 'none',
+                  opacity: 0.72,
+                } : {}),
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      {tooltip && (
+        <div
           style={{
-            padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            border: 'none', fontFamily: 'inherit', transition: 'all .12s',
-            background: value === item.value ? 'var(--card-hi)' : 'transparent',
-            color:      value === item.value ? 'var(--text)' : 'var(--text-2)',
-            boxShadow:  value === item.value ? 'var(--sh-sm)' : 'none',
-            ...buttonStyle,
+            position: 'fixed',
+            left: tooltip.left,
+            top: tooltip.top,
+            zIndex: 1200,
+            transform: 'translateX(-50%)',
+            maxWidth: 260,
+            padding: '7px 9px',
+            borderRadius: 8,
+            border: '1px solid var(--border-hi)',
+            background: 'var(--card)',
+            color: 'var(--text-2)',
+            boxShadow: '0 14px 34px rgba(0,0,0,.22)',
+            fontSize: 11,
+            fontWeight: 750,
+            lineHeight: 1.35,
+            pointerEvents: 'none',
           }}
         >
-          {item.label}
-        </button>
-      ))}
-    </div>
+          {tooltip.text}
+        </div>
+      )}
+    </>
   );
 }
 

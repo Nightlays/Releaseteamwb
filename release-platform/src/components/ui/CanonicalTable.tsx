@@ -56,6 +56,15 @@ function cssSize(value: number | string | undefined) {
   return typeof value === 'number' ? `${value}px` : value;
 }
 
+function stableStripe(key: React.Key) {
+  const text = String(key);
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash) % 2;
+}
+
 function readStoredColumnWidths(storageKey?: string): Record<string, number> {
   if (!storageKey) return {};
   try {
@@ -499,10 +508,12 @@ export function CanonicalTable<T>({
                 </td>
               </tr>
             )}
-            {tableColumns.length > 0 && rows.map((row, rowIndex) => (
-              <tr key={getRowKey(row, rowIndex)} style={{ height: rowHeight }}>
+            {tableColumns.length > 0 && rows.map((row, rowIndex) => {
+              const rowKey = getRowKey(row, rowIndex);
+              const rowStripe = stableStripe(rowKey);
+              return (
+              <tr key={rowKey} style={{ height: rowHeight }}>
                 {tableColumns.map((column, columnIndex) => {
-                  const rowKey = getRowKey(row, rowIndex);
                   const cellKey = `${String(rowKey)}:${column.id}`;
                   const rowHighlighted = Boolean(isRowHighlighted?.(row, rowIndex));
                   const rendered = column.render ? column.render(row) : column.text?.(row) || '';
@@ -514,7 +525,7 @@ export function CanonicalTable<T>({
                   const isButtonPreview = canPreview && previewTrigger === 'button';
                   const rowBg = rowHighlighted
                     ? 'color-mix(in srgb, var(--accent) 13%, var(--card))'
-                    : (rowIndex % 2 === 0 ? 'var(--card)' : 'var(--card-hi)');
+                    : (rowStripe === 0 ? 'var(--card)' : 'color-mix(in srgb, var(--card) 96%, var(--surface-soft-6))');
                   const stickyRowBg = rowBg;
                   const stickyLeft = stickyLeftOffsets[columnIndex];
                   const isStickyLeft = typeof stickyLeft === 'number';
@@ -638,7 +649,8 @@ export function CanonicalTable<T>({
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
