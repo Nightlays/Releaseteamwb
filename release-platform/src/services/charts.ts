@@ -4593,25 +4593,20 @@ async function readStreamingChartsAiSummary(
   return text.trim();
 }
 
-async function retryFetchWithBackoff(
+async function fetchWithNetworkRetry(
   fn: () => Promise<Response>,
-  maxAttempts: number,
   signal?: AbortSignal
 ): Promise<Response> {
-  let lastError: Error = new Error('No attempts');
-  for (let i = 0; i < maxAttempts; i++) {
+  try {
+    return await fn();
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') throw error;
+    const msg = (error as Error)?.message || '';
+    if (msg.startsWith('HTTP ')) throw error;
+    await new Promise(resolve => setTimeout(resolve, 900));
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    try {
-      return await fn();
-    } catch (error) {
-      if ((error as Error)?.name === 'AbortError') throw error;
-      lastError = error as Error;
-      const is5xx = /HTTP 5\d\d/.test(lastError.message);
-      if (!is5xx || i === maxAttempts - 1) break;
-      await new Promise(resolve => setTimeout(resolve, 600 * (i + 1)));
-    }
+    return fn();
   }
-  throw lastError;
 }
 
 export async function requestChartsAiSummary(
@@ -4630,9 +4625,9 @@ export async function requestChartsAiSummary(
   const prompt = buildChartsAiSummaryPrompt(context);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (String(cfg.glmKey || '').trim()) headers.Authorization = `Bearer ${String(cfg.glmKey || '').trim()}`;
-  const nonStreamBody = JSON.stringify({
+  const makeBody = (stream: boolean) => JSON.stringify({
     model: String(cfg.glmModel || 'glm-4'),
-    stream: false,
+    stream,
     temperature: 0.2,
     max_tokens: 1400,
     messages: [
@@ -4642,19 +4637,8 @@ export async function requestChartsAiSummary(
   });
 
   try {
-    const streamBody = JSON.stringify({
-      model: String(cfg.glmModel || 'glm-4'),
-      stream: true,
-      temperature: 0.2,
-      max_tokens: 1400,
-      messages: [
-        { role: 'system', content: prompt.system },
-        { role: 'user', content: prompt.user },
-      ],
-    });
-    const response = await retryFetchWithBackoff(
-      () => fetchWithProxyRouting(cfg, `${base}/chat/completions`, { method: 'POST', headers, body: streamBody, signal: options?.signal }),
-      3,
+    const response = await fetchWithNetworkRetry(
+      () => fetchWithProxyRouting(cfg, `${base}/chat/completions`, { method: 'POST', headers, body: makeBody(true), signal: options?.signal }),
       options?.signal
     );
     const streamedText = await readStreamingChartsAiSummary(response, options?.onToken, options?.signal);
@@ -4667,9 +4651,8 @@ export async function requestChartsAiSummary(
   }
 
   try {
-    const fallbackResponse = await retryFetchWithBackoff(
-      () => fetchWithProxyRouting(cfg, `${base}/chat/completions`, { method: 'POST', headers, body: nonStreamBody, signal: options?.signal }),
-      2,
+    const fallbackResponse = await fetchWithNetworkRetry(
+      () => fetchWithProxyRouting(cfg, `${base}/chat/completions`, { method: 'POST', headers, body: makeBody(false), signal: options?.signal }),
       options?.signal
     );
     const payload = await fallbackResponse.json().catch(() => ({}));
