@@ -4593,6 +4593,27 @@ async function readStreamingChartsAiSummary(
   return text.trim();
 }
 
+async function retryFetchWithBackoff(
+  fn: () => Promise<Response>,
+  maxAttempts: number,
+  signal?: AbortSignal
+): Promise<Response> {
+  let lastError: Error = new Error('No attempts');
+  for (let i = 0; i < maxAttempts; i++) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    try {
+      return await fn();
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') throw error;
+      lastError = error as Error;
+      const is5xx = /HTTP 5\d\d/.test(lastError.message);
+      if (!is5xx || i === maxAttempts - 1) break;
+      await new Promise(resolve => setTimeout(resolve, 600 * (i + 1)));
+    }
+  }
+  throw lastError;
+}
+
 export async function requestChartsAiSummary(
   cfg: ChartsConfig,
   context: ChartsAiContext,
@@ -4609,9 +4630,9 @@ export async function requestChartsAiSummary(
   const prompt = buildChartsAiSummaryPrompt(context);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (String(cfg.glmKey || '').trim()) headers.Authorization = `Bearer ${String(cfg.glmKey || '').trim()}`;
-  const body = JSON.stringify({
+  const nonStreamBody = JSON.stringify({
     model: String(cfg.glmModel || 'glm-4'),
-    stream: true,
+    stream: false,
     temperature: 0.2,
     max_tokens: 1400,
     messages: [
@@ -4621,12 +4642,21 @@ export async function requestChartsAiSummary(
   });
 
   try {
-    const response = await fetchWithProxyRouting(cfg, `${base}/chat/completions`, {
-      method: 'POST',
-      headers,
-      body,
-      signal: options?.signal,
+    const streamBody = JSON.stringify({
+      model: String(cfg.glmModel || 'glm-4'),
+      stream: true,
+      temperature: 0.2,
+      max_tokens: 1400,
+      messages: [
+        { role: 'system', content: prompt.system },
+        { role: 'user', content: prompt.user },
+      ],
     });
+    const response = await retryFetchWithBackoff(
+      () => fetchWithProxyRouting(cfg, `${base}/chat/completions`, { method: 'POST', headers, body: streamBody, signal: options?.signal }),
+      3,
+      options?.signal
+    );
     const streamedText = await readStreamingChartsAiSummary(response, options?.onToken, options?.signal);
     if (streamedText) {
       CHARTS_AI_SUMMARY_CACHE.set(cacheKey, streamedText);
@@ -4636,27 +4666,26 @@ export async function requestChartsAiSummary(
     if ((error as Error)?.name === 'AbortError') throw error;
   }
 
-  const fallbackResponse = await fetchWithProxyRouting(cfg, `${base}/chat/completions`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: String(cfg.glmModel || 'glm-4'),
-      stream: false,
-      temperature: 0.2,
-      max_tokens: 1400,
-      messages: [
-        { role: 'system', content: prompt.system },
-        { role: 'user', content: prompt.user },
-      ],
-    }),
-    signal: options?.signal,
-  });
-  const payload = await fallbackResponse.json().catch(() => ({}));
-  const text = extractLlmTextFromPayload(payload);
-  if (!text) return buildLocalChartsAiSummaryText(context);
-  CHARTS_AI_SUMMARY_CACHE.set(cacheKey, text);
-  if (options?.onToken) options.onToken(text);
-  return text;
+  try {
+    const fallbackResponse = await retryFetchWithBackoff(
+      () => fetchWithProxyRouting(cfg, `${base}/chat/completions`, { method: 'POST', headers, body: nonStreamBody, signal: options?.signal }),
+      2,
+      options?.signal
+    );
+    const payload = await fallbackResponse.json().catch(() => ({}));
+    const text = extractLlmTextFromPayload(payload);
+    if (text) {
+      CHARTS_AI_SUMMARY_CACHE.set(cacheKey, text);
+      if (options?.onToken) options.onToken(text);
+      return text;
+    }
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') throw error;
+  }
+
+  const localText = buildLocalChartsAiSummaryText(context);
+  if (options?.onToken) options.onToken(localText);
+  return localText;
 }
 
 export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string, toRelease: string, options?: CollectChartsOptions): Promise<ChartsReport> {
