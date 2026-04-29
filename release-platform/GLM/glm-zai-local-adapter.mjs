@@ -153,11 +153,24 @@ async function proxyChatCompletions(req, res, pathname) {
     upstreamHeaders["X-Client-Request-Id"] = String(req.headers["x-client-request-id"]);
   }
 
-  const upstream = await fetch(upstreamUrl, {
-    method: "POST",
-    headers: upstreamHeaders,
-    body: JSON.stringify(upstreamPayload)
-  });
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), 90_000);
+
+  let upstream;
+  try {
+    upstream = await fetch(upstreamUrl, {
+      method: "POST",
+      headers: upstreamHeaders,
+      body: JSON.stringify(upstreamPayload),
+      signal: abortController.signal
+    });
+  } catch (fetchError) {
+    const cause = fetchError?.cause;
+    const causeStr = cause ? ` (${cause.code || cause.message || String(cause)})` : "";
+    throw new Error(`upstream unreachable: ${fetchError.message}${causeStr} → ${upstreamUrl}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 
   setCors(res);
   res.statusCode = upstream.status;
@@ -202,9 +215,11 @@ const server = http.createServer(async (req, res) => {
     try {
       await proxyChatCompletions(req, res, pathname);
     } catch (error) {
+      const msg = String(error?.message || error);
+      console.error(`[glm-adapter] 502 error: ${msg}`);
       json(res, 502, {
         error: {
-          message: String(error?.message || error),
+          message: msg,
           type: "adapter_error"
         }
       });
