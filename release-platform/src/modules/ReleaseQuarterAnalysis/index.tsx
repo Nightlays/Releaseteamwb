@@ -402,10 +402,9 @@ function secondaryTasksText(row: QuarterAnalysisRow) {
 
 function secondaryTasksPreview(row: QuarterAnalysisRow) {
   if (row.secondaryTasks.length <= 1) return null;
-  const hiddenTasks = row.secondaryTasks.slice(1);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {hiddenTasks.map(issue => <div key={issue.key}>{issueCell(issue)}</div>)}
+      {row.secondaryTasks.map(issue => <div key={issue.key}>{issueCell(issue)}</div>)}
     </div>
   );
 }
@@ -438,6 +437,14 @@ function secondaryTasksCell(row: QuarterAnalysisRow) {
 
 function taskCount(row: QuarterAnalysisRow) {
   return row.secondaryTasks.length + (row.primaryTask ? 1 : 0);
+}
+
+function releaseQuarterRowHeight(row: QuarterAnalysisRow) {
+  const primary = row.primaryTask;
+  if (!primary?.locomotive.any.length) return 74;
+  const summary = primary.summary.trim();
+  const needsSecondSummaryLine = summary.includes('\n') || summary.length > 42;
+  return needsSecondSummaryLine ? 92 : 74;
 }
 
 function columnFilterValue(row: QuarterAnalysisRow, key: ColumnFilterKey) {
@@ -2160,7 +2167,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
             columns={visibleTableColumns}
             getRowKey={quarterRowKey}
             isRowHighlighted={row => freshRowKeys.has(quarterRowKey(row))}
-            rowHeight={row => row.primaryTask?.locomotive.any.length ? 92 : 74}
+            rowHeight={releaseQuarterRowHeight}
             maxHeight="72vh"
             minWidth={visibleTableMinWidth}
             overscanRight={18}
