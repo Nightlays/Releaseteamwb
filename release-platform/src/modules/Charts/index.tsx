@@ -61,7 +61,6 @@ Chart.register(LineController, BarController, CategoryScale, LinearScale, PointE
 
 type ChartMode = 'line' | 'bar';
 type CompareMode = 'mean' | 'prev';
-type TabId = 'overview' | 'regress' | 'release' | 'types' | 'streams' | 'ai';
 type LogLevel = 'info' | 'ok' | 'warn' | 'error';
 
 interface ChartPalette {
@@ -205,6 +204,7 @@ function buildReleaseFilterCaption(total: number, selectedCount: number) {
 function filterReportByReleases(source: ChartsReport | null, selected: Set<string> | null) {
   if (!source || !selected || !selected.size) return source;
   const includesRelease = (release: string) => selected.has(release);
+  const filteredChpRows = source.chpRows.filter(item => includesRelease(item.release));
   return {
     ...source,
     releases: source.releases.filter(includesRelease),
@@ -213,7 +213,7 @@ function filterReportByReleases(source: ChartsReport | null, selected: Set<strin
     coverageRows: source.coverageRows.filter(item => includesRelease(item.release)),
     selectiveRows: source.selectiveRows.filter(item => includesRelease(item.release)),
     avgRows: source.avgRows.filter(item => includesRelease(item.release)),
-    chpRows: source.chpRows.filter(item => includesRelease(item.release)),
+    chpRows: filteredChpRows,
     devDowntime: {
       iosRows: source.devDowntime.iosRows.filter(item => includesRelease(item.release)),
       androidRows: source.devDowntime.androidRows.filter(item => includesRelease(item.release)),
@@ -232,7 +232,65 @@ function filterReportByReleases(source: ChartsReport | null, selected: Set<strin
       iosRows: source.chpTypes.iosRows.filter(item => includesRelease(item.release)),
       androidRows: source.chpTypes.androidRows.filter(item => includesRelease(item.release)),
     },
+    chpQuarterStats: rebuildFilteredChpQuarterStats(
+      filteredChpRows,
+      source.chpQuarterStats?.issues.filter(issue => includesRelease(issue.release)) || []
+    ),
     streamDeltaRows: source.streamDeltaRows.filter(item => includesRelease(item.release)),
+  };
+}
+
+function rebuildFilteredChpQuarterStats(
+  chpRows: ChartsReport['chpRows'],
+  issues: NonNullable<ChartsReport['chpQuarterStats']>['issues']
+): ChartsReport['chpQuarterStats'] {
+  if (!chpRows.length && !issues.length) return null;
+  const byQuarter = new Map<string, { total: number; streams: Map<string, { name: string; count: number; external: boolean; substreams: Map<string, number> }> }>();
+  issues.forEach(issue => {
+    const quarter = issue.quarter || 'Без квартала';
+    if (!byQuarter.has(quarter)) {
+      byQuarter.set(quarter, { total: 0, streams: new Map() });
+    }
+    const bucket = byQuarter.get(quarter)!;
+    bucket.total += 1;
+    const streamName = issue.stream || 'Без стрима';
+    if (!bucket.streams.has(streamName)) {
+      bucket.streams.set(streamName, { name: streamName, count: 0, external: issue.external, substreams: new Map() });
+    }
+    const stream = bucket.streams.get(streamName)!;
+    stream.count += 1;
+    const substream = issue.substream || 'Без сабстрима';
+    stream.substreams.set(substream, (stream.substreams.get(substream) || 0) + 1);
+  });
+
+  const quarterSortValue = (label: string) => {
+    const match = String(label || '').match(/^Q(\d)\s+(\d{4})$/i);
+    if (!match) return Number.POSITIVE_INFINITY;
+    return Number(match[2]) * 10 + Number(match[1]);
+  };
+
+  return {
+    average: chpRows.length ? chpRows.reduce((sum, row) => sum + (Number(row.total || 0) || 0), 0) / chpRows.length : 0,
+    releases: chpRows.length,
+    issues,
+    quarters: Array.from(byQuarter.entries())
+      .sort((left, right) => quarterSortValue(left[0]) - quarterSortValue(right[0]) || left[0].localeCompare(right[0]))
+      .map(([quarter, data]) => ({
+        quarter,
+        total: data.total,
+        streams: Array.from(data.streams.values())
+          .map(stream => {
+            const topSubstream = Array.from(stream.substreams.entries())
+              .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0] || null;
+            return {
+              name: stream.name,
+              count: stream.count,
+              external: stream.external,
+              topSubstream: topSubstream ? { name: topSubstream[0], count: topSubstream[1] } : null,
+            };
+          })
+          .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
+      })),
   };
 }
 
@@ -1073,6 +1131,69 @@ function renderTopTypesTable(snapshot: ChartsAiTypeSnapshot | null) {
   );
 }
 
+function ChpQuarterSummary({ stats }: { stats: ChartsReport['chpQuarterStats'] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>ЧП по диапазону и кварталам</CardTitle>
+          <CardHint>Среднее ЧП по выбранным релизам, топ стримов по кварталам и главный сабстрим.</CardHint>
+        </div>
+        <Badge color="red">{stats?.releases || 0} релизов</Badge>
+      </CardHeader>
+      <CardBody>
+        {!stats || (!stats.releases && !stats.quarters.length) ? (
+          <EmptyState text="Недостаточно данных по кварталам ЧП." />
+        ) : (
+          <div className="charts-quarter-summary">
+            <div className="charts-quarter-summary__stat">
+              <div>
+                <div className="charts-quarter-summary__label">Среднее ЧП за диапазон</div>
+                <div className="charts-quarter-summary__hint">{stats.issues.length} задач после cutoff в квартальной раскладке</div>
+              </div>
+              <div className="charts-quarter-summary__value">{stats.average.toFixed(1)}</div>
+            </div>
+            <div className="charts-quarter-summary__grid">
+              {stats.quarters.length ? stats.quarters.map(quarter => (
+                <div className="charts-quarter-card" key={`quarter-${quarter.quarter}`}>
+                  <div className="charts-quarter-card__head">
+                    <div className="charts-quarter-card__title">{quarter.quarter}</div>
+                    <Badge color="red">{quarter.total} ЧП</Badge>
+                  </div>
+                  {quarter.streams.length ? (
+                    <div className="charts-quarter-card__list">
+                      {quarter.streams.slice(0, 5).map(stream => (
+                        <div className="charts-quarter-stream" key={`${quarter.quarter}-${stream.name}`}>
+                          <div className="charts-quarter-stream__top">
+                            <span>{stream.name}</span>
+                            <strong>{stream.count}</strong>
+                          </div>
+                          <div className="charts-quarter-stream__meta">
+                            <Badge color={stream.external ? 'yellow' : 'gray'}>{stream.external ? 'Внешний' : 'Внутренний'}</Badge>
+                            <span>
+                              {stream.topSubstream
+                                ? `Топ сабстрим: ${stream.topSubstream.name} (${stream.topSubstream.count})`
+                                : 'Сабстрим не найден'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState text="Нет ЧП по стримам за квартал." />
+                  )}
+                </div>
+              )) : (
+                <EmptyState text="Нет квартальной детализации по выбранным релизам." />
+              )}
+            </div>
+          </div>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
 function buildCsv(metrics: ChartsMetricRow[]) {
   const header = ['release', 'tc_total', 'tc_manual', 'tc_auto', 'cov_swat', 'cov_stream', 'sel_swat', 'sel_stream', 'avg_total', 'chp_total', 'ml_risk_pct'];
   const rows = metrics.map(item => [
@@ -1107,13 +1228,11 @@ export function Charts() {
   const { theme } = useApp();
   const palette = useChartPalette(theme);
   const rootRef = useRef<HTMLDivElement>(null);
-  const tabRef = useRef<HTMLDivElement>(null);
 
   const [releaseFrom, setReleaseFrom] = useState('7.5.0000');
   const [releaseTo, setReleaseTo] = useState('7.5.9000');
   const [chartMode, setChartMode] = useState<ChartMode>('line');
   const [compareMode, setCompareMode] = useState<CompareMode>('mean');
-  const [activeTab, setActiveTab] = useState<TabId>('regress');
   const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -1288,13 +1407,13 @@ export function Charts() {
           });
           if (!controller.signal.aborted) {
             setAiText(text);
-            pushLog('LLM summary сформирован автоматически.', 'ok');
+            pushLog('LLM-сводка сформирована автоматически.', 'ok');
           }
         } catch (generationError) {
           if (!controller.signal.aborted) {
             const message = (generationError as Error)?.message || String(generationError);
             setAiText(`Ошибка: ${message}`);
-            pushLog(`LLM summary: ${message}`, 'error');
+            pushLog(`LLM-сводка: ${message}`, 'error');
           }
         } finally {
           if (!controller.signal.aborted) setAiLoading(false);
@@ -1519,14 +1638,14 @@ export function Charts() {
         pdf.addImage(image, 'JPEG', (pageWidth - width) / 2, (pageHeight - height) / 2, width, height, undefined, 'FAST');
       }
 
-      pdf.save(`charts-${activeTab}-${new Date().toISOString().slice(0, 10)}.pdf`);
+      pdf.save(`charts-${new Date().toISOString().slice(0, 10)}.pdf`);
       pushLog('PDF экспорт собран.', 'ok');
     } catch (error) {
       pushLog((error as Error)?.message || String(error), 'error');
     } finally {
       setExportingPdf(false);
     }
-  }, [activeTab, pushLog]);
+  }, [pushLog]);
 
   const generateAi = useCallback(async () => {
     if (!displayedReport) return;
@@ -1547,11 +1666,11 @@ export function Charts() {
         onToken: partial => setAiText(partial),
       });
       setAiText(text);
-      pushLog('LLM summary сформирован.', 'ok');
+      pushLog('LLM-сводка сформирована.', 'ok');
     } catch (generationError) {
       const message = (generationError as Error)?.message || String(generationError);
       setAiText(`Ошибка: ${message}`);
-      pushLog(`LLM summary: ${message}`, 'error');
+      pushLog(`LLM-сводка: ${message}`, 'error');
     } finally {
       setAiLoading(false);
     }
@@ -1680,64 +1799,75 @@ export function Charts() {
       );
     };
 
+    const inlineTable = (children: React.ReactNode) => (
+      <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
+        <Table>{children}</Table>
+      </div>
+    );
     return (
       <>
-        <div data-export-kind="ml"><MlSectionSummaryCard section={source.ml.summary.sections.regress} /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <Card>
             <CardHeader><CardTitle>Объём регресса</CardTitle><CardHint>Manual и Auto по релизам в текущей выборке.</CardHint></CardHeader>
             <CardBody>{renderPrimary(tcDatasets, true, value => Number(value).toLocaleString('ru-RU'), (value, label) => `${label}: ${Number(value).toLocaleString('ru-RU')}`, value => formatCountLabelCompact(value))}</CardBody>
+            {inlineTable(<>
+              <thead><tr><Th>Релиз</Th><Th>Manual</Th><Th>Auto</Th><Th>Всего</Th><Th>Δ</Th></tr></thead>
+              <tbody>{source.metrics.map(item => (
+                <tr key={`tc-${item.release}`}>
+                  <Td mono bold>{formatReleaseShort(item.release)}</Td>
+                  <Td mono>{item.tc_manual.toLocaleString('ru-RU')}</Td>
+                  <Td mono>{item.tc_auto.toLocaleString('ru-RU')}</Td>
+                  <Td mono>{item.tc_total.toLocaleString('ru-RU')}</Td>
+                  <Td mono style={{ color: item.tc_total_delta > 0 ? '#16A34A' : item.tc_total_delta < 0 ? '#DC2626' : 'var(--text-3)' }}>
+                    {item.tc_total_delta > 0 ? '+' : ''}{item.tc_total_delta.toLocaleString('ru-RU')}
+                  </Td>
+                </tr>
+              ))}</tbody>
+            </>)}
           </Card>
           <Card>
             <CardHeader><CardTitle>High / Blocker: SWAT vs Stream</CardTitle><CardHint>Сравнение критичных проверок SWAT и stream-команд.</CardHint></CardHeader>
             <CardBody>{renderPrimary(covDatasets, false, value => Number(value).toLocaleString('ru-RU'), (value, label) => `${label}: ${Number(value).toLocaleString('ru-RU')}`, value => formatCountLabelCompact(value))}</CardBody>
+            {inlineTable(<>
+              <thead><tr><Th>Релиз</Th><Th>HB SWAT</Th><Th>HB Stream</Th></tr></thead>
+              <tbody>{source.metrics.map(item => (
+                <tr key={`cov-${item.release}`}>
+                  <Td mono bold>{formatReleaseShort(item.release)}</Td>
+                  <Td mono>{item.cov_swat.toLocaleString('ru-RU')}</Td>
+                  <Td mono>{item.cov_stream.toLocaleString('ru-RU')}</Td>
+                </tr>
+              ))}</tbody>
+            </>)}
           </Card>
           <Card>
             <CardHeader><CardTitle>Selective: SWAT vs Stream</CardTitle><CardHint>Объём selective-проверок по двум контурам.</CardHint></CardHeader>
             <CardBody>{renderPrimary(selDatasets, false, value => Number(value).toLocaleString('ru-RU'), (value, label) => `${label}: ${Number(value).toLocaleString('ru-RU')}`, value => formatCountLabelCompact(value))}</CardBody>
+            {inlineTable(<>
+              <thead><tr><Th>Релиз</Th><Th>Selective SWAT</Th><Th>Selective Stream</Th></tr></thead>
+              <tbody>{source.metrics.map(item => (
+                <tr key={`sel-${item.release}`}>
+                  <Td mono bold>{formatReleaseShort(item.release)}</Td>
+                  <Td mono>{item.sel_swat.toLocaleString('ru-RU')}</Td>
+                  <Td mono>{item.sel_stream.toLocaleString('ru-RU')}</Td>
+                </tr>
+              ))}</tbody>
+            </>)}
           </Card>
           <Card>
             <CardHeader><CardTitle>Среднее время прохождения</CardTitle><CardHint>Обычное и взвешенное время прохождения кейсов.</CardHint></CardHeader>
             <CardBody>{renderPrimary(avgDatasets, false, value => formatMinutesToClock(value), value => `${formatMinutesPretty(value, 2)} · ${value.toFixed(2)} мин`, value => formatMinutesToClock(value))}</CardBody>
+            {inlineTable(<>
+              <thead><tr><Th>Релиз</Th><Th>Среднее</Th><Th>Взвешенное</Th></tr></thead>
+              <tbody>{source.metrics.map(item => (
+                <tr key={`avg-${item.release}`}>
+                  <Td mono bold>{formatReleaseShort(item.release)}</Td>
+                  <Td mono>{formatMinutesPretty(item.avg_total, 2)}</Td>
+                  <Td mono>{formatMinutesPretty(item.avg_weighted, 2)}</Td>
+                </tr>
+              ))}</tbody>
+            </>)}
           </Card>
         </div>
-        <Card>
-          <CardHeader><CardTitle>Сводная таблица регресса</CardTitle></CardHeader>
-          <div style={{ overflowX: 'auto' }}>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Релиз</Th>
-                  <Th>Всего кейсов</Th>
-                  <Th>Изменение к базе</Th>
-                  <Th>HB SWAT</Th>
-                  <Th>HB Стримы</Th>
-                  <Th>Selective SWAT</Th>
-                  <Th>Selective Стримы</Th>
-                  <Th>Среднее</Th>
-                  <Th>Взвешенное</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {source.metrics.map(item => (
-                  <tr key={`reg-${item.release}`}>
-                    <Td mono bold>{item.release}</Td>
-                    <Td mono>{item.tc_total.toLocaleString('ru-RU')}</Td>
-                    <Td mono style={{ color: item.tc_total_delta >= 0 ? '#16A34A' : '#DC2626' }}>
-                      {item.tc_total_delta > 0 ? '+' : ''}{item.tc_total_delta.toLocaleString('ru-RU')}
-                    </Td>
-                    <Td mono>{item.cov_swat.toLocaleString('ru-RU')}</Td>
-                    <Td mono>{item.cov_stream.toLocaleString('ru-RU')}</Td>
-                    <Td mono>{item.sel_swat.toLocaleString('ru-RU')}</Td>
-                    <Td mono>{item.sel_stream.toLocaleString('ru-RU')}</Td>
-                    <Td mono>{formatMinutesPretty(item.avg_total, 2)}</Td>
-                    <Td mono>{formatMinutesPretty(item.avg_weighted, 2)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </div>
-        </Card>
       </>
     );
   };
@@ -1846,7 +1976,6 @@ export function Charts() {
     );
     return (
       <>
-        <div data-export-kind="ml"><MlSectionSummaryCard section={source.ml.summary.sections.release} /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 14 }}>
           <div data-export-kind="chart">
             <Card>
@@ -1856,9 +1985,28 @@ export function Charts() {
                   ? <BarChart labels={labels} datasets={chpDatasets.map(item => ({ label: item.label, data: item.data, color: item.color }))} palette={palette} markers={quietReleaseMarkers} yTickFormatter={value => Number(value).toLocaleString('ru-RU')} valueLabelFormatter={value => formatCountLabelCompact(value)} height={240} />
                   : <LineChart labels={labels} datasets={chpDatasets} palette={palette} markers={quietReleaseMarkers} yTickFormatter={value => Number(value).toLocaleString('ru-RU')} tooltipFormatter={(value, datasetLabel) => `${datasetLabel}: ${formatCountLabel(value)}`} valueLabelFormatter={value => formatCountLabelCompact(value)} valueLabelMode="all" height={240} />}
               </CardBody>
+              <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
+                <Table>
+                  <thead><tr><Th>Релиз</Th><Th>Всего</Th><Th>iOS</Th><Th>Android</Th><Th>Δ к базе</Th></tr></thead>
+                  <tbody>{source.metrics.map(item => (
+                    <tr key={`chp-${item.release}`}>
+                      <Td mono bold>{formatReleaseShort(item.release)}</Td>
+                      <Td mono>{item.chp_total.toLocaleString('ru-RU')}</Td>
+                      <Td mono>{item.chp_ios.toLocaleString('ru-RU')}</Td>
+                      <Td mono>{item.chp_android.toLocaleString('ru-RU')}</Td>
+                      <Td mono style={{ color: item.chp_total_delta > 0 ? '#DC2626' : item.chp_total_delta < 0 ? '#16A34A' : 'var(--text-3)' }}>
+                        {item.chp_total_delta > 0 ? '+' : ''}{formatMaybeNumber(item.chp_total_delta, 2)}
+                      </Td>
+                    </tr>
+                  ))}</tbody>
+                </Table>
+              </div>
             </Card>
           </div>
           {renderChpTypeCard('ЧП типы · всё', chpTypeDatasets)}
+        </div>
+        <div data-export-kind="ml">
+          <ChpQuarterSummary stats={source.chpQuarterStats} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           {renderChpTypeCard('ЧП типы · iOS', chpTypeIosDatasets)}
@@ -1892,6 +2040,20 @@ export function Charts() {
                       height={260}
                     />}
               </CardBody>
+              <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
+                <Table>
+                  <thead><tr><Th>Релиз</Th><Th>iOS Cutoff</Th><Th>Android Cutoff</Th><Th>iOS Store</Th><Th>Android Store</Th></tr></thead>
+                  <tbody>{source.timings.map(row => (
+                    <tr key={`cut-${row.release}`}>
+                      <Td mono bold>{formatReleaseShort(row.release)}</Td>
+                      <Td mono>{row.iosCutLabel || '—'}</Td>
+                      <Td mono>{row.androidCutLabel || '—'}</Td>
+                      <Td mono>{row.iosStoreLabel || '—'}</Td>
+                      <Td mono>{row.androidStoreLabel || '—'}</Td>
+                    </tr>
+                  ))}</tbody>
+                </Table>
+              </div>
             </Card>
           </div>
           <div data-export-kind="chart">
@@ -1921,6 +2083,20 @@ export function Charts() {
                       height={260}
                     />}
               </CardBody>
+              <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
+                <Table>
+                  <thead><tr><Th>Релиз</Th><Th>iOS Старт</Th><Th>Android Старт</Th><Th>Lag iOS</Th><Th>Lag Android</Th></tr></thead>
+                  <tbody>{source.timings.map(row => (
+                    <tr key={`reg-${row.release}`}>
+                      <Td mono bold>{formatReleaseShort(row.release)}</Td>
+                      <Td mono>{row.iosRegressionLabel || '—'}</Td>
+                      <Td mono>{row.androidRegressionLabel || '—'}</Td>
+                      <Td mono>{row.iosLagMinutes == null ? '—' : formatMinutesPretty(row.iosLagMinutes, 1)}</Td>
+                      <Td mono>{row.androidLagMinutes == null ? '—' : formatMinutesPretty(row.androidLagMinutes, 1)}</Td>
+                    </tr>
+                  ))}</tbody>
+                </Table>
+              </div>
             </Card>
           </div>
         </div>
@@ -2050,7 +2226,6 @@ export function Charts() {
     const lastAndroid = source.taskTypes.androidRows[source.taskTypes.androidRows.length - 1];
     return (
       <>
-        <div data-export-kind="ml"><MlSectionSummaryCard section={source.ml.summary.sections.types} /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div data-export-kind="chart">{renderTypesChart('Типы задач iOS', source.taskTypes.iosRows, source.taskTypes.iosTypes, releaseMarkers)}</div>
           <div data-export-kind="chart">{renderTypesChart('Типы задач Android', source.taskTypes.androidRows, source.taskTypes.androidTypes, releaseMarkers)}</div>
@@ -2105,7 +2280,6 @@ export function Charts() {
     const filteredRows = source.streamDeltaRows;
     return (
       <>
-        <div data-export-kind="ml"><MlSectionSummaryCard section={source.ml.summary.sections.streams} /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div data-export-kind="data">
             <Card>
@@ -2340,29 +2514,6 @@ export function Charts() {
           </Card></div>
         </div>
         <div data-export-kind="ml"><MlFeatureDriversCard drivers={source.ml.prediction.featureDrivers} /></div>
-        <div data-export-kind="ml"><Card>
-          <CardHeader>
-            <div>
-              <CardTitle>LLM-сводка</CardTitle>
-              <CardHint>LLM получает структурированный контекст из метрик, таймингов, стримов, типов, downtime и локальной ML-сводки.</CardHint>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <Button variant="ghost" size="sm" onClick={() => setLlmSummaryCollapsed(value => !value)}>
-                {llmSummaryCollapsed ? 'Развернуть' : 'Свернуть'}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={generateAi} disabled={aiLoading || !report}>
-              {aiLoading ? 'Генерация...' : 'Сформировать'}
-              </Button>
-            </div>
-          </CardHeader>
-          {!llmSummaryCollapsed && <CardBody>
-            {aiText ? (
-              <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.72, fontSize: 13, color: 'var(--text-2)' }}>{aiText}</div>
-            ) : (
-              <EmptyState text="LLM summary ещё не сформирован." />
-            )}
-          </CardBody>}
-        </Card></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
           <div data-export-kind="ml"><Card>
             <CardHeader><CardTitle>Аномалии релиза</CardTitle><Badge color={source.anomalies.release.count ? 'red' : 'green'}>{source.anomalies.release.count}</Badge></CardHeader>
@@ -2409,7 +2560,7 @@ export function Charts() {
   };
 
   return (
-    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div ref={rootRef} className="charts-shell">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2511,7 +2662,7 @@ export function Charts() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Глобальный фильтр релизов</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Применяется ко вкладкам Общее / Регресс / Релиз / Типы и таблице дельт по стримам.</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Применяется ко всем графикам, таблицам и дельтам по стримам на этом экране.</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <Badge color="gray">{buildReleaseFilterCaption(report.releases.length, selectedReleases.length || report.releases.length)}</Badge>
@@ -2546,33 +2697,49 @@ export function Charts() {
             </Card>
           </div>
 
-          <Card>
-            <CardBody style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <SegmentControl
-                items={[
-                  { label: 'Общее', value: 'overview' },
-                  { label: 'Регресс', value: 'regress' },
-                  { label: 'Релиз', value: 'release' },
-                  { label: 'Типы', value: 'types' },
-                  { label: 'Стримы', value: 'streams' },
-                  { label: 'AI / ML', value: 'ai' },
-                ]}
-                value={activeTab}
-                onChange={value => setActiveTab(value as TabId)}
-              />
-              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                Режим сравнения: {compareMode === 'mean' ? 'историческое среднее' : 'предыдущий релиз'}
-              </div>
-            </CardBody>
-          </Card>
+          <div className="charts-tab-content">
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+              Режим сравнения: {compareMode === 'mean' ? 'историческое среднее' : 'предыдущий релиз'}
+            </div>
 
-          <div ref={tabRef}>
-            {activeTab === 'overview' && renderOverviewTab()}
-            {activeTab === 'regress' && renderRegressTab()}
-            {activeTab === 'release' && renderReleaseTab()}
-            {activeTab === 'types' && renderTypesTab()}
-            {activeTab === 'streams' && renderStreamsTab()}
-            {activeTab === 'ai' && renderAiTab()}
+            {/* LLM-сводка — вверху, до всех графиков */}
+            <div data-export-kind="ml"><Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>LLM-сводка</CardTitle>
+                  <CardHint>LLM получает структурированный контекст из метрик, таймингов, стримов, типов, downtime и локальной ML-сводки.</CardHint>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <Button variant="ghost" size="sm" onClick={() => setLlmSummaryCollapsed(v => !v)}>
+                    {llmSummaryCollapsed ? 'Развернуть' : 'Свернуть'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={generateAi} disabled={aiLoading || !report}>
+                    {aiLoading ? 'Генерация...' : 'Сформировать'}
+                  </Button>
+                </div>
+              </CardHeader>
+              {!llmSummaryCollapsed && <CardBody>
+                {aiText ? (
+                  <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.72, fontSize: 13, color: 'var(--text-2)' }}>{aiText}</div>
+                ) : (
+                  <EmptyState text="LLM-сводка ещё не сформирована. Нажми «Сформировать» или включи «AI после сбора»." />
+                )}
+              </CardBody>}
+            </Card></div>
+
+            {renderRegressTab()}
+            {renderReleaseTab()}
+            {renderTypesTab()}
+            {renderStreamsTab()}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>AI и ML сводка</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
+                  Отдельный аналитический слой: локальная ML-сводка, LLM-вывод, аномалии и признаки модели.
+                </div>
+              </div>
+              {renderAiTab()}
+            </div>
           </div>
 
           {logs.length > 0 && (
