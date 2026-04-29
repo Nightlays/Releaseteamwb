@@ -708,3 +708,36 @@ a { color: inherit; text-decoration: none; }
   color: #DC2626;
   font-weight: 700;
 }
+.charts-data-table .delta-pos {
+  color: #16A34A;
+  font-weight: 600;
+}
+.charts-data-table .delta-neg {
+  color: #DC2626;
+  font-weight: 600;
+}
+.charts-table-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-soft-4);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.charts-table-toggle__btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-3);
+  font-family: inherit;
+  transition: background .12s, color .12s;
+}
+.charts-table-toggle__btn--active {
+  background: var(--surface);
+  color: rgba(155, 92, 255, .9);
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}

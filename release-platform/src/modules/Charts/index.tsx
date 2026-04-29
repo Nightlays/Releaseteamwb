@@ -1266,6 +1266,7 @@ export function Charts() {
   const [actionBusy, setActionBusy] = useState('');
   const [mlSummaryCollapsed, setMlSummaryCollapsed] = useState(false);
   const [llmSummaryCollapsed, setLlmSummaryCollapsed] = useState(false);
+  const [tcTableMode, setTcTableMode] = useState<'streams' | 'counts'>('streams');
   const abortRef = useRef<AbortController | null>(null);
 
   const status = useStatusBools(settings, proxyOnline, helperOnline);
@@ -1818,21 +1819,49 @@ export function Charts() {
       <>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <Card>
-            <CardHeader><CardTitle>Объём регресса</CardTitle><CardHint>Manual и Auto по релизам в текущей выборке.</CardHint></CardHeader>
+            <CardHeader>
+              <div><CardTitle>Объём регресса</CardTitle><CardHint>Manual и Auto по релизам в текущей выборке.</CardHint></div>
+              <div className="charts-table-toggle">
+                <button className={`charts-table-toggle__btn${tcTableMode === 'streams' ? ' charts-table-toggle__btn--active' : ''}`} onClick={() => setTcTableMode('streams')}>По стримам</button>
+                <button className={`charts-table-toggle__btn${tcTableMode === 'counts' ? ' charts-table-toggle__btn--active' : ''}`} onClick={() => setTcTableMode('counts')}>Счёт</button>
+              </div>
+            </CardHeader>
             <CardBody>{renderPrimary(tcDatasets, true, value => Number(value).toLocaleString('ru-RU'), (value, label) => `${label}: ${Number(value).toLocaleString('ru-RU')}`, value => formatCountLabelCompact(value))}</CardBody>
-            <div className="charts-data-table-wrap">
-              <table className="charts-data-table">
-                <thead><tr><th>Релиз</th><th>Ручные</th><th>Авто</th><th>Всего</th></tr></thead>
-                <tbody>{source.tcRows.map(row => (
-                  <tr key={`tc-${row.release}`}>
-                    <td>{formatReleaseShort(row.release)}</td>
-                    <td>{row.manual.toLocaleString('ru-RU')}</td>
-                    <td>{row.auto.toLocaleString('ru-RU')}</td>
-                    <td>{row.total.toLocaleString('ru-RU')}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
+            {tcTableMode === 'streams' ? (
+              <div className="charts-data-table-wrap" style={{ maxHeight: 260 }}>
+                <table className="charts-data-table">
+                  <thead><tr><th>Релиз</th><th>Stream</th><th>Manual Δ</th><th>AT Δ</th><th>uWu Manual Δ</th><th>uWu AT Δ</th></tr></thead>
+                  <tbody>
+                    {source.streamDeltaRows.length ? source.streamDeltaRows.map(row => (
+                      <tr key={`sd-${row.release}-${row.stream}`}>
+                        <td>{formatReleaseShort(row.release)}</td>
+                        <td style={{ textAlign: 'left' }}>{row.stream}</td>
+                        <td className={row.manualDelta > 0 ? 'delta-pos' : row.manualDelta < 0 ? 'delta-neg' : ''}>{row.manualDelta > 0 ? '+' : ''}{row.manualDelta}</td>
+                        <td className={row.autoDelta > 0 ? 'delta-pos' : row.autoDelta < 0 ? 'delta-neg' : ''}>{row.autoDelta > 0 ? '+' : ''}{row.autoDelta}</td>
+                        <td className={row.uwuManualDelta > 0 ? 'delta-pos' : row.uwuManualDelta < 0 ? 'delta-neg' : ''}>{row.uwuManualDelta > 0 ? '+' : ''}{row.uwuManualDelta.toFixed(1)}</td>
+                        <td className={row.uwuAutoDelta > 0 ? 'delta-pos' : row.uwuAutoDelta < 0 ? 'delta-neg' : ''}>{row.uwuAutoDelta > 0 ? '+' : ''}{row.uwuAutoDelta.toFixed(1)}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-3)', padding: '16px 0' }}>Нет изменений по стримам</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="charts-data-table-wrap">
+                <table className="charts-data-table">
+                  <thead><tr><th>Релиз</th><th>Ручные</th><th>Авто</th><th>Всего</th></tr></thead>
+                  <tbody>{source.tcRows.map(row => (
+                    <tr key={`tc-${row.release}`}>
+                      <td>{formatReleaseShort(row.release)}</td>
+                      <td>{row.manual.toLocaleString('ru-RU')}</td>
+                      <td>{row.auto.toLocaleString('ru-RU')}</td>
+                      <td>{row.total.toLocaleString('ru-RU')}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
           </Card>
           <Card>
             <CardHeader><CardTitle>High / Blocker: SWAT vs Stream</CardTitle><CardHint>Сравнение критичных проверок SWAT и stream-команд.</CardHint></CardHeader>
@@ -2350,36 +2379,36 @@ export function Charts() {
           <CardHeader>
             <div>
               <CardTitle>Дельта по стримам</CardTitle>
-              <CardHint>Изменения между соседними релизами: ручные кейсы, авто-кейсы и UwU. Карточки выше показывают последний шаг в диапазоне.</CardHint>
+              <CardHint>Таблица полностью доступна на вкладке «Регресс» — кнопка «По стримам» под графиком объёма.</CardHint>
             </div>
           </CardHeader>
-          <div style={{ overflowX: 'auto', maxHeight: 760, overflowY: 'auto' }}>
-            <Table>
+          <div className="charts-data-table-wrap" style={{ maxHeight: 500 }}>
+            <table className="charts-data-table">
               <thead>
                 <tr>
-                  <Th>Релиз</Th>
-                  <Th>Стрим</Th>
-                  <Th>Ручные кейсы</Th>
-                  <Th>Авто-кейсы</Th>
-                  <Th>UwU (ручные)</Th>
-                  <Th>UwU (авто)</Th>
+                  <th>Релиз</th>
+                  <th>Stream</th>
+                  <th>Manual Δ</th>
+                  <th>AT Δ</th>
+                  <th>uWu Manual Δ</th>
+                  <th>uWu AT Δ</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.length ? filteredRows.map(row => (
                   <tr key={`${row.release}-${row.stream}`}>
-                    <Td mono>{row.release}</Td>
-                    <Td>{row.stream}</Td>
-                    <Td>{renderStreamDeltaCell(row.manualBefore, row.manualDelta)}</Td>
-                    <Td>{renderStreamDeltaCell(row.autoBefore, row.autoDelta)}</Td>
-                    <Td>{renderStreamDeltaCell(row.uwuManualBefore, row.uwuManualDelta, 1)}</Td>
-                    <Td>{renderStreamDeltaCell(row.uwuAutoBefore, row.uwuAutoDelta, 1)}</Td>
+                    <td>{formatReleaseShort(row.release)}</td>
+                    <td style={{ textAlign: 'left' }}>{row.stream}</td>
+                    <td className={row.manualDelta > 0 ? 'delta-pos' : row.manualDelta < 0 ? 'delta-neg' : ''}>{row.manualDelta > 0 ? '+' : ''}{row.manualDelta}</td>
+                    <td className={row.autoDelta > 0 ? 'delta-pos' : row.autoDelta < 0 ? 'delta-neg' : ''}>{row.autoDelta > 0 ? '+' : ''}{row.autoDelta}</td>
+                    <td className={row.uwuManualDelta > 0 ? 'delta-pos' : row.uwuManualDelta < 0 ? 'delta-neg' : ''}>{row.uwuManualDelta > 0 ? '+' : ''}{row.uwuManualDelta.toFixed(1)}</td>
+                    <td className={row.uwuAutoDelta > 0 ? 'delta-pos' : row.uwuAutoDelta < 0 ? 'delta-neg' : ''}>{row.uwuAutoDelta > 0 ? '+' : ''}{row.uwuAutoDelta.toFixed(1)}</td>
                   </tr>
                 )) : (
-                  <tr><Td colSpan={6}><EmptyState text="Нет изменений по стримам." /></Td></tr>
+                  <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-3)', padding: '16px 0' }}>Нет изменений по стримам</td></tr>
                 )}
               </tbody>
-            </Table>
+            </table>
           </div>
         </Card></div>
       </>
