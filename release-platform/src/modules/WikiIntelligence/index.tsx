@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardHint, CardBody, Divider, Badge, Button, Input, FieldLabel, SegmentControl, EmptyState } from '../../components/ui';
 import { useSettings } from '../../context/SettingsContext';
 import { normalizeGlmBase } from '../../types';
-import { answerWikiQuestion, publishWikiDraft, type WikiDraftAction } from '../../services/wikiIntelligence';
+import { answerWikiQuestion, publishWikiDraft, type WikiDraftAction, type WikiPersona, WIKI_PERSONA_LABELS } from '../../services/wikiIntelligence';
 
 interface Message {
   id: string;
@@ -206,6 +206,7 @@ export function WikiIntelligence() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput]       = useState('');
   const [source, setSource]     = useState('all');
+  const [persona, setPersona]   = useState<WikiPersona>('release_engineer');
   const [loading, setLoading]   = useState(false);
   const [publishingDraftId, setPublishingDraftId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -235,6 +236,7 @@ export function WikiIntelligence() {
           glmModel: settings.glmModel,
           useWebSearch: source !== 'wiki' && settings.useWebSearch,
           webSearchKey: source === 'wiki' ? '' : settings.webSearchKey,
+          persona,
         },
         text.trim(),
         messages.map(msg => ({ role: msg.role, text: msg.text }))
@@ -322,13 +324,38 @@ export function WikiIntelligence() {
         <Badge color="purple" style={{ marginLeft: 4 }}>{settings.glmModel || 'GLM'}</Badge>
       </div>
 
-      {/* SOURCE SELECTOR */}
+      {/* SOURCE + PERSONA SELECTOR */}
       <Card>
         <CardBody>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' }}>
             <div>
               <FieldLabel>Источник знаний</FieldLabel>
               <SegmentControl items={SOURCES} value={source} onChange={setSource} />
+            </div>
+            <div>
+              <FieldLabel>Роль эксперта</FieldLabel>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {(Object.keys(WIKI_PERSONA_LABELS) as WikiPersona[]).map(key => (
+                  <button
+                    key={key}
+                    onClick={() => setPersona(key)}
+                    style={{
+                      padding: '5px 11px',
+                      fontSize: 12,
+                      borderRadius: 8,
+                      border: `1px solid ${persona === key ? 'rgba(155,92,255,.55)' : 'var(--border)'}`,
+                      background: persona === key ? 'rgba(155,92,255,.15)' : 'var(--surface-soft)',
+                      color: persona === key ? '#A78BFA' : 'var(--text-2)',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      fontWeight: persona === key ? 700 : 400,
+                      transition: 'all .12s',
+                    }}
+                  >
+                    {WIKI_PERSONA_LABELS[key]}
+                  </button>
+                ))}
+              </div>
             </div>
             {source !== 'web' && !settings.wikiToken && (
               <div style={{ fontSize: 11, color: '#F59E0B', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.18)', padding: '6px 12px', borderRadius: 8 }}>
