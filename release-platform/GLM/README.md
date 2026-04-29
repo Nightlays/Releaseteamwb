@@ -17,7 +17,7 @@
 
 ```bash
 cd release-platform/legacy/GLM
-GLM_API_KEY='ВАШ_CORELLM_JWT' node glm-zai-local-adapter.mjs
+GLM_API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzb1BNdUZ1dm5UOE1QS01uV3ppSUlWZko0M25mTlE0ZiJ9.AgJJ9Kre6dQpPBANKcvZ4QwvBwAsj66ggNVVGyp8ga4' node glm-zai-local-adapter.mjs
 ```
 
 Адаптер поднимется на `http://127.0.0.1:8789`.
