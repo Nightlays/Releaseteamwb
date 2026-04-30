@@ -24,6 +24,7 @@ import { Vangovat } from './modules/Vangovat';
 import { YtCopy } from './modules/YtCopy';
 import { WikiIntelligence } from './modules/WikiIntelligence';
 import { AccessPanel } from './modules/AccessPanel';
+import { RolloutReport } from './modules/RolloutReport';
 import {
   buildLegacyModuleUrl,
   canAccessModule,
@@ -46,10 +47,6 @@ const EMPTY_RBAC: RbacConfig = {
 };
 
 function ModuleContent({ moduleId, refreshKey, rbac, role, onRbacChange }: { moduleId: ModuleId; refreshKey: number; rbac: RbacConfig; role: Role; onRbacChange: (next: RbacConfig) => void }) {
-  if (moduleId === 'band') {
-    return <LegacyModuleFrame module={MODULE_BY_ID[moduleId]} refreshKey={refreshKey} />;
-  }
-
   const key = `${moduleId}:${refreshKey}`;
 
   switch (moduleId) {
@@ -83,6 +80,8 @@ function ModuleContent({ moduleId, refreshKey, rbac, role, onRbacChange }: { mod
       return <div key={key}><YtCopy /></div>;
     case 'wiki':
       return <div key={key}><WikiIntelligence /></div>;
+    case 'band':
+      return <div key={key}><RolloutReport /></div>;
     case 'access':
       return <div key={key} style={{ height: '100%' }}><AccessPanel rbac={rbac} onRbacChange={onRbacChange} /></div>;
     default:

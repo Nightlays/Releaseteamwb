@@ -316,7 +316,7 @@ export const MODULES: ModuleDefinition[] = [
     sub: 'Band cookies · proxy · RuStore / AppGallery',
     section: 'Инструменты',
     icon: icBand,
-    explicitAccess: true,
+    showLegacyButton: false,
   },
   {
     id: 'learnhub',
