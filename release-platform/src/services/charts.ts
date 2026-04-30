@@ -4395,20 +4395,22 @@ export function buildChartsAiSummaryPrompt(context: ChartsAiContext) {
   const compactContext = compressChartsAiContextForPrompt(context);
   return {
     system: [
-      'Ты senior release analyst по мобильным релизам.',
+      'Ты senior analyst-manager по мобильным релизам: совмещаешь роль сильного аналитика, release manager и владельца качества решения.',
       'Анализируй только факты из переданного JSON.',
       'Учитывай все разделы JSON: keyMetrics, anomalies, streams, taskTypes, recentReleases, devDowntime, mlSummary и displayedTables.',
       'Отдельно сверяй выводы с локальной ML-сводкой и вероятностью CatBoost/линейной модели. Если локальная ML-сводка уже содержит риск, не игнорируй его.',
       'Не придумывай причины, которых нет в данных.',
-      'Пиши только на русском, как сильный аналитик и инженер, а не как маркетинговая выжимка.',
+      'Пиши только на русском, на уровне senior analyst-manager: предметно, с бизнес-решением, рисками, владельцами проверки и следующими действиями.',
+      'Не пиши как маркетинговая выжимка и не размазывай формулировки. Каждый пункт должен помогать принять релизное решение.',
+      'В первом пункте короткого вывода дай управленческий decision state: можно выпускать, выпуск с проверками или стоп до проверки. Если есть риск, явно назови причину и что должно быть подтверждено.',
+      'Для рисков указывай конкретный источник: ML, ЧП, timing/SLA, regression load, stream delta, task types, downtime или anomalies.',
+      'Для рекомендаций формулируй действие + владелец/зона ответственности + ожидаемый результат, если эти данные есть в JSON.',
       'Не используй markdown-таблицы.',
       'Не пересказывай весь JSON. Сжимай в деловой вывод, но не теряй факты по регрессу, релизу, типам, стримам и downtime.',
       'Структура ответа строго такая:',
       'Короткий вывод',
       '- пункт',
       'Главные риски',
-      '- пункт',
-      'Что изменилось относительно базы',
       '- пункт',
       'Рекомендации на следующий релиз',
       '- пункт',
@@ -4429,13 +4431,11 @@ function buildLocalChartsAiSummaryText(context: ChartsAiContext) {
   if (!mlSummary) {
     return [
       'Короткий вывод',
+      '- Решение не формируется: недостаточно данных для senior AI/ML-сводки.',
       '- Недостаточно данных для LLM-анализа, используем локальный fallback.',
       '',
       'Главные риски',
       '- Локальная ML-сводка не была подготовлена.',
-      '',
-      'Что изменилось относительно базы',
-      '- Нет локальной сводки для сравнения.',
       '',
       'Рекомендации на следующий релиз',
       '- Проверь, что локальная ML-сводка сформировалась после сбора данных.',
@@ -4446,15 +4446,15 @@ function buildLocalChartsAiSummaryText(context: ChartsAiContext) {
   }
   return [
     'Короткий вывод',
+    `- ${mlSummary.statusText || 'Решение требует ручной проверки по локальной ML-сводке.'}`,
+    `- ${mlSummary.compareText || 'База сравнения не определена.'}`,
     ...mlSummary.overview.map(item => `- ${item}`),
     '',
     'Главные риски',
     ...mlSummary.risks.map(item => `- ${item}`),
     '',
-    'Что изменилось относительно базы',
-    ...mlSummary.changes.map(item => `- ${item}`),
-    '',
     'Рекомендации на следующий релиз',
+    ...mlSummary.changes.map(item => `- ${item}`),
     ...mlSummary.recommendations.map(item => `- ${item}`),
     '',
     'Что проверить вручную',
@@ -4615,7 +4615,11 @@ export async function requestChartsAiSummary(
   options?: { onToken?: (text: string) => void; signal?: AbortSignal; forceRefresh?: boolean }
 ) {
   const base = normalizeGlmBase(cfg.glmBase);
-  if (!base) throw new Error('LLM Base URL не задан');
+  if (!base) {
+    const localText = buildLocalChartsAiSummaryText(context);
+    if (options?.onToken) options.onToken(localText);
+    return localText;
+  }
   const cacheKey = buildChartsAiCacheKey(cfg, context);
   if (!options?.forceRefresh && CHARTS_AI_SUMMARY_CACHE.has(cacheKey)) {
     const cached = CHARTS_AI_SUMMARY_CACHE.get(cacheKey) || '';
@@ -4638,24 +4642,10 @@ export async function requestChartsAiSummary(
 
   try {
     const response = await fetchWithNetworkRetry(
-      () => fetchWithProxyRouting(cfg, `${base}/chat/completions`, { method: 'POST', headers, body: makeBody(true), signal: options?.signal }),
-      options?.signal
-    );
-    const streamedText = await readStreamingChartsAiSummary(response, options?.onToken, options?.signal);
-    if (streamedText) {
-      CHARTS_AI_SUMMARY_CACHE.set(cacheKey, streamedText);
-      return streamedText;
-    }
-  } catch (error) {
-    if ((error as Error)?.name === 'AbortError') throw error;
-  }
-
-  try {
-    const fallbackResponse = await fetchWithNetworkRetry(
       () => fetchWithProxyRouting(cfg, `${base}/chat/completions`, { method: 'POST', headers, body: makeBody(false), signal: options?.signal }),
       options?.signal
     );
-    const payload = await fallbackResponse.json().catch(() => ({}));
+    const payload = await response.json().catch(() => ({}));
     const text = extractLlmTextFromPayload(payload);
     if (text) {
       CHARTS_AI_SUMMARY_CACHE.set(cacheKey, text);
