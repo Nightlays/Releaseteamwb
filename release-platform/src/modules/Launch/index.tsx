@@ -39,6 +39,7 @@ import {
   fetchDutyPingPendingStreams,
   buildDutyPingMessage,
   postDutyPingToThread,
+  findExistingDutyPingMessage,
   runDutyPingPolling,
   refreshMajorPollTextFromAllure,
   fetchMajorYtData,
@@ -456,6 +457,7 @@ const STATUS_ICONS: Record<PushStatus, string> = {
 const STATUS_COLORS: Record<PushStatus, string> = {
   pending: 'var(--text-3)', running: '#F59E0B', done: '#22C55E', error: '#EF4444', skipped: 'var(--text-3)',
 };
+const DUTY_EDITOR_EMPTY_STREAM_ERROR = '__DUTY_EDITOR_EMPTY_STREAM__';
 
 function firstPendingIndex(statuses: PushStatus[]): number {
   const idx = statuses.findIndex(status => status === 'pending' || status === 'error');
@@ -625,15 +627,6 @@ function DutyEditorRefreshIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M20 12a8 8 0 1 1-2.35-5.65" />
       <path d="M20 4v6h-6" />
-    </svg>
-  );
-}
-
-function DutyEditorSaveIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M5 4h12l2 2v14H5V4Z" />
-      <path d="M8 4v6h8V4M8 20v-6h8v6" />
     </svg>
   );
 }
@@ -1718,6 +1711,10 @@ export function Launch() {
   const [collectionLogPanelSize, setCollectionLogPanelSize] = useState({ width: 430, height: 330 });
   const [collectionCopyStates, setCollectionCopyStates] = useState<Record<'list' | 'threads', CopyFeedbackState>>({ list: 'idle', threads: 'idle' });
   const collectionCopyTimersRef = useRef<Record<'list' | 'threads', ReturnType<typeof setTimeout> | null>>({ list: null, threads: null });
+  const collectionRowsRef = useRef<CollectionRow[]>([]);
+  const [dutyPingLogs, setDutyPingLogs] = useState<Array<{ text: string; level: LogLevel }>>([]);
+  const [dutyPingLogPanelOpen, setDutyPingLogPanelOpen] = useState(false);
+  const [dutyPingLogPanelSize, setDutyPingLogPanelSize] = useState({ width: 430, height: 330 });
   const [collectionBandDisplayNames, setCollectionBandDisplayNames] = useState<Record<string, string>>({});
   const collectionBandNamesAbortRef = useRef<AbortController | null>(null);
   const [collectionSinceMs, setCollectionSinceMs] = useState<number | null>(null);
@@ -1769,6 +1766,10 @@ export function Launch() {
   const collLog = useCallback((text: string, level: LogLevel = 'info') =>
     setCollectionLogs(prev => [...prev.slice(-300), { text: `[${new Date().toLocaleTimeString('ru-RU')}] ${text}`, level }]), []);
 
+  useEffect(() => {
+    collectionRowsRef.current = collectionRows;
+  }, [collectionRows]);
+
   const majorSharedRelease = useMemo(() => {
     const ios = String(iosRelease || '').trim();
     const android = String(andRelease || '').trim();
@@ -1786,14 +1787,16 @@ export function Launch() {
   }, []);
 
   const dutyPingLog = useCallback((platform: MajorPlatform, text: string, level: LogLevel = 'info') => {
-    updateDutyPingState(platform, {
-      logs: [
-        ...dutyPingStates[platform].logs.slice(-120),
-        { text: `[${new Date().toLocaleTimeString('ru-RU')}] ${text}`, level },
-      ],
-    });
-    log(text, level);
-  }, [dutyPingStates, log, updateDutyPingState]);
+    const line = { text: `[${new Date().toLocaleTimeString('ru-RU')}] ${text}`, level };
+    setDutyPingStates(prev => ({
+      ...prev,
+      [platform]: {
+        ...prev[platform],
+        logs: [...prev[platform].logs.slice(-120), line],
+      },
+    }));
+    setDutyPingLogs(prev => [...prev.slice(-300), line]);
+  }, []);
 
   const updateComponentTimerState = useCallback((platform: MajorPlatform, patch: Partial<ComponentTimerUiState>) => {
     setComponentTimers(prev => ({ ...prev, [platform]: { ...prev[platform], ...patch } }));
@@ -2027,6 +2030,7 @@ export function Launch() {
   ) => {
     const rows = Array.isArray(result.rows) ? result.rows : [];
     const dutyStreams = mapRowsToDutyStreams(rows);
+    collectionRowsRef.current = rows;
     setCollectionRows(rows);
     setCollectionSinceMs(result.sinceMs);
     setCollectionMessages(Array.isArray(result.messages) ? result.messages : []);
@@ -2066,9 +2070,11 @@ export function Launch() {
     setCollectionWorkflowCurrentIdx(firstPendingIndex(nextStatuses));
   }, [mapRowsToDutyStreams]);
 
-  const ensureCollectionRowsForMajorStep = useCallback(async (): Promise<CollectionRow[]> => {
+  const ensureCollectionRowsForMajorStep = useCallback(async (signal?: AbortSignal): Promise<CollectionRow[]> => {
     if (collectionRows.length) return collectionRows;
     const ac = new AbortController();
+    const abortCollection = () => ac.abort();
+    signal?.addEventListener('abort', abortCollection, { once: true });
     collectionAbortRef.current = ac;
     setCollectionRunning(true);
     try {
@@ -2076,6 +2082,7 @@ export function Launch() {
       applyCollectionResult(result);
       return result.rows;
     } finally {
+      signal?.removeEventListener('abort', abortCollection);
       collectionAbortRef.current = null;
       setCollectionRunning(false);
     }
@@ -2342,7 +2349,7 @@ export function Launch() {
     const seenStreams = new Set<string>();
     for (const row of nextLeads) {
       const streamName = String(row.name || '').trim();
-      if (!streamName) throw new Error('Заполни название стрима');
+      if (!streamName) throw new Error(DUTY_EDITOR_EMPTY_STREAM_ERROR);
       const values = Array.isArray(row.values) ? row.values.map(value => String(value || '').trim()) : [];
       const streamNames = isCoreEditorLead(row) ? ['Core iOS', 'Core Android'] : [streamName];
       const requiredLeads = isCoreEditorLead(row) ? [values[0] || '', values[1] || ''] : [values[0] || ''];
@@ -2463,7 +2470,10 @@ export function Launch() {
         : { text: 'Редактор сохранён.', level: 'ok' });
       return true;
     } catch (error) {
-      setEditorStatus({ text: error instanceof Error ? error.message : String(error), level: 'error' });
+      const message = error instanceof Error ? error.message : String(error);
+      setEditorStatus(message === DUTY_EDITOR_EMPTY_STREAM_ERROR || message === 'Заполни название стрима'
+        ? { text: '', level: 'idle' }
+        : { text: message, level: 'error' });
       return false;
     } finally {
       setEditorSaving(false);
@@ -2478,10 +2488,6 @@ export function Launch() {
     proxyBase,
     loadEditorBandAssets,
   ]);
-
-  const saveEditor = useCallback(() => {
-    void persistEditor(editorLeads, editorStreamGroups);
-  }, [persistEditor, editorLeads, editorStreamGroups]);
 
   const clearAllEditorLeadSearch = useCallback(() => {
     Object.values(editorLeadSearchTimersRef.current).forEach(timer => clearTimeout(timer));
@@ -3145,6 +3151,35 @@ export function Launch() {
     window.addEventListener('mouseup', onUp);
   }, [collectionLogPanelSize.height, collectionLogPanelSize.width]);
 
+  const startDutyPingLogPanelResize = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = dutyPingLogPanelSize.width;
+    const startHeight = dutyPingLogPanelSize.height;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const maxWidth = Math.max(320, window.innerWidth - 36);
+      const maxHeight = Math.max(220, window.innerHeight - 36);
+      setDutyPingLogPanelSize({
+        width: Math.min(maxWidth, Math.max(320, startWidth + startX - moveEvent.clientX)),
+        height: Math.min(maxHeight, Math.max(220, startHeight + startY - moveEvent.clientY)),
+      });
+    };
+
+    const onUp = () => {
+      document.body.style.userSelect = prevUserSelect;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [dutyPingLogPanelSize.height, dutyPingLogPanelSize.width]);
+
   const skipMajorStep = useCallback((platform: 'ios' | 'android', stepIdx: number) => {
     const statuses = platform === 'ios' ? iosStatuses : andStatuses;
     const isRunning = platform === 'ios' ? iosRunning : andRunning;
@@ -3213,31 +3248,12 @@ export function Launch() {
     }
   }, [noticeRunning, noticeText, proxyBase, cookies, log]);
 
-  const loadDutyPing = useCallback(async (platform: MajorPlatform) => {
-    const rel = platform === 'ios' ? iosRelease : andRelease;
-    if (!rel.trim()) { dutyPingLog(platform, 'Укажи версию релиза для пинга.', 'warn'); return; }
-    if (!token) { dutyPingLog(platform, 'Нужен Allure токен.', 'warn'); return; }
-    const ac = new AbortController();
-    dutyPingAbortRefs.current[platform] = ac;
-    updateDutyPingState(platform, { loading: true, pollState: null });
-    dutyPingLog(platform, 'Загружаю незакрытые стримы из Allure...');
-    try {
-      const streams = await fetchDutyPingPendingStreams(platform, rel, token, proxyBase, ac.signal);
-      const msg = buildDutyPingMessage(streams, collectionRows);
-      updateDutyPingState(platform, { streams, message: msg });
-      dutyPingLog(platform, `Найдено незакрытых стримов: ${streams.length}.`, streams.length ? 'warn' : 'ok');
-    } catch (error) {
-      dutyPingLog(platform, error instanceof Error ? error.message : String(error), 'error');
-    } finally {
-      updateDutyPingState(platform, { loading: false });
-      dutyPingAbortRefs.current[platform] = null;
-    }
-  }, [iosRelease, andRelease, token, proxyBase, collectionRows, dutyPingLog, updateDutyPingState]);
-
   const sendDutyPing = useCallback(async (platform: MajorPlatform): Promise<boolean> => {
     const state = dutyPingStates[platform];
     if (state.running || !state.message.trim()) return false;
     const rel = platform === 'ios' ? iosRelease : andRelease;
+    if (!rel.trim()) { dutyPingLog(platform, 'Укажи версию релиза для пинга.', 'warn'); return false; }
+    if (!cookies.trim()) { dutyPingLog(platform, 'Нужны Band cookies.', 'warn'); return false; }
     const ac = new AbortController();
     dutyPingAbortRefs.current[platform] = ac;
     updateDutyPingState(platform, { running: true });
@@ -3269,8 +3285,10 @@ export function Launch() {
     updateDutyPingState(platform, { polling: true, pollState: null });
     dutyPingLog(platform, 'Запуск мониторинга пинга...');
     try {
+      const rows = collectionRowsRef.current.length ? collectionRowsRef.current : await ensureCollectionRowsForMajorStep(ac.signal);
+      collectionRowsRef.current = rows;
       await runDutyPingPolling(
-        platform, rel, token, proxyBase, cookies, collectionRows,
+        platform, rel, token, proxyBase, cookies, rows,
         (state) => {
           updateDutyPingState(platform, {
             pollState: state,
@@ -3293,7 +3311,56 @@ export function Launch() {
     }
   }, [
     dutyPingStates, iosRelease, andRelease, token, proxyBase, cookies,
-    collectionRows, dutyPingLog, updateDutyPingState,
+    dutyPingLog, updateDutyPingState, ensureCollectionRowsForMajorStep,
+  ]);
+
+  const startDutyPing = useCallback(async (platform: MajorPlatform) => {
+    const rel = platform === 'ios' ? iosRelease : andRelease;
+    if (!rel.trim()) { dutyPingLog(platform, 'Укажи версию релиза для пинга.', 'warn'); return; }
+    if (!token) { dutyPingLog(platform, 'Нужен Allure токен.', 'warn'); return; }
+    if (!cookies.trim()) { dutyPingLog(platform, 'Нужны Band cookies.', 'warn'); return; }
+    const state = dutyPingStates[platform];
+    if (state.loading || state.running || state.polling) return;
+
+    const ac = new AbortController();
+    let resumeExisting = false;
+    dutyPingAbortRefs.current[platform] = ac;
+    updateDutyPingState(platform, { loading: true, pollState: null });
+    try {
+      const rows = collectionRowsRef.current.length ? collectionRowsRef.current : await ensureCollectionRowsForMajorStep(ac.signal);
+      collectionRowsRef.current = rows;
+      dutyPingLog(platform, 'Проверяю существующий пинг в треде...');
+      const existingMessage = await findExistingDutyPingMessage(platform, rel, proxyBase, cookies, ac.signal);
+      if (existingMessage.trim()) {
+        updateDutyPingState(platform, { streams: [], message: existingMessage });
+        dutyPingLog(platform, 'Найден существующий пинг, запускаю мониторинг.', 'ok');
+        resumeExisting = true;
+        return;
+      }
+
+      dutyPingLog(platform, 'Загружаю незакрытые стримы из Allure...');
+      const streams = await fetchDutyPingPendingStreams(platform, rel, token, proxyBase, ac.signal);
+      const msg = buildDutyPingMessage(platform, streams, rows);
+      updateDutyPingState(platform, {
+        streams,
+        message: msg,
+        pollState: streams.length ? null : { message: '', pendingCount: 0, verifiedCount: 0, done: true },
+      });
+      dutyPingLog(platform, `Найдено незакрытых стримов: ${streams.length}.`, streams.length ? 'warn' : 'ok');
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') {
+        dutyPingLog(platform, 'Подготовка остановлена.', 'warn');
+      } else {
+        dutyPingLog(platform, error instanceof Error ? error.message : String(error), 'error');
+      }
+    } finally {
+      updateDutyPingState(platform, { loading: false });
+      dutyPingAbortRefs.current[platform] = null;
+      if (resumeExisting) void startDutyPingPolling(platform);
+    }
+  }, [
+    iosRelease, andRelease, token, cookies, proxyBase, dutyPingStates,
+    dutyPingLog, updateDutyPingState, ensureCollectionRowsForMajorStep, startDutyPingPolling,
   ]);
 
   const publishDutyPingAndStartMonitor = useCallback(async (platform: MajorPlatform) => {
@@ -3302,6 +3369,11 @@ export function Launch() {
       await startDutyPingPolling(platform);
     }
   }, [sendDutyPing, startDutyPingPolling, dutyPingStates]);
+
+  const stopDutyPing = useCallback((platform: MajorPlatform) => {
+    dutyPingAbortRefs.current[platform]?.abort();
+    updateDutyPingState(platform, emptyDutyPingState());
+  }, [updateDutyPingState]);
 
   const startCollection = useCallback(async () => {
     if (collectionRunning) {
@@ -4060,33 +4132,64 @@ export function Launch() {
   const renderDutyPingCard = (platform: MajorPlatform) => {
     const label = platform === 'ios' ? 'iOS' : 'Android';
     const state = dutyPingStates[platform];
+    const busy = state.loading || state.running || state.polling;
+    const ready = !busy && Boolean(state.message.trim());
+    const idle = !busy && !state.message.trim();
+    const startDisabled = !majorSharedRelease.trim();
+    const statusText = state.loading
+      ? 'Подготовка...'
+      : state.running
+        ? 'Публикация...'
+        : state.polling
+          ? 'Мониторинг активен, сообщение обновляется каждые 5 секунд.'
+          : state.pollState?.done && !state.message.trim()
+            ? 'В pending нет активных стримов'
+          : ready
+            ? 'Готово к публикации'
+            : 'Ожидает запуска';
     return (
       <Card key={platform}>
         <CardHeader>
           <div>
             <CardTitle>{label}</CardTitle>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
-              {state.polling ? 'Мониторинг активен, сообщение обновляется каждые 5 секунд.' : 'Ожидает запуска'}
+              {statusText}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <Button variant="secondary" size="sm" disabled={state.loading || state.polling} onClick={() => void loadDutyPing(platform)}>
-              {state.loading ? 'Подготовка...' : 'Старт пинга'}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={state.running || state.loading || state.polling || !state.message.trim() || !cookies}
-              onClick={() => void publishDutyPingAndStartMonitor(platform)}
-            >
-              {state.running ? 'Публикую...' : 'Опубликовать'}
-            </Button>
-            {state.polling && (
+            {idle && (
+              <Button
+                variant="secondary"
+                size="sm"
+                style={{
+                  background: 'linear-gradient(135deg,#2563EB,#0EA5E9)',
+                  color: '#fff',
+                  boxShadow: '0 4px 14px rgba(37,99,235,.28)',
+                  border: '1px solid rgba(37,99,235,.35)',
+                  opacity: startDisabled ? .55 : 1,
+                }}
+                disabled={startDisabled}
+                title={startDisabled ? 'Укажи номер релиза' : undefined}
+                onClick={() => void startDutyPing(platform)}
+              >
+                Старт пинга
+              </Button>
+            )}
+            {ready && (
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!cookies}
+                onClick={() => void publishDutyPingAndStartMonitor(platform)}
+              >
+                Опубликовать
+              </Button>
+            )}
+            {!idle && (
               <Button
                 variant="danger"
                 size="sm"
-                disabled={state.loading}
-                onClick={() => void startDutyPingPolling(platform)}
+                onClick={() => stopDutyPing(platform)}
               >
                 Стоп пинга
               </Button>
@@ -4124,14 +4227,34 @@ export function Launch() {
               Скопировать
             </Button>
           </div>
-          <div>
-            <FieldLabel>Логи</FieldLabel>
-            {state.logs.length ? <LogView lines={state.logs} maxHeight={170} /> : <EmptyState text="Лог появится здесь." />}
-          </div>
         </CardBody>
       </Card>
     );
   };
+  const renderMajorReleaseNumberCard = () => (
+    <Card style={{ borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 34px rgba(15,23,42,.06)' }}>
+      <CardHeader style={{ alignItems: 'flex-start', gap: 14, flexWrap: 'wrap', padding: '18px 20px 0' }}>
+        <div>
+          <CardTitle>Номер релиза</CardTitle>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+            Один номер используется для вкладок «Пинг дежурных» и «Релиз».
+          </div>
+        </div>
+      </CardHeader>
+      <CardBody style={{ padding: '14px 20px 18px' }}>
+        <div style={{ maxWidth: 420 }}>
+          <FieldLabel>Версия релиза</FieldLabel>
+          <Input
+            value={majorSharedRelease}
+            onChange={event => updateMajorSharedRelease(event.target.value)}
+            placeholder="например: 7.5.5"
+          />
+        </div>
+      </CardBody>
+    </Card>
+  );
+  const dutyPingLogActive = dutyPingStates.android.loading || dutyPingStates.android.running || dutyPingStates.android.polling
+    || dutyPingStates.ios.loading || dutyPingStates.ios.running || dutyPingStates.ios.polling;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -4405,16 +4528,10 @@ export function Launch() {
 
 	          {majorTab === 'release' && (
 	            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+	              {renderMajorReleaseNumberCard()}
+
 	              <Card>
-	                <CardBody style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-	                  <div style={{ flex: '1 1 280px' }}>
-	                    <FieldLabel>Номер релиза</FieldLabel>
-	                    <Input
-	                      value={majorSharedRelease}
-	                      onChange={event => updateMajorSharedRelease(event.target.value)}
-	                      placeholder="например: 7.5.5"
-	                    />
-	                  </div>
+	                <CardBody style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
 	                  <Button variant="ghost" onClick={() => void openNoticeModal()}>
 	                    Опубликовать оповещение
 	                  </Button>
@@ -4612,18 +4729,7 @@ export function Launch() {
 
 	          {majorTab === 'ping' && (
 	            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-	              <Card>
-	                <CardBody>
-	                  <div>
-	                    <FieldLabel>Номер релиза</FieldLabel>
-	                    <Input
-	                      value={majorSharedRelease}
-	                      onChange={event => updateMajorSharedRelease(event.target.value)}
-	                      placeholder="например: 7.3.1000"
-	                    />
-	                  </div>
-	                </CardBody>
-	              </Card>
+	              {renderMajorReleaseNumberCard()}
 
 	              <Card>
 	                <CardHeader>
@@ -4661,7 +4767,6 @@ export function Launch() {
                       {editorStatus.text}
                     </Badge>
                   )}
-                  {editorDirty && <Badge color="yellow">Есть несохранённые изменения</Badge>}
                   {editorPresenceLoading && <Badge color="blue">Band-профили обновляются</Badge>}
                 </div>
                 <div className="release-launch-duty-editor-top-actions">
@@ -4673,15 +4778,6 @@ export function Launch() {
                   >
                     <DutyEditorRefreshIcon />
                     <span>{editorLoading ? 'Загрузка...' : 'Обновить'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="release-launch-duty-editor-action-btn is-primary"
-                    onClick={saveEditor}
-                    disabled={editorLoading || editorSaving || !editorDirty}
-                  >
-                    <DutyEditorSaveIcon />
-                    <span>{editorSaving ? 'Сохранение...' : 'Сохранить'}</span>
                   </button>
                 </div>
               </div>
@@ -5378,6 +5474,125 @@ export function Launch() {
           </div>
           <div style={{ padding: 10, flex: 1, minHeight: 0 }}>
             <LogView lines={collectionLogs} maxHeight="100%" style={{ height: '100%', boxSizing: 'border-box' }} />
+          </div>
+        </div>
+      )}
+      {mode === 'major' && majorTab === 'ping' && dutyPingLogs.length > 0 && !dutyPingLogPanelOpen && (
+        <button
+          type="button"
+          onClick={() => setDutyPingLogPanelOpen(true)}
+          title="Открыть лог пинга"
+          aria-label="Открыть лог пинга"
+          style={{
+            position: 'fixed',
+            right: 18,
+            bottom: 18,
+            zIndex: 520,
+            width: 46,
+            height: 46,
+            borderRadius: 12,
+            border: '1.5px solid var(--border-hi)',
+            background: 'var(--card)',
+            color: 'var(--text)',
+            boxShadow: '0 14px 42px rgba(0,0,0,.24)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            fontWeight: 900,
+          }}
+        >
+          ≡
+          <span
+            style={{
+              position: 'absolute',
+              top: -7,
+              right: -7,
+              minWidth: 20,
+              height: 20,
+              padding: '0 5px',
+              borderRadius: 999,
+              background: dutyPingLogActive ? '#A855F7' : '#64748B',
+              color: '#fff',
+              fontSize: 10,
+              lineHeight: '20px',
+              fontWeight: 800,
+              border: '2px solid var(--card)',
+            }}
+          >
+            {dutyPingLogs.length}
+          </span>
+        </button>
+      )}
+      {mode === 'major' && majorTab === 'ping' && dutyPingLogs.length > 0 && dutyPingLogPanelOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            right: 18,
+            bottom: 18,
+            zIndex: 520,
+            width: dutyPingLogPanelSize.width,
+            height: dutyPingLogPanelSize.height,
+            minWidth: 320,
+            minHeight: 220,
+            maxWidth: 'calc(100vw - 36px)',
+            maxHeight: 'calc(100vh - 36px)',
+            border: '1.5px solid var(--border-hi)',
+            borderRadius: 12,
+            background: 'var(--card)',
+            boxShadow: '0 20px 70px rgba(0,0,0,.30)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <button
+            type="button"
+            onMouseDown={startDutyPingLogPanelResize}
+            title="Изменить размер"
+            aria-label="Изменить размер лога"
+            style={{
+              position: 'absolute',
+              left: -1,
+              top: -1,
+              zIndex: 2,
+              width: 18,
+              height: 18,
+              border: '1px solid var(--border-hi)',
+              borderRadius: '12px 0 8px 0',
+              background: 'var(--surface-soft-2)',
+              cursor: 'nwse-resize',
+              padding: 0,
+            }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'var(--card-hi)' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase' }}>Лог пинга</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Badge color={dutyPingLogActive ? 'purple' : 'gray'}>{dutyPingLogs.length}</Badge>
+              <button
+                type="button"
+                onClick={() => setDutyPingLogPanelOpen(false)}
+                title="Скрыть лог"
+                aria-label="Скрыть лог"
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 8,
+                  border: '1px solid var(--border-hi)',
+                  background: 'var(--surface-soft)',
+                  color: 'var(--text-2)',
+                  cursor: 'pointer',
+                  fontSize: 15,
+                  lineHeight: 1,
+                }}
+              >
+                x
+              </button>
+            </div>
+          </div>
+          <div style={{ padding: 10, flex: 1, minHeight: 0 }}>
+            <LogView lines={dutyPingLogs} maxHeight="100%" style={{ height: '100%', boxSizing: 'border-box' }} />
           </div>
         </div>
       )}

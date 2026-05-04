@@ -389,11 +389,23 @@ async function bandFetchChannelPostsSince(
 }
 
 async function bandFetchThreadPosts(
-  proxyBase: string, cookies: string, rootId: string, signal?: AbortSignal,
+  proxyBase: string,
+  cookies: string,
+  rootId: string,
+  signal?: AbortSignal,
+  options?: { perPage?: number; updatesOnly?: boolean; fromUpdateAt?: number; direction?: 'up' | 'down' },
 ): Promise<BandPost[]> {
-  const url = `${BAND_BASE}/api/v4/posts/${encodeURIComponent(rootId)}/thread?skipFetchThreads=false&collapsedThreads=true&collapsedThreadsExtended=false&direction=down&perPage=60`;
-  const raw = await proxyRequest<unknown>(proxyBase, 'GET', url, bandReadHeaders(cookies), undefined, signal);
-  return collectBandPosts(unwrapBandPayload(raw));
+  const opts = options || {};
+  const url = new URL(`${BAND_BASE}/api/v4/posts/${encodeURIComponent(rootId)}/thread`);
+  url.searchParams.set('skipFetchThreads', 'false');
+  url.searchParams.set('collapsedThreads', 'true');
+  url.searchParams.set('collapsedThreadsExtended', 'false');
+  url.searchParams.set('direction', opts.direction || 'down');
+  url.searchParams.set('perPage', String(Math.max(1, Math.min(200, Number(opts.perPage) || 60))));
+  if (opts.updatesOnly) url.searchParams.set('updatesOnly', 'true');
+  if (Number.isFinite(Number(opts.fromUpdateAt))) url.searchParams.set('fromUpdateAt', String(Number(opts.fromUpdateAt)));
+  const raw = await proxyRequest<unknown>(proxyBase, 'GET', url.toString(), bandReadHeaders(cookies), undefined, signal);
+  return collectBandPosts(unwrapBandPayload(raw)).sort((a, b) => (Number(a.create_at) || 0) - (Number(b.create_at) || 0));
 }
 
 async function bandPatchPost(
@@ -3264,26 +3276,38 @@ export async function fetchDutyPingPendingStreams(
 ): Promise<string[]> {
   const run = await findMajorReadinessRun(platform, release, token, proxyBase, signal);
   if (!run) return [];
-  const url = `${ALLURE_BASE}/api/testresult?launchId=${run.id}&page=0&size=200&sort=name%2Casc&projectId=${RUN_CREATOR_PROJECT_ID}&statuses=PENDING`;
-  const data = await proxyRequest<{ content?: Array<{ name?: string }> }>(
-    proxyBase, 'GET', url, allureHeaders(token), undefined, signal,
-  );
-  const results = Array.isArray(data?.content) ? data.content : [];
-  return [...new Set(results.map(r => String(r.name || '').trim()).filter(Boolean))];
+  const excludeSet = buildHardcodedExcludeSet();
+  const pendingMap = await fetchDutyPingPendingLeafMap(run.id, token, proxyBase, signal);
+  return sortComponentDisplayTexts([...new Set(
+    [...pendingMap.values()]
+      .map(name => String(name || '').trim())
+      .filter(name => Boolean(name) && !excludeSet.has(normStr(name))),
+  )]);
 }
 
 export function buildDutyPingMessage(
-  pendingStreams: string[], dutyRows: CollectionRow[],
+  platform: 'ios' | 'android', pendingStreams: string[], dutyRows: CollectionRow[],
 ): string {
-  const lines: string[] = ['Коллеги, просьба написать сроки по стримам которые ещё не закрыты'];
+  if (!pendingStreams.length) return '';
+  const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
+  const lines: string[] = [`Коллеги, просьба написать сроки проставления оков по платформе ${platformLabel}`, ''];
+  const rowNames = dutyRows
+    .flatMap(row => [row.stream, row.streamDisplay])
+    .map(name => String(name || '').trim())
+    .filter(Boolean);
+  const streamNorm2Canonical = buildStreamNorm2Canonical(rowNames, buildHardcodedAliases());
+  const findDutyRow = (streamName: string) => {
+    const direct = dutyRows.find(row => row.stream === streamName || row.streamDisplay === streamName);
+    if (direct) return direct;
+    const matched = matchStream(streamName, streamNorm2Canonical);
+    return matched ? dutyRows.find(row => row.stream === matched || row.streamDisplay === matched) : undefined;
+  };
   for (const streamName of pendingStreams) {
-    const row = dutyRows.find(r => r.stream === streamName || r.streamDisplay === streamName);
-    const handles = [row?.iosDuty, row?.androidDuty]
-      .filter((h): h is string => Boolean(h))
-      .filter((h, i, arr) => arr.indexOf(h) === i);
-    lines.push(handles.length ? `${streamName} ${handles.join(' ')}` : streamName);
+    const row = findDutyRow(streamName);
+    const handle = platform === 'ios' ? row?.iosDuty : row?.androidDuty;
+    lines.push(`${streamName} ${String(handle || '?').trim() || '?'}`.trimEnd());
   }
-  return lines.join('\n');
+  return lines.join('\n').replace(/\s+$/u, '') + '\n';
 }
 
 export async function postDutyPingToThread(
@@ -3295,26 +3319,39 @@ export async function postDutyPingToThread(
   if (!release.trim()) throw new Error(`Укажи версию ${platform === 'ios' ? 'iOS' : 'Android'}.`);
   if (!message.trim()) throw new Error('Сообщение пинга пусто.');
   const label = platform === 'ios' ? 'iOS' : 'Android';
+  const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
   const rootPost = await majorFindFeedRoot(proxyBase, cookies, platform, release, signal);
   const rootId = rootPost.id;
   const userId = getCurrentBandUserId(cookies);
-  const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, rootId, signal);
-  const existingPing = threadPosts.find(p =>
-    Number(p.delete_at) === 0 && p.root_id === rootId && p.user_id === userId &&
-    normBandText(p.message).startsWith('Коллеги, просьба написать сроки'),
-  );
+  const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, rootId, signal, {
+    perPage: 200,
+    updatesOnly: true,
+    fromUpdateAt: DUTY_PING_THREAD_FROM_UPDATE_AT,
+  });
+  const existingPing = findDutyPingBasePost(threadPosts, rootId, userId, platformLabel);
   const normalized = normBandText(message);
   if (existingPing) {
-    if (normBandText(existingPing.message) !== normalized) {
-      await bandPatchPost(proxyBase, cookies, existingPing, normalized, signal);
-      onLog(`[${label}] Пинг обновлён в треде.`, 'ok');
-    } else {
-      onLog(`[${label}] Пинг уже актуален.`, 'ok');
-    }
+    onLog(`[${label}] Найден существующий пинг, сохраняю текущий текст и запускаю мониторинг.`, 'ok');
   } else {
     await bandCreateReply(proxyBase, cookies, FEED_CHANNEL_ID, rootId, normalized, signal);
     onLog(`[${label}] Пинг опубликован в тред.`, 'ok');
   }
+}
+
+export async function findExistingDutyPingMessage(
+  platform: 'ios' | 'android', release: string,
+  proxyBase: string, cookies: string, signal?: AbortSignal,
+): Promise<string> {
+  if (!cookies.trim() || !release.trim()) return '';
+  const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
+  const rootPost = await majorFindFeedRoot(proxyBase, cookies, platform, release, signal);
+  const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, rootPost.id, signal, {
+    perPage: 200,
+    updatesOnly: true,
+    fromUpdateAt: DUTY_PING_THREAD_FROM_UPDATE_AT,
+  });
+  const existing = findDutyPingBasePost(threadPosts, rootPost.id, getCurrentBandUserId(cookies), platformLabel);
+  return existing ? String(existing.message || '') : '';
 }
 
 // ─── ALLURE B64 QUERY ──────────────────────────────────────────
@@ -3497,8 +3534,78 @@ function buildDutyPingEtaFromHHMM(baseMs: number, hh: number, mm: number): strin
 
 // ─── DUTY PING ETA PARSING ────────────────────────────────────
 
+const DUTY_PING_THREAD_FROM_UPDATE_AT = 1565303257750;
 const DUTY_PING_OK  = ':green_verify:';
 const DUTY_PING_ETA = ':spiral_calendar_pad:';
+const DUTY_PING_ETA_APPROX_WORDS_PART = '(?:около|примерно|приблизительно|ориентировочно|где\\s*[-–—]?\\s*то|гдето)';
+const DUTY_PING_WORD_LEFT = '(?<![\\p{L}\\p{N}_])';
+const DUTY_PING_WORD_RIGHT = '(?![\\p{L}\\p{N}_])';
+
+function dutyPingWordRe(pattern: string, flags = 'iu'): RegExp {
+  return new RegExp(`${DUTY_PING_WORD_LEFT}${pattern}${DUTY_PING_WORD_RIGHT}`, flags);
+}
+
+const DUTY_PING_TIME_HHMM_RE = dutyPingWordRe('([01]?\\d|2[0-3])\\s*[:.]\\s*([0-5]\\d)');
+const DUTY_PING_TIME_TO_RE = dutyPingWordRe('до\\s*([01]?\\d|2[0-3])(?:\\s*[:.]\\s*([0-5]\\d))?');
+const DUTY_PING_TIME_H_ONLY_RE = new RegExp(`${DUTY_PING_WORD_LEFT}(?:в|к)\\s*([01]?\\d|2[0-3])${DUTY_PING_WORD_RIGHT}(?!\\s*[:.]\\s*\\d)`, 'iu');
+const DUTY_PING_RANGE_MIN_SUFFIX_RE = dutyPingWordRe('(\\d{1,3})\\s*[-–]\\s*(\\d{1,3})\\s*(?:мин|минута|минуты|минут|минуток|минутак|m|м)');
+const DUTY_PING_RANGE_MIN_PREFIX_RE = dutyPingWordRe('(?:минут(?:ок|ак)?|мин)\\s*(\\d{1,3})\\s*[-–]\\s*(\\d{1,3})');
+const DUTY_PING_RANGE_NUMBERS_CONTEXT_MIN_RE = dutyPingWordRe('(\\d{1,3})\\s*[-–]\\s*(\\d{1,3})');
+const DUTY_PING_MIN_PREFIX_RE = dutyPingWordRe('(?:минут(?:ок|ак)?|мин)\\s*(\\d{1,3})');
+const DUTY_PING_MIN_SUFFIX_RE = dutyPingWordRe('(\\d{1,3})\\s*(?:мин|минута|минуты|минут|минуток|минутак|m|м)');
+const DUTY_PING_H_SHORT_RE = /(?:^|[^\p{L}\p{N}])(\d+(?:[.,]\d+)?)\s*ч(?!\p{L}|\p{N})/iu;
+const DUTY_PING_M_SHORT_RE = /(?:^|[^\p{L}\p{N}])(\d{1,3})\s*м(?!\p{L}|\p{N})/iu;
+const DUTY_PING_ONE_HOUR_FUZZY_RE = dutyPingWordRe('(?:часик(?:а)?|часок)');
+const DUTY_PING_RANGE_HOURS_RE = dutyPingWordRe('(\\d+(?:[.,]\\d+)?)\\s*[-–]\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:ч\\.?|час(?:а|ов)?|часик(?:а)?|часка)');
+const DUTY_PING_HOURS_RE = dutyPingWordRe(`(?:через\\s*)?(?:${DUTY_PING_ETA_APPROX_WORDS_PART}\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)`);
+const DUTY_PING_HOURS_REV_RE = dutyPingWordRe('(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)\\s*(\\d+(?:[.,]\\d+)?)');
+const DUTY_PING_HALF_HOUR_WORD_RE = dutyPingWordRe('(?:полчаса|полчасика|пол-часа|пол часа|полчас)');
+const DUTY_PING_ONE_AND_HALF_WORD_RE = dutyPingWordRe('(?:полтора\\s*часа|часа\\s*полтора|час-полтора)');
+const DUTY_PING_HOUR_MAYBE_ONE_AND_HALF_RE = new RegExp(`${DUTY_PING_WORD_LEFT}час(?:а)?${DUTY_PING_WORD_RIGHT}[^\\n]{0,30}${DUTY_PING_WORD_LEFT}полтора${DUTY_PING_WORD_RIGHT}`, 'iu');
+const DUTY_PING_ONE_HOUR_APPROX_RE = dutyPingWordRe(`(?:${DUTY_PING_ETA_APPROX_WORDS_PART})\\s*(?:час|часик(?:а)?|часок)`);
+const DUTY_PING_THROUGH_HOUR_RE = dutyPingWordRe('через\\s*(?:часок|часик|час)');
+const DUTY_PING_WITHIN_ONE_HOUR_RE = dutyPingWordRe('(?:в\\s+течение|в\\s+течении)\\s*(?:ближайш(?:ий|его)\\s*)?(?:часа|час|часик(?:а)?|часок)');
+const DUTY_PING_ONE_HOUR_PLAIN_RE = dutyPingWordRe('час');
+const DUTY_PING_WORD_HOURS_RE = dutyPingWordRe(`(?:через\\s*)?(?:${DUTY_PING_ETA_APPROX_WORDS_PART}\\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)`);
+const DUTY_PING_WORD_HOURS_REV_RE = dutyPingWordRe('(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)\\s*(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)');
+const DUTY_PING_WORD_MIN_RE = dutyPingWordRe(`(?:через\\s*)?(?:${DUTY_PING_ETA_APPROX_WORDS_PART}\\s*)?(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)\\s*(?:минут(?:ок|ак)?|мин|m|м)`);
+const DUTY_PING_WORD_MIN_REV_RE = dutyPingWordRe('(?:минут(?:ок|ак)?|мин|m|м)\\s*(один|одна|одну|раз|два|две|двух|пару|пара|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|пятнадцать|двадцать|тридцать|сорок)');
+const DUTY_PING_WITHIN_WORD_HOURS_RE = dutyPingWordRe('(?:в\\s+течение|в\\s+течении)\\s*(один|одна|одну|раз|два|две|двух|пару|пара|пары|три|трех|трёх|четыре|четырех|четырёх|пять|шесть|семь|восемь|девять|десять|полтора)\\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)');
+const DUTY_PING_WITHIN_HOURS_RE = dutyPingWordRe('(?:в\\s+течение|в\\s+течении)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:час(?:а|ов)?|часик(?:а)?|часка|ч\\.?)');
+const DUTY_PING_REPLY_STREAM_SPLIT_RE = /\s*(?:[-—:–|]|->|=>)\s*/u;
+const DUTY_PING_REPLY_TIME_BOUNDARY_RE = dutyPingWordRe(`(?:до|в|к|через|${DUTY_PING_ETA_APPROX_WORDS_PART}|минут(?:ок|ак)?|мин|час(?:а|ов)?|ч\\.?|полтора|полчаса|полчасика|пол-часа|пол часа)`);
+const DUTY_PING_REPLY_QUOTED_STREAM_RE = /["«]([^"»]{2,120})["»]/gu;
+const DUTY_PING_NUM_WORDS: Record<string, number> = {
+  'ноль': 0,
+  'один': 1,
+  'одна': 1,
+  'одну': 1,
+  'раз': 1,
+  'два': 2,
+  'две': 2,
+  'двух': 2,
+  'пару': 2,
+  'пара': 2,
+  'пары': 2,
+  'три': 3,
+  'трех': 3,
+  'трёх': 3,
+  'четыре': 4,
+  'четырех': 4,
+  'четырёх': 4,
+  'пять': 5,
+  'шесть': 6,
+  'семь': 7,
+  'восемь': 8,
+  'восьми': 8,
+  'девять': 9,
+  'десять': 10,
+  'пятнадцать': 15,
+  'двадцать': 20,
+  'тридцать': 30,
+  'сорок': 40,
+  'полтора': 1.5,
+};
 
 function normDutyPingText(t: string): string {
   return String(t || '')
@@ -3510,44 +3617,123 @@ function normDutyPingText(t: string): string {
     .replace(/\s+/g, ' ');
 }
 
+function dutyPingWordValue(word: string): number | null {
+  const key = String(word || '').trim().toLocaleLowerCase('ru-RU');
+  return Object.prototype.hasOwnProperty.call(DUTY_PING_NUM_WORDS, key) ? DUTY_PING_NUM_WORDS[key] : null;
+}
+
+function parseDutyPingMinutesLikeText(text: string): number | null {
+  const source = normDutyPingText(text);
+  if (!source) return null;
+
+  if (DUTY_PING_THROUGH_HOUR_RE.test(source)) return 60;
+  if (DUTY_PING_HALF_HOUR_WORD_RE.test(source)) return 30;
+  if (DUTY_PING_ONE_AND_HALF_WORD_RE.test(source)) return 90;
+  if (DUTY_PING_HOUR_MAYBE_ONE_AND_HALF_RE.test(source)) return 90;
+  if (DUTY_PING_ONE_HOUR_APPROX_RE.test(source)) return 60;
+  if (DUTY_PING_WITHIN_ONE_HOUR_RE.test(source)) return 60;
+  if (DUTY_PING_ONE_HOUR_FUZZY_RE.test(source)) return 60;
+  if (DUTY_PING_ONE_HOUR_PLAIN_RE.test(source)) return 60;
+
+  let match = source.match(DUTY_PING_WITHIN_WORD_HOURS_RE);
+  if (match) {
+    const value = dutyPingWordValue(match[1] || '');
+    if (value != null) return Math.round(value * 60);
+  }
+
+  match = source.match(DUTY_PING_WITHIN_HOURS_RE);
+  if (match) return Math.round(parseFloat(String(match[1]).replace(',', '.')) * 60);
+
+  match = source.match(DUTY_PING_WORD_HOURS_RE);
+  if (match) {
+    const value = dutyPingWordValue(match[1] || '');
+    if (value != null) return Math.round(value * 60);
+  }
+
+  match = source.match(DUTY_PING_WORD_HOURS_REV_RE);
+  if (match) {
+    const value = dutyPingWordValue(match[1] || '');
+    if (value != null) return Math.round(value * 60);
+  }
+
+  match = source.match(DUTY_PING_WORD_MIN_RE);
+  if (match) {
+    const value = dutyPingWordValue(match[1] || '');
+    if (value != null) return Math.round(value);
+  }
+
+  match = source.match(DUTY_PING_WORD_MIN_REV_RE);
+  if (match) {
+    const value = dutyPingWordValue(match[1] || '');
+    if (value != null) return Math.round(value);
+  }
+
+  match = source.match(DUTY_PING_H_SHORT_RE);
+  if (match) return Math.round(parseFloat(String(match[1]).replace(',', '.')) * 60);
+
+  match = source.match(DUTY_PING_M_SHORT_RE);
+  if (match) return Number(match[1]);
+
+  match = source.match(DUTY_PING_HOURS_RE);
+  if (match) return Math.round(parseFloat(String(match[1]).replace(',', '.')) * 60);
+
+  match = source.match(DUTY_PING_HOURS_REV_RE);
+  if (match) return Math.round(parseFloat(String(match[1]).replace(',', '.')) * 60);
+
+  match = source.match(DUTY_PING_RANGE_HOURS_RE);
+  if (match) {
+    const left = parseFloat(String(match[1]).replace(',', '.'));
+    const right = parseFloat(String(match[2]).replace(',', '.'));
+    return Math.round(Math.max(left, right) * 60);
+  }
+
+  match = source.match(DUTY_PING_RANGE_MIN_SUFFIX_RE);
+  if (match) return Math.max(Number(match[1]), Number(match[2]));
+
+  match = source.match(DUTY_PING_RANGE_MIN_PREFIX_RE);
+  if (match) return Math.max(Number(match[1]), Number(match[2]));
+
+  match = source.match(DUTY_PING_RANGE_NUMBERS_CONTEXT_MIN_RE);
+  if (match && /\b(?:минут(?:ок|ак)?|мин|m|м)\b/iu.test(source)) return Math.max(Number(match[1]), Number(match[2]));
+
+  match = source.match(DUTY_PING_MIN_PREFIX_RE);
+  if (match) {
+    const value = Number(match[1]);
+    if (value >= 1 && value <= 24 * 60) return value;
+  }
+
+  match = source.match(DUTY_PING_MIN_SUFFIX_RE);
+  if (match) {
+    const value = Number(match[1]);
+    if (value >= 1 && value <= 24 * 60) return value;
+  }
+
+  match = source.match(/^\s*(\d{1,3})\s*[!?.,…]?\s*$/u);
+  if (match) {
+    const value = Number(match[1]);
+    if (value >= 1 && value <= 24 * 60) return value;
+  }
+
+  return null;
+}
+
 function parseDutyPingEta(text: string, createdAtMs: number): string | null {
   const src = normDutyPingText(text);
   if (!src) return null;
 
-  // relative: "через час", "полчаса", etc.
-  if (/через\s*(?:часок|часик|час)\b/iu.test(src)) return buildDutyPingEtaFromMinutes(createdAtMs, 60);
-  if (/(?:полчаса|полчасика|пол-часа|пол часа|полчас)\b/iu.test(src)) return buildDutyPingEtaFromMinutes(createdAtMs, 30);
-  if (/(?:полтора\s*часа|часа\s*полтора|час-полтора)\b/iu.test(src)) return buildDutyPingEtaFromMinutes(createdAtMs, 90);
+  const relativeMinutes = parseDutyPingMinutesLikeText(src);
+  if (relativeMinutes != null) {
+    return buildDutyPingEtaFromMinutes(createdAtMs, Math.max(0, Math.min(relativeMinutes, 24 * 60)));
+  }
 
-  // "в течение N часов/минут"
-  const withinH = src.match(/(?:в\s+течени[ие])\s*([\d.,]+)\s*ч/u);
-  if (withinH) return buildDutyPingEtaFromMinutes(createdAtMs, Math.round(parseFloat(withinH[1].replace(',', '.')) * 60));
-  const withinM = src.match(/(?:в\s+течени[ие])\s*([\d]+)\s*(?:мин|минут)/u);
-  if (withinM) return buildDutyPingEtaFromMinutes(createdAtMs, Number(withinM[1]));
+  let match = src.match(DUTY_PING_TIME_HHMM_RE);
+  if (match) return buildDutyPingEtaFromHHMM(createdAtMs, Number(match[1]), Number(match[2]));
 
-  // HH:MM or HH.MM absolute time
-  const hmColon = src.match(/\b([01]?\d|2[0-3])\s*[:.]?\s*([0-5]\d)\b/);
-  if (hmColon) return buildDutyPingEtaFromHHMM(createdAtMs, Number(hmColon[1]), Number(hmColon[2]));
+  match = src.match(DUTY_PING_TIME_TO_RE);
+  if (match) return buildDutyPingEtaFromHHMM(createdAtMs, Number(match[1]), Number(match[2] || 0));
 
-  // "до ЧЧ"
-  const toH = src.match(/до\s*([01]?\d|2[0-3])(?:\s*[:.]?\s*([0-5]\d))?\b/u);
-  if (toH) return buildDutyPingEtaFromHHMM(createdAtMs, Number(toH[1]), Number(toH[2] || 0));
-
-  // "в ЧЧ"
-  const atH = src.match(/\bв\s*([01]?\d|2[0-3])\b(?!\s*[:.])/u);
-  if (atH) return buildDutyPingEtaFromHHMM(createdAtMs, Number(atH[1]), 0);
-
-  // N часов / часа
-  const hours = src.match(/(?:через\s*)?([\d.,]+)\s*(?:час(?:а|ов)?|ч\.?)\b/u);
-  if (hours) return buildDutyPingEtaFromMinutes(createdAtMs, Math.round(parseFloat(hours[1].replace(',', '.')) * 60));
-
-  // N минут / мин
-  const mins = src.match(/([\d]+)\s*(?:мин(?:ут(?:ок|ак)?)?|m|м)\b/u);
-  if (mins) { const v = Number(mins[1]); if (v >= 1 && v <= 1440) return buildDutyPingEtaFromMinutes(createdAtMs, v); }
-
-  // bare number as minutes
-  const bareN = src.match(/^\s*(\d{1,3})\s*[!?.,…]?\s*$/u);
-  if (bareN) { const v = Number(bareN[1]); if (v >= 1 && v <= 1440) return buildDutyPingEtaFromMinutes(createdAtMs, v); }
+  match = src.match(DUTY_PING_TIME_H_ONLY_RE);
+  if (match) return buildDutyPingEtaFromHHMM(createdAtMs, Number(match[1]), 0);
 
   return null;
 }
@@ -3558,6 +3744,7 @@ function lineWithDutyPingStatus(baseLine: string, status: string | null): string
   let line = String(baseLine || '').trimEnd();
   line = line.replace(/\s*:green_verify:\s*/gi, ' ');
   line = line.replace(/\s*:verified:\s*/gi, ' ');
+  line = line.replace(/\s*:multi-search:\s*/gi, ' ');
   line = line.replace(/\s*:spiral_calendar_pad:\s*\d{1,2}\s*[:.]\s*\d{2}\s*/gi, ' ');
   line = line.replace(/\s*:spiral_calendar_pad:\s*/gi, ' ');
   line = line.replace(/\s+/g, ' ').trim();
@@ -3573,6 +3760,81 @@ function matchDutyPingStreamFromLine(line: string, streamsSorted: string[]): str
     if (!rest || /[\s\-–—:]/.test(rest[0])) return stream;
   }
   return '';
+}
+
+function resolveDutyPingUserStreams(
+  username: string,
+  streamOrder: string[],
+  usernameToStreams: Record<string, string[]>,
+  streamToHandle: Record<string, string>,
+): string[] {
+  const userKey = String(username || '').trim().toLocaleLowerCase('ru-RU');
+  if (!userKey) return [];
+
+  const resolved: string[] = [];
+  const seen = new Set<string>();
+  const direct = Array.isArray(usernameToStreams[userKey]) ? usernameToStreams[userKey] : [];
+  for (const stream of direct) {
+    if (streamOrder.includes(stream) && !seen.has(stream)) {
+      seen.add(stream);
+      resolved.push(stream);
+    }
+  }
+  if (resolved.length) return resolved;
+
+  for (const stream of streamOrder) {
+    const handle = String(streamToHandle[stream] || '').replace(/^@+/, '').trim().toLocaleLowerCase('ru-RU');
+    if (handle && handle !== '?' && handle === userKey && !seen.has(stream)) {
+      seen.add(stream);
+      resolved.push(stream);
+    }
+  }
+  return resolved;
+}
+
+function extractDutyPingReplyStreams(
+  text: string,
+  allowedStreams: string[],
+  streamNorm2Canonical: Record<string, string>,
+): string[] {
+  const allowed = Array.isArray(allowedStreams) ? allowedStreams.filter(Boolean) : [];
+  if (!allowed.length) return [];
+  const allowedSet = new Set(allowed);
+  const candidates: string[] = [];
+
+  for (const rawLine of String(text || '').split(/\r?\n/)) {
+    const line = String(rawLine || '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/[    ]/g, ' ')
+      .replace(/[​-‍﻿]/g, '')
+      .trim()
+      .replace(/\s+/g, ' ');
+    if (!line) continue;
+
+    for (const match of line.matchAll(DUTY_PING_REPLY_QUOTED_STREAM_RE)) {
+      const quoted = String(match[1] || '').trim().replace(/\s+/g, ' ');
+      if (quoted) candidates.push(quoted);
+    }
+
+    const prefixSep = line.split(DUTY_PING_REPLY_STREAM_SPLIT_RE, 1)[0].trim();
+    if (prefixSep && prefixSep !== line) candidates.push(prefixSep);
+
+    const boundaryMatch = line.match(DUTY_PING_REPLY_TIME_BOUNDARY_RE);
+    if (boundaryMatch && Number.isFinite(boundaryMatch.index)) {
+      const prefixTime = line.slice(0, boundaryMatch.index).trim().replace(/[-—:–|,.;\s]+$/u, '');
+      if (prefixTime && prefixTime !== line) candidates.push(prefixTime);
+    }
+  }
+
+  const resolved: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const matched = matchStream(candidate, streamNorm2Canonical);
+    if (!matched || !allowedSet.has(matched) || seen.has(matched)) continue;
+    seen.add(matched);
+    resolved.push(matched);
+  }
+  return resolved;
 }
 
 function updateDutyPingMessagePreservingBase(
@@ -3608,6 +3870,96 @@ function updateDutyPingMessagePreservingBase(
   return lines.join('\n').replace(/\s+$/u, '') + '\n';
 }
 
+function markDutyPingMessageAllOk(baseMessage: string, knownStreams: string[]): { message: string; changed: boolean } {
+  const lines = String(baseMessage || '').split(/\r?\n/);
+  const streamsSorted = [...new Set((Array.isArray(knownStreams) ? knownStreams : []).filter(Boolean))]
+    .sort((a, b) => String(b).length - String(a).length);
+  let changed = false;
+
+  for (let index = 0; index < lines.length; index++) {
+    const matched = matchDutyPingStreamFromLine(lines[index], streamsSorted);
+    if (!matched) continue;
+    const nextLine = lineWithDutyPingStatus(lines[index], DUTY_PING_OK);
+    if (nextLine !== lines[index]) {
+      lines[index] = nextLine;
+      changed = true;
+    }
+  }
+
+  return { message: lines.join('\n').replace(/\s+$/u, '') + '\n', changed };
+}
+
+function findDutyPingBasePost(
+  threadPosts: BandPost[],
+  rootId: string,
+  userId: string,
+  platformLabel: string,
+): BandPost | null {
+  const root = String(rootId || '').trim();
+  const currentUserId = String(userId || '').trim();
+  const platformNeedle = String(platformLabel || '').toLocaleLowerCase('ru-RU');
+  let found: BandPost | null = null;
+
+  for (const post of Array.isArray(threadPosts) ? threadPosts : []) {
+    if (!post || typeof post !== 'object') continue;
+    if (Number(post.delete_at) > 0) continue;
+    if (String(post.root_id || '').trim() !== root) continue;
+    if (currentUserId && String(post.user_id || '').trim() !== currentUserId) continue;
+    const lowered = String(post.message || '').toLocaleLowerCase('ru-RU');
+    if (!lowered.includes('просьба написать сроки') || !lowered.includes(platformNeedle)) continue;
+    if (!found || (Number(post.create_at) || 0) > (Number(found.create_at) || 0)) found = post;
+  }
+
+  return found;
+}
+
+async function dutyPingTestResultExistsInLaunch(
+  testResultId: string,
+  launchId: string,
+  token: string,
+  proxyBase: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const id = String(testResultId || '').trim();
+  if (!id) return true;
+  try {
+    const data = await proxyRequest<{ launchId?: unknown; launch_id?: unknown }>(
+      proxyBase, 'GET', `${ALLURE_BASE}/api/testresult/${encodeURIComponent(id)}`,
+      allureHeaders(token), undefined, signal,
+    );
+    const currentLaunchId = data && (data.launchId ?? data.launch_id);
+    if (currentLaunchId == null) return true;
+    return String(currentLaunchId) === String(launchId);
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') throw error;
+    if (/Proxy HTTP 404|Allure HTTP 404/.test(error instanceof Error ? error.message : String(error))) return false;
+    return true;
+  }
+}
+
+function removeDutyPingTrackedStream(
+  stream: string,
+  streamOrder: string[],
+  streamToIds: Record<string, string[]>,
+  streamVerified: Record<string, boolean>,
+  streamEta: Record<string, string>,
+  streamToHandle: Record<string, string>,
+  usernameToStreams: Record<string, string[]>,
+): string[] {
+  const streamName = String(stream || '').trim();
+  if (!streamName) return streamOrder;
+  delete streamToIds[streamName];
+  delete streamVerified[streamName];
+  delete streamEta[streamName];
+  delete streamToHandle[streamName];
+  for (const [login, streams] of Object.entries(usernameToStreams)) {
+    const next = (Array.isArray(streams) ? streams : []).filter(item => item !== streamName);
+    if (next.length) usernameToStreams[login] = next;
+    else delete usernameToStreams[login];
+  }
+  return streamOrder.filter(item => item !== streamName);
+}
+
 // ─── DUTY PING FULL POLLING LOOP ──────────────────────────────
 
 export interface DutyPingState {
@@ -3631,68 +3983,108 @@ export async function runDutyPingPolling(
 
   const label = platform === 'ios' ? 'iOS' : 'Android';
   const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
+  const aliases = buildHardcodedAliases();
+  const excludeSet = buildHardcodedExcludeSet();
 
-  // Find readiness launch
   onLog(`[${label}] Ищу запуск готовности в Allure...`);
   const run = await findMajorReadinessRun(platform, release, token, proxyBase, signal);
   if (!run) throw new Error(`Не найден запуск готовности для ${platformLabel} ${release}`);
   const launchId = run.id;
   onLog(`[${label}] launchId: ${launchId}`, 'ok');
 
-  // Get initial pending map
   onLog(`[${label}] Получаю pending кейсы...`);
   const initialPendingMap = await fetchDutyPingPendingLeafMap(launchId, token, proxyBase, signal);
   onLog(`[${label}] Pending стримов: ${initialPendingMap.size}`, initialPendingMap.size ? 'ok' : 'warn');
 
   if (!initialPendingMap.size) {
-    onState({ message: '', pendingCount: 0, verifiedCount: 0, done: true });
+    let syncedMessage = '';
+    try {
+      const rootPost = await majorFindFeedRoot(proxyBase, cookies, platform, release, signal);
+      const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, rootPost.id, signal, {
+        perPage: 200,
+        updatesOnly: true,
+        fromUpdateAt: DUTY_PING_THREAD_FROM_UPDATE_AT,
+      });
+      const existingPost = findDutyPingBasePost(threadPosts, rootPost.id, getCurrentBandUserId(cookies), platformLabel);
+      if (existingPost) {
+        const knownStreams = [...new Set(
+          collectionRows
+            .flatMap(row => [row.stream, row.streamDisplay])
+            .map(item => String(item || '').trim())
+            .filter(Boolean),
+        )];
+        const synced = markDutyPingMessageAllOk(String(existingPost.message || ''), knownStreams);
+        syncedMessage = synced.message;
+        if (synced.changed) {
+          await bandPatchPost(proxyBase, cookies, existingPost, synced.message, signal);
+          onLog(`[${label}] Pending пустой, проставил OK в существующем пинге.`, 'ok');
+        }
+      }
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') throw error;
+      onLog(`[${label}] Не удалось синхронизировать существующий пинг без pending: ${error instanceof Error ? error.message : String(error)}`, 'warn');
+    }
+    onState({ message: syncedMessage, pendingCount: 0, verifiedCount: 0, done: true });
     onLog(`[${label}] Нет pending стримов — всё закрыто.`, 'ok');
     return;
   }
 
-  // Build stream tracking state
   const streamToIds: Record<string, string[]> = {};
   const streamVerified: Record<string, boolean> = {};
   const streamEta: Record<string, string> = {};
   const streamToHandle: Record<string, string> = {};
-  const streamOrder: string[] = [];
+  let streamOrder: string[] = [];
+  const collectionRowNames = collectionRows
+    .flatMap(row => [row.stream, row.streamDisplay])
+    .map(name => String(name || '').trim())
+    .filter(Boolean);
+  const collectionStreamNorm2Canonical = buildStreamNorm2Canonical(collectionRowNames, aliases);
+  const findCollectionRow = (streamName: string) => {
+    const direct = collectionRows.find(row => row.stream === streamName || row.streamDisplay === streamName);
+    if (direct) return direct;
+    const matched = matchStream(streamName, collectionStreamNorm2Canonical);
+    return matched ? collectionRows.find(row => row.stream === matched || row.streamDisplay === matched) : undefined;
+  };
 
-  const ensureStream = (name: string, id: string) => {
-    if (!streamOrder.includes(name)) { streamOrder.push(name); streamVerified[name] = false; }
-    if (!streamToIds[name]) streamToIds[name] = [];
-    if (id && !streamToIds[name].includes(id)) streamToIds[name].push(id);
-    if (!Object.prototype.hasOwnProperty.call(streamToHandle, name)) {
-      const row = collectionRows.find(r => r.stream === name || r.streamDisplay === name);
-      const handle = platform === 'ios'
-        ? (row?.iosDuty || '?')
-        : (row?.androidDuty || '?');
-      streamToHandle[name] = handle || '?';
+  const getStreamHandle = (name: string): string => {
+    const row = findCollectionRow(name);
+    return String(platform === 'ios' ? (row?.iosDuty || '?') : (row?.androidDuty || '?')).trim() || '?';
+  };
+
+  const ensureStream = (name: string, id: string): boolean => {
+    const streamName = String(name || '').trim();
+    if (!streamName || excludeSet.has(normStr(streamName))) return false;
+    if (!streamOrder.includes(streamName)) {
+      streamOrder.push(streamName);
+      streamVerified[streamName] = false;
     }
+    if (!streamToIds[streamName]) streamToIds[streamName] = [];
+    if (id && !streamToIds[streamName].includes(id)) streamToIds[streamName].push(id);
+    if (!Object.prototype.hasOwnProperty.call(streamToHandle, streamName)) {
+      streamToHandle[streamName] = getStreamHandle(streamName);
+    }
+    return true;
+  };
+
+  const sortTrackedStreams = () => {
+    streamOrder = sortComponentDisplayTexts(streamOrder);
   };
 
   for (const [id, name] of initialPendingMap) {
-    if (name) ensureStream(name, id);
+    ensureStream(name, id);
+  }
+  sortTrackedStreams();
+
+  if (!streamOrder.length) {
+    onState({ message: '', pendingCount: 0, verifiedCount: 0, done: true });
+    onLog(`[${label}] В pending нет корректных стримов.`, 'warn');
+    return;
   }
 
-  // Sort streams
-  streamOrder.sort((a, b) => {
-    const sortBucket = (v: string) => {
-      const ch = String(v || '').match(/[\p{L}\p{N}]/u)?.[0] || '';
-      if (/[A-Za-z]/.test(ch)) return 0;
-      if (/[А-Яа-яЁё]/.test(ch)) return 1;
-      if (/\d/.test(ch)) return 2;
-      return 3;
-    };
-    const bd = sortBucket(a) - sortBucket(b);
-    return bd || a.localeCompare(b, ['ru', 'en'], { sensitivity: 'base', numeric: true });
-  });
-
-  // Find root thread post
   const rootPost = await majorFindFeedRoot(proxyBase, cookies, platform, release, signal);
   const rootId = rootPost.id;
   const myUserId = getCurrentBandUserId(cookies);
 
-  // Fetch channel users for reply matching
   onLog(`[${label}] Загружаю пользователей канала...`);
   let userIdToUsername: Record<string, string> = {};
   try {
@@ -3700,16 +4092,15 @@ export async function runDutyPingPolling(
   } catch { /* proceed without usernames */ }
   onLog(`[${label}] Пользователей: ${Object.keys(userIdToUsername).length}`, 'ok');
 
-  // Build username → streams reverse index
   const usernameToStreams: Record<string, string[]> = {};
-  for (const [stream, handle] of Object.entries(streamToHandle)) {
-    const login = handle.replace(/^@+/, '').trim().toLocaleLowerCase('ru-RU');
-    if (!login || login === '?') continue;
+  const trackUsernameForStream = (stream: string) => {
+    const login = String(streamToHandle[stream] || '').replace(/^@+/, '').trim().toLocaleLowerCase('ru-RU');
+    if (!login || login === '?') return;
     if (!usernameToStreams[login]) usernameToStreams[login] = [];
     if (!usernameToStreams[login].includes(stream)) usernameToStreams[login].push(stream);
-  }
+  };
+  streamOrder.forEach(trackUsernameForStream);
 
-  // Publish/find initial ping post
   const buildInitialMessage = () => {
     const lines = [`Коллеги, просьба написать сроки проставления оков по платформе ${platformLabel}`, ''];
     for (const stream of streamOrder) {
@@ -3719,22 +4110,27 @@ export async function runDutyPingPolling(
     return lines.join('\n').replace(/\s+$/u, '') + '\n';
   };
 
-  const threadPosts0 = await bandFetchThreadPosts(proxyBase, cookies, rootId, signal);
-  let pingPost = threadPosts0.find(p =>
-    Number(p.delete_at) === 0 && p.root_id === rootId && p.user_id === myUserId &&
-    normBandText(p.message).toLocaleLowerCase('ru-RU').includes('просьба написать сроки') &&
-    normBandText(p.message).toLocaleLowerCase('ru-RU').includes(platformLabel.toLocaleLowerCase('ru-RU')),
-  ) || null;
+  const threadPosts0 = await bandFetchThreadPosts(proxyBase, cookies, rootId, signal, {
+    perPage: 200,
+    updatesOnly: true,
+    fromUpdateAt: DUTY_PING_THREAD_FROM_UPDATE_AT,
+  });
+  let pingPost = findDutyPingBasePost(threadPosts0, rootId, myUserId, platformLabel);
   let pingCreatedAt = pingPost ? Number(pingPost.create_at) : 0;
 
-  const initialMsg = buildInitialMessage();
+  let initialMsg = buildInitialMessage();
   if (pingPost) {
-    if (normBandText(pingPost.message) !== normBandText(initialMsg)) {
-      await bandPatchPost(proxyBase, cookies, pingPost, normBandText(initialMsg), signal);
-      onLog(`[${label}] Пинг обновлён.`, 'ok');
-    } else {
-      onLog(`[${label}] Найден существующий пинг.`, 'ok');
+    onLog(`[${label}] Найден существующий пинг.`, 'ok');
+    initialMsg = String(pingPost.message || initialMsg);
+    const knownStreams = [...new Set([
+      ...collectionRows.flatMap(row => [row.stream, row.streamDisplay]),
+      ...streamOrder,
+    ].map(item => String(item || '').trim()).filter(Boolean))].sort((a, b) => b.length - a.length);
+    for (const line of initialMsg.split(/\r?\n/)) {
+      const matched = matchDutyPingStreamFromLine(line, knownStreams);
+      if (matched && ensureStream(matched, '')) trackUsernameForStream(matched);
     }
+    sortTrackedStreams();
   } else {
     pingPost = await bandCreateReply(proxyBase, cookies, FEED_CHANNEL_ID, rootId, normBandText(initialMsg), signal);
     pingCreatedAt = Number(pingPost.create_at);
@@ -3749,8 +4145,8 @@ export async function runDutyPingPolling(
   });
 
   const seenPostUat: Record<string, number> = {};
+  const etaParseWarned = new Set<string>();
 
-  // Polling loop
   while (true) {
     if (signal?.aborted) break;
     await new Promise<void>((resolve, reject) => {
@@ -3761,30 +4157,88 @@ export async function runDutyPingPolling(
 
     try {
       const currentPendingMap = await fetchDutyPingPendingLeafMap(launchId, token, proxyBase, signal);
-      const currentPendingNames = new Set(currentPendingMap.values());
+      const currentPendingIds = new Set(currentPendingMap.keys());
+      const currentPendingStreams = new Set<string>();
+      let addedStream = false;
+
+      for (const [id, rawName] of currentPendingMap) {
+        const streamName = String(rawName || '').trim();
+        if (!streamName || excludeSet.has(normStr(streamName))) continue;
+        currentPendingStreams.add(streamName);
+        const wasKnown = streamOrder.includes(streamName);
+        if (ensureStream(streamName, id)) {
+          trackUsernameForStream(streamName);
+          if (!wasKnown) {
+            addedStream = true;
+            onLog(`[${label}] Добавлен новый pending-стрим: ${streamName}`, 'warn');
+          }
+        }
+      }
+      if (addedStream) sortTrackedStreams();
+
+      for (const stream of [...streamOrder]) {
+        const ids = Array.isArray(streamToIds[stream]) ? [...streamToIds[stream]] : [];
+        const keepIds: string[] = [];
+        for (const testResultId of ids) {
+          if (currentPendingIds.has(testResultId)) {
+            keepIds.push(testResultId);
+            continue;
+          }
+          const exists = await dutyPingTestResultExistsInLaunch(testResultId, String(launchId), token, proxyBase, signal);
+          if (exists) {
+            keepIds.push(testResultId);
+          } else {
+            onLog(`[${label}] TestResult ${testResultId} удален из рана для "${stream}"`, 'warn');
+          }
+        }
+        if (keepIds.length || !ids.length) {
+          streamToIds[stream] = keepIds;
+        } else {
+          streamOrder = removeDutyPingTrackedStream(stream, streamOrder, streamToIds, streamVerified, streamEta, streamToHandle, usernameToStreams);
+          onLog(`[${label}] Стрим удален из трекинга: ${stream}`, 'warn');
+        }
+      }
 
       for (const stream of streamOrder) {
         const wasVerified = streamVerified[stream];
-        const nowPending = currentPendingNames.has(stream);
+        const nowPending = currentPendingStreams.has(stream);
         if (!nowPending && !wasVerified) { streamVerified[stream] = true; onLog(`[${label}] OK: ${stream}`, 'ok'); }
         if (nowPending && wasVerified) { streamVerified[stream] = false; onLog(`[${label}] Pending вернулся: ${stream}`, 'warn'); }
       }
 
-      const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, rootId, signal);
+      const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, rootId, signal, {
+        perPage: 200,
+        updatesOnly: true,
+        fromUpdateAt: DUTY_PING_THREAD_FROM_UPDATE_AT,
+      });
 
-      // Rediscover ping post if needed
       if (!pingPost || !threadPosts.find(p => p.id === pingPost!.id)) {
-        const found = threadPosts.find(p =>
-          Number(p.delete_at) === 0 && p.root_id === rootId && p.user_id === myUserId &&
-          normBandText(p.message).toLocaleLowerCase('ru-RU').includes('просьба написать сроки'),
-        );
-        if (found) { pingPost = found; pingCreatedAt = Number(found.create_at); }
+        const found = findDutyPingBasePost(threadPosts, rootId, myUserId, platformLabel);
+        if (found) {
+          pingPost = found;
+          pingCreatedAt = Number(found.create_at);
+          onLog(`[${label}] Пинг-пост найден заново.`, 'warn');
+        }
       }
 
       if (!pingPost) { onLog(`[${label}] Пинг-пост не найден, следующий цикл...`, 'warn'); continue; }
       const baseMessage = String(pingPost.message || '');
+      const activeStreamMap = buildStreamNorm2Canonical(streamOrder, aliases);
+      const okInMessage = new Set<string>();
+      const streamsSorted = [...streamOrder].sort((a, b) => String(b).length - String(a).length);
+      for (const line of baseMessage.split(/\r?\n/)) {
+        const matched = matchDutyPingStreamFromLine(line, streamsSorted);
+        if (!matched) continue;
+        const lowered = line.toLocaleLowerCase('ru-RU');
+        if (lowered.includes(':green_verify:') || lowered.includes(':verified:')) {
+          okInMessage.add(matched);
+        }
+        const etaMatch = line.match(/:spiral_calendar_pad:\s*(\d{1,2})\s*[:.]\s*(\d{2})/i);
+        if (etaMatch) {
+          streamEta[matched] = `${String(Number(etaMatch[1])).padStart(2, '0')}:${etaMatch[2]}`;
+        }
+      }
 
-      // Parse replies for ETA
       for (const post of threadPosts) {
         if (!post || post.root_id !== rootId || post.id === rootId || post.id === pingPost.id) continue;
         const createdAt = Number(post.create_at);
@@ -3796,31 +4250,33 @@ export async function runDutyPingPolling(
 
         const username = String(userIdToUsername[String(post.user_id || '')] || '').trim();
         if (!username) continue;
-        const userLogin = username.toLocaleLowerCase('ru-RU');
-        const userStreams = usernameToStreams[userLogin] || [];
-        const replyStreams = userStreams.length
-          ? userStreams.filter(s => streamOrder.includes(s))
-          : [];
-        if (!replyStreams.length) continue;
+        const matchedStreams = resolveDutyPingUserStreams(username, streamOrder, usernameToStreams, streamToHandle);
+        if (!matchedStreams.length) continue;
 
-        const msg = String(post.message || '').replace(/&nbsp;/gi, ' ').replace(/[ ]/g, ' ').trim();
+        const msg = normDutyPingText(post.message);
+        const explicitStreams = extractDutyPingReplyStreams(msg, matchedStreams, activeStreamMap);
+        const replyStreams = explicitStreams.length ? explicitStreams : matchedStreams;
         const eta = parseDutyPingEta(msg, createdAt);
         if (eta) {
+          const changed: string[] = [];
           for (const s of replyStreams) {
             if (streamEta[s] !== eta) {
               streamEta[s] = eta;
-              onLog(`[${label}] ETA для ${s} (@${username}): ${eta}`, 'ok');
+              changed.push(s);
             }
           }
+          if (changed.length) onLog(`[${label}] ETA для ${changed.join(', ')} (@${username}): ${eta}`, 'ok');
+        } else if (!etaParseWarned.has(post.id)) {
+          etaParseWarned.add(post.id);
+          onLog(`[${label}] Не смог разобрать ETA для ${replyStreams.join(', ')} (@${username}).`, 'warn');
         }
       }
 
-      // Build updated message
       const streamToStatus: Record<string, string | null> = {};
       for (const stream of streamOrder) {
         if (streamVerified[stream]) { streamToStatus[stream] = DUTY_PING_OK; }
         else if (streamEta[stream]) { streamToStatus[stream] = `${DUTY_PING_ETA} ${streamEta[stream]}`; }
-        else { streamToStatus[stream] = null; }
+        else { streamToStatus[stream] = okInMessage.has(stream) ? '' : null; }
       }
 
       const newMessage = updateDutyPingMessagePreservingBase(baseMessage, streamOrder, streamToHandle, streamToStatus);
@@ -3828,6 +4284,12 @@ export async function runDutyPingPolling(
         await bandPatchPost(proxyBase, cookies, pingPost, normBandText(newMessage), signal);
         pingPost = { ...pingPost, message: newMessage };
         onLog(`[${label}] Сообщение-пинг обновлено.`, 'ok');
+      }
+
+      if (!streamOrder.length) {
+        onState({ message: newMessage, pendingCount: 0, verifiedCount: 0, done: true });
+        onLog(`[${label}] Все стримы сняты с трекинга.`, 'ok');
+        break;
       }
 
       const verifiedCount = streamOrder.filter(s => streamVerified[s]).length;
