@@ -8,7 +8,7 @@
 #
 # В остальной логике НИЧЕГО не менялось.
 
-import os, sys, json, time, base64, re
+import os, sys, json, time, base64, re, traceback
 from datetime import datetime, timedelta, time as dtime
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Set, Tuple, Optional
@@ -60,10 +60,20 @@ TOT_0_10  = PatternFill("solid", fgColor="E07C78")  # 0..10
 # ===== Глобальные кеши =====
 DRIVE_BASE_META: Dict[str, Optional[dict]] = {}   # защита от гонок по modifiedTime
 DRIVE_VERSION_FOLDER: Dict[str, Optional[str]] = {}  # id подпапки версии
+DEBUG_MODE = False
 
 # ---------- Утилиты ----------
 def now_msk() -> datetime:
     return datetime.now(ZoneInfo("Europe/Moscow"))
+
+def debug_log(message: str):
+    if DEBUG_MODE:
+        print(f"[DEBUG {now_msk().strftime('%H:%M:%S')}] {message}", flush=True)
+
+def debug_exception(context: str, error: Exception):
+    if DEBUG_MODE:
+        print(f"[DEBUG {now_msk().strftime('%H:%M:%S')}] {context}: {error!r}", flush=True)
+        traceback.print_exc()
 
 def cache_path(version: str) -> str:
     safe_version = re.sub(r"[^0-9A-Za-z\.\-_]", "_", version.strip())
@@ -76,6 +86,7 @@ def build_session() -> requests.Session:
     if not API_TOKEN:
         print("[ERROR] Пустой API_TOKEN.")
         sys.exit(2)
+    debug_log("Создаю requests.Session для Allure")
     s = requests.Session()
     s.headers.update({
         "Accept":"application/json",
@@ -116,11 +127,17 @@ def time_to_label(t: dtime) -> str:
 def http_get_with_retries(session: requests.Session, url: str, *, params: dict = None, timeout: int = 60):
     last_err = None
     for attempt in range(1, 4):
+        started = time.monotonic()
         try:
+            debug_log(f"GET attempt {attempt}/3 url={url} params={params} timeout={timeout}")
             r = session.get(url, params=params, timeout=timeout)
+            elapsed = time.monotonic() - started
+            debug_log(f"GET response status={r.status_code} elapsed={elapsed:.2f}s url={r.url}")
             r.raise_for_status()
             return r
         except Exception as e:
+            elapsed = time.monotonic() - started
+            debug_log(f"GET failed elapsed={elapsed:.2f}s attempt={attempt}/3 url={url} err={e}")
             last_err = e
             if attempt < 3:
                 print(f"[WARN] GET {url} failed (attempt {attempt}/3): {e}. Retrying in 5s...")
@@ -132,6 +149,7 @@ def http_get_with_retries(session: requests.Session, url: str, *, params: dict =
 # ---------- API ----------
 def fetch_launches_hb(session: requests.Session, version: str) -> List[Dict]:
     terms = [f"[High/Blocker][DeployLab] Регресс {version}", f"[High/Blocker] Регресс {version}"]
+    debug_log(f"Ищу HB launches для релиза {version}: terms={terms}")
     result_by_id = {}
     size = 1000
     for term in terms:
@@ -139,9 +157,11 @@ def fetch_launches_hb(session: requests.Session, version: str) -> List[Dict]:
         page = 0
         while True:
             params = {"page":page,"size":size,"search":search_b64,"projectId":PROJECT_ID,"preview":"true","sort":"createdDate,desc"}
+            debug_log(f"Allure launch search term={term!r} page={page}")
             r = http_get_with_retries(session, f"{BASE_URL}/api/launch", params=params, timeout=60)
             data = r.json() or {}
             content = data.get("content") or []
+            debug_log(f"Allure launch search result term={term!r} page={page} count={len(content)}")
             if not content: break
             for it in content:
                 try:
@@ -151,19 +171,25 @@ def fetch_launches_hb(session: requests.Session, version: str) -> List[Dict]:
             page += 1
     launches = list(result_by_id.values())
     launches.sort(key=lambda L: (L.get("name",""), -int(L.get("id") or 0)))
+    debug_log(f"Итого найдено launches: {len(launches)} ids={[L.get('id') for L in launches]}")
     return launches
 
 def fetch_member_stats(session: requests.Session, launch_id: int) -> List[Dict]:
+    debug_log(f"Загружаю memberstats launch_id={launch_id}")
     r = http_get_with_retries(session, f"{BASE_URL}/api/launch/{launch_id}/memberstats",
                               params={"size":1000,"page":0}, timeout=60)
     data = r.json() or []
-    if isinstance(data, dict): return data.get("content") or []
-    return data
+    out = data.get("content") or [] if isinstance(data, dict) else data
+    debug_log(f"memberstats launch_id={launch_id}: rows={len(out)}")
+    return out
 
 def fetch_total_statistic(session: requests.Session, launch_id: int) -> List[Dict]:
+    debug_log(f"Загружаю total statistic launch_id={launch_id}")
     r = http_get_with_retries(session, f"{BASE_URL}/api/launch/{launch_id}/statistic", timeout=60)
     data = r.json() or []
-    return data if isinstance(data, list) else []
+    out = data if isinstance(data, list) else []
+    debug_log(f"total statistic launch_id={launch_id}: rows={len(out)}")
+    return out
 
 def stat_total_count(stat_list: List[Dict]) -> int:
     return sum(int(x.get("count") or 0) for x in stat_list)
@@ -250,32 +276,41 @@ def _get_oauth_credentials(scopes: List[str]):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     token_path = os.path.join(script_dir, "token.json")
     client_secret_path = os.path.join(script_dir, "client_secret.json")
+    debug_log(f"OAuth: token_path={token_path} exists={os.path.exists(token_path)} client_secret_exists={os.path.exists(client_secret_path)} scopes={scopes}")
 
     creds = None
     if os.path.exists(token_path):
         try:
             creds = UserCredentials.from_authorized_user_file(token_path, scopes)
-        except Exception:
+            debug_log("OAuth: token.json прочитан")
+        except Exception as e:
+            debug_exception("OAuth: не удалось прочитать token.json", e)
             creds = None
 
     if creds and creds.valid:
+        debug_log("OAuth: credentials valid")
         return creds
 
     if creds and creds.expired and creds.refresh_token:
         try:
+            debug_log("OAuth: refresh expired credentials")
             creds.refresh(Request())
             with open(token_path, "w", encoding="utf-8") as f:
                 f.write(creds.to_json())
+            debug_log("OAuth: refresh ok, token.json обновлен")
             return creds
-        except RefreshError:
+        except RefreshError as e:
+            debug_exception("OAuth: RefreshError, token будет переименован в .bak", e)
             try: os.replace(token_path, token_path + ".bak")
             except Exception: pass
             creds = None
-        except Exception:
+        except Exception as e:
+            debug_exception("OAuth: refresh failed, token будет переименован в .bak", e)
             try: os.replace(token_path, token_path + ".bak")
             except Exception: pass
             creds = None
 
+    debug_log("OAuth: запускаю browser consent flow")
     flow = InstalledAppFlow.from_client_secrets_file(
         client_secret_path,
         scopes=scopes
@@ -288,6 +323,7 @@ def _get_oauth_credentials(scopes: List[str]):
 
     with open(token_path, "w", encoding="utf-8") as f:
         f.write(creds.to_json())
+    debug_log("OAuth: новый token.json сохранен")
 
     return creds
 
@@ -299,6 +335,7 @@ def _get_drive_service():
         print(f"[WARN] google api libs not installed for Drive: {e}")
         return None
     scopes = ["https://www.googleapis.com/auth/drive"]
+    debug_log("Drive: создаю service")
     creds = _get_oauth_credentials(scopes)
     return build("drive", "v3", credentials=creds)
 
@@ -306,6 +343,7 @@ def _drive_find_file(drive, folder_id: str, name: str) -> Optional[dict]:
     if not drive: return None
     q = f"name = '{name}' and '{folder_id}' in parents and trashed = false"
     try:
+        debug_log(f"Drive: ищу файл name={name!r} folder_id={folder_id}")
         resp = drive.files().list(
             q=q,
             fields="files(id,name,parents,modifiedTime,md5Checksum,mimeType)",
@@ -314,19 +352,24 @@ def _drive_find_file(drive, folder_id: str, name: str) -> Optional[dict]:
             includeItemsFromAllDrives=True
         ).execute()
         files = resp.get("files", [])
+        debug_log(f"Drive: find file name={name!r} found={len(files)}")
         return files[0] if files else None
     except Exception as e:
+        debug_exception("Drive list failed", e)
         print(f"[WARN] Drive list failed: {e}")
         return None
 
 def _drive_get_version_folder(version: str, create_if_missing: bool) -> Optional[str]:
     if version in DRIVE_VERSION_FOLDER and DRIVE_VERSION_FOLDER[version]:
+        debug_log(f"Drive: version folder cached version={version} id={DRIVE_VERSION_FOLDER[version]}")
         return DRIVE_VERSION_FOLDER[version]
     drive = _get_drive_service()
     if not drive:
+        debug_log("Drive: service unavailable, folder lookup skipped")
         return None
     q = f"mimeType = 'application/vnd.google-apps.folder' and name = '{version}' and '{PARENT_FOLDER_ID}' in parents and trashed = false"
     try:
+        debug_log(f"Drive: ищу папку версии version={version} create_if_missing={create_if_missing}")
         resp = drive.files().list(
             q=q,
             fields="files(id,name,parents)",
@@ -338,8 +381,10 @@ def _drive_get_version_folder(version: str, create_if_missing: bool) -> Optional
         if files:
             fid = files[0]["id"]
             DRIVE_VERSION_FOLDER[version] = fid
+            debug_log(f"Drive: папка версии найдена id={fid}")
             return fid
         if not create_if_missing:
+            debug_log(f"Drive: папка версии не найдена, создание запрещено version={version}")
             return None
         meta = {
             "name": version,
@@ -353,23 +398,30 @@ def _drive_get_version_folder(version: str, create_if_missing: bool) -> Optional
         ).execute()
         fid = created.get("id")
         DRIVE_VERSION_FOLDER[version] = fid
+        debug_log(f"Drive: папка версии создана id={fid}")
         return fid
     except Exception as e:
+        debug_exception("Drive create/get version folder failed", e)
         print(f"[WARN] Drive create/get version folder failed: {e}")
         return None
 
 def _drive_download_cache(version: str) -> Tuple[Optional[dict], Optional[dict]]:
+    debug_log(f"Drive cache: download start version={version}")
     drive = _get_drive_service()
     if not drive:
+        debug_log("Drive cache: no drive service")
         return None, None
     folder_id = _drive_get_version_folder(version, create_if_missing=False)
     if not folder_id:
+        debug_log("Drive cache: no version folder")
         return None, None
     name = f"cache_{version}.json"
     meta = _drive_find_file(drive, folder_id, name)
     if not meta:
+        debug_log(f"Drive cache: file not found name={name}")
         return None, None
     try:
+        debug_log(f"Drive cache: downloading file_id={meta.get('id')} modifiedTime={meta.get('modifiedTime')}")
         from googleapiclient.http import MediaIoBaseDownload
         req = drive.files().get_media(fileId=meta["id"])
         buf = BytesIO()
@@ -378,8 +430,10 @@ def _drive_download_cache(version: str) -> Tuple[Optional[dict], Optional[dict]]
         while not done:
             _, done = downloader.next_chunk()
         data = json.loads(buf.getvalue().decode("utf-8"))
+        debug_log(f"Drive cache: downloaded bytes={len(buf.getvalue())} keys={list(data.keys())}")
         return data, meta
     except Exception as e:
+        debug_exception("Drive download failed", e)
         print(f"[WARN] Drive download failed: {e}")
         return None, None
 
@@ -455,8 +509,10 @@ def _merge_caches(A: dict, B: dict) -> dict:
     return R
 
 def _drive_upload_cache(version: str, data: dict):
+    debug_log(f"Drive cache: upload start version={version}")
     drive = _get_drive_service()
     if not drive:
+        debug_log("Drive cache: no drive service, upload skipped")
         return
     folder_id = _drive_get_version_folder(version, create_if_missing=True)
     if not folder_id:
@@ -471,6 +527,7 @@ def _drive_upload_cache(version: str, data: dict):
 
     current = _drive_find_file(drive, folder_id, name)
     base_meta = DRIVE_BASE_META.get(version)
+    debug_log(f"Drive cache: current_exists={bool(current)} base_meta_modified={base_meta.get('modifiedTime') if base_meta else None}")
 
     payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
     media = MediaIoBaseUpload(BytesIO(payload), mimetype="application/json", resumable=False)
@@ -479,6 +536,7 @@ def _drive_upload_cache(version: str, data: dict):
         if current:
             if base_meta and current.get("modifiedTime") != base_meta.get("modifiedTime"):
                 try:
+                    debug_log("Drive cache: remote changed, merging before upload")
                     req = drive.files().get_media(fileId=current["id"])
                     buf = BytesIO()
                     downloader = MediaIoBaseDownload(buf, req)
@@ -490,8 +548,10 @@ def _drive_upload_cache(version: str, data: dict):
                     payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
                     media = MediaIoBaseUpload(BytesIO(payload), mimetype="application/json", resumable=False)
                 except Exception as me:
+                    debug_exception("Drive cache: conflict merge failed", me)
                     print(f"[WARN] conflict merge failed, proceed with local: {me}")
 
+            debug_log(f"Drive cache: update file_id={current.get('id')}")
             drive.files().update(
                 fileId=current["id"],
                 media_body=media,
@@ -499,6 +559,7 @@ def _drive_upload_cache(version: str, data: dict):
             ).execute()
         else:
             file_meta = {"name": name, "parents": [folder_id], "mimeType": "application/json"}
+            debug_log(f"Drive cache: create file name={name}")
             drive.files().create(
                 body=file_meta,
                 media_body=media,
@@ -509,6 +570,7 @@ def _drive_upload_cache(version: str, data: dict):
         # Снапшот
         snap_name = f"cache_{version}_{now_msk().strftime('%Y%m%d-%H%M')}.json"
         snap_meta = {"name": snap_name, "parents": [folder_id], "mimeType": "application/json"}
+        debug_log(f"Drive cache: create snapshot name={snap_name}")
         drive.files().create(
             body=snap_meta,
             media_body=MediaIoBaseUpload(BytesIO(payload), mimetype="application/json", resumable=False),
@@ -516,25 +578,34 @@ def _drive_upload_cache(version: str, data: dict):
             supportsAllDrives=True
         ).execute()
     except Exception as e:
+        debug_exception("Drive upload failed", e)
         print(f"[WARN] Drive upload failed: {e}")
 
 # ---------- SWAT из Google Doc ----------
 def _get_drive_export_text(file_id: str) -> Optional[str]:
+    debug_log(f"Google Doc: export text start file_id={file_id}")
     drive = _get_drive_service()
     if not drive:
+        debug_log("Google Doc: no drive service")
         return None
     try:
         data = drive.files().export(fileId=file_id, mimeType="text/plain").execute()
-        return data.decode("utf-8") if isinstance(data, (bytes, bytearray)) else str(data)
-    except Exception:
+        text = data.decode("utf-8") if isinstance(data, (bytes, bytearray)) else str(data)
+        debug_log(f"Google Doc: export ok chars={len(text)}")
+        return text
+    except Exception as e:
+        debug_exception("Google Doc export failed", e)
         return None
 
 def read_swat_logins_from_gdoc() -> Set[str]:
+    debug_log("SWAT logins: читаю Google Doc")
     text = _get_drive_export_text(GDOC_SWAT_DOC_ID)
     if text is None:
         print("[INFO] Не удалось получить SWAT из Google Doc. Использую локальный SWAT.txt")
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        return read_swat_logins_local(os.path.join(script_dir, "SWAT.txt"))
+        result = read_swat_logins_local(os.path.join(script_dir, "SWAT.txt"))
+        debug_log(f"SWAT logins: local count={len(result)}")
+        return result
     logins: Set[str] = set()
     for line in text.splitlines():
         line = line.strip()
@@ -546,40 +617,53 @@ def read_swat_logins_from_gdoc() -> Set[str]:
     if not logins:
         print("[INFO] SWAT в Google Doc пустой. Использую локальный SWAT.txt")
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        return read_swat_logins_local(os.path.join(script_dir, "SWAT.txt"))
+        result = read_swat_logins_local(os.path.join(script_dir, "SWAT.txt"))
+        debug_log(f"SWAT logins: local count={len(result)}")
+        return result
+    debug_log(f"SWAT logins: google doc count={len(logins)}")
     return logins
 
 # ---------- Кэш ----------
 def load_cache(version: str) -> Dict:
+    debug_log(f"Cache: load start version={version} cwd={os.getcwd()}")
     data, meta = _drive_download_cache(version)
     if data is not None:
         DRIVE_BASE_META[version] = meta
         data.setdefault("day_counts", {})
         data.setdefault("day_seen", {})
+        debug_log(f"Cache: loaded from Drive runs={len(data.get('runs') or {})}")
         return data
 
     path = cache_path(version)
     DRIVE_BASE_META[version] = None
     if os.path.exists(path):
         try:
+            debug_log(f"Cache: load local path={os.path.abspath(path)}")
             obj = json.load(open(path, "r", encoding="utf-8"))
             obj.setdefault("runs", {})
             obj.setdefault("history", {})
             obj.setdefault("people", {})
             obj.setdefault("day_counts", {})  # NEW optional
             obj.setdefault("day_seen", {})    # NEW optional
+            debug_log(f"Cache: loaded local runs={len(obj.get('runs') or {})}")
             return obj
-        except:
+        except Exception as e:
+            debug_exception(f"Cache: local load failed path={os.path.abspath(path)}", e)
             pass
+    debug_log("Cache: empty new cache")
     return {"runs":{}, "history":{}, "people":{}, "day_counts":{}, "day_seen":{}}
 
 def save_cache(version: str, obj: Dict):
     path = cache_path(version)
     tmp = path + ".tmp"
+    debug_log(f"Cache: save start path={os.path.abspath(path)} tmp={os.path.abspath(tmp)} cwd={os.getcwd()}")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
+    debug_log("Cache: tmp written, replacing target")
     os.replace(tmp, path)
+    debug_log("Cache: local replace ok, uploading to Drive")
     _drive_upload_cache(version, obj)
+    debug_log("Cache: save complete")
 
 # ---------- Excel ----------
 def auto_fit(ws):
@@ -868,15 +952,18 @@ def upload_excel_sheet_to_gsheets(excel_path: str, spreadsheet_id: str, sheet_na
     script_dir = os.path.dirname(os.path.abspath(__file__))
     log_path = os.path.join(script_dir, "gsheets_upload.log")
     def _log(msg: str):
+        debug_log(f"Google Sheets upload: {msg}")
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"[{now_msk().strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
 
     try:
+        debug_log(f"Google Sheets upload start excel_path={excel_path} spreadsheet_id={spreadsheet_id} sheet_name={sheet_name} version={version}")
         try:
             from googleapiclient.discovery import build  # noqa
             from googleapiclient.http import MediaFileUpload  # noqa
             from googleapiclient.errors import HttpError  # noqa
         except Exception as e:
+            debug_exception("Google Sheets upload: google api libs import failed", e)
             _log(f"ERROR: google api libs not installed: {e}")
             return False
 
@@ -888,15 +975,19 @@ def upload_excel_sheet_to_gsheets(excel_path: str, spreadsheet_id: str, sheet_na
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
+        debug_log("Google Sheets upload: получаю OAuth credentials")
         creds = _get_oauth_credentials(scopes)
+        debug_log("Google Sheets upload: создаю sheets/drive services")
         sheets_srv = build("sheets", "v4", credentials=creds)
         drive_srv  = build("drive",  "v3", credentials=creds)
 
+        debug_log("Google Sheets upload: получаю папку версии")
         version_folder_id = _drive_get_version_folder(version, create_if_missing=True)
         if not version_folder_id:
             _log("WARN: Не удалось получить/создать подпапку версии. Пишу во вложения базовой папки.")
             version_folder_id = PARENT_FOLDER_ID
 
+        debug_log("Google Sheets upload: читаю Excel")
         wb = load_workbook(excel_path, data_only=True)
         if sheet_name not in wb.sheetnames:
             _log(f"ERROR: В Excel нет листа '{sheet_name}'")
@@ -904,6 +995,7 @@ def upload_excel_sheet_to_gsheets(excel_path: str, spreadsheet_id: str, sheet_na
         ws = wb[sheet_name]
         max_row = ws.max_row
         max_col = ws.max_column
+        debug_log(f"Google Sheets upload: Excel sheet size rows={max_row} cols={max_col}")
         values: List[List[str]] = []
         for r in range(1, max_row+1):
             row = []
@@ -935,6 +1027,7 @@ def upload_excel_sheet_to_gsheets(excel_path: str, spreadsheet_id: str, sheet_na
             temp_spreadsheet_id = temp_file.get("id")
             _log(f"INFO: Создана временная таблица {temp_spreadsheet_id}, parents={temp_file.get('parents')}")
         except HttpError as e:
+            debug_exception("Google Sheets upload: create temp failed, fallback", e)
             msg = str(e)
             _log(f"WARN: create temp failed: {msg}. Fallback to values.update.")
             try:
@@ -965,10 +1058,12 @@ def upload_excel_sheet_to_gsheets(excel_path: str, spreadsheet_id: str, sheet_na
                 _log(f"SUCCESS: Данные записаны в лист '{sheet_name}' (fallback, без форматирования).")
                 return True
             except Exception as fe:
+                debug_exception("Google Sheets upload: fallback failed", fe)
                 _log(f"ERROR: Fallback не удался: {fe}")
                 return False
 
         try:
+            debug_log("Google Sheets upload: читаю temp spreadsheet meta")
             temp_meta = sheets_srv.spreadsheets().get(spreadsheetId=temp_spreadsheet_id).execute()
             temp_sheets = temp_meta.get("sheets", [])
             source_sheet_id = None
@@ -983,6 +1078,7 @@ def upload_excel_sheet_to_gsheets(excel_path: str, spreadsheet_id: str, sheet_na
                 _log("ERROR: Не удалось определить исходный лист во временной таблице")
                 return False
 
+            debug_log("Google Sheets upload: читаю target spreadsheet meta")
             target_meta = sheets_srv.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
             target_sheets = target_meta.get("sheets", [])
             to_delete_id = None
@@ -991,9 +1087,11 @@ def upload_excel_sheet_to_gsheets(excel_path: str, spreadsheet_id: str, sheet_na
                     to_delete_id = s.get("properties", {}).get("sheetId")
                     break
             if to_delete_id is not None:
+                debug_log(f"Google Sheets upload: удаляю старый лист sheetId={to_delete_id}")
                 req = {"requests": [{"deleteSheet": {"sheetId": to_delete_id}}]}
                 sheets_srv.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body=req).execute()
 
+            debug_log(f"Google Sheets upload: copyTo source_sheet_id={source_sheet_id}")
             copy_result = sheets_srv.spreadsheets().sheets().copyTo(
                 spreadsheetId=temp_spreadsheet_id,
                 sheetId=source_sheet_id,
@@ -1007,6 +1105,7 @@ def upload_excel_sheet_to_gsheets(excel_path: str, spreadsheet_id: str, sheet_na
                     "fields": "title"
                 }
             }]}
+            debug_log(f"Google Sheets upload: переименовываю новый лист sheetId={new_sheet_id}")
             sheets_srv.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body=req).execute()
             _log(f"SUCCESS: Лист '{sheet_name}' обновлён (с форматированием).")
             return True
@@ -1014,11 +1113,14 @@ def upload_excel_sheet_to_gsheets(excel_path: str, spreadsheet_id: str, sheet_na
         finally:
             if temp_spreadsheet_id:
                 try:
+                    debug_log(f"Google Sheets upload: удаляю temp spreadsheet id={temp_spreadsheet_id}")
                     drive_srv.files().delete(fileId=temp_spreadsheet_id).execute()
-                except Exception:
+                except Exception as e:
+                    debug_exception("Google Sheets upload: delete temp failed", e)
                     pass
 
     except Exception as e:
+        debug_exception("Google Sheets upload failed", e)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"[{now_msk().strftime('%Y-%m-%d %H:%M:%S')}] ERROR: {e}\n")
         return False
@@ -1042,19 +1144,28 @@ def _find_prev_day_key(day_seen_map: Dict[str, Dict[str,int]], current_key: str)
 
 # ---------- Сбор ----------
 def run_collect(version: str, manual_between: bool):
+    started_collect = time.monotonic()
+    debug_log(f"run_collect start version={version} manual_between={manual_between}")
     session = build_session()
+    debug_log("run_collect: session ready")
 
     # SWAT-логины
+    debug_log("run_collect: читаю SWAT-логины")
     swat_set = read_swat_logins_from_gdoc()
+    debug_log(f"run_collect: SWAT-логины готовы count={len(swat_set)}")
 
+    debug_log("run_collect: загружаю cache")
     cache = load_cache(version)
     cache.setdefault("day_counts", {})  # опциональные разделы на всякий случай
     cache.setdefault("day_seen", {})
+    debug_log(f"run_collect: cache готов runs={len(cache.get('runs') or {})} history_days={len(cache.get('history') or {})}")
 
     now = now_msk()
     date_key = now.strftime("%Y-%m-%d")
 
+    debug_log("run_collect: ищу launches")
     launches = fetch_launches_hb(session, version)
+    debug_log(f"run_collect: launches найдено {len(launches)}")
 
     # ---- НОВОЕ: готовим базовый снимок на границе суток ----
     prev_seen_same_day: Dict[str, int] = (cache.get("day_seen") or {}).get(date_key, {}) or {}
@@ -1070,15 +1181,18 @@ def run_collect(version: str, manual_between: bool):
         lid = int(L.get("id"))
         name = L.get("name","")
         platform = "Android" if "[Android]" in name else ("iOS" if "[iOS]" in name else "Other")
+        debug_log(f"run_collect: launch start id={lid} platform={platform} name={name!r}")
 
         total_stat = fetch_total_statistic(session, lid)
         memberstats = fetch_member_stats(session, lid)
         total_cases = stat_total_count(total_stat)
         complete = is_launch_complete(total_stat, memberstats)
         rem_no_status = count_without_status(memberstats)
+        debug_log(f"run_collect: launch id={lid} total_cases={total_cases} complete={complete} rem_no_status={rem_no_status}")
 
         per_person_ws = swat_totals_by_person(memberstats, swat_set)   # ТОЛЬКО статусы
         per_person_rt = swat_retries_by_person(memberstats, swat_set)  # retriedCount
+        debug_log(f"run_collect: launch id={lid} swat_ws_sum={sum(per_person_ws.values())} swat_retry_sum={sum(per_person_rt.values())} swat_people_ws={len(per_person_ws)}")
 
         # НОВОЕ: ws_cur = ws + retriedCount (для day_seen/day_counts ТОЛЬКО)
         all_logins = set(per_person_ws.keys()) | set(per_person_rt.keys())
@@ -1106,6 +1220,7 @@ def run_collect(version: str, manual_between: bool):
                 write_slot = cur_label
 
         if write_slot:
+            debug_log(f"run_collect: пишу history launch_id={lid} slot={write_slot} value={int(sum(per_person_ws.values()))}")
             day_map = cache["history"].setdefault(date_key, {})
             lid_map = day_map.setdefault(str(lid), {})
             lid_map[write_slot] = int(sum(per_person_ws.values()))
@@ -1135,14 +1250,18 @@ def run_collect(version: str, manual_between: bool):
 
     cache.setdefault("day_counts", {})[date_key] = updated_day_counts
     cache.setdefault("day_seen", {})[date_key] = cur_seen
+    debug_log(f"run_collect: day_counts updated people={len(updated_day_counts)} cur_seen={len(cur_seen)}")
 
     # people[дата] = только логины с суммарной дневной дельтой > 0
     active_people_today = sorted([login for login, total in updated_day_counts.items() if int(total) > 0])
     cache.setdefault("people", {})[date_key] = active_people_today
+    debug_log(f"run_collect: active_people_today={len(active_people_today)}")
 
+    debug_log("run_collect: сохраняю cache")
     save_cache(version, cache)
 
     runs_int = {int(k): v for k, v in cache["runs"].items()}
+    debug_log(f"run_collect: строю Excel runs={len(runs_int)}")
     wb, fname = build_full_table(
         runs_int,
         cache.get("history", {}),
@@ -1153,15 +1272,18 @@ def run_collect(version: str, manual_between: bool):
     )
 
     out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), fname)
+    debug_log(f"run_collect: сохраняю Excel path={out_path}")
     wb.save(out_path)
     print(f"[OK] Excel сохранён: {out_path}")
 
+    debug_log("run_collect: загружаю Excel в Google Sheets")
     ok = upload_excel_sheet_to_gsheets(out_path, SPREADSHEET_ID, version, version)
     if ok:
         print(f"[OK] Лист '{version}' загружен в Google Sheets {SPREADSHEET_ID}")
     else:
         print(f"[WARN] Ошибка загрузки листа '{version}' в Google Sheets")
 
+    debug_log(f"run_collect complete elapsed={time.monotonic() - started_collect:.2f}s")
     return out_path
 
 # ---------- Планирование ----------
@@ -1175,11 +1297,24 @@ def next_run_datetime(now: datetime) -> datetime:
     return now + timedelta(hours=1)
 
 def main():
+    global DEBUG_MODE
     print("=== Питон скрипт для Allure SWAT 733 ===")
-    version = input("Введите номер релиза (например 7.3.7000): ").strip()
+    raw_version = input("Введите номер релиза (например 7.3.7000): ").strip()
+    parts = raw_version.split()
+    if len(parts) >= 2 and parts[-1] == "1":
+        DEBUG_MODE = True
+        version = " ".join(parts[:-1]).strip()
+    else:
+        version = raw_version
     if not version:
         print("[ERROR] Не указан номер релиза.")
         sys.exit(2)
+    if DEBUG_MODE:
+        debug_log("DEBUG_MODE включен через ввод релиза с суффиксом '1'")
+        debug_log(f"version={version}")
+        debug_log(f"cwd={os.getcwd()}")
+        debug_log(f"script={os.path.abspath(__file__)}")
+        debug_log(f"python={sys.executable}")
 
     now = now_msk()
     nxt = next_run_datetime(now)
@@ -1196,6 +1331,7 @@ def main():
             except EOFError:
                 break
             if s == "1":
+                debug_log("manual listener: получена команда 1")
                 manual_flag["v"] = True
     listener = threading.Thread(target=_listen_manual, daemon=True)
     listener.start()
@@ -1204,7 +1340,12 @@ def main():
         now = now_msk()
         cur_label = time_to_label(dtime(now.hour, now.minute))
         if any(cur_label == time_to_label(t) for t in OFFICIAL_SLOTS):
-            run_collect(version, manual_between=False)
+            print("[AUTO] Запускаю плановый сбор...", flush=True)
+            try:
+                run_collect(version, manual_between=False)
+            except Exception as e:
+                debug_exception("auto run_collect failed", e)
+                print(f"[ERROR] Плановый сбор упал: {e}", flush=True)
             time.sleep(60)
             continue
 
@@ -1215,8 +1356,14 @@ def main():
             time.sleep(1)
             sec_passed += 1
             if manual_flag["v"]:
-                run_collect(version, manual_between=True)
-                manual_flag["v"] = False
+                print("[MANUAL] Запускаю ручной сбор...", flush=True)
+                try:
+                    run_collect(version, manual_between=True)
+                except Exception as e:
+                    debug_exception("manual run_collect failed", e)
+                    print(f"[ERROR] Ручной сбор упал: {e}", flush=True)
+                finally:
+                    manual_flag["v"] = False
                 nxt = next_run_datetime(now_msk())
                 remaining = max(1, int((nxt - now_msk()).total_seconds()))
                 sec_passed = 0
