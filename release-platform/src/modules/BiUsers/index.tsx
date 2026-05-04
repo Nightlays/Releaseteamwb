@@ -30,8 +30,16 @@ import {
 } from '../../components/ui';
 import { useApp, type ThemeMode } from '../../context/AppContext';
 import { useSettings } from '../../context/SettingsContext';
-import { checkProxy, proxyFetch } from '../../services/proxy';
+import { checkProxy } from '../../services/proxy';
 import { fetchBiUsersSnapshot, type BiUserRecord } from '../../services/youtrack';
+import {
+  BI_INTERVAL_OPTIONS,
+  biDriveFetch,
+  buildBiDriveGetUrl,
+  buildBiDriveSaveUrl,
+  mergeBiSnapshots,
+  normalizeBiSnapshotsPayload,
+} from '../../services/bi';
 
 Chart.register(
   BarController,
@@ -53,12 +61,8 @@ const SNAP_LIMIT = 20;
 const SNAP_DEFAULT = 4;
 const CHART_SNAP_MAX = 4;
 const SUMMARY_TOP_LIMIT = 20;
-const DRIVE = {
-  url: 'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec',
-  historyFile: 'bi_users_history.json',
-  cacheFile: 'wb_local_cache.json',
-};
-const INTERVAL_OPTIONS = ['today', 'yesterday', 'last_2_days', 'last_7_days', 'last_30_days'] as const;
+const BI_USERS_HISTORY_FILE = 'bi_users_history.json';
+const BI_USERS_CACHE_FILE = 'wb_local_cache.json';
 const BAR_COLORS = ['#6f1d7a', '#2e7d32', '#1565c0', '#ef6c00'];
 
 type SnapshotPlatform = 'iOS' | 'Android';
@@ -168,6 +172,62 @@ function getChartThemeColors(theme: ThemeMode): ChartThemeColors {
     green: readCssVar('--green', '#22C55E'),
     red: readCssVar('--red', '#EF4444'),
   };
+}
+
+function hexToRgba(color: string, alpha: number) {
+  const value = String(color || '').trim();
+  const match = value.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!match) return value;
+  const [, r, g, b] = match;
+  return `rgba(${parseInt(r, 16)},${parseInt(g, 16)},${parseInt(b, 16)},${alpha})`;
+}
+
+function createVerticalGradient(ctx: CanvasRenderingContext2D, area: { top: number; bottom: number }, color: string, topAlpha: number, bottomAlpha: number) {
+  const gradient = ctx.createLinearGradient(0, area.top, 0, area.bottom);
+  gradient.addColorStop(0, hexToRgba(color, topAlpha));
+  gradient.addColorStop(1, hexToRgba(color, bottomAlpha));
+  return gradient;
+}
+
+function roundedRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+function drawLabelPill(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  align: CanvasTextAlign,
+  color: string,
+  colors: ChartThemeColors,
+) {
+  const metrics = ctx.measureText(text);
+  const padX = 7;
+  const width = metrics.width + padX * 2;
+  const height = 19;
+  const left = align === 'left' ? x - 2 : align === 'right' ? x - width + 2 : x - width / 2;
+  const top = y - height + 5;
+
+  ctx.save();
+  roundedRectPath(ctx, left, top, width, height, 7);
+  ctx.fillStyle = hexToRgba(color, 0.13);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(color, 0.34);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = colors.labelStrong;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, left + width / 2, top + height / 2 + 0.5);
+  ctx.restore();
 }
 
 interface LabelRect {
@@ -556,20 +616,8 @@ function writeCache(items: SummaryRecord[]) {
   }
 }
 
-function normalizeSnapshotsFromDrive(raw: unknown): BiSnapshot[] {
-  const source = typeof raw === 'string' ? JSON.parse(raw || '[]') : raw;
-  const items = Array.isArray(source) ? source : source ? [source] : [];
-  return items
-    .map(normalizeSnapshot)
-    .filter((item): item is BiSnapshot => Boolean(item));
-}
-
 function mergeHistory(localHistory: BiSnapshot[], driveHistory: BiSnapshot[]) {
-  const byTime = new Map<string, BiSnapshot>();
-  [...localHistory, ...driveHistory].forEach(snapshot => {
-    byTime.set(snapshot.time, snapshot);
-  });
-  return [...byTime.values()].sort((a, b) => Date.parse(a.time) - Date.parse(b.time)).slice(-HISTORY_LIMIT);
+  return mergeBiSnapshots(localHistory, driveHistory, HISTORY_LIMIT);
 }
 
 function persistSnapshot(history: BiSnapshot[], snapshot: BiSnapshot) {
@@ -807,6 +855,67 @@ function computeAndroidSummary(rows: SummaryRecord[]) {
   ];
 }
 
+function classifyReleaseCohort(release: string) {
+  const normalized = normalizeReleaseName(release);
+  const lower = normalized.toLowerCase();
+  if (isDummyNine(normalized)) return 'Технические / dummy';
+  if (lower.includes('rustore')) return 'RuStore';
+  if (lower.includes('huawei')) return 'Huawei';
+  const parsed = parseVersionSemver(normalized);
+  const build = parsed.nums[2] || 0;
+  if (build > 0 && build % 1000 !== 0) return 'Hotfix';
+  if (/^\d+(?:\.\d+){2,3}/.test(normalized)) return 'Base release';
+  return 'Прочее';
+}
+
+function computeReleaseCohorts(rows: SummaryRecord[]) {
+  const total = rows.reduce((sum, row) => sum + Number(row.users || 0), 0);
+  const byLabel = new Map<string, { label: string; users: number; releases: number }>();
+  rows.forEach(row => {
+    const label = classifyReleaseCohort(row.release);
+    const current = byLabel.get(label) || { label, users: 0, releases: 0 };
+    current.users += Number(row.users || 0);
+    current.releases += 1;
+    byLabel.set(label, current);
+  });
+
+  return [...byLabel.values()]
+    .sort((left, right) => right.users - left.users)
+    .map(row => ({
+      ...row,
+      share: total > 0 ? (row.users / total) * 100 : 0,
+    }));
+}
+
+function buildBiUsersWarnings(rows: SummaryRecord[], currentTotals: { ios: number; android: number; total: number }, previousTotals: { total: number }) {
+  const warnings: string[] = [];
+  if (!rows.length) {
+    warnings.push('Текущий снэпшот пустой или не выбран.');
+    return warnings;
+  }
+  if (!currentTotals.ios) warnings.push('В текущем срезе нет iOS аудитории.');
+  if (!currentTotals.android) warnings.push('В текущем срезе нет Android аудитории.');
+
+  const dummyUsers = rows
+    .filter(row => isDummyNine(row.release))
+    .reduce((sum, row) => sum + Number(row.users || 0), 0);
+  if (dummyUsers > 0) warnings.push(`Есть dummy-релизы 99.9999: ${formatNumber(dummyUsers)} пользователей.`);
+
+  if (previousTotals.total > 0) {
+    const pct = ((currentTotals.total - previousTotals.total) / previousTotals.total) * 100;
+    if (pct <= -10) warnings.push(`Общая аудитория просела на ${pct.toFixed(1)}% к предыдущему срезу.`);
+    if (pct >= 15) warnings.push(`Общая аудитория выросла на ${pct.toFixed(1)}% к предыдущему срезу, стоит проверить интервал BI.`);
+  }
+
+  const top = rows.slice().sort((left, right) => Number(right.users || 0) - Number(left.users || 0))[0];
+  if (top && currentTotals.total > 0) {
+    const share = (Number(top.users || 0) / currentTotals.total) * 100;
+    if (share > 80) warnings.push(`Версия ${top.release} занимает ${share.toFixed(1)}% общей аудитории.`);
+  }
+
+  return warnings;
+}
+
 function getTopReleasesByPlatformFromSummary(rows: SummaryRecord[]) {
   const acc = { ios: new Map<string, number>(), android: new Map<string, number>() };
   rows.forEach(row => {
@@ -926,46 +1035,14 @@ function downloadCsv(rows: string[][], filename: string) {
   URL.revokeObjectURL(url);
 }
 
-async function driveFetch(settings: ReturnType<typeof buildRuntimeSettings>, rawUrl: string, init?: RequestInit) {
-  const headers = {
-    Accept: 'application/json',
-    ...((init?.headers as Record<string, string> | undefined) || {}),
-  };
-
-  if (settings.useProxy !== false && String(settings.proxyBase || '').trim()) {
-    return proxyFetch(
-      {
-        base: String(settings.proxyBase || '').trim(),
-        mode: 'prefix',
-      },
-      rawUrl,
-      {
-        ...init,
-        headers,
-      },
-    );
-  }
-
-  return fetch(rawUrl, {
-    ...init,
-    headers,
-  });
-}
-
-function buildDriveGetUrl(name: string) {
-  return `${DRIVE.url}?op=get&name=${encodeURIComponent(name)}`;
-}
-
-function buildDriveSaveUrl(name: string) {
-  return `${DRIVE.url}?name=${encodeURIComponent(name)}`;
-}
-
 function buildRuntimeSettings(settings: {
   proxyBase: string;
+  proxyMode: 'query' | 'prefix';
   useProxy: boolean;
 }) {
   return {
     proxyBase: settings.proxyBase,
+    proxyMode: settings.proxyMode,
     useProxy: settings.useProxy,
   };
 }
@@ -998,9 +1075,7 @@ function createBarOverlayPlugin(values: number[], deltas: number[], colors: Char
           stepY: 16,
           minTop: chartArea.top + 4,
         });
-        ctx.fillStyle = colors.labelStrong;
-        ctx.textAlign = valuePlacement.align;
-        ctx.fillText(valueLabel, valuePlacement.x, valuePlacement.y);
+        drawLabelPill(ctx, valueLabel, valuePlacement.x, valuePlacement.y, valuePlacement.align, '#64748B', colors);
 
         const delta = Number(deltas[index] || 0);
         if (delta !== 0) {
@@ -1011,9 +1086,7 @@ function createBarOverlayPlugin(values: number[], deltas: number[], colors: Char
             stepY: 16,
             minTop: chartArea.top + 4,
           });
-          ctx.fillStyle = delta > 0 ? colors.green : colors.red;
-          ctx.textAlign = deltaPlacement.align;
-          ctx.fillText(deltaLabel, deltaPlacement.x, deltaPlacement.y);
+          drawLabelPill(ctx, deltaLabel, deltaPlacement.x, deltaPlacement.y, deltaPlacement.align, delta > 0 ? colors.green : colors.red, colors);
         }
       }
       ctx.restore();
@@ -1055,9 +1128,8 @@ function createLineLabelsPlugin(colors: ChartThemeColors) {
             stepY: 18,
             minTop: chartArea.top + 4,
           });
-          ctx.fillStyle = colors.labelStrong;
-          ctx.textAlign = placement.align;
-          ctx.fillText(labelText, placement.x, placement.y);
+          const datasetColor = String((dataset as { borderColor?: unknown }).borderColor || '#64748B');
+          drawLabelPill(ctx, labelText, placement.x, placement.y, placement.align, datasetColor, colors);
         });
       });
       ctx.restore();
@@ -1091,12 +1163,23 @@ function DeltaChart({
         datasets: model.datasets.map(dataset => ({
           label: dataset.label,
           data: dataset.data,
-          backgroundColor: `${dataset.color}22`,
+          backgroundColor: (context: { chart: Chart }) => {
+            const { ctx, chartArea } = context.chart;
+            if (!chartArea) return hexToRgba(dataset.color, 0.2);
+            return createVerticalGradient(ctx, chartArea, dataset.color, 0.46, 0.1);
+          },
+          hoverBackgroundColor: (context: { chart: Chart }) => {
+            const { ctx, chartArea } = context.chart;
+            if (!chartArea) return hexToRgba(dataset.color, 0.34);
+            return createVerticalGradient(ctx, chartArea, dataset.color, 0.68, 0.18);
+          },
           borderColor: dataset.color,
-          borderWidth: 1.5,
-          borderRadius: 6,
-          barPercentage: 0.9,
-          categoryPercentage: 0.6,
+          hoverBorderColor: dataset.color,
+          borderWidth: 1.7,
+          borderRadius: 8,
+          borderSkipped: false,
+          barPercentage: 0.86,
+          categoryPercentage: 0.62,
         })),
       },
       options: {
@@ -1118,6 +1201,17 @@ function DeltaChart({
           tooltip: {
             mode: 'index',
             intersect: false,
+            backgroundColor: hexToRgba(themeColors.surface, 0.96),
+            titleColor: themeColors.text,
+            bodyColor: themeColors.text2,
+            borderColor: themeColors.border,
+            borderWidth: 1,
+            padding: 12,
+            displayColors: true,
+            usePointStyle: true,
+            titleFont: { family: themeColors.font, size: 12, weight: 700 },
+            bodyFont: { family: themeColors.mono, size: 11, weight: 500 },
+            cornerRadius: 10,
             callbacks: {
               title: items => model.fullLabels[items[0]?.dataIndex || 0] || '',
               label: context => `${context.dataset.label}: ${formatNumber(Number(context.raw || 0))}`,
@@ -1198,11 +1292,24 @@ function TrendChart({
           label: dataset.label,
           data: dataset.data,
           borderColor: dataset.borderColor,
-          backgroundColor: dataset.backgroundColor,
-          tension: 0.3,
-          borderWidth: dataset.label === 'Итого' ? 2.5 : 1.8,
+          backgroundColor: (context: { chart: Chart }) => {
+            const { ctx, chartArea } = context.chart;
+            if (!chartArea) return dataset.backgroundColor;
+            return createVerticalGradient(ctx, chartArea, dataset.borderColor, dataset.label === 'Итого' ? 0.22 : 0.15, 0.015);
+          },
+          fill: true,
+          tension: 0.34,
+          borderCapStyle: 'round',
+          borderJoinStyle: 'round',
+          borderWidth: dataset.label === 'Итого' ? 2.8 : 2,
           pointRadius: dataset.label === 'Итого' ? 4 : 3,
           pointHoverRadius: dataset.label === 'Итого' ? 5 : 4,
+          pointBackgroundColor: themeColors.surface,
+          pointBorderColor: dataset.borderColor,
+          pointBorderWidth: 2,
+          pointHoverBackgroundColor: dataset.borderColor,
+          pointHoverBorderColor: themeColors.labelStrong,
+          pointHoverBorderWidth: 2,
         })),
       },
       options: {
@@ -1222,6 +1329,19 @@ function TrendChart({
             },
           },
           tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: hexToRgba(themeColors.surface, 0.96),
+            titleColor: themeColors.text,
+            bodyColor: themeColors.text2,
+            borderColor: themeColors.border,
+            borderWidth: 1,
+            padding: 12,
+            displayColors: true,
+            usePointStyle: true,
+            titleFont: { family: themeColors.font, size: 12, weight: 700 },
+            bodyFont: { family: themeColors.mono, size: 11, weight: 500 },
+            cornerRadius: 10,
             callbacks: {
               label: context => `${context.dataset.label}: ${formatNumber(Number(context.raw || 0))}`,
             },
@@ -1303,10 +1423,10 @@ export function BiUsers() {
 
     const bootstrap = async () => {
       try {
-        const response = await driveFetch(runtimeSettings, buildDriveGetUrl(DRIVE.historyFile), { method: 'GET' });
+        const response = await biDriveFetch(runtimeSettings, buildBiDriveGetUrl(BI_USERS_HISTORY_FILE), { method: 'GET' });
         const text = await response.text();
         if (!response.ok) throw new Error(`Drive history HTTP ${response.status}`);
-        const merged = mergeHistory(readHistory(), normalizeSnapshotsFromDrive(text));
+        const merged = mergeHistory(readHistory(), normalizeBiSnapshotsPayload(text, normalizeSnapshot));
         if (!cancelled) {
           writeHistory(merged);
           setHistory(merged);
@@ -1403,6 +1523,11 @@ export function BiUsers() {
     () => filteredRows.reduce((sum, row) => sum + Number(row.users || 0), 0),
     [filteredRows],
   );
+  const releaseCohorts = useMemo(() => computeReleaseCohorts(summaryRaw), [summaryRaw]);
+  const biUsersWarnings = useMemo(
+    () => buildBiUsersWarnings(summaryRaw, currentTotals, previousTotals),
+    [currentTotals, previousTotals, summaryRaw],
+  );
   const visiblePlatformsLabel = useMemo(() => {
     const labels = [];
     if (moduleSettings.chartShowIos && moduleSettings.platforms.includes('iOS')) labels.push('iOS');
@@ -1470,12 +1595,12 @@ export function BiUsers() {
       setStatusTone('ok');
 
       try {
-        await driveFetch(runtimeSettings, buildDriveSaveUrl(DRIVE.historyFile), {
+        await biDriveFetch(runtimeSettings, buildBiDriveSaveUrl(BI_USERS_HISTORY_FILE), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(nextHistory),
         });
-        await driveFetch(runtimeSettings, buildDriveSaveUrl(DRIVE.cacheFile), {
+        await biDriveFetch(runtimeSettings, buildBiDriveSaveUrl(BI_USERS_CACHE_FILE), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload.records),
@@ -1622,7 +1747,7 @@ export function BiUsers() {
             <div>
               <FieldLabel>Интервал WB BI</FieldLabel>
               <Select value={moduleSettings.interval} onChange={event => updateSettings({ interval: event.target.value })}>
-                {INTERVAL_OPTIONS.map(option => (
+                {BI_INTERVAL_OPTIONS.map(option => (
                   <option key={option} value={option}>{option}</option>
                 ))}
               </Select>
@@ -1740,6 +1865,45 @@ export function BiUsers() {
           </div>
         </CardBody>
       </Card>
+
+      {(releaseCohorts.length > 0 || biUsersWarnings.length > 0) && (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Качество среза и когорты</CardTitle>
+              <CardHint>Быстрая проверка текущего BI-снимка перед выводами по аудитории релизов.</CardHint>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <Badge color={biUsersWarnings.length ? 'yellow' : 'green'}>{biUsersWarnings.length ? `${biUsersWarnings.length} сигналов` : 'без сигналов'}</Badge>
+              <Badge color="gray">{releaseCohorts.length} когорт</Badge>
+            </div>
+          </CardHeader>
+          <CardBody style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, .8fr)', gap: 14, paddingTop: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+              {releaseCohorts.map(row => (
+                <MetricTile
+                  key={row.label}
+                  label={row.label}
+                  value={formatNumber(row.users)}
+                  meta={`${row.releases} релизов · ${row.share.toFixed(2)}%`}
+                  tone={row.label === 'Hotfix' ? 'accent' : row.label === 'Технические / dummy' ? 'negative' : 'neutral'}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {biUsersWarnings.length ? biUsersWarnings.map(item => (
+                <div key={item} style={{ padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(245,158,11,.22)', background: 'rgba(245,158,11,.08)', color: 'var(--text-2)', fontSize: 12 }}>
+                  {item}
+                </div>
+              )) : (
+                <div style={{ padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(34,197,94,.18)', background: 'rgba(34,197,94,.08)', color: 'var(--text-2)', fontSize: 12 }}>
+                  Срез выглядит консистентно: обе платформы присутствуют, резких общих скачков не найдено.
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       <div ref={chartsCardRef}>
         <Card>

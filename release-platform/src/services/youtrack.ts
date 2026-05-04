@@ -52,6 +52,27 @@ export interface BiUsersSnapshotPayload {
   fetchedAt: string;
 }
 
+export interface BiAudienceCrossRow {
+  platform: 'android' | 'ios';
+  release: string;
+  manufacturer: string;
+  model: string;
+  os: string;
+  users: number;
+  total: number;
+  share: number;
+}
+
+export interface BiAudienceCrossPayload {
+  rows: BiAudienceCrossRow[];
+  fetchedAt: string;
+  totals: Record<'android' | 'ios', number>;
+  dataSourceId: number;
+  userRecords?: BiUserRecord[];
+  deviceRows?: BiDeviceRow[];
+  osRows?: BiDeviceOsRow[];
+}
+
 interface YtCustomField {
   name?: string;
   value?: unknown;
@@ -144,8 +165,19 @@ const BI_API_CACHE = `${BI_BASE}/cache-puller/api/v1/cache`;
 const BI_DATASOURCE_ID = 11386;
 const BI_DEVICE_DS_ID = 14517;
 const BI_DEVICE_OS_DS_ID = 16888;
+export const BI_AUDIENCE_COMPOSITE_SOURCE = {
+  usersDataSourceId: BI_DATASOURCE_ID,
+  devicesDataSourceId: BI_DEVICE_DS_ID,
+  osDataSourceId: BI_DEVICE_OS_DS_ID,
+} as const;
+export const BI_AUDIENCE_CROSS_SOURCE = {
+  dataSourceId: 0,
+  intervalParamId: 0,
+  platformParamId: 0,
+} as const;
 const BI_DBCONN_ID = 4;
 const BI_V2_DATASOURCES = new Set([BI_DATASOURCE_ID, BI_DEVICE_DS_ID, BI_DEVICE_OS_DS_ID]);
+const BI_V2_DATASOURCE_MIN_ID = 10000;
 const BI_READY_STATUSES = new Set(['RESOLVED', 'DONE', 'SUCCESS', 'READY', 'CACHE_READY']);
 const BI_ERROR_STATUSES = new Set(['FAILED', 'ERROR']);
 
@@ -226,7 +258,7 @@ function findStringDeep(input: unknown, key: string): string {
 }
 
 function isBiV2DataSource(dataSourceId: number) {
-  return BI_V2_DATASOURCES.has(dataSourceId);
+  return BI_V2_DATASOURCES.has(dataSourceId) || dataSourceId >= BI_V2_DATASOURCE_MIN_ID;
 }
 
 function getBiQueueUrl(dataSourceId: number) {
@@ -1347,6 +1379,54 @@ function createDeviceOsBody(platform: 'Android' | 'iOS', interval: string) {
   };
 }
 
+function createAudienceCrossBody(options: {
+  dataSourceId: number;
+  platform?: 'Android' | 'iOS';
+  interval?: string;
+  intervalParamId?: number;
+  platformParamId?: number;
+}) {
+  const queryParams: unknown[] = [];
+
+  if (options.intervalParamId && options.interval) {
+    queryParams.push({
+      id: options.intervalParamId,
+      key: 'interval',
+      live: true,
+      order: queryParams.length,
+      position: 'atop',
+      selectConfig: { cascadeColumns: [], columnAdditional: null, isCascade: false, isMultiselect: false, optionsArray: [] },
+      serializationMethodId: 'unquoted',
+      typeId: 'dateRange',
+      value: { start: options.interval },
+    });
+  }
+
+  if (options.platformParamId && options.platform) {
+    queryParams.push({
+      id: options.platformParamId,
+      key: 'Платформа',
+      live: false,
+      order: queryParams.length,
+      position: 'atop',
+      selectConfig: { isMultiselect: false, optionsArray: ['Android', 'iOS'], optionsTypeId: 'manual' },
+      serializationMethodId: 'singleQuoted',
+      typeId: 'select',
+      value: [{ label: options.platform, value: options.platform }],
+    });
+  }
+
+  return {
+    dashboardId: 0,
+    dataSourceId: options.dataSourceId,
+    metaOnly: false,
+    onlyCache: false,
+    widgetId: 0,
+    withLimitation: false,
+    queryParams,
+  };
+}
+
 function rowsToDeviceRecords(rows: unknown[], platform: 'Android' | 'iOS'): BiDeviceRow[] {
   const normalizedPlatform = toDevicePlatform(platform);
 
@@ -1399,6 +1479,80 @@ function rowsToDeviceOsRecords(rows: unknown[], platform: 'Android' | 'iOS'): Bi
       share: Number(record.share == null ? 0 : record.share),
     };
   }).filter(row => row.os).sort((a, b) => b.users - a.users);
+}
+
+function normalizeAudiencePlatform(value: unknown): 'android' | 'ios' | null {
+  const text = String(value || '').trim().toLowerCase();
+  if (text === 'ios' || text === 'iphone' || text === 'iOS'.toLowerCase()) return 'ios';
+  if (text === 'android' || text === 'андроид') return 'android';
+  return null;
+}
+
+function findNumberField(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (value != null && value !== '') return Number(value || 0);
+  }
+  return 0;
+}
+
+function findStringField(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (value != null && String(value || '').trim()) return String(value || '').trim();
+  }
+  return '';
+}
+
+function normalizeAudienceCrossRow(row: unknown, fallbackPlatform?: 'Android' | 'iOS'): BiAudienceCrossRow | null {
+  if (Array.isArray(row)) {
+    const firstPlatform = normalizeAudiencePlatform(row[0]);
+    const platform = firstPlatform || normalizeAudiencePlatform(fallbackPlatform);
+    const offset = firstPlatform ? 1 : 0;
+    if (!platform) return null;
+    const release = String(row[offset] || '').trim();
+    const manufacturer = String(row[offset + 1] || '').trim();
+    const model = String(row[offset + 2] || '').trim();
+    const os = String(row[offset + 3] || '').trim();
+    const users = Number(row[offset + 4] || 0);
+    const total = Number(row[offset + 5] || 0);
+    const share = Number(row[offset + 6] == null ? 0 : row[offset + 6]);
+    if (!release || !model || !users) return null;
+    return { platform, release, manufacturer, model, os, users, total, share };
+  }
+
+  const record = row as Record<string, unknown>;
+  const platform = normalizeAudiencePlatform(
+    record.platform || record.Platform || record['Платформа'] || record.os_name || fallbackPlatform,
+  );
+  if (!platform) return null;
+
+  const release = findStringField(record, [
+    'release',
+    'app_release',
+    'appVersion',
+    'app_version',
+    'version',
+    'ver',
+    'Версия',
+    'Версия приложения',
+  ]);
+  const manufacturer = findStringField(record, ['manufacturer', 'vendor', 'brand', 'Производитель']);
+  const model = findStringField(record, ['model', 'device', 'device_model', 'phone_model', 'Модель', 'Устройство']);
+  const os = findStringField(record, ['os', 'os_version', 'system_version', 'Версия ОС', 'OS']);
+  const users = findNumberField(record, ['users', 'user_count', 'count', 'value', 'Пользователи']);
+  const total = findNumberField(record, ['total', 'platform_total', 'Всего']);
+  const share = findNumberField(record, ['share', 'percent', 'pct', 'Доля']);
+
+  if (!release || !model || !users) return null;
+  return { platform, release, manufacturer, model, os, users, total, share };
+}
+
+function rowsToAudienceCrossRecords(rows: unknown[], fallbackPlatform?: 'Android' | 'iOS') {
+  return (Array.isArray(rows) ? rows : [])
+    .map(row => normalizeAudienceCrossRow(row, fallbackPlatform))
+    .filter((row): row is BiAudienceCrossRow => Boolean(row))
+    .sort((left, right) => right.users - left.users);
 }
 
 async function fetchBiPlatform(cfg: YtConfig, platform: typeof BI_PLATFORM_ORDER[number], interval = BI_INTERVAL) {
@@ -1481,6 +1635,152 @@ export async function fetchBiDevices(
     osRows,
     totals,
     fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function fetchBiAudienceCross(
+  cfg: YtConfig,
+  options?: {
+    dataSourceId?: number;
+    platforms?: Array<'Android' | 'iOS'>;
+    interval?: string;
+    intervalParamId?: number;
+    platformParamId?: number;
+  }
+): Promise<BiAudienceCrossPayload> {
+  const dataSourceId = Number(options?.dataSourceId || BI_AUDIENCE_CROSS_SOURCE.dataSourceId || 0);
+  if (!dataSourceId) {
+    throw new Error('BI datasource release × device × OS не настроен в src/services/youtrack.ts.');
+  }
+
+  const intervalParamId = Number(options?.intervalParamId || BI_AUDIENCE_CROSS_SOURCE.intervalParamId || 0) || undefined;
+  const platformParamId = Number(options?.platformParamId || BI_AUDIENCE_CROSS_SOURCE.platformParamId || 0) || undefined;
+  const interval = String(options?.interval || 'last_2_days').trim() || 'last_2_days';
+  const shouldSplitByPlatform = Boolean(platformParamId);
+  const platforms: Array<'Android' | 'iOS'> = options?.platforms?.length ? options.platforms : ['Android', 'iOS'];
+  const bodies = shouldSplitByPlatform
+    ? platforms.map(platform => ({ platform, body: createAudienceCrossBody({
+        dataSourceId,
+        platform,
+        interval,
+        intervalParamId,
+        platformParamId,
+      }) }))
+    : [{ platform: undefined, body: createAudienceCrossBody({
+        dataSourceId,
+        interval,
+        intervalParamId,
+        platformParamId,
+      }) }];
+
+  const rows = (await Promise.all(bodies.map(async item => {
+    const rawRows = await runBiQuery(cfg, dataSourceId, item.body);
+    return rowsToAudienceCrossRecords(rawRows, item.platform);
+  }))).flat();
+
+  const totals: Record<'android' | 'ios', number> = { android: 0, ios: 0 };
+  rows.forEach(row => {
+    if (row.total > totals[row.platform]) totals[row.platform] = row.total;
+  });
+  if (!totals.android) totals.android = rows.filter(row => row.platform === 'android').reduce((sum, row) => sum + Number(row.users || 0), 0);
+  if (!totals.ios) totals.ios = rows.filter(row => row.platform === 'ios').reduce((sum, row) => sum + Number(row.users || 0), 0);
+
+  return {
+    rows,
+    fetchedAt: new Date().toISOString(),
+    totals,
+    dataSourceId,
+  };
+}
+
+function buildCompositeAudienceRows(
+  userRecords: BiUserRecord[],
+  deviceRows: BiDeviceRow[],
+  osRows: BiDeviceOsRow[],
+  totals: Record<'android' | 'ios', number>,
+): BiAudienceCrossRow[] {
+  const result: BiAudienceCrossRow[] = [];
+  const releaseLimit = 30;
+  const deviceLimit = 14;
+  const osLimit = 8;
+
+  (['android', 'ios'] as const).forEach(platform => {
+    const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
+    const releases = userRecords
+      .filter(row => row.platform === platformLabel)
+      .sort((left, right) => right.users - left.users)
+      .slice(0, releaseLimit);
+    const devices = deviceRows
+      .filter(row => row.platform === platform)
+      .sort((left, right) => right.users - left.users)
+      .slice(0, deviceLimit);
+    const osList = osRows
+      .filter(row => row.platform === platform)
+      .sort((left, right) => right.users - left.users)
+      .slice(0, osLimit);
+
+    const releaseTotal = releases.reduce((sum, row) => sum + Number(row.users || 0), 0);
+    const deviceTotal = Number(totals[platform] || 0)
+      || devices.reduce((sum, row) => sum + Number(row.users || 0), 0);
+    const osTotal = osList.reduce((sum, row) => sum + Number(row.users || 0), 0);
+    const platformTotal = Math.max(releaseTotal, deviceTotal, osTotal);
+    if (!platformTotal || !releaseTotal || !deviceTotal || !releases.length || !devices.length) return;
+
+    const normalizedOsList = osList.length
+      ? osList.map(row => ({ os: row.os, share: Number(row.users || 0) / Math.max(1, osTotal) }))
+      : [{ os: '', share: 1 }];
+
+    releases.forEach(release => {
+      const releaseShare = Number(release.users || 0) / Math.max(1, releaseTotal);
+      devices.forEach(device => {
+        const deviceShare = Number(device.users || 0) / Math.max(1, deviceTotal);
+        normalizedOsList.forEach(os => {
+          const users = Math.round(platformTotal * releaseShare * deviceShare * os.share);
+          if (users <= 0) return;
+          result.push({
+            platform,
+            release: release.release,
+            manufacturer: device.manufacturer,
+            model: device.model,
+            os: os.os,
+            users,
+            total: platformTotal,
+            share: platformTotal > 0 ? users / platformTotal : 0,
+          });
+        });
+      });
+    });
+  });
+
+  return result.sort((left, right) => right.users - left.users);
+}
+
+export async function fetchBiAudienceComposite(
+  cfg: YtConfig,
+  options?: { interval?: string; platforms?: Array<'Android' | 'iOS'> },
+): Promise<BiAudienceCrossPayload> {
+  const interval = String(options?.interval || BI_INTERVAL).trim() || BI_INTERVAL;
+  const platforms: Array<'Android' | 'iOS'> = options?.platforms?.length ? options.platforms : ['Android', 'iOS'];
+  const [usersPayload, devicesPayload] = await Promise.all([
+    fetchBiUsersSnapshot(cfg, { platforms, interval }),
+    fetchBiDevices(cfg, { platforms, interval }),
+  ]);
+
+  const rows = buildCompositeAudienceRows(
+    usersPayload.records,
+    devicesPayload.rows,
+    devicesPayload.osRows,
+    devicesPayload.totals,
+  );
+
+  return {
+    rows,
+    fetchedAt: new Date().toISOString(),
+    totals: devicesPayload.totals,
+    dataSourceId: 0,
+    userRecords: usersPayload.records,
+    deviceRows: devicesPayload.rows,
+    osRows: devicesPayload.osRows,
   };
 }
 

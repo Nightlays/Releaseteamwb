@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { ModuleDefinition } from '../../config/modules';
 import { StatusPill, Button } from '../ui';
 import { THEME_LIST, type ThemeMode } from '../../context/AppContext';
+import { ServiceLauncher } from './ServiceLauncher';
 
 interface TopbarProps {
   module: ModuleDefinition;
@@ -13,6 +14,7 @@ interface TopbarProps {
   onRefresh: () => void;
   onOpenLegacy: () => void;
   showLegacyButton?: boolean;
+  showServiceLauncher?: boolean;
 }
 
 function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t: ThemeMode) => void }) {
@@ -157,7 +159,17 @@ function ThemeDropdown({ theme, onSetTheme }: { theme: ThemeMode; onSetTheme: (t
   );
 }
 
-export function Topbar({ module, proxyOnline, mlReady, theme, onSetTheme, onRefresh, onOpenLegacy, showLegacyButton = true }: TopbarProps) {
+export function Topbar({
+  module,
+  proxyOnline,
+  mlReady,
+  theme,
+  onSetTheme,
+  onRefresh,
+  onOpenLegacy,
+  showLegacyButton = true,
+  showServiceLauncher = false,
+}: TopbarProps) {
   return (
     <header className="app-topbar" style={{
       position: 'relative',
@@ -178,6 +190,7 @@ export function Topbar({ module, proxyOnline, mlReady, theme, onSetTheme, onRefr
       </div>
 
       <div className="app-topbar__actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {showServiceLauncher && <ServiceLauncher placement="bottom-end" />}
         <StatusPill status={proxyOnline ? 'live' : 'error'}>Proxy {proxyOnline ? 'online' : 'offline'}</StatusPill>
         <StatusPill status={mlReady ? 'live' : 'warn'}>ML {mlReady ? 'ready' : 'pending'}</StatusPill>
         <ThemeDropdown theme={theme} onSetTheme={onSetTheme} />

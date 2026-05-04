@@ -1681,7 +1681,7 @@ export function Dashboard() {
 
       setLoadingStep('Загружаем данные Allure (статусы, memberstats)…');
       const [dashboardData, readinessData] = await Promise.all([
-        fetchDashboardAggregate(cfg, version).then(data => {
+        fetchDashboardAggregate(cfg, version, { forceRefreshDetails: true }).then(data => {
           setLoadedPct(62);
           setLoadingStep('Загружаем готовностный launch…');
           return data;

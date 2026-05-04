@@ -11,6 +11,7 @@ import { MODULE_BY_ID, MODULE_BY_LEGACY_ID, MODULE_SECTIONS, type ModuleId } fro
 import { Dashboard } from './modules/Dashboard';
 import { GoalsPortal } from './modules/GoalsPortal';
 import { Charts } from './modules/Charts';
+import { BiAudience } from './modules/BiAudience';
 import { BiUsers } from './modules/BiUsers';
 import { Devices } from './modules/Devices';
 import { Launch } from './modules/Launch';
@@ -74,6 +75,8 @@ function ModuleContent({ moduleId, refreshKey, rbac, role, onRbacChange }: { mod
       return <div key={key}><SwatRelease /></div>;
     case 'uvu':
       return <div key={key}><Uvu /></div>;
+    case 'biaudience':
+      return <div key={key}><BiAudience /></div>;
     case 'vangovat':
       return <div key={key}><Vangovat /></div>;
     case 'ytcopy':

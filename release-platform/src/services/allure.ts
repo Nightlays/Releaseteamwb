@@ -69,6 +69,10 @@ export interface DashboardAggregateResult {
   manualWindowStopTs: number | null;
 }
 
+export interface DashboardAggregateOptions {
+  forceRefreshDetails?: boolean;
+}
+
 export interface ReadinessLaunchSummary {
   platform: 'android' | 'ios';
   id: number | null;
@@ -1139,7 +1143,8 @@ export async function fetchReadinessSummary(
 
 export async function fetchDashboardAggregate(
   cfg: AllureConfig,
-  releaseVersion?: string
+  releaseVersion?: string,
+  options: DashboardAggregateOptions = {}
 ): Promise<DashboardAggregateResult> {
   const rawLaunches = await fetchLaunches(cfg, releaseVersion);
   const releaseCache = readDashboardReleaseCache(releaseVersion);
@@ -1199,7 +1204,7 @@ export async function fetchDashboardAggregate(
       continue;
     }
 
-    if (cachedEntry && isReusableDashboardCacheEntry(cachedEntry, rawLaunch)) {
+    if (!options.forceRefreshDetails && cachedEntry && isReusableDashboardCacheEntry(cachedEntry, rawLaunch)) {
       const reusableEntry = cachedEntry;
       const counts = sanitizeDashboardCounts(reusableEntry.counts);
       if (current) {

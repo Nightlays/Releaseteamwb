@@ -8,6 +8,7 @@ export type ModuleId =
   | 'launch'
   | 'chp'
   | 'uvu'
+  | 'biaudience'
   | 'biusers'
   | 'devices'
   | 'charts'
@@ -240,6 +241,15 @@ export const MODULES: ModuleDefinition[] = [
     sub: 'Управление версионными обновлениями',
     section: 'Аналитика',
     icon: icUvu,
+  },
+  {
+    id: 'biaudience',
+    legacyId: 'BI аудитория.html',
+    label: 'BI аудитория',
+    sub: 'Версии × устройства × OS',
+    section: 'Аналитика',
+    icon: icCharts,
+    showLegacyButton: false,
   },
   {
     id: 'biusers',
