@@ -38,7 +38,7 @@ export const FEED_CHANNEL_ID         = 'tdj9ns46eprx8n5neupw8ejw9c';
 const GROUP_ANDROID_ID               = 'bbtekcuhfjykmm9awe56gebj9y';
 const GROUP_IOS_ID                   = '6skkxrr3ufrkmy1u3paepd35ar';
 
-const NOTICE_CHANNELS: Array<{ id: string; name: string }> = [
+export const NOTICE_CHANNELS: Array<{ id: string; name: string }> = [
   { id: 'e87794p6sirx8kyg71dgrzp74r', name: 'mp-ios-release' },
   { id: 'bzd6dd5133855cor6faew61xtr', name: 'mp-Релиз Андроид' },
   { id: '11pg8zfbdfbwpdzijiseg6g6zr', name: 'Олеся и Лиды QA' },
@@ -309,6 +309,23 @@ async function proxyRequest<T>(
   return JSON.parse(text) as T;
 }
 
+async function proxyBlobRequest(
+  proxyBase: string,
+  method: string,
+  targetUrl: string,
+  headers: Record<string, string>,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const base = String(proxyBase || '').replace(/\/+$/, '');
+  const proxyUrl = `${base}/proxy?url=${encodeURIComponent(targetUrl)}`;
+  const resp = await fetch(proxyUrl, { method, headers, signal, cache: 'no-store' });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Proxy HTTP ${resp.status} для ${targetUrl}: ${text.slice(0, 200)}`);
+  }
+  return resp.blob();
+}
+
 // ─── ALLURE API ────────────────────────────────────────────────
 
 async function allureFetch<T>(
@@ -331,6 +348,30 @@ async function allureFetch<T>(
 async function allureFetchUrl<T>(token: string, url: string, signal?: AbortSignal): Promise<T> {
   const headers = allureHeaders(token);
   const resp = await fetch(url, { headers, signal, mode: 'cors', credentials: 'omit' });
+  const text = await resp.text();
+  if (!resp.ok) throw new Error(`Allure HTTP ${resp.status}: ${text.slice(0, 200)}`);
+  if (!text.trim()) return null as T;
+  return JSON.parse(text) as T;
+}
+
+async function allureRequestUrl<T>(
+  token: string,
+  method: string,
+  url: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  const init: RequestInit = {
+    method,
+    headers: allureHeaders(token),
+    signal,
+    mode: 'cors',
+    credentials: 'omit',
+  };
+  if (body !== undefined && body !== null) {
+    init.body = typeof body === 'string' ? body : JSON.stringify(body);
+  }
+  const resp = await fetch(url, init);
   const text = await resp.text();
   if (!resp.ok) throw new Error(`Allure HTTP ${resp.status}: ${text.slice(0, 200)}`);
   if (!text.trim()) return null as T;
@@ -425,6 +466,184 @@ async function bandSearchUserIds(
 }
 
 export type BandPresenceStatus = 'online' | 'away' | 'dnd' | 'offline';
+
+export interface BandUserSuggestion {
+  id: string;
+  handle: string;
+  displayName: string;
+  email: string;
+  position: string;
+  avatarStamp: number;
+  presence: BandPresenceStatus;
+}
+
+function normalizeBandUserSuggestion(user: {
+  id?: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  nickname?: string;
+  email?: string;
+  position?: string;
+  last_picture_update?: number | string;
+  update_at?: number | string;
+  create_at?: number | string;
+}): BandUserSuggestion | null {
+  const username = String(user?.username || '').trim().replace(/^@+/, '');
+  if (!username) return null;
+  const firstName = String(user?.first_name || '').trim();
+  const lastName = String(user?.last_name || '').trim();
+  const nickname = String(user?.nickname || '').trim();
+  const displayName = [firstName, lastName].filter(Boolean).join(' ').trim() || nickname || username;
+  return {
+    id: String(user?.id || username).trim() || username,
+    handle: `@${username}`,
+    displayName,
+    email: String(user?.email || '').trim(),
+    position: String(user?.position || '').trim(),
+    avatarStamp: Number(user?.last_picture_update || user?.update_at || user?.create_at || 0) || 0,
+    presence: 'offline',
+  };
+}
+
+export async function searchBandUsers(
+  proxyBase: string,
+  cookies: string,
+  term: string,
+  signal?: AbortSignal,
+): Promise<BandUserSuggestion[]> {
+  const query = String(term || '').trim();
+  if (query.length < 2 || !cookies.trim()) return [];
+  const data = await proxyRequest<unknown>(
+    proxyBase,
+    'POST',
+    `${BAND_BASE}/api/v4/users/search`,
+    bandGetHeaders(cookies),
+    { term: query.replace(/^@+/, ''), team_id: '' },
+    signal,
+  );
+  const seen = new Set<string>();
+  const users = (Array.isArray(data) ? data : [])
+    .map(user => normalizeBandUserSuggestion(user as Parameters<typeof normalizeBandUserSuggestion>[0]))
+    .filter((user): user is BandUserSuggestion => Boolean(user))
+    .filter(user => {
+      const key = user.handle.toLocaleLowerCase('ru-RU');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 8);
+  const ids = users.map(user => user.id).filter(Boolean);
+  if (!ids.length) return users;
+
+  try {
+    const statuses = await proxyRequest<Array<{ user_id?: string; status?: string }>>(
+      proxyBase,
+      'POST',
+      `${BAND_BASE}/api/v4/users/status/ids`,
+      bandGetHeaders(cookies),
+      ids,
+      signal,
+    );
+    const presenceById: Record<string, BandPresenceStatus> = {};
+    for (const item of Array.isArray(statuses) ? statuses : []) {
+      const uid = String(item?.user_id || '').trim();
+      const raw = String(item?.status || '').trim().toLowerCase();
+      if (uid) presenceById[uid] = (['online', 'away', 'dnd'].includes(raw) ? raw : 'offline') as BandPresenceStatus;
+    }
+    return users.map(user => ({ ...user, presence: presenceById[user.id] ?? 'offline' }));
+  } catch {
+    return users;
+  }
+}
+
+export async function fetchBandUsersByUsernames(
+  proxyBase: string,
+  cookies: string,
+  usernames: string[],
+  signal?: AbortSignal,
+): Promise<BandUserSuggestion[]> {
+  const requestedUsernames = [...new Set(
+    (Array.isArray(usernames) ? usernames : [])
+      .map(username => String(username || '').trim().replace(/^@+/, '').toLocaleLowerCase('ru-RU'))
+      .filter(Boolean),
+  )];
+  if (!requestedUsernames.length || !cookies.trim()) return [];
+
+  const data = await proxyRequest<unknown>(
+    proxyBase,
+    'POST',
+    `${BAND_BASE}/api/v4/users/usernames`,
+    bandGetHeaders(cookies),
+    requestedUsernames,
+    signal,
+  );
+
+  return (Array.isArray(data) ? data : [])
+    .map(user => normalizeBandUserSuggestion(user as Parameters<typeof normalizeBandUserSuggestion>[0]))
+    .filter((user): user is BandUserSuggestion => Boolean(user));
+}
+
+export async function fetchBandUserAvatarBlob(
+  proxyBase: string,
+  cookies: string,
+  userId: string,
+  avatarStamp = 0,
+  signal?: AbortSignal,
+): Promise<Blob | null> {
+  const id = String(userId || '').trim();
+  if (!id || !cookies.trim()) return null;
+
+  const url = `${BAND_BASE}/api/v4/users/${encodeURIComponent(id)}/image?_=${encodeURIComponent(String(avatarStamp || Date.now()))}`;
+  const blob = await proxyBlobRequest(
+    proxyBase,
+    'GET',
+    url,
+    {
+      ...bandReadHeaders(cookies),
+      Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    },
+    signal,
+  );
+
+  if (!blob.size) return null;
+  const type = String(blob.type || '').toLowerCase();
+  if (type && !type.startsWith('image/')) return null;
+  return blob;
+}
+
+export async function fetchBandDisplayNamesByHandles(
+  proxyBase: string,
+  cookies: string,
+  handles: string[],
+  signal?: AbortSignal,
+): Promise<Record<string, string>> {
+  const normalizedHandles = [...new Set(
+    (Array.isArray(handles) ? handles : [])
+      .map(handle => toHandle(String(handle || '').trim()))
+      .filter(Boolean)
+      .map(handle => handle.toLocaleLowerCase('ru-RU')),
+  )];
+  if (!normalizedHandles.length || !cookies.trim()) return {};
+
+  const out: Record<string, string> = {};
+  const batchSize = 50;
+  for (let i = 0; i < normalizedHandles.length; i += batchSize) {
+    const batch = normalizedHandles.slice(i, i + batchSize);
+    const users = await fetchBandUsersByUsernames(
+      proxyBase,
+      cookies,
+      batch.map(handle => handle.replace(/^@+/, '')),
+      signal,
+    );
+    for (const user of users) {
+      const key = String(user.handle || '').trim().toLocaleLowerCase('ru-RU');
+      const displayName = String(user.displayName || '').trim();
+      if (key && displayName) out[key] = displayName;
+    }
+  }
+  return out;
+}
 
 export async function fetchBandPresenceByHandles(
   proxyBase: string, cookies: string, handles: string[], signal?: AbortSignal,
@@ -671,6 +890,9 @@ export interface CollectionRow {
   requireIos: boolean;
   requireAndroid: boolean;
   missing: boolean;
+  postId?: string;
+  iosPostId?: string;
+  androidPostId?: string;
 }
 
 export interface CollectionResult {
@@ -692,6 +914,19 @@ export interface CollectionWorkflowStepDef {
   action: 'publishPing' | 'publishMissing' | 'findIds' | 'clearGroups' | 'addGroups';
 }
 
+interface CollectionDutyMeta {
+  post_id: string;
+  Android_post_id: string;
+  iOS_post_id: string;
+  create_at: number;
+}
+
+interface CollectionDutyParseRow {
+  Android: string;
+  iOS: string;
+  _meta: CollectionDutyMeta;
+}
+
 export const COLLECTION_WORKFLOW_STEPS: CollectionWorkflowStepDef[] = [
   { code: 'Шаг 1', title: 'Опубликовать в чат просьбу указать дежурных', action: 'publishPing' },
   { code: 'Шаг 2', title: 'Опубликовать в чат недостающих дежурных', action: 'publishMissing' },
@@ -700,9 +935,15 @@ export const COLLECTION_WORKFLOW_STEPS: CollectionWorkflowStepDef[] = [
   { code: 'Шаг 5', title: 'Добавить новых дежурных в группы', action: 'addGroups' },
 ];
 
+export interface DutyEditorAllureLeaf {
+  id: number | null;
+  name: string;
+}
+
 export interface DutyEditorLeadEntry {
-  handle: string;
-  streams: string[];
+  name: string;
+  values: string[];
+  allureLeafId?: number | null;
 }
 
 export interface DutyEditorStreamGroupEntry {
@@ -715,15 +956,22 @@ export interface DutyEditorData {
   streamEntries: DutyEditorStreamGroupEntry[];
   tables: unknown[];
   meta: Record<string, unknown>;
-  allureLeaves: string[];
+  allureLeaves: DutyEditorAllureLeaf[];
 }
 
 export const DUTY_EDITOR_ALLURE_TREE_ID = 406;
 export const DUTY_EDITOR_ALLURE_SEARCH = 'W3siaWQiOiJjZnYuLTIiLCJ0eXBlIjoibG9uZ0FycmF5IiwidmFsdWUiOls3MDExOV19XQ%3D%3D';
+export const QA_LEADS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxPTT8Gc8rQLKV7tIrtwsUQd_ciUOkESbS7WoQ3JfPEoBtxB0gr6GpOs640uBIaPTCy8A/exec';
 export const DUTY_EDITOR_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby305NTQLS73Dw9CyG_QKkRMMljub5wkkdIlBpvHDuR6S9SntfPLTkR4jiq6uHXwHkoMg/exec';
 export const DUTY_EDITOR_DOC_URL = 'https://docs.google.com/document/d/1glaEFkdpAzGuRyQZYz1muBzVkFOnKyn85BW-CXLFSFU/edit?tab=t.0';
 export const DUTY_EDITOR_JSON_URL = 'https://drive.google.com/file/d/1Arzm2ZEix5aVyp0lqAFeZxLnDnkfkkUb/view?usp=sharing';
 const DUTY_EDITOR_ALLURE_STREAMS_URL = `https://allure-testops.wb.ru/api/testcasetree/leaf?projectId=7&treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&path=7904&path=70119&search=${DUTY_EDITOR_ALLURE_SEARCH}&sort=name%2Casc&size=100`;
+const DUTY_EDITOR_ALLURE_CREATE_URL = `https://allure-testops.wb.ru/api/testcasetree/leaf?projectId=7&treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&path=7904&path=70119`;
+const DUTY_EDITOR_ALLURE_RENAME_URL = `https://allure-testops.wb.ru/api/testcasetree/leaf/rename?projectId=7&treeId=${DUTY_EDITOR_ALLURE_TREE_ID}&search=${DUTY_EDITOR_ALLURE_SEARCH}`;
+const DUTY_EDITOR_ALLURE_TESTCASE_BASE_URL = 'https://allure-testops.wb.ru/api/testcase';
+const DUTY_EDITOR_ALLURE_TAG_ID = 25;
+const DUTY_EDITOR_ALLURE_STATUS_ID = -3;
+const DUTY_EDITOR_ALLURE_WORKFLOW_ID = 1;
 
 // ─── COLLECTION HELPERS ────────────────────────────────────────
 
@@ -783,14 +1031,153 @@ function normalizeStreamGroupsData(input: unknown): Record<string, string[]> {
   return out;
 }
 
-function normalizeDutyEditorAllureLeaves(input: unknown): string[] {
-  return [...new Set(normalizeStringList(input))];
+function normalizeDutyEditorAllureLeaves(input: unknown): DutyEditorAllureLeaf[] {
+  const out: DutyEditorAllureLeaf[] = [];
+  const seen = new Set<string>();
+  for (const item of Array.isArray(input) ? input : normalizeStringList(input)) {
+    const raw: Record<string, unknown> = item && typeof item === 'object' ? item as Record<string, unknown> : { name: item };
+    const idValue = Number(raw.id);
+    const id = Number.isFinite(idValue) && idValue > 0 ? idValue : null;
+    const name = String(raw.name || '').trim();
+    if (!name) continue;
+    const key = `${id || 0}::${normStr(name)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id, name });
+  }
+  return out;
 }
 
-function mapToLeadEntries(leads: Record<string, string[]>): DutyEditorLeadEntry[] {
-  return Object.entries(leads)
-    .map(([handle, streams]) => ({ handle, streams: [...streams] }))
-    .sort((a, b) => a.handle.localeCompare(b.handle, 'ru'));
+function dutyEditorAllureNames(leaves: DutyEditorAllureLeaf[]): string[] {
+  return normalizeDutyEditorAllureLeaves(leaves).map(leaf => leaf.name).filter(Boolean);
+}
+
+function mergeLeadMaps(...sources: Array<Record<string, string[]> | undefined>): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const source of sources) {
+    for (const [leadRaw, streamsRaw] of Object.entries(source || {})) {
+      const lead = toHandle(leadRaw);
+      if (!lead) continue;
+      if (!Array.isArray(out[lead])) out[lead] = [];
+      for (const streamRaw of Array.isArray(streamsRaw) ? streamsRaw : []) {
+        const stream = String(streamRaw || '').trim();
+        if (stream && !out[lead].includes(stream)) out[lead].push(stream);
+      }
+    }
+  }
+  return normalizeLeadsData(out);
+}
+
+function makeDutyEditorLeadEntry(name: string, values: string[], allureLeafId?: number | null): DutyEditorLeadEntry {
+  const id = Number(allureLeafId);
+  return {
+    name: String(name || '').trim(),
+    values: Array.isArray(values) ? values.map(item => String(item || '').trim()) : [],
+    allureLeafId: Number.isFinite(id) && id > 0 ? id : null,
+  };
+}
+
+function isDutyEditorCoreEntry(entry: DutyEditorLeadEntry): boolean {
+  return normStr(entry?.name || '') === normStr('Core');
+}
+
+function buildDutyEditorLeadModel(
+  leads: Record<string, string[]>,
+  allureLeaves: DutyEditorAllureLeaf[],
+): { entries: DutyEditorLeadEntry[]; hiddenLeadAssignments: Record<string, string[]> } {
+  const normalizedLeads = normalizeLeadsData(leads);
+  const leaves = normalizeDutyEditorAllureLeaves(allureLeaves);
+  const streamNames = leaves.map(leaf => leaf.name).filter(Boolean);
+
+  if (!streamNames.length) {
+    const entries: DutyEditorLeadEntry[] = [];
+    for (const [lead, streams] of Object.entries(normalizedLeads)) {
+      const streamList = Array.isArray(streams) ? streams : [];
+      if (!streamList.length) {
+        entries.push(makeDutyEditorLeadEntry('', [lead]));
+        continue;
+      }
+      for (const stream of streamList) entries.push(makeDutyEditorLeadEntry(stream, [lead]));
+    }
+    return { entries, hiddenLeadAssignments: {} };
+  }
+
+  const aliases = buildHardcodedAliases();
+  const streamNorm2Canonical = buildStreamNorm2Canonical(streamNames, aliases);
+  const visibleStreamNorms = new Set(streamNames.map(stream => normStr(stream)));
+  const hasSharedCoreLeaf = leaves.some(leaf => normStr(leaf.name) === normStr('Core'));
+  const hasPlatformCoreLeaves = leaves.some(leaf => {
+    const n = normStr(leaf.name);
+    return n === normStr('Core iOS') || n === normStr('Core Android');
+  });
+  const useSharedCoreLeaf = hasSharedCoreLeaf && !hasPlatformCoreLeaves;
+  const visibleByNorm = new Map<string, string>();
+  const visibleByLooseNorm = new Map<string, string>();
+  for (const streamName of streamNames) {
+    const n = normStr(streamName);
+    if (n && !visibleByNorm.has(n)) visibleByNorm.set(n, streamName);
+    const loose = normLooseStr(streamName);
+    if (loose && !visibleByLooseNorm.has(loose)) visibleByLooseNorm.set(loose, streamName);
+  }
+
+  const leadByVisibleStreamNorm = new Map<string, string>();
+  const hiddenLeadAssignments: Record<string, string[]> = {};
+  let coreIosLead = '';
+  let coreAndroidLead = '';
+
+  for (const [leadRaw, streamsRaw] of Object.entries(normalizedLeads)) {
+    const lead = toHandle(leadRaw);
+    if (!lead) continue;
+    for (const streamRaw of Array.isArray(streamsRaw) ? streamsRaw : []) {
+      const stream = String(streamRaw || '').trim();
+      if (!stream) continue;
+      const streamNorm = normStr(stream);
+      const streamLoose = normLooseStr(stream);
+
+      if (useSharedCoreLeaf && streamNorm === normStr('Core iOS')) {
+        if (!coreIosLead) {
+          coreIosLead = lead;
+        } else {
+          if (!Array.isArray(hiddenLeadAssignments[lead])) hiddenLeadAssignments[lead] = [];
+          if (!hiddenLeadAssignments[lead].includes(stream)) hiddenLeadAssignments[lead].push(stream);
+        }
+        continue;
+      }
+
+      if (useSharedCoreLeaf && streamNorm === normStr('Core Android')) {
+        if (!coreAndroidLead) {
+          coreAndroidLead = lead;
+        } else {
+          if (!Array.isArray(hiddenLeadAssignments[lead])) hiddenLeadAssignments[lead] = [];
+          if (!hiddenLeadAssignments[lead].includes(stream)) hiddenLeadAssignments[lead].push(stream);
+        }
+        continue;
+      }
+
+      const canonical = visibleByNorm.get(streamNorm)
+        || visibleByLooseNorm.get(streamLoose)
+        || streamNorm2Canonical[streamNorm]
+        || streamNorm2Canonical[streamLoose]
+        || '';
+      const canonicalNorm = canonical ? normStr(canonical) : '';
+
+      if (canonical && visibleStreamNorms.has(canonicalNorm) && !leadByVisibleStreamNorm.has(canonicalNorm)) {
+        leadByVisibleStreamNorm.set(canonicalNorm, lead);
+        continue;
+      }
+
+      if (!Array.isArray(hiddenLeadAssignments[lead])) hiddenLeadAssignments[lead] = [];
+      if (!hiddenLeadAssignments[lead].includes(stream)) hiddenLeadAssignments[lead].push(stream);
+    }
+  }
+
+  const entries = leaves.map(leaf => {
+    if (useSharedCoreLeaf && normStr(leaf.name) === normStr('Core')) {
+      return makeDutyEditorLeadEntry(leaf.name, [coreIosLead, coreAndroidLead], leaf.id);
+    }
+    return makeDutyEditorLeadEntry(leaf.name, [leadByVisibleStreamNorm.get(normStr(leaf.name)) || ''], leaf.id);
+  });
+  return { entries, hiddenLeadAssignments: normalizeLeadsData(hiddenLeadAssignments) };
 }
 
 function mapToStreamEntries(streamsTree: Record<string, string[]>): DutyEditorStreamGroupEntry[] {
@@ -801,12 +1188,34 @@ function mapToStreamEntries(streamsTree: Record<string, string[]>): DutyEditorSt
 
 function entriesToLeadMap(entries: DutyEditorLeadEntry[]): Record<string, string[]> {
   const out: Record<string, string[]> = {};
+  const seenStreams = new Set<string>();
   for (const entry of entries) {
-    const handle = toHandle(entry?.handle || '');
-    const streams = normalizeStringList(entry?.streams || []);
-    if (handle && streams.length) out[handle] = streams;
+    const streamName = String(entry?.name || '').trim();
+    if (!streamName) throw new Error('Заполни название стрима');
+    const values = Array.isArray(entry?.values)
+      ? entry.values.map(item => String(item || '').trim())
+      : normalizeStringList(entry?.values || []);
+    const fields = isDutyEditorCoreEntry(entry)
+      ? [
+          { streamName: 'Core iOS', lead: String(values[0] || '').trim() },
+          { streamName: 'Core Android', lead: String(values[1] || '').trim() },
+        ]
+      : [{ streamName, lead: String(values[0] || '').trim() }];
+
+    for (const field of fields) {
+      const lead = toHandle(field.lead);
+      if (!lead) {
+        if (isDutyEditorCoreEntry(entry)) throw new Error('Заполни лидов iOS и Android для стрима "Core"');
+        throw new Error(`Заполни лида для стрима "${streamName}"`);
+      }
+      const streamKey = normStr(field.streamName);
+      if (seenStreams.has(streamKey)) throw new Error(`Повторяющееся название стрима: ${field.streamName}`);
+      seenStreams.add(streamKey);
+      if (!Array.isArray(out[lead])) out[lead] = [];
+      out[lead].push(field.streamName);
+    }
   }
-  return out;
+  return normalizeLeadsData(out);
 }
 
 function entriesToStreamMap(entries: DutyEditorStreamGroupEntry[]): Record<string, string[]> {
@@ -972,26 +1381,69 @@ function buildLeadIndex(leads: Record<string, string[]>, streamNorm2Canonical: R
 }
 
 function leadsForStream(streamCanonical: string, platform: 'iOS' | 'Android', leadIndex: LeadIndex): string[] {
-  if (normStr(streamCanonical) === normStr('Core')) {
+  const streamNorm = normStr(streamCanonical);
+  if (streamNorm === normStr('Core')) {
     const chosen = platform === 'Android' ? leadIndex.coreAndroid : leadIndex.coreIos;
     return Array.from(chosen).sort();
   }
-  const values = leadIndex.leadByStreamNorm.get(normStr(streamCanonical));
+  if (streamNorm === normStr('Core iOS')) return Array.from(leadIndex.coreIos || []).sort();
+  if (streamNorm === normStr('Core Android')) return Array.from(leadIndex.coreAndroid || []).sort();
+  const values = leadIndex.leadByStreamNorm.get(streamNorm);
   return values ? Array.from(values).sort() : [];
 }
 
 function parseDuties(
-  messages: string[], allStreams: string[], streamAliases: Record<string, string[]>,
-): { duties: Record<string, { Android: string; iOS: string }> } {
-  const duties: Record<string, { Android: string; iOS: string }> = {};
+  postsOrMessages: Array<BandPost | string>,
+  allStreams: string[],
+  streamAliases: Record<string, string[]>,
+): { duties: Record<string, CollectionDutyParseRow> } {
+  const duties: Record<string, CollectionDutyParseRow> = {};
   const streamNorm2Canonical = buildStreamNorm2Canonical(allStreams, streamAliases);
 
   const ensureRow = (streamName: string) => {
-    if (!duties[streamName]) duties[streamName] = { Android: '', iOS: '' };
+    if (!duties[streamName]) {
+      duties[streamName] = {
+        Android: '',
+        iOS: '',
+        _meta: {
+          post_id: '',
+          Android_post_id: '',
+          iOS_post_id: '',
+          create_at: -1,
+        },
+      };
+    }
     return duties[streamName];
   };
 
-  for (const msg of messages) {
+  const touchPostMeta = (row: CollectionDutyParseRow, postId: string, createdAt: number) => {
+    if (!postId) return;
+    const created = Number(createdAt);
+    const current = Number(row._meta.create_at);
+    if (created >= (Number.isFinite(current) ? current : -1)) {
+      row._meta.create_at = Number.isFinite(created) ? created : -1;
+      row._meta.post_id = postId;
+    }
+  };
+
+  const entries = (Array.isArray(postsOrMessages) ? postsOrMessages : [])
+    .map(item => {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        const message = typeof item.message === 'string' ? item.message : '';
+        if (!message.trim()) return null;
+        return {
+          message,
+          postId: String(item.id || '').trim(),
+          createdAt: Number(item.create_at) || 0,
+        };
+      }
+      const message = String(item || '').trim();
+      return message ? { message, postId: '', createdAt: 0 } : null;
+    })
+    .filter((entry): entry is { message: string; postId: string; createdAt: number } => Boolean(entry));
+
+  for (const entry of entries) {
+    const msg = entry.message;
     for (const m of msg.matchAll(RE_BLOCK_QUOTED)) {
       const streamRaw = String(m[1] || '').trim();
       const body = String(m[2] || '');
@@ -1000,12 +1452,20 @@ function parseDuties(
       const row = ensureRow(streamName);
       const ma = body.match(RE_ANDROID);
       const mi = body.match(RE_IOS);
-      if (ma) row.Android = toHandle(ma[1]);
-      if (mi) row.iOS = toHandle(mi[1]);
+      if (ma) {
+        row.Android = toHandle(ma[1]);
+        if (entry.postId) row._meta.Android_post_id = entry.postId;
+      }
+      if (mi) {
+        row.iOS = toHandle(mi[1]);
+        if (entry.postId) row._meta.iOS_post_id = entry.postId;
+      }
+      touchPostMeta(row, entry.postId, entry.createdAt);
     }
   }
 
-  for (const msg of messages) {
+  for (const entry of entries) {
+    const msg = entry.message;
     for (const m of msg.matchAll(RE_BLOCK_OT)) {
       const streamRaw = String(m[1] || '').trim();
       const body = String(m[2] || '');
@@ -1014,12 +1474,20 @@ function parseDuties(
       const row = ensureRow(streamName);
       const ma = body.match(RE_ANDROID);
       const mi = body.match(RE_IOS);
-      if (ma && !row.Android) row.Android = toHandle(ma[1]);
-      if (mi && !row.iOS) row.iOS = toHandle(mi[1]);
+      if (ma && !row.Android) {
+        row.Android = toHandle(ma[1]);
+        if (entry.postId) row._meta.Android_post_id = entry.postId;
+      }
+      if (mi && !row.iOS) {
+        row.iOS = toHandle(mi[1]);
+        if (entry.postId) row._meta.iOS_post_id = entry.postId;
+      }
+      touchPostMeta(row, entry.postId, entry.createdAt);
     }
   }
 
-  for (const msg of messages) {
+  for (const entry of entries) {
+    const msg = entry.message;
     for (const m of msg.matchAll(RE_BLOCK_HEADER)) {
       const header = String(m[1] || '').trim();
       const body = String(m[2] || '');
@@ -1028,12 +1496,20 @@ function parseDuties(
       const row = ensureRow(streamName);
       const ma = body.match(RE_ANDROID);
       const mi = body.match(RE_IOS);
-      if (ma && !row.Android) row.Android = toHandle(ma[1]);
-      if (mi && !row.iOS) row.iOS = toHandle(mi[1]);
+      if (ma && !row.Android) {
+        row.Android = toHandle(ma[1]);
+        if (entry.postId) row._meta.Android_post_id = entry.postId;
+      }
+      if (mi && !row.iOS) {
+        row.iOS = toHandle(mi[1]);
+        if (entry.postId) row._meta.iOS_post_id = entry.postId;
+      }
+      touchPostMeta(row, entry.postId, entry.createdAt);
     }
   }
 
-  for (const msg of messages) {
+  for (const entry of entries) {
+    const msg = entry.message;
     for (const m of msg.matchAll(RE_INLINE_FREE)) {
       const rawName = String(m[1] || '').replace(/\s+/g, ' ').trim();
       const person = toHandle(m[2]);
@@ -1051,7 +1527,16 @@ function parseDuties(
       const streamName = matchStream(baseStream, streamNorm2Canonical);
       if (!streamName) continue;
       const row = ensureRow(streamName);
-      if (platform) (row as Record<string, string>)[platform] = person;
+      if (platform) {
+        if (platform === 'iOS') {
+          row.iOS = person;
+          if (entry.postId) row._meta.iOS_post_id = entry.postId;
+        } else {
+          row.Android = person;
+          if (entry.postId) row._meta.Android_post_id = entry.postId;
+        }
+      }
+      touchPostMeta(row, entry.postId, entry.createdAt);
     }
   }
 
@@ -1070,7 +1555,7 @@ function requiredPlatformsForStream(streamName: string): { requireIos: boolean; 
 
 function buildCollectionRows(
   allStreams: string[],
-  duties: Record<string, { Android: string; iOS: string }>,
+  duties: Record<string, CollectionDutyParseRow>,
   leadIndex: LeadIndex,
   excludeSet: Set<string>,
 ): CollectionRow[] {
@@ -1084,7 +1569,21 @@ function buildCollectionRows(
     const androidLeads = leadsForStream(stream, 'Android', leadIndex);
     const req = requiredPlatformsForStream(stream);
     const missing = (req.requireIos && !iosDuty) || (req.requireAndroid && !androidDuty);
-    rows.push({ stream, streamDisplay: displayStreamName(stream), iosDuty, androidDuty, iosLeads, androidLeads, requireIos: req.requireIos, requireAndroid: req.requireAndroid, missing });
+    const meta = row._meta || { post_id: '', Android_post_id: '', iOS_post_id: '', create_at: -1 };
+    rows.push({
+      stream,
+      streamDisplay: displayStreamName(stream),
+      iosDuty,
+      androidDuty,
+      iosLeads,
+      androidLeads,
+      requireIos: req.requireIos,
+      requireAndroid: req.requireAndroid,
+      missing,
+      postId: meta.post_id || '',
+      iosPostId: meta.iOS_post_id || meta.post_id || '',
+      androidPostId: meta.Android_post_id || meta.post_id || '',
+    });
   }
   return rows;
 }
@@ -1136,12 +1635,24 @@ function buildDutyThreadBullet(display: string, url: string, indent: number): st
 
 export function buildCurrentDutyThreadsCopyText(
   rows: CollectionRow[],
-  idMaps: CollectionIdMaps,
   streamGroups: DutyEditorStreamGroupEntry[],
 ): string {
   const streamList = (Array.isArray(rows) ? rows : [])
     .map(r => String(r.streamDisplay || r.stream || '').trim())
     .filter(Boolean);
+
+  const rowByNorm: Record<string, CollectionRow> = {};
+  const rowByLoose: Record<string, CollectionRow> = {};
+  for (const row of Array.isArray(rows) ? rows : []) {
+    for (const name of [row.streamDisplay, row.stream]) {
+      const value = String(name || '').trim();
+      if (!value) continue;
+      const n = normThread(value);
+      const l = normThreadLoose(value);
+      if (n && !rowByNorm[n]) rowByNorm[n] = row;
+      if (l && !rowByLoose[l]) rowByLoose[l] = row;
+    }
+  }
 
   const groupingMap: Record<string, string[]> = {};
   for (const g of streamGroups) {
@@ -1166,10 +1677,18 @@ export function buildCurrentDutyThreadsCopyText(
   }
   const resolveStream = (name: string) => byNorm[normThread(name)] || byLoose[normThreadLoose(name)] || '';
 
+  const resolveRow = (streamName: string): CollectionRow | undefined =>
+    rowByNorm[normThread(streamName)] || rowByLoose[normThreadLoose(streamName)];
+
   const dutyUrl = (streamName: string, platform: string): string => {
-    const postId = platform
-      ? (idMaps[platform.toLowerCase() as 'ios' | 'android']?.[streamName] || idMaps.ios?.[streamName] || '')
-      : (idMaps.ios?.[streamName] || idMaps.android?.[streamName] || '');
+    const row = resolveRow(streamName);
+    if (!row) return '';
+    const normalizedPlatform = normThread(platform);
+    const postId = normalizedPlatform === 'ios'
+      ? (row.iosPostId || row.postId || row.androidPostId || '')
+      : normalizedPlatform === 'android'
+        ? (row.androidPostId || row.postId || row.iosPostId || '')
+        : (row.postId || row.iosPostId || row.androidPostId || '');
     return buildDutyThreadUrl(postId);
   };
 
@@ -1211,7 +1730,7 @@ export function buildCurrentDutyThreadsCopyText(
     for (const s of leftovers) lines.push(buildDutyThreadBullet(s, dutyUrl(s, ''), 0));
   }
 
-  if (!lines.length) return 'Нет данных для формирования треда (не найдены стримы или посты в Band).';
+  if (!lines.length) return 'Нет данных для формирования треда (не найдены стримы в Allure или посты с дежурными в Band).';
   return lines.join('\n');
 }
 
@@ -1230,24 +1749,17 @@ export function buildCurrentDutiesCopyText(rows: CollectionRow[]): string {
 }
 
 async function fetchQaLeadsFromGas(proxyBase: string, gasUrl: string, signal?: AbortSignal): Promise<Record<string, string[]>> {
-  if (!gasUrl.trim()) return {};
-  const data = await proxyRequest<unknown>(proxyBase, 'GET', gasUrl, { Accept: 'application/json' }, undefined, signal);
+  const url = String(gasUrl || '').trim() || QA_LEADS_SCRIPT_URL;
+  const data = await proxyRequest<unknown>(proxyBase, 'GET', url, { Accept: 'application/json' }, undefined, signal);
   let leadsRaw: unknown = data;
   if (data && typeof data === 'object' && !Array.isArray(data)) {
     const d = data as Record<string, unknown>;
     if (d.leads && typeof d.leads === 'object' && !Array.isArray(d.leads)) leadsRaw = d.leads;
+    else if (d.qaLeads && typeof d.qaLeads === 'object' && !Array.isArray(d.qaLeads)) leadsRaw = d.qaLeads;
+    else if (d.leadsJson && typeof d.leadsJson === 'object' && !Array.isArray(d.leadsJson)) leadsRaw = d.leadsJson;
     else if (d.data && typeof d.data === 'object' && !Array.isArray(d.data)) leadsRaw = d.data;
   }
-  if (!leadsRaw || typeof leadsRaw !== 'object' || Array.isArray(leadsRaw)) return {};
-  const raw = leadsRaw as Record<string, unknown>;
-  const out: Record<string, string[]> = {};
-  for (const [key, val] of Object.entries(raw)) {
-    const k = key.trim();
-    if (!k) continue;
-    if (Array.isArray(val)) out[k] = val.map(v => String(v || '').trim()).filter(Boolean);
-    else { const s = String(val || '').trim(); out[k] = s ? [s] : []; }
-  }
-  return out;
+  return normalizeLeadsData(leadsRaw);
 }
 
 async function collectDutyRowsSince(
@@ -1295,19 +1807,24 @@ async function collectDutyRowsSince(
 
   onLog(syncAllure ? 'Шаг 4/5: читаю сообщения из Band SWAT QA...' : 'Обновляю сообщения из Band SWAT QA...');
   const allPosts = await bandFetchChannelPostsSince(proxyBase, cookies, SWAT_QA_CHANNEL_ID, sinceMs, signal);
+  const posts: BandPost[] = [];
   const messages: string[] = [];
   for (const post of allPosts) {
     if (Number(post.delete_at) > 0) continue;
     if (Number(post.create_at) < sinceMs) continue;
     const msg = typeof post.message === 'string' ? post.message.trim() : '';
-    if (msg) messages.push(msg);
+    if (msg) {
+      posts.push(post);
+      messages.push(msg);
+    }
   }
+  posts.sort((a, b) => (Number(a.create_at) || 0) - (Number(b.create_at) || 0));
   onLog(`Сообщений: ${messages.length}`, 'ok');
 
   onLog(syncAllure ? 'Шаг 5/5: парсю дежурных...' : 'Обновляю разбор дежурных...');
   const aliases = buildHardcodedAliases();
   const excludeSet = buildHardcodedExcludeSet();
-  const { duties } = parseDuties(messages, streams, aliases);
+  const { duties } = parseDuties(posts, streams, aliases);
   const streamMap = buildStreamNorm2Canonical(streams, aliases);
   const leadIndex = buildLeadIndex(leadsRaw, streamMap);
   const rows = buildCollectionRows(streams, duties, leadIndex, excludeSet);
@@ -1477,26 +1994,102 @@ export async function fetchDutyEditorAllureStreams(
   token: string,
   signal?: AbortSignal,
 ): Promise<string[]> {
+  return dutyEditorAllureNames(await fetchDutyEditorAllureLeaves(token, signal));
+}
+
+export async function fetchDutyEditorAllureLeaves(
+  token: string,
+  signal?: AbortSignal,
+): Promise<DutyEditorAllureLeaf[]> {
   if (!String(token || '').trim()) return [];
-  const names: string[] = [];
+  const leaves: DutyEditorAllureLeaf[] = [];
   for (let page = 0; page < 50; page++) {
     const url = new URL(DUTY_EDITOR_ALLURE_STREAMS_URL);
     url.searchParams.set('page', String(page));
     const data = await allureFetchUrl<{
-      content?: Array<{ name?: string }>;
+      content?: Array<{ id?: number; name?: string }>;
       last?: boolean;
       totalPages?: number;
     }>(token, url.toString(), signal);
     const content = Array.isArray(data?.content) ? data.content : [];
     for (const item of content) {
       const name = String(item?.name || '').trim();
-      if (name) names.push(name);
+      const id = Number(item?.id);
+      if (name) leaves.push({ id: Number.isFinite(id) && id > 0 ? id : null, name });
     }
     if (data?.last) break;
     const totalPages = typeof data?.totalPages === 'number' ? data.totalPages : null;
     if (totalPages !== null && page >= totalPages - 1) break;
   }
-  return normalizeDutyEditorAllureLeaves(names);
+  return normalizeDutyEditorAllureLeaves(leaves);
+}
+
+export async function createDutyEditorAllureLeaf(
+  token: string,
+  streamName: string,
+  signal?: AbortSignal,
+): Promise<DutyEditorAllureLeaf> {
+  const name = String(streamName || '').trim();
+  if (!name) throw new Error('Заполни название стрима');
+  const created = await allureRequestUrl<{ id?: number; name?: string }>(
+    token,
+    'POST',
+    DUTY_EDITOR_ALLURE_CREATE_URL,
+    { name },
+    signal,
+  );
+  const createdId = Number(created?.id);
+  if (!Number.isFinite(createdId) || createdId <= 0) {
+    throw new Error('Allure не вернул id нового стрима');
+  }
+  await allureRequestUrl<unknown>(
+    token,
+    'POST',
+    `${DUTY_EDITOR_ALLURE_TESTCASE_BASE_URL}/${encodeURIComponent(String(createdId))}/tag`,
+    [{ id: DUTY_EDITOR_ALLURE_TAG_ID }],
+    signal,
+  );
+  await allureRequestUrl<unknown>(
+    token,
+    'PATCH',
+    `${DUTY_EDITOR_ALLURE_TESTCASE_BASE_URL}/${encodeURIComponent(String(createdId))}`,
+    {
+      statusId: DUTY_EDITOR_ALLURE_STATUS_ID,
+      workflowId: DUTY_EDITOR_ALLURE_WORKFLOW_ID,
+    },
+    signal,
+  );
+  return { id: createdId, name: String(created?.name || name).trim() || name };
+}
+
+export async function renameDutyEditorAllureLeaf(
+  token: string,
+  leafId: number,
+  streamName: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const id = Number(leafId);
+  const name = String(streamName || '').trim();
+  if (!Number.isFinite(id) || id <= 0) throw new Error('Некорректный leafId для rename Allure');
+  if (!name) throw new Error('Заполни название стрима');
+  const url = `${DUTY_EDITOR_ALLURE_RENAME_URL}&leafId=${encodeURIComponent(String(id))}`;
+  await allureRequestUrl<unknown>(token, 'POST', url, { name }, signal);
+}
+
+export async function deleteDutyEditorAllureLeaf(
+  token: string,
+  leafId: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  const id = Number(leafId);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('Некорректный leafId для удаления Allure');
+  await allureRequestUrl<unknown>(
+    token,
+    'DELETE',
+    `${DUTY_EDITOR_ALLURE_TESTCASE_BASE_URL}/${encodeURIComponent(String(id))}?force=false`,
+    undefined,
+    signal,
+  );
 }
 
 export async function fetchDutyEditorData(
@@ -1515,28 +2108,26 @@ export async function fetchDutyEditorData(
       undefined,
       signal,
     ),
-    fetchDutyEditorAllureStreams(token, signal).catch(() => []),
+    fetchDutyEditorAllureLeaves(token, signal).catch(() => []),
   ]);
   const normalized = normalizeDutyEditorResponse(scriptRaw);
+  const fallbackLeaves = normalizeDutyEditorAllureLeaves(
+    (normalized.meta as Record<string, unknown>).allureLeaves ||
+    (normalized.meta as Record<string, unknown>).allureStreams,
+  );
+  const effectiveLeaves = allureLeaves.length ? allureLeaves : fallbackLeaves;
+  const leadModel = buildDutyEditorLeadModel(normalized.leads, effectiveLeaves);
   return {
-    leadsEntries: mapToLeadEntries(normalized.leads),
+    leadsEntries: leadModel.entries,
     streamEntries: mapToStreamEntries(normalized.streamsTree),
     tables: normalized.tables,
     meta: {
       ...normalized.meta,
-      allureLeaves: allureLeaves.length
-        ? allureLeaves
-        : normalizeDutyEditorAllureLeaves(
-            (normalized.meta as Record<string, unknown>).allureLeaves ||
-            (normalized.meta as Record<string, unknown>).allureStreams,
-          ),
+      allureLeaves: effectiveLeaves,
+      allureStreams: effectiveLeaves,
+      hiddenLeadAssignments: leadModel.hiddenLeadAssignments,
     },
-    allureLeaves: allureLeaves.length
-      ? allureLeaves
-      : normalizeDutyEditorAllureLeaves(
-          (normalized.meta as Record<string, unknown>).allureLeaves ||
-          (normalized.meta as Record<string, unknown>).allureStreams,
-        ),
+    allureLeaves: effectiveLeaves,
   };
 }
 
@@ -1545,15 +2136,17 @@ export async function saveDutyEditorData(
   data: DutyEditorData,
   signal?: AbortSignal,
 ): Promise<DutyEditorData> {
+  const meta = (data.meta || {}) as Record<string, unknown>;
+  const hiddenLeads = normalizeLeadsData(meta.hiddenLeadAssignments || {});
+  const visibleLeads = entriesToLeadMap(data.leadsEntries);
   const payload = {
     op: 'save',
-    leads: entriesToLeadMap(data.leadsEntries),
+    leads: mergeLeadMaps(hiddenLeads, visibleLeads),
     streamsTree: entriesToStreamMap(data.streamEntries),
     tables: Array.isArray(data.tables) ? [...data.tables] : [],
     meta: {
       ...(data.meta || {}),
-      allureLeaves: undefined,
-      allureStreams: undefined,
+      hiddenLeadAssignments: hiddenLeads,
     },
   };
   delete (payload.meta as Record<string, unknown>).allureLeaves;
@@ -1572,7 +2165,7 @@ export async function saveDutyEditorData(
       return normalizeDutyEditorResponse(raw);
     } catch {
       return {
-        leads: entriesToLeadMap(data.leadsEntries),
+        leads: mergeLeadMaps(hiddenLeads, visibleLeads),
         streamsTree: entriesToStreamMap(data.streamEntries),
         tables: Array.isArray(data.tables) ? [...data.tables] : [],
         meta: { ...(data.meta || {}) },
@@ -1584,11 +2177,12 @@ export async function saveDutyEditorData(
     (normalized.meta as Record<string, unknown>).allureLeaves ||
     (normalized.meta as Record<string, unknown>).allureStreams,
   );
+  const leadModel = buildDutyEditorLeadModel(normalized.leads, allureLeaves);
   return {
-    leadsEntries: mapToLeadEntries(normalized.leads),
+    leadsEntries: leadModel.entries,
     streamEntries: mapToStreamEntries(normalized.streamsTree),
     tables: normalized.tables,
-    meta: { ...normalized.meta, allureLeaves },
+    meta: { ...normalized.meta, allureLeaves, allureStreams: allureLeaves, hiddenLeadAssignments: leadModel.hiddenLeadAssignments },
     allureLeaves,
   };
 }
@@ -2054,6 +2648,7 @@ export async function majorPublishComponents(
   platform: 'ios' | 'android', release: string, componentsText: string,
   proxyBase: string, cookies: string,
   onLog: (msg: string, level?: LogLevel) => void, signal?: AbortSignal,
+  options?: { updateExisting?: boolean },
 ): Promise<void> {
   if (!cookies.trim()) throw new Error('Band cookies не заданы.');
   if (!release.trim()) throw new Error(`Укажи версию ${platform === 'ios' ? 'iOS' : 'Android'}.`);
@@ -2075,7 +2670,13 @@ export async function majorPublishComponents(
       await bandPatchPost(proxyBase, cookies, compPost, text, signal);
       onLog(`[${label}] Компоненты обновлены (patch ${compPost.id}, ${lines.length} шт.).`, 'ok');
     } else {
-      onLog(`[${label}] Компоненты уже актуальны.`, 'ok');
+      if (options?.updateExisting) {
+        onLog(`[${label}] Компоненты уже актуальны.`, 'ok');
+      } else {
+        const noticeText = 'Предыдущий список компонентов актуален, новых компонентов нет.';
+        await bandCreateReply(proxyBase, cookies, FEED_CHANNEL_ID, rootId, noticeText, signal);
+        onLog(`[${label}] Новых компонентов нет — отправлено уведомление в тред.`, 'ok');
+      }
     }
   } else {
     await bandCreateReply(proxyBase, cookies, FEED_CHANNEL_ID, rootId, text, signal);
@@ -2087,6 +2688,7 @@ export async function majorPublishComponentsFromDeployLab(
   platform: 'ios' | 'android', release: string, deployLabToken: string,
   proxyBase: string, cookies: string,
   onLog: (msg: string, level?: LogLevel) => void, signal?: AbortSignal,
+  options?: { updateExisting?: boolean },
 ): Promise<void> {
   if (!cookies.trim()) throw new Error('Band cookies не заданы.');
   if (!release.trim()) throw new Error(`Укажи версию ${platform === 'ios' ? 'iOS' : 'Android'}.`);
@@ -2112,7 +2714,13 @@ export async function majorPublishComponentsFromDeployLab(
       await bandPatchPost(proxyBase, cookies, compPost, text, signal);
       onLog(`[${label}] Компоненты обновлены из Deploy Lab (patch ${compPost.id}, ${components.length} шт.).`, 'ok');
     } else {
-      onLog(`[${label}] Компоненты уже актуальны.`, 'ok');
+      if (options?.updateExisting) {
+        onLog(`[${label}] Компоненты уже актуальны.`, 'ok');
+      } else {
+        const noticeText = 'Предыдущий список компонентов актуален, новых компонентов нет.';
+        await bandCreateReply(proxyBase, cookies, FEED_CHANNEL_ID, rootId, noticeText, signal);
+        onLog(`[${label}] Новых компонентов нет — отправлено уведомление в тред.`, 'ok');
+      }
     }
   } else {
     await bandCreateReply(proxyBase, cookies, FEED_CHANNEL_ID, rootId, text, signal);
@@ -2472,56 +3080,181 @@ async function fetchDeployLabReleaseInfo(
   platform: 'ios' | 'android', release: string, deployLabToken: string, proxyBase: string, signal?: AbortSignal,
 ): Promise<{ cutoff?: string }> {
   const releaseId = buildDeployLabReleaseId(platform, release);
-  const url = `${DEPLOY_LAB_BASE_URL}/api/release/${encodeURIComponent(releaseId)}`;
+  const url = `${DEPLOY_LAB_BASE_URL}/releaseboss/admin_panel/release/${encodeURIComponent(releaseId)}`;
   try {
     const data = await proxyRequest<Record<string, unknown>>(proxyBase, 'GET', url, buildDeployLabHeaders(deployLabToken), undefined, signal);
-    const raw = data?.cutoff ?? data?.cutoffDate ?? data?.cut_off;
+    const raw = data?.cutoff ?? data?.cutoffDate ?? data?.cut_off ?? data?.cutoff_at ?? data?.cutoffAt;
     return { cutoff: raw ? String(raw) : undefined };
   } catch {
     return {};
   }
 }
 
+type NoticeCutoffItem = { platform: 'ios' | 'android'; cutoffMs: number };
+
+const NOTICE_MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const NOTICE_WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+
+function noticeTwo(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function parseDeployLabCutoffMs(value?: string): number {
+  const raw = String(value || '').trim();
+  if (!raw) return NaN;
+  const normalized = raw.includes('T') && !/[zZ]|[+-]\d\d:?\d\d$/.test(raw)
+    ? `${raw}+03:00`
+    : raw;
+  return new Date(normalized).getTime();
+}
+
+function noticeMskParts(ms: number) {
+  const d = new Date(Number(ms) + MSK_OFFSET_MS);
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate(),
+    hours: d.getUTCHours(),
+    minutes: d.getUTCMinutes(),
+  };
+}
+
+function noticeMeta(ms: number) {
+  const value = Number(ms);
+  if (!Number.isFinite(value)) return null;
+  const parts = noticeMskParts(value);
+  const weekdayDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  return {
+    ...parts,
+    weekday: NOTICE_WEEKDAYS[weekdayDate.getUTCDay()] || '',
+    monthLabel: NOTICE_MONTHS[parts.month - 1] || '',
+    dateKey: `${parts.year}-${noticeTwo(parts.month)}-${noticeTwo(parts.day)}`,
+    minuteKey: String(Math.floor(value / 60000)),
+  };
+}
+
+function formatNoticeDate(ms: number): string {
+  const meta = noticeMeta(ms);
+  return meta ? `${meta.day} ${meta.monthLabel} (${meta.weekday})` : '';
+}
+
+function formatNoticeTime(ms: number): string {
+  const meta = noticeMeta(ms);
+  return meta ? `${noticeTwo(meta.hours)}:${noticeTwo(meta.minutes)}` : '';
+}
+
+function formatNoticeDateTime(ms: number): string {
+  const date = formatNoticeDate(ms);
+  const time = formatNoticeTime(ms);
+  return date && time ? `${date} - в ${time}` : '';
+}
+
+function buildNoticeCodeFreezeMs(cutoffMs: number): number {
+  const parts = noticeMskParts(cutoffMs);
+  return Date.UTC(parts.year, parts.month - 1, parts.day - 1, 19, 0, 0, 0) - MSK_OFFSET_MS;
+}
+
+function buildNoticeFallbackText(release: string): string {
+  const releaseText = String(release || '').trim() || '[релиз]';
+  return [
+    `❗️ Катофф ${releaseText} - [заполни дату и время вручную]`,
+    `❗️ Кодфриз ${releaseText} - [заполни дату и время вручную]`,
+    '❗️ Просьба все стримы проверить свои тест-планы, а так же актуализировать статус задач',
+  ].join('\n');
+}
+
+function buildNoticeCutoffLine(release: string, items: NoticeCutoffItem[]): string {
+  const releaseText = String(release || '').trim();
+  const normalizedItems = items.filter(item => Number.isFinite(item.cutoffMs));
+  if (!normalizedItems.length) return `❗️ Катофф ${releaseText} - [заполни дату и время вручную]`;
+
+  if (normalizedItems.length === 1) {
+    return `❗️ Катофф ${releaseText} - ${formatNoticeDateTime(normalizedItems[0].cutoffMs)}`;
+  }
+
+  const dateKeys = new Set(normalizedItems.map(item => noticeMeta(item.cutoffMs)?.dateKey).filter(Boolean));
+  const minuteKeys = new Set(normalizedItems.map(item => noticeMeta(item.cutoffMs)?.minuteKey).filter(Boolean));
+
+  if (dateKeys.size === 1) {
+    const sharedDate = formatNoticeDate(normalizedItems[0].cutoffMs);
+    if (minuteKeys.size === 1) {
+      return `❗️ Катофф ${releaseText} - ${sharedDate} - в ${formatNoticeTime(normalizedItems[0].cutoffMs)}`;
+    }
+    const details = normalizedItems
+      .map(item => `${item.platform === 'ios' ? 'iOS' : 'Android'} в ${formatNoticeTime(item.cutoffMs)}`)
+      .join(', ');
+    return `❗️ Катофф ${releaseText} - ${sharedDate} - ${details}`;
+  }
+
+  const details = normalizedItems
+    .map(item => `${item.platform === 'ios' ? 'iOS' : 'Android'} ${formatNoticeDate(item.cutoffMs)} в ${formatNoticeTime(item.cutoffMs)}`)
+    .join(', ');
+  return `❗️ Катофф ${releaseText} - ${details}`;
+}
+
 export async function fetchMajorReleaseNoticeText(
   iosRelease: string, androidRelease: string, deployLabToken: string, proxyBase: string, signal?: AbortSignal,
 ): Promise<string> {
-  let cutoffLine = '';
-  if (deployLabToken && (iosRelease.trim() || androidRelease.trim())) {
-    const platform = iosRelease.trim() ? 'ios' : 'android';
-    const release = (iosRelease.trim() || androidRelease.trim());
-    try {
-      const info = await fetchDeployLabReleaseInfo(platform, release, deployLabToken, proxyBase, signal);
-      if (info.cutoff) {
-        const d = new Date(info.cutoff);
-        if (!isNaN(d.getTime())) {
-          const dateStr = d.toLocaleDateString('ru-RU', {
-            timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', year: 'numeric',
-          });
-          cutoffLine = `\nДата катоффа: ${dateStr}`;
-        }
-      }
-    } catch { /* ignore */ }
-  }
   const parts = [
     iosRelease.trim() ? `iOS ${iosRelease.trim()}` : '',
     androidRelease.trim() ? `Android ${androidRelease.trim()}` : '',
   ].filter(Boolean);
-  const versionLine = parts.length ? parts.join(' / ') : '(версия не указана)';
-  return `Запуск мажора! Версия ${versionLine}${cutoffLine}`;
+  const releaseText = parts.length ? parts.join(' / ') : (iosRelease.trim() || androidRelease.trim() || '[релиз]');
+  if (!deployLabToken || (!iosRelease.trim() && !androidRelease.trim())) {
+    return buildNoticeFallbackText(releaseText);
+  }
+
+  const releaseCandidates: Array<{ platform: 'ios' | 'android'; release: string }> = [
+    { platform: 'android', release: androidRelease.trim() || iosRelease.trim() },
+    { platform: 'ios', release: iosRelease.trim() || androidRelease.trim() },
+  ];
+  const releases = releaseCandidates.filter(item => item.release);
+  const results = await Promise.allSettled(
+    releases.map(async item => {
+      const info = await fetchDeployLabReleaseInfo(item.platform, item.release, deployLabToken, proxyBase, signal);
+      const cutoffMs = parseDeployLabCutoffMs(info.cutoff);
+      return Number.isFinite(cutoffMs) ? { platform: item.platform, cutoffMs } : null;
+    }),
+  );
+  const items = results
+    .filter((item): item is PromiseFulfilledResult<NoticeCutoffItem | null> => item.status === 'fulfilled')
+    .map(item => item.value)
+    .filter((item): item is NoticeCutoffItem => Boolean(item && Number.isFinite(item.cutoffMs)))
+    .sort((a, b) => a.cutoffMs - b.cutoffMs);
+  if (!items.length) return buildNoticeFallbackText(releaseText);
+
+  const primaryCutoffMs = Math.min(...items.map(item => item.cutoffMs));
+  return [
+    buildNoticeCutoffLine(releaseText, items),
+    `❗️ Кодфриз ${releaseText} - ${formatNoticeDateTime(buildNoticeCodeFreezeMs(primaryCutoffMs))}`,
+    '❗️ Просьба все стримы проверить свои тест-планы, а так же актуализировать статус задач',
+  ].join('\n');
 }
 
 export async function majorPublishReleaseNotice(
   noticeText: string, proxyBase: string, cookies: string,
   onLog: (msg: string, level?: LogLevel) => void, signal?: AbortSignal,
+  onChannelStatus?: (channelId: string, state: 'idle' | 'loading' | 'success' | 'error', message?: string) => void,
 ): Promise<void> {
   if (!cookies.trim()) throw new Error('Band cookies не заданы.');
   if (!noticeText.trim()) throw new Error('Текст оповещения пуст.');
   const normalized = normBandText(noticeText);
+  const errors: string[] = [];
   for (const channel of NOTICE_CHANNELS) {
-    onLog(`Публикую оповещение в "${channel.name}"...`);
-    await bandPostMessage(proxyBase, cookies, normalized, { channelId: channel.id }, signal);
-    onLog(`Опубликовано в "${channel.name}".`, 'ok');
+    onChannelStatus?.(channel.id, 'loading');
+    try {
+      onLog(`Публикую оповещение в "${channel.name}"...`);
+      await bandPostMessage(proxyBase, cookies, normalized, { channelId: channel.id }, signal);
+      onChannelStatus?.(channel.id, 'success');
+      onLog(`Опубликовано в "${channel.name}".`, 'ok');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      onChannelStatus?.(channel.id, 'error', message);
+      errors.push(`${channel.name}: ${message}`);
+      onLog(`Не удалось опубликовать в "${channel.name}": ${message}`, 'error');
+    }
   }
+  if (errors.length) throw new Error(errors[0]);
 }
 
 // ─── DUTY PING ─────────────────────────────────────────────────
@@ -3157,10 +3890,43 @@ function buildNonMajorThreadMessage(
   ].join('\n');
 }
 
+export type NonMajorFeedPreviewItem = { rootMessage: string; threadMessage: string };
+
 export function buildNonMajorSwatText(copyMessage: string, leadTag: string, napiHostsText?: string): string {
   let text = `${copyMessage}\n\nSWAT${leadTag ? `\n${leadTag}` : ''}`.trim();
   if (napiHostsText) text = `${text}\n\n${napiHostsText}`.trim();
   return text;
+}
+
+export function buildNonMajorFeedPreviewItems(
+  mode: RunMode, release: string, runs: LaunchRecord[], buildValue: string,
+  boardUrl: string, ticketKey: string, ticketUrl: string,
+): NonMajorFeedPreviewItem[] {
+  if (!release.trim()) throw new Error('Укажи версию релиза.');
+
+  if (mode === 'hf_android') {
+    const run = runs.find(r => String(r.name || '').includes('[Android]')) || runs[0];
+    if (!run) throw new Error('Не нашёл ссылку на ран Android.');
+    return [{ rootMessage: `#Android #Hotfix ${release}`, threadMessage: buildNonMajorThreadMessage(release, run, boardUrl, ticketKey, ticketUrl, buildValue) }];
+  }
+
+  if (mode === 'hf_ios') {
+    const run = runs.find(r => /\[iOS\]|\[IOS\]/i.test(String(r.name || ''))) || runs[0];
+    if (!run) throw new Error('Не нашёл ссылку на ран iOS.');
+    return [{ rootMessage: `#iOS #Hotfix ${release}`, threadMessage: buildNonMajorThreadMessage(release, run, boardUrl, ticketKey, ticketUrl, buildValue) }];
+  }
+
+  if (mode === 'rustore_critical' || mode === 'rustore_smoke') {
+    const huaweiRun = runs.find(r => String(r.name || '').includes('AppGallery'));
+    const rustoreRun = runs.find(r => /RuStore|Rustore/.test(String(r.name || '')));
+    if (!huaweiRun || !rustoreRun) throw new Error('Не нашёл ссылки на раны AppGallery/RuStore.');
+    return [
+      { rootMessage: `#Android #Release #Huawei ${release}`, threadMessage: buildNonMajorThreadMessage(release, huaweiRun, boardUrl, ticketKey, ticketUrl, buildValue) },
+      { rootMessage: `#Android #Release #Rustore ${release}`, threadMessage: buildNonMajorThreadMessage(release, rustoreRun, boardUrl, ticketKey, ticketUrl, buildValue) },
+    ];
+  }
+
+  throw new Error('Для выбранного режима публикация в ленту релизов не поддерживается.');
 }
 
 export async function publishNonMajorFeedPosts(
@@ -3173,29 +3939,7 @@ export async function publishNonMajorFeedPosts(
   if (!release.trim()) throw new Error('Укажи версию релиза.');
   const userId = getCurrentBandUserId(cookies);
   const channelPosts = await bandFetchChannelPostsSince(proxyBase, cookies, FEED_CHANNEL_ID, Date.now() - RELEASE_FEED_LOOKBACK_MS, signal);
-
-  type FeedItem = { rootMessage: string; threadMessage: string };
-  let posts: FeedItem[] = [];
-
-  if (mode === 'hf_android') {
-    const run = runs.find(r => String(r.name || '').includes('[Android]')) || runs[0];
-    if (!run) throw new Error('Не нашёл ссылку на ран Android.');
-    posts = [{ rootMessage: `#Android #Hotfix ${release}`, threadMessage: buildNonMajorThreadMessage(release, run, boardUrl, ticketKey, ticketUrl, buildValue) }];
-  } else if (mode === 'hf_ios') {
-    const run = runs.find(r => /\[iOS\]|\[IOS\]/i.test(String(r.name || ''))) || runs[0];
-    if (!run) throw new Error('Не нашёл ссылку на ран iOS.');
-    posts = [{ rootMessage: `#iOS #Hotfix ${release}`, threadMessage: buildNonMajorThreadMessage(release, run, boardUrl, ticketKey, ticketUrl, buildValue) }];
-  } else if (mode === 'rustore_critical' || mode === 'rustore_smoke') {
-    const huaweiRun = runs.find(r => String(r.name || '').includes('AppGallery'));
-    const rustoreRun = runs.find(r => /RuStore|Rustore/.test(String(r.name || '')));
-    if (!huaweiRun || !rustoreRun) throw new Error('Не нашёл ссылки на раны AppGallery/RuStore.');
-    posts = [
-      { rootMessage: `#Android #Release #Huawei ${release}`, threadMessage: buildNonMajorThreadMessage(release, huaweiRun, boardUrl, ticketKey, ticketUrl, buildValue) },
-      { rootMessage: `#Android #Release #Rustore ${release}`, threadMessage: buildNonMajorThreadMessage(release, rustoreRun, boardUrl, ticketKey, ticketUrl, buildValue) },
-    ];
-  } else {
-    throw new Error('Для выбранного режима публикация в ленту релизов не поддерживается.');
-  }
+  const posts = buildNonMajorFeedPreviewItems(mode, release, runs, buildValue, boardUrl, ticketKey, ticketUrl);
 
   for (const item of posts) {
     let rootPost = findLatestRootPostByMessage(channelPosts, item.rootMessage, userId);
