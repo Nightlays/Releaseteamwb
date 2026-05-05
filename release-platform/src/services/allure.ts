@@ -182,6 +182,8 @@ const NON_COMPLETED_STATUSES = new Set(['in_progress']);
 const DASHBOARD_RELEASE_CACHE_KEY = 'rp_dashboard_release_cache_v8';
 const DASHBOARD_RELEASE_CACHE_LIMIT = 8;
 const DASHBOARD_RELEASE_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14;
+const DASHBOARD_LAUNCH_DETAIL_CONCURRENCY = 25;
+const DASHBOARD_UWU_CASE_CONCURRENCY = 25;
 
 function sumByStatuses(list: AllureLaunchStatisticItem[] | undefined, allowed: Set<string>) {
   return (Array.isArray(list) ? list : []).reduce((sum, item) => {
@@ -907,7 +909,7 @@ async function fetchTestCaseUwU(cfg: AllureConfig, testCaseId: number): Promise<
 async function computeLaunchUwuFromLeaves(cfg: AllureConfig, leaves: AllureLeafItem[]): Promise<DashboardUwuCounts> {
   const result: DashboardUwuCounts = { total: 0, done: 0, left: 0 };
 
-  await mapLimit(leaves, 20, async leaf => {
+  await mapLimit(leaves, DASHBOARD_UWU_CASE_CONCURRENCY, async leaf => {
     const testCaseId = Number(leaf?.testCaseId || 0);
     if (!testCaseId) return;
 
@@ -1224,7 +1226,7 @@ export async function fetchDashboardAggregate(
     launchesToRefresh.push(rawLaunch);
   }
 
-  await mapLimit(launchesToRefresh, 12, async rawLaunch => {
+  await mapLimit(launchesToRefresh, DASHBOARD_LAUNCH_DETAIL_CONCURRENCY, async rawLaunch => {
     const launchId = Number(rawLaunch.id || 0);
     if (!launchId) return;
 

@@ -71,6 +71,7 @@
       "*"
     ],
     "manager": [
+      "service-home",
       "dashboard_run_module.html",
       "Ванговатор.html",
       "Создание рана.html",
@@ -85,6 +86,7 @@
       "Копирование данных из YT.html"
     ],
     "analyst": [
+      "service-home",
       "dashboard_run_module.html",
       "Графики.html",
       "Анализ релизов за квартал.html",
@@ -93,6 +95,7 @@
       "Популярные устройства.html"
     ],
     "viewer": [
+      "service-home",
       "dashboard_run_module.html"
     ]
   },

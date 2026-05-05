@@ -1545,6 +1545,7 @@ function buildPersonaArticleSystemPrompt(
     '• Не добавляй заголовок H1 с названием — title создаётся через API отдельно',
     '• Разделы через ## заголовки, подразделы через ###',
     '• В разделе "## Источники" используй markdown-ссылки: [Название](url)',
+    '• В видимом тексте ссылок не пиши URL, encoded slug и percent-encoded фрагменты вида %D0%BE — только короткое понятное название',
   ].join('\n');
 }
 
@@ -1744,10 +1745,78 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;');
 }
 
+function trimUrlPunctuation(url: string) {
+  const match = String(url || '').match(/^(.+?)([.,;:!?]+)?$/);
+  return {
+    url: match?.[1] || String(url || ''),
+    tail: match?.[2] || '',
+  };
+}
+
+function safeDecodeURIComponent(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function cleanMarkdownLinkLabel(label: string, url: string) {
+  const raw = String(label || '').trim();
+  if (!raw) return 'ссылка';
+  if (/^https?:\/\//i.test(raw)) return 'ссылка';
+
+  const decoded = /%[0-9a-f]{2}/i.test(raw) ? safeDecodeURIComponent(raw) : raw;
+  const readableCode = decoded.match(/^([A-ZА-Я]{2,}\s+\d{2,})\b/u);
+  if (readableCode && raw.includes('%')) return readableCode[1];
+
+  const cleaned = decoded
+    .replace(/\s+/g, ' ')
+    .replace(/[()[\]]+/g, ' ')
+    .trim();
+  if (!cleaned) return 'ссылка';
+  if (/^https?:\/\//i.test(cleaned)) return 'ссылка';
+  if (cleaned.length > 90 && /wiki\.wb\.ru/i.test(url)) return cleaned.slice(0, 87).trimEnd() + '...';
+  return cleaned;
+}
+
+function normalizeWikiPublishMarkdown(markdown: string) {
+  const linkPlaceholders: string[] = [];
+  let text = String(markdown || '').replace(/\r\n/g, '\n');
+
+  text = text.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, (_, label: string, rawUrl: string) => {
+    const { url, tail } = trimUrlPunctuation(rawUrl);
+    const placeholder = `\u0000WIKI_LINK_${linkPlaceholders.length}\u0000`;
+    linkPlaceholders.push(`[${cleanMarkdownLinkLabel(label, url)}](${url})${tail}`);
+    return placeholder;
+  });
+
+  text = text.replace(/\((https?:\/\/[^)\s]+)\)/g, (_, rawUrl: string) => {
+    const { url, tail } = trimUrlPunctuation(rawUrl);
+    return `([ссылка](${url})${tail})`;
+  });
+
+  text = text.replace(/(^|[\s>])https?:\/\/[^\s)]+/g, (match: string, prefix: string) => {
+    const rawUrl = match.slice(prefix.length);
+    const { url, tail } = trimUrlPunctuation(rawUrl);
+    return `${prefix}[ссылка](${url})${tail}`;
+  });
+
+  linkPlaceholders.forEach((value, index) => {
+    text = text.replace(`\u0000WIKI_LINK_${index}\u0000`, value);
+  });
+
+  return text.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function renderInlineMarkdown(value: string) {
-  let output = escapeHtml(value);
+  let output = escapeHtml(normalizeWikiPublishMarkdown(value));
   output = output.replace(/`([^`]+)`/g, '<code>$1</code>');
   output = output.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  output = output.replace(/(^|[\s>])(https?:\/\/[^\s<)]+)/g, (_match, prefix: string, rawUrl: string) => {
+    const { url, tail } = trimUrlPunctuation(rawUrl);
+    return `${prefix}<a href="${url}" target="_blank" rel="noopener noreferrer">ссылка</a>${tail}`;
+  });
   output = output.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   output = output.replace(/__([^_]+)__/g, '<strong>$1</strong>');
   output = output.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
@@ -1756,7 +1825,7 @@ function renderInlineMarkdown(value: string) {
 }
 
 function renderMarkdownToHtml(markdown: string) {
-  const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
+  const lines = normalizeWikiPublishMarkdown(markdown).split('\n');
   const html: string[] = [];
   let listMode: 'ul' | 'ol' | null = null;
   let codeFence = false;
@@ -1891,7 +1960,8 @@ async function updateWikiArticleContent(
   article: { spaceId: string; articleNumber: string; title: string },
   markdown: string
 ) {
-  const html = renderMarkdownToHtml(markdown);
+  const publishMarkdown = normalizeWikiPublishMarkdown(markdown);
+  const html = renderMarkdownToHtml(publishMarkdown);
   const response = await fetchWithRouting(cfg, buildArticleApiUrl(base, article.spaceId, article.articleNumber), {
     method: 'PUT',
     headers: {
@@ -1900,7 +1970,7 @@ async function updateWikiArticleContent(
     },
     body: JSON.stringify({
       title: article.title,
-      markdown,
+      markdown: publishMarkdown,
       content: html,
     }),
   });

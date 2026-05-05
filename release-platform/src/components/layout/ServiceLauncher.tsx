@@ -7,6 +7,8 @@ export interface ServiceLauncherItem {
   href: string;
   color: string;
   icon: React.ReactNode;
+  target?: React.HTMLAttributeAnchorTarget;
+  rel?: string;
 }
 
 export type ServiceLauncherPlacement = 'right-start' | 'bottom-start' | 'bottom-end';
@@ -217,6 +219,8 @@ export function ServiceLauncher({
                 href={item.href}
                 title={item.label.replace('\n', ' ')}
                 role="menuitem"
+                target={item.target}
+                rel={item.rel || (item.target === '_blank' ? 'noopener noreferrer' : undefined)}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',

@@ -1,6 +1,7 @@
 import React from 'react';
 
 export type ModuleId =
+  | 'home'
   | 'dashboard'
   | 'goals'
   | 'vangovat'
@@ -43,6 +44,15 @@ const icDashboard = (
     <rect x="7" y="10" width="3.5" height="10" rx="1" fill="currentColor" fillOpacity=".85" stroke="none"/>
     <rect x="12" y="12" width="3.5" height="8" rx="1" fill="currentColor" fillOpacity=".85" stroke="none"/>
     <polyline points="1,9 4,9 6,5 8,11 10,7 13,9 16,9" strokeWidth="1.5"/>
+  </svg>
+);
+
+const icHome = (
+  <svg viewBox="0 0 22 22" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="3" width="6" height="6" rx="1.5" fill="currentColor" fillOpacity=".22"/>
+    <rect x="13" y="3" width="6" height="6" rx="1.5" fill="currentColor" fillOpacity=".34"/>
+    <rect x="3" y="13" width="6" height="6" rx="1.5" fill="currentColor" fillOpacity=".34"/>
+    <rect x="13" y="13" width="6" height="6" rx="1.5" fill="currentColor" fillOpacity=".22"/>
   </svg>
 );
 
@@ -182,6 +192,15 @@ const icAccess = (
 // ── Module registry ───────────────────────────────────────────────────────────
 
 export const MODULES: ModuleDefinition[] = [
+  {
+    id: 'home',
+    legacyId: 'service-home',
+    label: 'Сервисы',
+    sub: 'Dashboard · Learning Hub · Project',
+    section: 'Обзор',
+    icon: icHome,
+    showLegacyButton: false,
+  },
   {
     id: 'dashboard',
     legacyId: 'dashboard_run_module.html',

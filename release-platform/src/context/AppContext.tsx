@@ -38,7 +38,7 @@ function readStoredTheme(): ThemeMode {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [activeModule, setActiveModule] = useState<ModuleId>('dashboard');
+  const [activeModule, setActiveModule] = useState<ModuleId>('home');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
 

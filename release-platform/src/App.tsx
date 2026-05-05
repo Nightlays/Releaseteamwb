@@ -27,6 +27,14 @@ import { WikiIntelligence } from './modules/WikiIntelligence';
 import { AccessPanel } from './modules/AccessPanel';
 import { RolloutReport } from './modules/RolloutReport';
 import {
+  DEFAULT_SERVICE_GATEWAY_ID,
+  getServiceGatewayItem,
+  ServiceGateway,
+  SERVICE_GATEWAY_ITEMS,
+  type ServiceGatewayAuthTarget,
+  type ServiceGatewayItem,
+} from './modules/ServiceGateway';
+import {
   buildLegacyModuleUrl,
   canAccessModule,
   clearStoredAuth,
@@ -47,10 +55,39 @@ const EMPTY_RBAC: RbacConfig = {
   userAccess: {},
 };
 
-function ModuleContent({ moduleId, refreshKey, rbac, role, onRbacChange }: { moduleId: ModuleId; refreshKey: number; rbac: RbacConfig; role: Role; onRbacChange: (next: RbacConfig) => void }) {
+function ModuleContent({
+  moduleId,
+  refreshKey,
+  rbac,
+  role,
+  onRbacChange,
+  onActivateModule,
+}: {
+  moduleId: ModuleId;
+  refreshKey: number;
+  rbac: RbacConfig;
+  role: Role;
+  onRbacChange: (next: RbacConfig) => void;
+  onActivateModule: (moduleId: ModuleId) => void;
+}) {
   const key = `${moduleId}:${refreshKey}`;
 
   switch (moduleId) {
+    case 'home':
+      return (
+        <div key={key} style={{ height: '100%' }}>
+          <ServiceGateway
+            selectedServiceId={DEFAULT_SERVICE_GATEWAY_ID}
+            onSelect={item => {
+              if (item.authTarget.type === 'module') {
+                onActivateModule(item.authTarget.moduleId);
+                return;
+              }
+              window.location.assign(item.authTarget.href);
+            }}
+          />
+        </div>
+      );
     case 'dashboard':
       return <div key={key}><Dashboard /></div>;
     case 'goals':
@@ -101,179 +138,167 @@ function AuthScreen({
   error: string;
   theme: ThemeMode;
   onToggleTheme: () => void;
-  onSubmit: (login: string, pass: string) => void;
+  onSubmit: (login: string, pass: string, target?: ServiceGatewayAuthTarget) => void;
 }) {
   const [login, setLogin] = useState('');
   const [pass, setPass] = useState('');
+  const [selectedServiceId, setSelectedServiceId] = useState(DEFAULT_SERVICE_GATEWAY_ID);
+  const formRef = useRef<HTMLFormElement>(null);
+  const selectedService = getServiceGatewayItem(selectedServiceId);
 
-  const statCard: React.CSSProperties = {
-    flex: 1,
-    minWidth: 0,
-    padding: '14px 16px',
-    borderRadius: 16,
-    background: 'var(--card)',
-    border: '1px solid var(--border-hi)',
-    boxShadow: 'var(--sh-sm)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
+  const selectService = (item: ServiceGatewayItem) => {
+    setSelectedServiceId(item.id);
+    requestAnimationFrame(() => {
+      if (item.authTarget.type === 'module') {
+        formRef.current?.querySelector<HTMLInputElement>('input[name="login"]')?.focus();
+      }
+    });
   };
 
-  const iconBox = (color: string): React.CSSProperties => ({
-    width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-    background: `rgba(${color},.15)`,
-    border: `1px solid rgba(${color},.28)`,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  });
+  const authCard = (
+    <form
+      ref={formRef}
+      onSubmit={e => { e.preventDefault(); onSubmit(login, pass, selectedService.authTarget); }}
+      style={{
+        minHeight: 382,
+        padding: '26px 26px 22px',
+        borderRadius: 22,
+        background: 'var(--card)',
+        border: '1px solid var(--border-hi)',
+        boxShadow: 'var(--shadow-hard)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
+        boxSizing: 'border-box',
+        textAlign: 'center',
+        position: 'relative',
+      }}
+    >
+      <div style={{ minHeight: 96, marginBottom: 14, padding: '0 44px' }}>
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          style={{
+            position: 'absolute',
+            top: 24,
+            right: 24,
+            padding: '6px 10px',
+            borderRadius: 999,
+            border: '1px solid var(--border-hi)',
+            background: 'var(--surface-soft-4)',
+            color: 'var(--text-2)',
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          {theme === 'dark' ? 'Тёмная' : 'Светлая'}
+        </button>
+        <div>
+          <div style={{ fontSize: 21, fontWeight: 850, color: 'var(--text)', lineHeight: 1.15 }}>
+            {selectedService.title}
+          </div>
+          <div style={{ marginTop: 7, fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-3)' }}>
+            {selectedService.description}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ minHeight: 44, marginBottom: 12 }}>
+        {selectedService.authTarget.type === 'external' ? (
+          <a
+            href={selectedService.authTarget.href}
+            target={selectedService.authTarget.target || '_self'}
+            rel={selectedService.authTarget.target === '_blank' ? 'noopener noreferrer' : undefined}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              minHeight: 42,
+              padding: '10px 14px',
+              borderRadius: 12,
+              background: 'var(--surface-soft-4)',
+              border: '1px solid var(--border-hi)',
+              color: 'var(--text)',
+              textDecoration: 'none',
+              fontSize: 13,
+              fontWeight: 750,
+              boxSizing: 'border-box',
+            }}
+          >
+            Открыть {selectedService.label}
+          </a>
+        ) : (
+          <div style={{
+            minHeight: 42,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '9px 14px',
+            borderRadius: 12,
+            background: 'rgba(155,92,255,.10)',
+            border: '1px solid rgba(155,92,255,.24)',
+            color: 'var(--text-2)',
+            fontSize: 12.5,
+            fontWeight: 700,
+            boxSizing: 'border-box',
+          }}>
+            После входа откроется выбранный раздел
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '.2px' }}>ЛОГИН</span>
+          <input
+            name="login"
+            value={login}
+            onChange={e => setLogin(e.target.value)}
+            autoComplete="username"
+            placeholder="Ваш логин"
+            style={{ padding: '12px 14px', borderRadius: 12, border: '1.5px solid var(--border-hi)', background: 'var(--surface-soft-2)', color: 'var(--text)', fontSize: 14, outline: 'none', width: '100%', boxSizing: 'border-box' }}
+          />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '.2px' }}>ПАРОЛЬ</span>
+          <input
+            type="password"
+            value={pass}
+            onChange={e => setPass(e.target.value)}
+            autoComplete="current-password"
+            placeholder="Пароль"
+            style={{ padding: '12px 14px', borderRadius: 12, border: '1.5px solid var(--border-hi)', background: 'var(--surface-soft-2)', color: 'var(--text)', fontSize: 14, outline: 'none', width: '100%', boxSizing: 'border-box' }}
+          />
+        </label>
+      </div>
+
+      {error && (
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.22)', color: '#EF4444', fontSize: 12.5 }}>
+          {error}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        style={{ width: '100%', marginTop: 16, padding: '12px 16px', borderRadius: 12, background: 'var(--grad)', color: '#fff', fontWeight: 750, fontSize: 14, border: 'none', cursor: 'pointer', boxShadow: '0 10px 32px rgba(155,92,255,.28)' }}
+      >
+        {selectedService.authTarget.type === 'module'
+          ? `Войти и открыть ${selectedService.label}`
+          : `Войти и перейти в ${selectedService.label}`}
+      </button>
+    </form>
+  );
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'var(--hero-bg)',
-    }}>
-      {/* ── Header ───────────────────────────────────────────────────────── */}
-      <header style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px clamp(24px,5vw,64px)' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ width:34, height:34, borderRadius:10, background:'var(--grad)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', boxShadow:'0 4px 16px rgba(155,92,255,.4)', flexShrink:0 }}>WB</div>
-          <span style={{ fontSize:13, fontWeight:700, color:'var(--text-3)' }}>Release Platform</span>
-        </div>
-        <button type="button" onClick={onToggleTheme} style={{ padding:'6px 14px', borderRadius:999, border:'1px solid var(--border-hi)', background:'var(--surface-soft-4)', color:'var(--text-2)', fontSize:11, fontWeight:700, cursor:'pointer' }}>
-          {theme === 'dark' ? '☾ Тёмная' : '☀ Светлая'}
-        </button>
-      </header>
-
-      {/* ── Main: centered column ────────────────────────────────────────── */}
-      <main style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px clamp(16px,5vw,32px) 40px' }}>
-        <div style={{ width:'100%', maxWidth:480, display:'flex', flexDirection:'column', gap:24 }}>
-
-          {/* Hero text */}
-          <div style={{ textAlign:'center' }}>
-            <h1 style={{ fontSize:'clamp(38px,5vw,58px)', lineHeight:.92, letterSpacing:'-2px', fontWeight:900, color:'var(--text)', margin:'0 0 14px' }}>
-              Управляй{' '}
-              <span style={{ background:'var(--grad)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>релизами</span>
-              {' '}уверенно
-            </h1>
-            <p style={{ fontSize:14, lineHeight:1.6, color:'var(--text-3)', margin:0 }}>
-              Единый центр запуска, аналитики, SWAT-дежурств<br/>и AI-базы знаний для мобильных релизов WB.
-            </p>
-          </div>
-
-          {/* Auth card */}
-          <form
-            onSubmit={e => { e.preventDefault(); onSubmit(login, pass); }}
-            style={{ padding:'28px 28px 24px', borderRadius:24, background:'var(--card)', border:'1px solid var(--border-hi)', boxShadow:'var(--shadow-hard)' }}
-          >
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <label style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                <span style={{ fontSize:11, fontWeight:700, color:'var(--text-2)', letterSpacing:'.2px' }}>ЛОГИН</span>
-                <input
-                  value={login}
-                  onChange={e => setLogin(e.target.value)}
-                  autoComplete="username"
-                  placeholder="Ваш логин"
-                  style={{ padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--border-hi)', background:'var(--surface-soft-2)', color:'var(--text)', fontSize:14, outline:'none', width:'100%' }}
-                />
-              </label>
-              <label style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                <span style={{ fontSize:11, fontWeight:700, color:'var(--text-2)', letterSpacing:'.2px' }}>ПАРОЛЬ</span>
-                <input
-                  type="password"
-                  value={pass}
-                  onChange={e => setPass(e.target.value)}
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  style={{ padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--border-hi)', background:'var(--surface-soft-2)', color:'var(--text)', fontSize:14, outline:'none', width:'100%' }}
-                />
-              </label>
-            </div>
-
-            {error && (
-              <div style={{ marginTop:12, padding:'10px 14px', borderRadius:10, background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.22)', color:'#EF4444', fontSize:12.5 }}>
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              style={{ width:'100%', marginTop:16, padding:'12px 16px', borderRadius:12, background:'var(--grad)', color:'#fff', fontWeight:700, fontSize:14, border:'none', cursor:'pointer', boxShadow:'0 10px 32px rgba(155,92,255,.28)', letterSpacing:'-.1px' }}
-            >
-              Войти
-            </button>
-          </form>
-
-          {/* Stat cards row */}
-          <div style={{ display:'flex', gap:10 }}>
-
-            {/* Release — full-width progress bar */}
-            <div style={{ ...statCard, flex:1.5, flexDirection:'column', alignItems:'stretch', gap:9 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <div style={iconBox('245,158,11')}>
-                  <svg viewBox="0 0 22 22" width="15" height="15" fill="none" stroke="#F59E0B" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    {/* rocket body */}
-                    <path d="M11 2C9.2 4 8 7 8 10v2.5h6V10c0-3-1.2-6-3-8z" fill="rgba(245,158,11,.18)"/>
-                    {/* left fin */}
-                    <path d="M8 10.5L5.5 14H8.5" strokeWidth="1.4"/>
-                    {/* right fin */}
-                    <path d="M14 10.5L16.5 14H13.5" strokeWidth="1.4"/>
-                    {/* exhaust */}
-                    <path d="M10 13c0 0 .5 2.2 1 2.2s1-2.2 1-2.2" strokeWidth="1.3"/>
-                    {/* porthole */}
-                    <circle cx="11" cy="8" r="1.3" fill="#F59E0B" stroke="none"/>
-                  </svg>
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:11.5, fontWeight:700, color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>Релиз v25.5 Мажорный</div>
-                  <div style={{ fontSize:10, color:'var(--text-3)', marginTop:1 }}>Готовность тест-кейсов</div>
-                </div>
-                <span style={{ fontSize:12, fontWeight:800, color:'var(--yellow)', flexShrink:0 }}>68%</span>
-              </div>
-              <div style={{ height:4, borderRadius:999, background:'var(--border-hi)', overflow:'hidden' }}>
-                <div style={{ width:'68%', height:'100%', borderRadius:999, background:'linear-gradient(90deg,#F59E0B,#FCD34D)', boxShadow:'0 0 8px rgba(245,158,11,.35)' }}/>
-              </div>
-            </div>
-
-            {/* SWAT */}
-            <div style={statCard}>
-              <div style={iconBox('34,197,94')}>
-                <svg viewBox="0 0 22 22" width="15" height="15" fill="none" stroke="#22C55E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 2L4 5v6c0 4.42 2.96 8.56 7 9.93C15.04 19.56 18 15.42 18 11V5L11 2z" fill="rgba(34,197,94,.18)"/>
-                  <path d="M8 11l2.5 2.5 4-4" strokeWidth="2"/>
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize:11.5, fontWeight:700, color:'var(--text)' }}>SWAT онлайн</div>
-                <div style={{ fontSize:10.5, color:'var(--text-3)', marginTop:1 }}>5 дежурных</div>
-              </div>
-            </div>
-
-            {/* ML */}
-            <div style={statCard}>
-              <div style={iconBox('99,102,241')}>
-                <svg viewBox="0 0 22 22" width="15" height="15" fill="none" stroke="#818CF8" strokeWidth="1.8" strokeLinecap="round">
-                  <path d="M2 13c0-5 4-9 9-9s9 4 9 9" strokeOpacity=".3"/>
-                  <path d="M5 13c0-3.31 2.69-6 6-6s6 2.69 6 6" strokeOpacity=".65"/>
-                  <path d="M8 13c0-1.66 1.34-3 3-3s3 1.34 3 3"/>
-                  <circle cx="11" cy="13" r="2" fill="#818CF8" stroke="none"/>
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize:11.5, fontWeight:700, color:'var(--text)' }}>ML-прогноз</div>
-                <div style={{ fontSize:10.5, color:'var(--green)', fontWeight:700, marginTop:1 }}>Риск ↓ низкий</div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </main>
-
-      {/* ── Feature pills ─────────────────────────────────────────────────── */}
-      <footer style={{ display:'flex', justifyContent:'center', flexWrap:'wrap', gap:8, padding:'0 24px 28px' }}>
-        {['Запуск релизов','SWAT','ЧП','ML-прогноз','Wiki AI','Графики','Ванговатор','Устройства'].map(f => (
-          <span key={f} style={{ padding:'5px 12px', borderRadius:999, background:'var(--surface-soft-4)', border:'1px solid var(--border)', color:'var(--text-3)', fontSize:11.5, fontWeight:600 }}>{f}</span>
-        ))}
-      </footer>
+    <div style={{ minHeight: '100vh', background: 'var(--main-bg)' }}>
+      <ServiceGateway
+        items={SERVICE_GATEWAY_ITEMS}
+        authPanel={authCard}
+        selectedServiceId={selectedService.id}
+        onSelect={selectService}
+      />
     </div>
   );
 }
@@ -409,7 +434,7 @@ function Layout() {
     setRefreshKey(prev => prev + 1);
   }, [settings]);
 
-  const handleLogin = (login: string, pass: string) => {
+  const handleLogin = (login: string, pass: string, target?: ServiceGatewayAuthTarget) => {
     if (!rbac.users.length) {
       setAuthError('RBAC-конфиг ещё не загружен');
       return;
@@ -428,11 +453,23 @@ function Layout() {
       ? 'superadmin'
       : (found.role === 'superadmin' ? 'admin' : found.role || 'viewer');
 
+    const nextAllowedLegacyIds = resolveAllowedLegacyIds(found.login, nextRole, rbac.roleAccess, rbac.userAccess);
+    const requestedModule = target?.type === 'module' ? MODULE_BY_ID[target.moduleId] : null;
+    const nextModule = requestedModule
+      && canAccessModule(requestedModule, nextRole, nextAllowedLegacyIds)
+      && !requestedModule.openNewTab
+        ? requestedModule.id
+        : getFirstAllowedModuleId(found.login, nextRole, rbac.roleAccess, rbac.userAccess);
+
     persistAuth(found.login, nextRole);
-    didHydrateModuleRef.current = false;
+    didHydrateModuleRef.current = Boolean(target);
     setAuth({ authed: true, login: found.login, role: nextRole as Role });
-    setActiveModule(getFirstAllowedModuleId(found.login, nextRole, rbac.roleAccess, rbac.userAccess));
+    setActiveModule(nextModule);
     setAuthError('');
+
+    if (target?.type === 'external') {
+      window.location.assign(target.href);
+    }
   };
 
   const handleLogout = () => {
@@ -470,10 +507,14 @@ function Layout() {
     return <AuthScreen error={authError} theme={theme} onToggleTheme={toggleTheme} onSubmit={handleLogin} />;
   }
 
-  const isWideModule = currentModule.id === 'charts' || currentModule.id === 'goals' || currentModule.id === 'releaseAnalysis';
+  const isWideModule = currentModule.id === 'home' || currentModule.id === 'dashboard' || currentModule.id === 'charts' || currentModule.id === 'goals' || currentModule.id === 'releaseAnalysis';
   const mainPadding = currentModule.id === 'releaseAnalysis'
     ? '10px 12px 18px 12px'
-    : (currentModule.id === 'charts' || currentModule.id === 'goals') ? '0' : 16;
+    : currentModule.id === 'home'
+      ? '0'
+      : currentModule.id === 'dashboard'
+      ? '12px 14px 18px'
+      : (currentModule.id === 'charts' || currentModule.id === 'goals') ? '0' : 16;
 
   return (
     <div className="app-shell" style={{
@@ -514,7 +555,14 @@ function Layout() {
           background: 'var(--main-bg)',
         }}>
           <div style={{ maxWidth: isWideModule ? undefined : 1440, margin: '0 auto', width: '100%', height: '100%' }}>
-            <ModuleContent moduleId={currentModule.id} refreshKey={refreshKey} rbac={rbac} role={auth.role} onRbacChange={setRbac} />
+            <ModuleContent
+              moduleId={currentModule.id}
+              refreshKey={refreshKey}
+              rbac={rbac}
+              role={auth.role}
+              onRbacChange={setRbac}
+              onActivateModule={handleActivate}
+            />
           </div>
         </main>
       </div>

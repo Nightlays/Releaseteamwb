@@ -3,7 +3,7 @@ tags:
   - microfrontend
   - wiki
   - ai
-updated: 2026-05-04
+updated: 2026-05-05
 ---
 
 # Wiki Intelligence v4
@@ -51,6 +51,18 @@ AI-поиск и генерация ответов по базе знаний: W
 - persona selector;
 - suggested questions;
 - draft actions: publish/copy.
+
+## Публикация статей
+
+Перед отправкой черновика в Wiki сервис нормализует markdown:
+
+- очищает подписи markdown-ссылок от percent-encoded мусора;
+- голые URL и URL в скобках превращает в markdown-ссылки с подписью `ссылка`;
+- одинаково очищает `markdown` и HTML `content`, которые уходят в publish API.
+
+Prompt генерации статьи дополнительно запрещает использовать URL, encoded slug и `%D0...` фрагменты в видимом тексте ссылок.
+
+Это защищает опубликованные статьи от артефактов вида `ADR 0011%20...` и сырых `https://wiki.wb.ru/...%D0...` внутри текста.
 
 ## Доступ
 

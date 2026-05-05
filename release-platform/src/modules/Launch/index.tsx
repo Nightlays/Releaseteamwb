@@ -1439,6 +1439,20 @@ function StepScheduleBlock({
 
 // ─── AUTOMATION BLOCK ────────────────────────────────────────────
 const AUTOMATION_SUPPORTED: RunMode[] = ['major', 'hf_android', 'hf_ios', 'napi', 'sunday_devices', 'rustore_critical', 'rustore_smoke'];
+const AUTOMATION_FEED_BLOCKED = new Set<RunMode>(['napi', 'sunday_devices']);
+
+function buildAutomationScenarioText(mode: RunMode): string {
+  if (mode === 'major') {
+    return 'Сценарий: выполнит сбор дежурных и затем автоматически пройдёт шаги 1–5 с ответом «Да».';
+  }
+  if (mode === 'napi') {
+    return 'Сценарий: создаст NAPI раны, опубликует SWAT Team Only.';
+  }
+  if (mode === 'sunday_devices') {
+    return 'Сценарий: создаст воскресные раны устройств, опубликует SWAT Team Only.';
+  }
+  return 'Сценарий: создаст ран, опубликует SWAT Team Only, обновит ленту релизов.';
+}
 function AutomationBlock({
   mode, running, automationRunning, plan, tick, onSchedule, onCancel, withDivider = true,
 }: {
@@ -1462,12 +1476,7 @@ function AutomationBlock({
   const busy = running || automationRunning;
   if (!supported && !plan && !automationRunning) return null;
 
-  const feedBlocked = mode === 'napi' || mode === 'sunday_devices';
-  const scenarioText = mode === 'major'
-    ? 'Сценарий: выполнит сбор дежурных и затем автоматически пройдёт шаги 1–5 с ответом «Да».'
-    : feedBlocked
-    ? 'Сценарий: создаст ран, опубликует SWAT Team Only.'
-    : 'Сценарий: создаст ран, опубликует SWAT Team Only, обновит ленту релизов.';
+  const scenarioText = buildAutomationScenarioText(plan?.snapshot.mode || mode);
 
   const inputStyle: React.CSSProperties = {
     padding: '4px 8px', borderRadius: 8,
@@ -3424,10 +3433,10 @@ export function Launch() {
         { id: 'create_run', label: 'Создание NAPI ранов', status: 'pending' },
         { id: 'notify_swat', label: 'Уведомление SWAT', status: 'pending' },
       ],
-	      sunday_devices: [
-	        { id: 'create_run', label: 'Создание ранов устройств', status: 'pending' },
-	        { id: 'notify_swat', label: 'Уведомление SWAT', status: 'pending' },
-	      ],
+      sunday_devices: [
+        { id: 'create_run', label: 'Создание ранов устройств', status: 'pending' },
+        { id: 'notify_swat', label: 'Уведомление SWAT', status: 'pending' },
+      ],
       rustore_critical: [
         { id: 'create_run', label: 'Создание RuStore/AppGallery Critical Path', status: 'pending' },
         { id: 'notify_swat', label: 'Уведомление SWAT', status: 'pending' },
@@ -3787,7 +3796,7 @@ export function Launch() {
         const swatText = buildNonMajorSwatText(result.message, leadTag, napiHosts);
         await bandPostMessage(proxyBase, cookies, swatText, { channelId: SWAT_CHANNEL_ID });
         log('✓ SWAT Team Only опубликован', 'ok');
-	        if (m !== 'napi' && m !== 'sunday_devices') {
+        if (!AUTOMATION_FEED_BLOCKED.has(m)) {
           try {
             await publishNonMajorFeedPosts(m, rel, result.runs, bv, '', '', '', proxyBase, cookies, log);
             log('✓ Лента релизов опубликована', 'ok');
@@ -3795,6 +3804,8 @@ export function Launch() {
             log(`Лента: ${fe instanceof Error ? fe.message : String(fe)}`, 'warn');
           }
         }
+      } else {
+        log('Band cookies не заданы — публикация SWAT Team Only пропущена.', 'warn');
       }
       log('✓ Автозапуск завершён', 'ok');
     } catch (e) {
@@ -5145,13 +5156,13 @@ export function Launch() {
               <Button variant="secondary" onClick={runProxyCheck}>
                 Проверить прокси
               </Button>
-	              {(!settings.allureToken || !settings.ytToken || !settings.bandCookies) && (
-	                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-	                  {!settings.allureToken && <Badge color="red">Нужен Allure токен</Badge>}
-	                  {!settings.ytToken && <Badge color="yellow">Нужен YouTrack токен</Badge>}
-	                  {!settings.bandCookies && <Badge color="red">Нужны Band cookies</Badge>}
-	                </div>
-	              )}
+              {(!settings.allureToken || !settings.ytToken || !settings.bandCookies) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {!settings.allureToken && <Badge color="red">Нужен Allure токен</Badge>}
+                  {!settings.ytToken && <Badge color="yellow">Нужен YouTrack токен</Badge>}
+                  {!settings.bandCookies && <Badge color="red">Нужны Band cookies</Badge>}
+                </div>
+              )}
 
               <AutomationBlock
                 mode={mode} running={running} automationRunning={automationRunning}

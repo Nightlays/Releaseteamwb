@@ -146,7 +146,7 @@ export function buildLegacyModuleUrl(module: ModuleDefinition, settings: AppSett
 
 export function getDefaultRoleAccess(): Record<string, string[]> {
   const all = MODULES.filter(module => !module.explicitAccess).map(module => module.legacyId);
-  const analyst = all.filter(id => /dashboard|Графики|BiUser|Популярные/u.test(id));
+  const analyst = all.filter(id => /service-home|dashboard|Графики|BiUser|Популярные/u.test(id));
   return {
     superadmin: ['*', 'access-management'],
     admin: ['*', 'access-management'],
