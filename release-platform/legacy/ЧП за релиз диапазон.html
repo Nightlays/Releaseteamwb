@@ -1,0 +1,2292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>ЧП за релиз</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link rel="stylesheet" href="./style.css" />
+
+  <style>
+    .chp-release #status.ok{color:var(--green)}
+    .chp-release #status.err{color:var(--red)}
+    .chp-release #status.warn{color:#f59e0b}
+
+    .chp-release .log{
+      white-space:pre-wrap;
+      background:#fff;
+      border-radius:16px;
+      padding:12px;
+      border:1px solid #ecebff;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 20px rgba(124,58,237,.06);
+      max-height:280px;
+      overflow:auto;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px;
+      line-height:1.4;
+    }
+    .chp-release #logs .ok{color:var(--green)}
+    .chp-release #logs .err{color:var(--red)}
+    .chp-release #logs .warn{color:#f59e0b}
+
+    .chp-release .stats-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+      gap:12px;
+    }
+    .chp-release .stat-card{
+      border:1px solid #ecebff;
+      border-radius:18px;
+      background:linear-gradient(180deg,#fff 0%,#fbfbff 100%);
+      padding:14px 16px;
+    }
+    .chp-release .stat-label{
+      font-size:12px;
+      font-weight:700;
+      color:#64748b;
+      margin-bottom:4px;
+    }
+    .chp-release .stat-value{
+      font-size:20px;
+      font-weight:800;
+      color:#111827;
+      line-height:1.2;
+    }
+    .chp-release .stat-sub{
+      margin-top:6px;
+      font-size:12px;
+      color:#64748b;
+      line-height:1.45;
+    }
+
+    .chp-release .platform-tabs{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .chp-release .mini-summary{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:14px;
+    }
+    .chp-release .mini-summary-card{
+      border:1px solid #ecebff;
+      border-radius:16px;
+      background:#fff;
+      padding:14px 16px;
+      min-width:0;
+    }
+    .chp-release .mini-summary-label{
+      font-size:13px;
+      font-weight:700;
+      color:#64748b;
+      margin-bottom:10px;
+      line-height:1.1;
+    }
+    .chp-release .mini-summary-value{
+      font-size:24px;
+      font-weight:800;
+      line-height:1.1;
+      color:#111827;
+    }
+    .chp-release .mini-summary-metrics{
+      display:flex;
+      gap:12px;
+      flex-wrap:nowrap;
+      align-items:stretch;
+    }
+    .chp-release .mini-summary-metric{
+      border-radius:12px;
+      padding:12px 14px;
+      border:1px solid #ecebff;
+      background:#fcfbff;
+      flex:1 1 0;
+      min-width:0;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .chp-release .mini-summary-metric.is-ok{
+      border-color:rgba(34,197,94,.22);
+      background:rgba(34,197,94,.06);
+    }
+    .chp-release .mini-summary-metric.is-bad{
+      border-color:rgba(244,63,94,.22);
+      background:rgba(244,63,94,.06);
+    }
+    .chp-release .mini-summary-metric-label{
+      font-size:12px;
+      font-weight:700;
+      color:#64748b;
+      margin-bottom:0;
+      line-height:1.15;
+      white-space:nowrap;
+      flex:1 1 auto;
+      min-width:0;
+    }
+    .chp-release .mini-summary-metric-value{
+      font-size:24px;
+      font-weight:800;
+      line-height:1;
+      color:#111827;
+      flex:0 0 auto;
+    }
+    @media (max-width: 900px){
+      .chp-release .mini-summary{
+        grid-template-columns:1fr;
+      }
+    }
+    @media (max-width: 720px){
+      .chp-release .mini-summary-metrics{
+        flex-wrap:wrap;
+      }
+      .chp-release .mini-summary-metric{
+        flex-basis:100%;
+      }
+    }
+    .chp-release .platform-tab{
+      border:1px solid #e9ddff;
+      background:#fff;
+      color:#6d28d9;
+      padding:10px 14px;
+      border-radius:14px;
+      font-weight:800;
+      box-shadow:0 8px 20px rgba(124,58,237,.06);
+      transition:.18s ease;
+    }
+    .chp-release .platform-tab.is-active{
+      background:linear-gradient(90deg,#7c3aed,#ec4899);
+      color:#fff;
+      border-color:transparent;
+      box-shadow:0 12px 24px rgba(124,58,237,.22);
+    }
+
+    .chp-release .platform-panel[hidden]{
+      display:none !important;
+    }
+    .chp-release .release-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+      gap:10px;
+    }
+    .chp-release .release-card{
+      border:1px solid #ecebff;
+      border-radius:16px;
+      background:#fff;
+      padding:12px 14px;
+    }
+    .chp-release .release-card-title{
+      font-size:14px;
+      font-weight:800;
+      color:#111827;
+      margin-bottom:4px;
+    }
+    .chp-release .release-card-sub{
+      font-size:12px;
+      color:#64748b;
+      line-height:1.45;
+    }
+
+    .chp-release .table-wrap{
+      overflow:auto;
+      border:1px solid #ecebff;
+      border-radius:18px;
+      background:#fff;
+    }
+    .chp-release .result-table{
+      width:100%;
+      min-width:980px;
+      border-collapse:separate;
+      border-spacing:0;
+    }
+    .chp-release .result-table thead th{
+      position:sticky;
+      top:0;
+      z-index:1;
+      background:#f7f5ff;
+      color:#5b21b6;
+      font-size:12px;
+      font-weight:800;
+      padding:12px 14px;
+      white-space:nowrap;
+      border-bottom:1px solid #ecebff;
+      text-align:left;
+    }
+    .chp-release .sort-btn{
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      border:none;
+      background:transparent;
+      padding:0;
+      color:inherit;
+      font:inherit;
+      text-align:left;
+      cursor:pointer;
+    }
+    .chp-release .sort-btn:hover{
+      color:#4c1d95;
+    }
+    .chp-release .sort-btn.is-active{
+      color:#4c1d95;
+    }
+    .chp-release .sort-indicator{
+      flex:0 0 auto;
+      font-size:11px;
+      color:#7c3aed;
+    }
+    .chp-release .result-table tbody td{
+      padding:12px 14px;
+      border-bottom:1px dashed #ede9fe;
+      vertical-align:top;
+      font-size:13px;
+      color:#111827;
+    }
+    .chp-release .result-table tbody tr:hover td{
+      background:#faf9ff;
+    }
+    .chp-release .result-table tbody tr:last-child td{
+      border-bottom:none;
+    }
+    .chp-release .mono{
+      font-variant-numeric:tabular-nums;
+    }
+    .chp-release .release-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid #e9ddff;
+      background:#f7f4ff;
+      color:#6d28d9;
+      font-weight:800;
+      font-size:12px;
+      white-space:nowrap;
+    }
+    .chp-release .status-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid #e2e8f0;
+      background:#fff;
+      font-size:12px;
+      font-weight:800;
+      white-space:nowrap;
+    }
+    .chp-release .status-pill.is-ok{
+      color:#15803d;
+      border-color:rgba(34,197,94,.28);
+      background:rgba(34,197,94,.10);
+    }
+    .chp-release .status-pill.is-bad{
+      color:#b91c1c;
+      border-color:rgba(244,63,94,.22);
+      background:rgba(244,63,94,.08);
+    }
+    .chp-release .empty-state{
+      border:1px dashed #d8d6ff;
+      border-radius:18px;
+      background:#fcfbff;
+      color:#64748b;
+      padding:24px 18px;
+      line-height:1.6;
+      text-align:center;
+    }
+    .chp-release .meta-note{
+      font-size:12px;
+      color:#64748b;
+      line-height:1.5;
+    }
+    .chp-release .data-link{
+      color:#4c1d95;
+      font-weight:800;
+      text-decoration:none;
+    }
+    .chp-release .data-link:hover{
+      text-decoration:underline;
+    }
+    .chp-release textarea.input{
+      min-height:112px;
+      resize:vertical;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px;
+      line-height:1.45;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen chp-release">
+  <div class="max-w-screen-2xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="brand-badge">
+        <span class="brand-dot"></span>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="font-extrabold leading-tight">ЧП за релиз</div>
+            <span class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
+              <span>v0.1.0</span>
+            </span>
+          </div>
+          <div class="hint">Band + YouTrack + GitLab, фильтр по выбранному стриму</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="mt-5 grid grid-cols-1 gap-4">
+      <section class="card p-5 space-y-4">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 class="text-lg font-semibold">Параметры запуска</h2>
+            <div class="hint">Диапазон как в Сборе ЧП, поиск в Band идёт по интервалам релизов из YouTrack.</div>
+          </div>
+        </div>
+
+        <form class="w-full" onsubmit="return false;">
+          <div class="border border-[#ecebff] rounded-2xl bg-white p-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Версия релиза</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input id="startRel" class="input" placeholder="От, напр. 7.6.0000" value="7.6.0000" />
+                  <input id="endRel" class="input" placeholder="До, напр. 7.6.3000" value="7.6.3000" />
+                </div>
+              </div>
+
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">YouTrack токен</label>
+                <input id="ytToken" type="password" class="input" autocomplete="off" placeholder="Без Bearer" />
+              </div>
+
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">GitLab token</label>
+                <input id="gitlabToken" type="password" class="input" autocomplete="off" placeholder="PRIVATE-TOKEN" />
+              </div>
+
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Стрим</label>
+                <input id="streamName" class="input" autocomplete="off" placeholder="Банк" value="Банк" />
+              </div>
+
+              <div class="md:col-span-12">
+                <label class="block text-xs font-semibold text-[#111827] mb-1">Band cookies</label>
+                <input id="bandCookies" type="password" class="input mono" autocomplete="new-password" spellcheck="false" placeholder="wbx-validation-key=...; MMAUTHTOKEN=...; MMUSERID=...; MMCSRF=..." />
+                <div class="meta-note mt-2">Канал черепиков зафиксирован в коде: <span class="mono">fd9r3h67et8qbqq7oqwi95m6ae</span>.</div>
+              </div>
+
+              <div class="md:col-span-3">
+                <button id="runBtn" type="button" class="btn btn-grad w-full">Собрать отчёт</button>
+              </div>
+
+              <div class="md:col-span-3">
+                <button id="checkProxyBtn" type="button" class="btn btn-soft w-full">Проверить прокси</button>
+              </div>
+
+              <div class="md:col-span-6">
+                <div class="flex items-center justify-between gap-3 mb-1">
+                  <div class="text-xs font-semibold text-[#111827]">Статус</div>
+                  <div id="status" class="text-sm text-slate-500">Готов.</div>
+                </div>
+                <div class="bar"><div id="progressBar"></div></div>
+              </div>
+
+              <div class="md:col-span-12">
+                <div class="flex items-center justify-between gap-3 mb-1">
+                  <div class="text-xs font-semibold text-[#111827]">Логи</div>
+                  <div class="hint">Последние события по YT, Band и GitLab</div>
+                </div>
+                <div id="logs" class="log"></div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="card p-5 space-y-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <h2 class="text-lg font-semibold">Результат</h2>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="exportExcelBtn" type="button" class="btn btn-soft" disabled>Excel</button>
+            <button id="exportPdfBtn" type="button" class="btn btn-soft" disabled>PDF</button>
+          </div>
+        </div>
+
+        <div id="summaryBar" class="mini-summary" aria-live="polite"></div>
+
+        <div class="platform-tabs" role="tablist" aria-label="Платформы">
+          <button id="androidTabBtn" class="platform-tab is-active" type="button" role="tab" aria-selected="true">Android</button>
+          <button id="iosTabBtn" class="platform-tab" type="button" role="tab" aria-selected="false">iOS</button>
+        </div>
+
+        <section id="androidPanel" class="platform-panel space-y-4" role="tabpanel"></section>
+        <section id="iosPanel" class="platform-panel space-y-4" role="tabpanel" hidden></section>
+      </section>
+    </main>
+  </div>
+
+  <div id="toastBox" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+const BAND_CHANNEL_ID = 'fd9r3h67et8qbqq7oqwi95m6ae';
+const DEFAULT_PROXY_BASE = 'http://localhost:8787';
+const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
+const YT_BASE = 'https://youtrack.wildberries.ru';
+const GITLAB_BASE = 'https://gitlab.wildberries.ru';
+const AGILE_SPRINTS_FIELDS = 'archived,finish,goal,id,isDefault,isStarted,name,ordinal,report(id),start';
+const GITLAB_PAGE_SIZE = 100;
+const PDF_ROWS_PER_PAGE = 18;
+const RELEASE_WINDOW_BEFORE_MS = 6 * 60 * 60 * 1000;
+const RELEASE_WINDOW_AFTER_MS = 36 * 60 * 60 * 1000;
+const STORAGE_KEYS = ['chp_turtles_v1_0_3', 'chp_turtles_v1_0_2', 'chp_release_range_report_v0_1_0'];
+const STORAGE_KEY_WRITE = STORAGE_KEYS[0];
+const RELEASE_LAUNCH_SETTINGS_KEY = 'wb_release_launch_settings_v1';
+const ISSUE_KEY_RE = /\b(?:ANDR|IOS)-\d+\b/ig;
+const APPROVED_REACTIONS = new Set(['+1', 'white_check_mark', 'done_']);
+const REJECT_REACTIONS = new Set(['octagonal_sign', 'no_entry']);
+const PLATFORM_CONFIG = {
+  android: {
+    key: 'android',
+    label: 'Android',
+    agileId: '83-2175',
+    sprintFieldNames: ['{Версия релиза (ex. Sprint) Android}', 'Версия релиза Android', 'Версия релиза'],
+    projectPath: 'mobile/androidnative/androidnative',
+    issuePrefix: 'ANDR'
+  },
+  ios: {
+    key: 'ios',
+    label: 'iOS',
+    agileId: '83-469',
+    sprintFieldNames: ['{Версия релиза (ex. Sprint) iOS}', 'Версия релиза iOS', 'Версия релиза'],
+    projectPath: 'mobile/ios/marketplace',
+    issuePrefix: 'IOS'
+  }
+};
+const TEXT_COLLATOR = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
+const SORT_DEFAULTS = {
+  android: { key: 'release', dir: 'asc' },
+  ios: { key: 'release', dir: 'asc' }
+};
+const SORTABLE_COLUMN_KEYS = new Set(['release', 'issueKey', 'substream', 'broughtBy', 'broughtAtMs', 'approvalKind', 'mergedAtMs']);
+
+const ui = {
+  startRel: document.getElementById('startRel'),
+  endRel: document.getElementById('endRel'),
+  ytToken: document.getElementById('ytToken'),
+  gitlabToken: document.getElementById('gitlabToken'),
+  streamName: document.getElementById('streamName'),
+  bandCookies: document.getElementById('bandCookies'),
+  runBtn: document.getElementById('runBtn'),
+  checkProxyBtn: document.getElementById('checkProxyBtn'),
+  exportExcelBtn: document.getElementById('exportExcelBtn'),
+  exportPdfBtn: document.getElementById('exportPdfBtn'),
+  status: document.getElementById('status'),
+  progressBar: document.getElementById('progressBar'),
+  logs: document.getElementById('logs'),
+  summaryBar: document.getElementById('summaryBar'),
+  androidTabBtn: document.getElementById('androidTabBtn'),
+  iosTabBtn: document.getElementById('iosTabBtn'),
+  androidPanel: document.getElementById('androidPanel'),
+  iosPanel: document.getElementById('iosPanel'),
+  toastBox: document.getElementById('toastBox')
+};
+
+let appState = {
+  activePlatform: 'android',
+  result: null,
+  releaseMeta: null,
+  sortByPlatform: {
+    android: { ...SORT_DEFAULTS.android },
+    ios: { ...SORT_DEFAULTS.ios }
+  }
+};
+
+function escapeHtml(value){
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function showToast(message){
+  if(!ui.toastBox) return;
+  ui.toastBox.textContent = String(message || '').trim();
+  ui.toastBox.classList.add('show');
+  setTimeout(() => ui.toastBox.classList.remove('show'), 2200);
+}
+
+function logLine(message, cls = ''){
+  if(!ui.logs) return;
+  const line = document.createElement('div');
+  line.textContent = `[${new Date().toLocaleTimeString('ru-RU')}] ${String(message || '').trim()}`;
+  if(cls) line.className = cls;
+  ui.logs.appendChild(line);
+  ui.logs.scrollTop = ui.logs.scrollHeight;
+}
+
+function clearLogs(){
+  if(ui.logs) ui.logs.textContent = '';
+}
+
+function setStatus(text, cls = ''){
+  if(!ui.status) return;
+  ui.status.classList.remove('ok', 'err', 'warn');
+  if(cls) ui.status.classList.add(cls);
+  ui.status.textContent = String(text || '').trim();
+}
+
+function setProgress(value){
+  if(!ui.progressBar) return;
+  const percent = Math.max(0, Math.min(100, Number(value) || 0));
+  ui.progressBar.style.width = `${percent}%`;
+}
+
+function normalizeText(value){
+  return String(value || '')
+    .replace(/\r/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function formatMskDateTime(value){
+  if(value === null || value === undefined || value === '') return '—';
+  const ms = typeof value === 'number' ? value : Date.parse(String(value));
+  if(!Number.isFinite(ms)) return '—';
+  const parts = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  }).formatToParts(new Date(ms));
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.day}.${map.month} ${map.hour}:${map.minute}:${map.second}`;
+}
+
+function formatMskRange(startMs, finishMs){
+  if(!Number.isFinite(startMs) || !Number.isFinite(finishMs)) return '—';
+  return `${formatMskDateTime(startMs)} -> ${formatMskDateTime(finishMs)}`;
+}
+
+function normalizeProxyBase(value){
+  return String(value || '').trim().replace(/\/+$/, '') || DEFAULT_PROXY_BASE;
+}
+
+function getProxyBase(){
+  return normalizeProxyBase(ui.proxyBase?.value || DEFAULT_PROXY_BASE);
+}
+
+function getSelectedStreamName(){
+  return String(ui.streamName?.value || '').trim();
+}
+
+function readStoredInputs(){
+  for(const key of STORAGE_KEYS){
+    try{
+      const raw = localStorage.getItem(key);
+      if(!raw) continue;
+      const parsed = JSON.parse(raw);
+      if(parsed && typeof parsed === 'object'){
+        return parsed;
+      }
+    }catch(_){}
+  }
+  return null;
+}
+
+function readReleaseLaunchSettings(){
+  try{
+    const raw = localStorage.getItem(RELEASE_LAUNCH_SETTINGS_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || typeof parsed !== 'object') return null;
+    const next = { ...parsed };
+    if(!String(next.bandCookiesRead || '').trim() && String(next.bandCookiesPost || '').trim()){
+      next.bandCookiesRead = String(next.bandCookiesPost || '');
+    }
+    if(!String(next.bandCookiesRead || '').trim() && String(next.bandCookiesAdmin || '').trim()){
+      next.bandCookiesRead = String(next.bandCookiesAdmin || '');
+    }
+    return next;
+  }catch(_){}
+  return null;
+}
+
+function saveReleaseLaunchBandCookies(value){
+  try{
+    const prev = readReleaseLaunchSettings() || {};
+    const next = {
+      ...prev,
+      bandCookiesRead: String(value || '')
+    };
+    localStorage.setItem(RELEASE_LAUNCH_SETTINGS_KEY, JSON.stringify(next));
+  }catch(_){}
+}
+
+function saveInputs(){
+  try{
+    const prev = readStoredInputs() || {};
+    const next = {
+      ...prev,
+      startRel: ui.startRel.value || '',
+      endRel: ui.endRel.value || '',
+      ytToken: ui.ytToken.value || '',
+      gitlabToken: ui.gitlabToken.value || '',
+      streamName: ui.streamName.value || '',
+      bandCookies: ui.bandCookies.value || '',
+      savedAt: Date.now()
+    };
+    localStorage.setItem(STORAGE_KEY_WRITE, JSON.stringify(next));
+    saveReleaseLaunchBandCookies(ui.bandCookies.value || '');
+  }catch(_){}
+}
+
+function restoreInputs(){
+  try{
+    const parsed = readStoredInputs();
+    const releaseLaunchSettings = readReleaseLaunchSettings();
+    if(parsed){
+      if(typeof parsed.startRel === 'string') ui.startRel.value = parsed.startRel;
+      if(typeof parsed.endRel === 'string') ui.endRel.value = parsed.endRel;
+      if(typeof parsed.ytToken === 'string') ui.ytToken.value = parsed.ytToken;
+      if(typeof parsed.gitlabToken === 'string') ui.gitlabToken.value = parsed.gitlabToken;
+      if(typeof parsed.streamName === 'string' && parsed.streamName.trim()) ui.streamName.value = parsed.streamName;
+    }
+    const bandCookies = String((releaseLaunchSettings && releaseLaunchSettings.bandCookiesRead) || (parsed && parsed.bandCookies) || '').trim();
+    if(bandCookies) ui.bandCookies.value = bandCookies;
+  }catch(_){}
+}
+
+function parseReleaseParts(raw){
+  const match = String(raw || '').trim().match(/^(\d+)\.(\d+)\.(\d{1,4})$/);
+  if(!match) return null;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    buildDigits: match[3],
+    buildRaw: Number(match[3])
+  };
+}
+
+function normalizeRelease(raw){
+  const parsed = parseReleaseParts(raw);
+  if(!parsed) return '';
+  let build = parsed.buildRaw;
+  if(parsed.buildDigits.length < 4){
+    build = parsed.buildRaw * Math.pow(10, 4 - parsed.buildDigits.length);
+  }
+  build = Math.floor(build / 1000) * 1000;
+  return `${parsed.major}.${parsed.minor}.${String(build).padStart(4, '0')}`;
+}
+
+function parseRelease(raw){
+  const normalized = normalizeRelease(raw);
+  if(!normalized) return null;
+  const parts = normalized.split('.').map(Number);
+  if(parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null;
+  return parts;
+}
+
+function compareRelease(a, b){
+  const left = parseRelease(a);
+  const right = parseRelease(b);
+  if(!left || !right) return String(a).localeCompare(String(b), 'ru');
+  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2];
+}
+
+function displayRelease(raw){
+  const parsed = parseRelease(raw);
+  if(!parsed) return String(raw || '').trim();
+  return `${parsed[0]}.${parsed[1]}.${Math.floor(parsed[2] / 1000)}`;
+}
+
+function compareTextValues(left, right){
+  return TEXT_COLLATOR.compare(String(left || '').trim(), String(right || '').trim());
+}
+
+function isMissingSortValue(value){
+  if(value === null || value === undefined) return true;
+  if(typeof value === 'number') return !Number.isFinite(value);
+  return !String(value).trim();
+}
+
+function compareNullableValues(left, right, compareFn, direction = 'asc'){
+  const leftMissing = isMissingSortValue(left);
+  const rightMissing = isMissingSortValue(right);
+  if(leftMissing || rightMissing){
+    if(leftMissing && rightMissing) return 0;
+    return leftMissing ? 1 : -1;
+  }
+  const result = compareFn(left, right);
+  return direction === 'desc' ? -result : result;
+}
+
+function approvalSortRank(kind){
+  if(kind === 'approved') return 2;
+  if(kind === 'rejected') return 1;
+  return null;
+}
+
+function getSortState(platformKey){
+  const fallback = SORT_DEFAULTS[platformKey] || { key: 'release', dir: 'asc' };
+  const current = appState.sortByPlatform && appState.sortByPlatform[platformKey];
+  if(!current || !SORTABLE_COLUMN_KEYS.has(current.key)){
+    return { ...fallback };
+  }
+  return {
+    key: current.key,
+    dir: current.dir === 'desc' ? 'desc' : 'asc'
+  };
+}
+
+function buildSortHeader(platformKey, sortKey, label){
+  const state = getSortState(platformKey);
+  const isActive = state.key === sortKey;
+  const indicator = isActive ? (state.dir === 'asc' ? '↑' : '↓') : '↕';
+  return `
+    <button
+      type="button"
+      class="sort-btn ${isActive ? 'is-active' : ''}"
+      data-platform="${escapeHtml(platformKey)}"
+      data-sort-key="${escapeHtml(sortKey)}"
+      title="Сортировать по колонке ${escapeHtml(label)}"
+    >
+      <span>${escapeHtml(label)}</span>
+      <span class="sort-indicator" aria-hidden="true">${indicator}</span>
+    </button>
+  `;
+}
+
+function compareRowsBySortKey(left, right, sortKey, direction){
+  let result = 0;
+  switch(sortKey){
+    case 'release':
+      result = compareRelease(left.release, right.release);
+      if(direction === 'desc') result *= -1;
+      break;
+    case 'issueKey':
+      result = compareNullableValues(left.issueKey, right.issueKey, compareTextValues, direction);
+      break;
+    case 'substream':
+      result = compareNullableValues(left.substream, right.substream, compareTextValues, direction);
+      break;
+    case 'broughtBy':
+      result = compareNullableValues(left.broughtBy, right.broughtBy, compareTextValues, direction);
+      break;
+    case 'broughtAtMs':
+      result = compareNullableValues(left.broughtAtMs, right.broughtAtMs, (a, b) => a - b, direction);
+      break;
+    case 'approvalKind':
+      result = compareNullableValues(approvalSortRank(left.approvalKind), approvalSortRank(right.approvalKind), (a, b) => a - b, direction);
+      break;
+    case 'mergedAtMs':
+      result = compareNullableValues(left.mergedAtMs, right.mergedAtMs, (a, b) => a - b, direction);
+      break;
+    default:
+      break;
+  }
+  if(result) return result;
+  return compareRelease(left.release, right.release)
+    || compareTextValues(left.issueKey, right.issueKey)
+    || compareNullableValues(left.broughtAtMs, right.broughtAtMs, (a, b) => a - b, 'asc');
+}
+
+function getSortedRows(platformKey, rows){
+  const state = getSortState(platformKey);
+  return [...(Array.isArray(rows) ? rows : [])].sort((left, right) => compareRowsBySortKey(left, right, state.key, state.dir));
+}
+
+function togglePlatformSort(platformKey, sortKey){
+  if(!PLATFORM_CONFIG[platformKey] || !SORTABLE_COLUMN_KEYS.has(sortKey)) return;
+  const current = getSortState(platformKey);
+  const nextDir = current.key === sortKey && current.dir === 'asc' ? 'desc' : 'asc';
+  appState.sortByPlatform = {
+    ...(appState.sortByPlatform || {}),
+    [platformKey]: { key: sortKey, dir: nextDir }
+  };
+  renderPlatformPanel(platformKey);
+}
+
+function expandReleaseRange(startRel, endRel){
+  let start = parseRelease(startRel);
+  let end = parseRelease(endRel);
+  if(!start || !end){
+    throw new Error('Неверный формат релиза. Пример: 7.6.0000');
+  }
+  if(compareRelease(
+    `${start[0]}.${start[1]}.${String(start[2]).padStart(4, '0')}`,
+    `${end[0]}.${end[1]}.${String(end[2]).padStart(4, '0')}`
+  ) > 0){
+    const temp = start;
+    start = end;
+    end = temp;
+  }
+  const out = [];
+  let current = start.slice();
+  for(;;){
+    out.push(`${current[0]}.${current[1]}.${String(current[2]).padStart(4, '0')}`);
+    if(current[0] === end[0] && current[1] === end[1] && current[2] === end[2]) break;
+    current[2] += 1000;
+    if(current[2] >= 10000){
+      current[2] = 0;
+      current[1] += 1;
+      if(current[1] >= 100){
+        current[1] = 0;
+        current[0] += 1;
+      }
+    }
+  }
+  return out;
+}
+
+function buildReleaseAliases(release){
+  const normalized = normalizeRelease(release);
+  const parsed = parseRelease(normalized);
+  if(!normalized || !parsed) return [];
+  const family = Math.floor(parsed[2] / 1000);
+  return Array.from(new Set([
+    normalized,
+    `${parsed[0]}.${parsed[1]}.${family}`,
+    `${parsed[0]}.${parsed[1]}.${String(family).padStart(2, '0')}`,
+    `${parsed[0]}.${parsed[1]}.${String(family).padStart(3, '0')}`,
+    `${parsed[0]}.${parsed[1]}.${String(family).padStart(4, '0')}`
+  ]));
+}
+
+function buildReleaseAliasIndex(releases){
+  return releases.map((release) => ({
+    release: normalizeRelease(release),
+    dottedAliases: buildReleaseAliases(release).sort((a, b) => b.length - a.length),
+    compactAlias: displayRelease(release).replace(/\./g, '')
+  }));
+}
+
+function findDottedAliasPosition(source, alias){
+  if(!alias) return -1;
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`(^|[^\\d])(${escaped})(?=$|[^\\d])`).exec(source);
+  return match ? match.index + match[1].length : -1;
+}
+
+function findCompactAliasPosition(source, alias){
+  if(!alias) return -1;
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`(?:релиз(?:а)?|release|branch|ветк[аи]|сборк[аи]|target_branch)\\s*[:#№/\\-]*\\s*(${escaped})(?=$|\\D)`, 'i'),
+    new RegExp(`release\\s*\\/\\s*(${escaped})(?=$|\\D)`, 'i')
+  ];
+  for(const pattern of patterns){
+    const match = pattern.exec(source);
+    if(match) return match.index;
+  }
+  return -1;
+}
+
+function extractReleaseMatches(source, aliasIndex){
+  const text = String(source || '');
+  const matches = [];
+  for(const entry of aliasIndex){
+    let bestIndex = Number.POSITIVE_INFINITY;
+    for(const alias of entry.dottedAliases){
+      const index = findDottedAliasPosition(text, alias);
+      if(index >= 0){
+        bestIndex = Math.min(bestIndex, index);
+      }
+    }
+    const compactIndex = findCompactAliasPosition(text, entry.compactAlias);
+    if(compactIndex >= 0){
+      bestIndex = Math.min(bestIndex, compactIndex);
+    }
+    if(Number.isFinite(bestIndex)){
+      matches.push({ release: entry.release, index: bestIndex });
+    }
+  }
+  matches.sort((a, b) => a.index - b.index || compareRelease(a.release, b.release));
+  return Array.from(new Set(matches.map((item) => item.release)));
+}
+
+function buildProxyUrl(targetUrl){
+  const proxyUrl = new URL(`${getProxyBase()}/proxy`);
+  proxyUrl.searchParams.set('url', targetUrl);
+  return proxyUrl.toString();
+}
+
+function safeJson(text){
+  try{
+    return JSON.parse(text);
+  }catch(_){
+    return null;
+  }
+}
+
+async function proxyRequestJson(method, targetUrl, headers = {}, body, signal, service = 'proxy'){
+  const response = await fetch(buildProxyUrl(targetUrl), {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal
+  });
+  const raw = await response.text().catch(() => '');
+  const parsed = safeJson(raw);
+  if(!response.ok){
+    logLine(`Запрос ${service} [${response.status} ${response.statusText}]`, 'err');
+    if(raw) logLine(`Тело ответа: ${raw.slice(0, 1500)}`, 'err');
+    const detail = parsed && typeof parsed === 'object'
+      ? [parsed.message, parsed.error, parsed.details].filter(Boolean).join(' | ')
+      : String(raw || '').trim();
+    throw new Error(detail || `${response.status} ${response.statusText}`);
+  }
+  logLine(`Запрос ${service} [${response.status} OK]`, 'ok');
+  if(parsed && typeof parsed === 'object') return parsed;
+  return raw;
+}
+
+async function checkProxyHealth(){
+  const base = getProxyBase();
+  const response = await fetch(`${base}/health`, { cache: 'no-store' });
+  const payload = await response.json().catch(() => null);
+  if(!response.ok || !payload || payload.ok !== true){
+    throw new Error(`Proxy health error (${response.status})`);
+  }
+  return payload;
+}
+
+function normalizeGitlabToken(value){
+  return String(value || '')
+    .replace(/^PRIVATE-TOKEN\s*:\s*/i, '')
+    .trim();
+}
+
+function normalizeReleaseFromBranch(branch){
+  const match = String(branch || '').trim().match(/^release\/(.+)$/i);
+  if(!match) return '';
+  return normalizeRelease(match[1]);
+}
+
+async function fetchAgileSprints(agileId, signal){
+  const params = new URLSearchParams();
+  params.set('issuesQuery', '');
+  params.set('$top', '-1');
+  params.set('fields', AGILE_SPRINTS_FIELDS);
+  return proxyRequestJson('GET', `${YT_BASE}/api/agiles/${agileId}/sprints/?${params.toString()}`, {
+    Accept: 'application/json',
+    Authorization: `Bearer ${String(ui.ytToken.value || '').trim()}`
+  }, undefined, signal, 'youtrack');
+}
+
+function parseDateMs(value){
+  if(typeof value === 'number' && Number.isFinite(value)) return value;
+  if(typeof value === 'string' && value.trim()){
+    const asNumber = Number(value);
+    if(Number.isFinite(asNumber)) return asNumber;
+    const parsed = Date.parse(value);
+    if(Number.isFinite(parsed)) return parsed;
+  }
+  return NaN;
+}
+
+function findSprintForRelease(sprints, release){
+  const aliases = new Set(buildReleaseAliases(release).map((item) => item.toLowerCase()));
+  return (Array.isArray(sprints) ? sprints : []).find((item) => aliases.has(String(item?.name || '').trim().toLowerCase()));
+}
+
+async function loadReleaseMeta(releases, signal){
+  const [androidSprints, iosSprints] = await Promise.all([
+    fetchAgileSprints(PLATFORM_CONFIG.android.agileId, signal),
+    fetchAgileSprints(PLATFORM_CONFIG.ios.agileId, signal)
+  ]);
+
+  const meta = {};
+  for(const release of releases){
+    const androidSprint = findSprintForRelease(androidSprints, release);
+    const iosSprint = findSprintForRelease(iosSprints, release);
+    const androidStart = parseDateMs(androidSprint?.start);
+    const androidFinish = parseDateMs(androidSprint?.finish);
+    const iosStart = parseDateMs(iosSprint?.start);
+    const iosFinish = parseDateMs(iosSprint?.finish);
+    const startCandidates = [androidStart, iosStart].filter(Number.isFinite);
+    const finishCandidates = [androidFinish, iosFinish].filter(Number.isFinite);
+    if(!startCandidates.length || !finishCandidates.length){
+      logLine(`Релиз ${displayRelease(release)}: не удалось полностью найти интервалы в YT`, 'warn');
+    }
+    meta[release] = {
+      release,
+      display: displayRelease(release),
+      startMs: startCandidates.length ? Math.min(...startCandidates) : NaN,
+      finishMs: finishCandidates.length ? Math.max(...finishCandidates) : NaN,
+      windowStartMs: startCandidates.length ? Math.min(...startCandidates) - RELEASE_WINDOW_BEFORE_MS : NaN,
+      windowFinishMs: finishCandidates.length ? Math.max(...finishCandidates) + RELEASE_WINDOW_AFTER_MS : NaN,
+      platforms: {
+        android: {
+          startMs: androidStart,
+          finishMs: androidFinish,
+          sprintName: String(androidSprint?.name || '').trim()
+        },
+        ios: {
+          startMs: iosStart,
+          finishMs: iosFinish,
+          sprintName: String(iosSprint?.name || '').trim()
+        }
+      }
+    };
+  }
+  return meta;
+}
+
+function buildOverallWindow(releaseMeta){
+  const values = Object.values(releaseMeta || {});
+  const starts = values.map((item) => item.windowStartMs).filter(Number.isFinite);
+  const finishes = values.map((item) => item.windowFinishMs).filter(Number.isFinite);
+  if(!starts.length || !finishes.length){
+    throw new Error('Не удалось определить общий временной диапазон по релизам в YouTrack.');
+  }
+  return {
+    sinceMs: Math.max(0, Math.min(...starts)),
+    untilMs: Math.max(...finishes)
+  };
+}
+
+function buildBandHeaders(){
+  const cookies = String(ui.bandCookies.value || '').trim();
+  if(!cookies) throw new Error('Заполни Band cookies.');
+  return {
+    Accept: 'application/json',
+    'Accept-Language': 'ru',
+    'X-Requested-With': 'XMLHttpRequest',
+    [PROXY_COOKIE_HEADER]: cookies
+  };
+}
+
+function unwrapBandPostsPayload(raw){
+  let node = raw;
+  for(let step = 0; step < 5; step += 1){
+    if(node && typeof node === 'object' && node.posts && typeof node.posts === 'object'){
+      return node;
+    }
+    if(node && typeof node === 'object' && node.body !== undefined){
+      if(typeof node.body === 'string'){
+        const parsed = safeJson(node.body);
+        if(parsed && typeof parsed === 'object'){
+          node = parsed;
+          continue;
+        }
+      }else if(node.body && typeof node.body === 'object'){
+        node = node.body;
+        continue;
+      }
+    }
+    if(node && typeof node === 'object' && node.data && typeof node.data === 'object'){
+      node = node.data;
+      continue;
+    }
+    break;
+  }
+  return raw && typeof raw === 'object' ? raw : {};
+}
+
+function collectBandPosts(payload){
+  const postsMap = payload && payload.posts && typeof payload.posts === 'object' ? payload.posts : {};
+  const order = Array.isArray(payload && payload.order) ? payload.order : Object.keys(postsMap);
+  const seen = new Set();
+  const posts = [];
+  for(const id of order){
+    const post = postsMap[id];
+    if(post && typeof post === 'object'){
+      posts.push(post);
+      seen.add(String(id));
+    }
+  }
+  for(const [id, post] of Object.entries(postsMap)){
+    if(seen.has(String(id))) continue;
+    if(post && typeof post === 'object') posts.push(post);
+  }
+  return posts;
+}
+
+function buildDutyBandUserDisplayName(user){
+  const firstName = String(user && user.first_name || '').trim();
+  const lastName = String(user && user.last_name || '').trim();
+  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim()
+    || [lastName, firstName].filter(Boolean).join(' ').trim();
+  const nickname = String(user && user.nickname || '').trim();
+  const username = String(user && user.username || '').trim();
+  return fullName || nickname || username;
+}
+
+function normalizeBandUser(user){
+  if(!user || typeof user !== 'object') return null;
+  const username = String(user.username || '').trim().replace(/^@+/, '');
+  if(!username) return null;
+  return {
+    id: String(user.id || username).trim(),
+    username,
+    handle: `@${username}`,
+    displayName: buildDutyBandUserDisplayName(user) || `@${username}`
+  };
+}
+
+async function fetchBandChannelUsers(signal){
+  const headers = buildBandHeaders();
+  const map = new Map();
+  for(let page = 0; page < 8; page += 1){
+    const url = new URL('https://band.wb.ru/api/v4/users');
+    url.searchParams.set('in_channel', BAND_CHANNEL_ID);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('per_page', '200');
+    url.searchParams.set('sort', 'admin');
+    const data = await proxyRequestJson('GET', url.toString(), headers, undefined, signal, 'band');
+    if(!Array.isArray(data) || !data.length) break;
+    for(const item of data){
+      const user = normalizeBandUser(item);
+      if(user) map.set(user.id, user);
+    }
+    if(data.length < 200) break;
+  }
+  return map;
+}
+
+async function fetchBandChannelPostsWindow(sinceMs, untilMs, signal){
+  const headers = buildBandHeaders();
+  const postsById = new Map();
+  let beforeId = '';
+  for(let page = 0; page < 300; page += 1){
+    const url = new URL(`https://band.wb.ru/api/v4/channels/${encodeURIComponent(BAND_CHANNEL_ID)}/posts`);
+    url.searchParams.set('page', '0');
+    url.searchParams.set('per_page', '100');
+    if(beforeId) url.searchParams.set('before', beforeId);
+    url.searchParams.set('skipFetchThreads', 'false');
+    url.searchParams.set('collapsedThreads', 'true');
+    url.searchParams.set('collapsedThreadsExtended', 'false');
+
+    const payload = unwrapBandPostsPayload(await proxyRequestJson('GET', url.toString(), headers, undefined, signal, 'band'));
+    const batch = collectBandPosts(payload);
+    if(!batch.length) break;
+
+    batch.sort((left, right) => (Number(right?.create_at) || 0) - (Number(left?.create_at) || 0));
+    for(const post of batch){
+      const id = String(post && post.id || '').trim();
+      if(id && !postsById.has(id)) postsById.set(id, post);
+    }
+
+    const oldestPost = batch[batch.length - 1] || null;
+    const oldestId = String(oldestPost && oldestPost.id || '').trim();
+    const oldestCreateAt = Number(oldestPost && oldestPost.create_at || 0);
+    logLine(`Band page ${page + 1}: +${batch.length} сообщений, oldest=${oldestId || 'n/a'}`);
+    if(!oldestId || oldestId === beforeId) break;
+    beforeId = oldestId;
+    if(batch.length < 100) break;
+    if(Number.isFinite(sinceMs) && Number.isFinite(oldestCreateAt) && oldestCreateAt < sinceMs) break;
+  }
+
+  return Array.from(postsById.values())
+    .filter((post) => {
+      const deletedAt = Number(post && post.delete_at);
+      if(Number.isFinite(deletedAt) && deletedAt > 0) return false;
+      if(String(post && post.root_id || '').trim()) return false;
+      const createdAt = Number(post && post.create_at || 0);
+      if(!Number.isFinite(createdAt) || createdAt <= 0) return false;
+      if(Number.isFinite(sinceMs) && createdAt < sinceMs) return false;
+      if(Number.isFinite(untilMs) && createdAt > untilMs) return false;
+      return true;
+    })
+    .sort((left, right) => (Number(left?.create_at) || 0) - (Number(right?.create_at) || 0));
+}
+
+function extractBandPostText(post){
+  const chunks = [];
+  const push = (value) => {
+    const text = normalizeText(
+      String(value || '')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2')
+        .replace(/\\([\\`*_{}\[\]()#+\-.!])/g, '$1')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*\n]+)\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+    );
+    if(text) chunks.push(text);
+  };
+  push(post && post.message || '');
+  const attachments = Array.isArray(post && post.props && post.props.attachments) ? post.props.attachments : [];
+  for(const attachment of attachments){
+    push(attachment && attachment.pretext);
+    push(attachment && attachment.title);
+    push(attachment && attachment.text);
+    push(attachment && attachment.fallback);
+    const fields = Array.isArray(attachment && attachment.fields) ? attachment.fields : [];
+    for(const field of fields){
+      const title = normalizeText(field && field.title || '');
+      const value = normalizeText(field && field.value || '');
+      if(title && value) push(`${title}: ${value}`);
+      else{
+        push(title);
+        push(value);
+      }
+    }
+  }
+  return normalizeText(chunks.join('\n'));
+}
+
+function extractIssueKeysFromPost(post, text){
+  const sourceChunks = [text, post && post.message || ''];
+  const embeds = Array.isArray(post && post.metadata && post.metadata.embeds) ? post.metadata.embeds : [];
+  for(const embed of embeds){
+    sourceChunks.push(embed && embed.url || '');
+    sourceChunks.push(embed && embed.title || '');
+    sourceChunks.push(embed && embed.text || '');
+  }
+  const blob = sourceChunks.filter(Boolean).join('\n');
+  const out = new Set();
+  let match;
+  ISSUE_KEY_RE.lastIndex = 0;
+  while((match = ISSUE_KEY_RE.exec(blob))){
+    out.add(String(match[0] || '').toUpperCase());
+  }
+  return Array.from(out);
+}
+
+function extractGitlabMrUrlFromPost(post, text){
+  const sourceChunks = [text, post && post.message || ''];
+  const embeds = Array.isArray(post && post.metadata && post.metadata.embeds) ? post.metadata.embeds : [];
+  for(const embed of embeds){
+    sourceChunks.push(embed && embed.url || '');
+  }
+  const blob = sourceChunks.filter(Boolean).join('\n');
+  const match = blob.match(/https?:\/\/gitlab\.wildberries\.ru\/\S*?\/merge_requests\/\d+\/?/i);
+  return match ? match[0] : '';
+}
+
+function readApprovalStatus(post){
+  const reactions = Array.isArray(post && post.metadata && post.metadata.reactions)
+    ? post.metadata.reactions.filter((reaction) => Number(reaction && reaction.delete_at || 0) === 0)
+    : [];
+  const names = reactions.map((reaction) => String(reaction && reaction.emoji_name || '').trim().toLowerCase()).filter(Boolean);
+  if(names.some((name) => REJECT_REACTIONS.has(name))){
+    return { kind: 'rejected', icon: '❌', label: 'Крестик', reactionNames: names };
+  }
+  if(names.some((name) => APPROVED_REACTIONS.has(name))){
+    return { kind: 'approved', icon: '✅', label: 'Галочка', reactionNames: names };
+  }
+  return { kind: 'none', icon: '', label: '', reactionNames: names };
+}
+
+function resolveBandUserDisplay(usersMap, userId){
+  const user = usersMap.get(String(userId || '').trim());
+  if(!user) return `user:${String(userId || '').trim() || 'unknown'}`;
+  if(user.displayName && user.displayName !== user.handle){
+    return `${user.displayName} (${user.handle})`;
+  }
+  return user.displayName || user.handle;
+}
+
+function matchReleaseByTimestamp(ms, releaseMeta){
+  if(!Number.isFinite(ms)) return '';
+  const matches = Object.values(releaseMeta || {})
+    .filter((item) => Number.isFinite(item.windowStartMs) && Number.isFinite(item.windowFinishMs))
+    .filter((item) => ms >= item.windowStartMs && ms <= item.windowFinishMs)
+    .sort((left, right) => compareRelease(left.release, right.release));
+  if(matches.length === 1) return matches[0].release;
+  return '';
+}
+
+function buildBandCandidates(posts, usersMap, releases, releaseMeta){
+  const aliasIndex = buildReleaseAliasIndex(releases);
+  const candidates = [];
+  let postsWithKeys = 0;
+  for(const post of posts){
+    const text = extractBandPostText(post);
+    const issueKeys = extractIssueKeysFromPost(post, text);
+    if(!issueKeys.length) continue;
+    postsWithKeys += 1;
+    const matchedReleases = extractReleaseMatches(text, aliasIndex);
+    const intervalRelease = matchReleaseByTimestamp(Number(post?.create_at || 0), releaseMeta);
+    const approval = readApprovalStatus(post);
+    const mrUrl = extractGitlabMrUrlFromPost(post, text);
+    const broughtBy = resolveBandUserDisplay(usersMap, post?.user_id);
+    for(const issueKey of issueKeys){
+      const platformKey = issueKey.startsWith('ANDR-') ? 'android' : 'ios';
+      candidates.push({
+        issueKey,
+        platformKey,
+        broughtBy,
+        broughtAtMs: Number(post?.create_at || 0) || NaN,
+        broughtAtText: formatMskDateTime(Number(post?.create_at || 0) || NaN),
+        bandRelease: matchedReleases[0] || '',
+        bandMatchedReleases: matchedReleases.slice(),
+        intervalRelease,
+        approvalKind: approval.kind,
+        approvalIcon: approval.icon,
+        approvalLabel: approval.label,
+        mrUrl,
+        bandText: text,
+        postId: String(post?.id || '').trim(),
+        reactionNames: approval.reactionNames.slice()
+      });
+    }
+  }
+  return { candidates, postsWithKeys };
+}
+
+function youTrackIssueUrl(key){
+  return `${YT_BASE}/issue/${encodeURIComponent(String(key || '').trim())}/`;
+}
+
+function ytIssueApiUrl(key){
+  const fields = [
+    'id',
+    'idReadable',
+    'summary',
+    'fields(name,projectCustomField(field(name,aliases,localizedName)),value(name,localizedName,text,markdownText,presentation,id,$type),$type)'
+  ].join(',');
+  return `${YT_BASE}/api/issues/${encodeURIComponent(String(key || '').trim())}?fields=${encodeURIComponent(fields)}&$top=-1`;
+}
+
+function issueFieldName(field){
+  return String(field?.name || field?.projectCustomField?.field?.name || '').trim();
+}
+
+function issueFieldAliases(field){
+  const raw = field?.projectCustomField?.field?.aliases;
+  if(Array.isArray(raw)){
+    return raw.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  return String(raw || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function extractFieldText(value){
+  if(typeof value === 'string') return value;
+  if(!value) return '';
+  if(Array.isArray(value)){
+    return value.map((item) => extractFieldText(item)).filter(Boolean).join(' ');
+  }
+  if(typeof value.text === 'string') return value.text;
+  if(typeof value.markdownText === 'string') return value.markdownText;
+  if(typeof value.name === 'string') return value.name;
+  if(typeof value.localizedName === 'string') return value.localizedName;
+  if(typeof value.presentation === 'string') return value.presentation;
+  return '';
+}
+
+function pickFieldNames(issue, targetName){
+  const out = [];
+  const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+  for(const field of fields){
+    if(issueFieldName(field) !== targetName) continue;
+    const values = Array.isArray(field?.value) ? field.value : [field?.value];
+    for(const value of values){
+      const text = String(value?.name || value?.localizedName || value?.text || '').trim();
+      if(text) out.push(text);
+    }
+  }
+  return out;
+}
+
+function pickFirstSubstreamField(issue){
+  const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+  for(const field of fields){
+    const fieldName = issueFieldName(field).toLowerCase();
+    if(!fieldName.includes('substream')) continue;
+    const values = Array.isArray(field?.value) ? field.value : [field?.value];
+    const out = values
+      .map((value) => String(value?.name || value?.localizedName || '').trim())
+      .filter(Boolean);
+    if(out.length) return out;
+  }
+  return [];
+}
+
+function pickSubstreamDynamic(issue, streamName){
+  return pickFirstSubstreamField(issue);
+}
+
+function normalizeStream(streams){
+  if(!Array.isArray(streams) || !streams.length) return '';
+  const value = String(streams[0] || '').trim();
+  if(value.toLowerCase().includes('paygate') && value.includes('.')){
+    return value.split('.').pop().trim();
+  }
+  return value;
+}
+
+function normalizeStreamLabel(value){
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[ё]/g, 'е')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchesSelectedStreamLabel(value){
+  const selected = normalizeStreamLabel(getSelectedStreamName());
+  const normalized = normalizeStreamLabel(value);
+  if(!selected) return false;
+  return normalized === selected;
+}
+
+function normalizeReleaseForCompare(raw){
+  const match = String(raw || '').match(/(\d+\.\d+\.\d{1,4})/);
+  if(!match) return '';
+  return normalizeRelease(match[1]);
+}
+
+function collectIssueReleaseVersionsFromFields(fields){
+  const versions = [];
+  const matchedFieldNames = new Set();
+  for(const field of fields){
+    const fieldName = issueFieldName(field);
+    if(fieldName) matchedFieldNames.add(fieldName);
+    const values = Array.isArray(field?.value) ? field.value : [field?.value];
+    for(const value of values){
+      const normalized = normalizeReleaseForCompare(extractFieldText(value));
+      if(normalized) versions.push(normalized);
+    }
+  }
+  return {
+    versions: Array.from(new Set(versions)),
+    matchedFieldNames: Array.from(matchedFieldNames)
+  };
+}
+
+function isGenericReleaseField(field){
+  return issueFieldName(field) === 'Версия релиза';
+}
+
+function isPlatformReleaseField(field, platformKey){
+  const config = PLATFORM_CONFIG[platformKey];
+  const fieldName = issueFieldName(field);
+  const fieldLower = fieldName.toLowerCase();
+  const aliases = issueFieldAliases(field).map((item) => item.toLowerCase());
+  const exactNames = (config?.sprintFieldNames || []).map((item) => String(item || '').trim());
+  if(exactNames.includes(fieldName) && !isGenericReleaseField(field)) return true;
+  if(platformKey === 'android'){
+    if(aliases.includes('fixversion-android')) return true;
+    if(fieldLower.includes('версия релиза') && fieldLower.includes('android')) return true;
+  }
+  if(platformKey === 'ios'){
+    if(aliases.includes('fixversion-ios')) return true;
+    if(fieldLower.includes('версия релиза') && fieldLower.includes('ios')) return true;
+  }
+  return false;
+}
+
+function readIssueReleaseInfo(issue, platformKey){
+  const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+  const platformFields = fields.filter((field) => isPlatformReleaseField(field, platformKey));
+  if(platformFields.length){
+    return collectIssueReleaseVersionsFromFields(platformFields);
+  }
+  const genericFields = fields.filter((field) => isGenericReleaseField(field));
+  if(genericFields.length){
+    return collectIssueReleaseVersionsFromFields(genericFields);
+  }
+  return { versions: [], matchedFieldNames: [] };
+}
+
+async function withPool(items, limit, worker){
+  const result = [];
+  let index = 0;
+  let active = 0;
+  let resolveDone;
+  const done = new Promise((resolve) => {
+    resolveDone = resolve;
+  });
+
+  const pump = async () => {
+    if(index >= items.length){
+      if(active === 0) resolveDone(result);
+      return;
+    }
+    const currentIndex = index += 1;
+    const item = items[currentIndex - 1];
+    active += 1;
+    try{
+      result[currentIndex - 1] = await worker(item, currentIndex - 1);
+    }catch(error){
+      result[currentIndex - 1] = { error };
+    }finally{
+      active -= 1;
+      pump();
+    }
+  };
+
+  const starters = Math.min(limit, items.length);
+  for(let i = 0; i < starters; i += 1){
+    pump();
+  }
+  return done;
+}
+
+async function fetchIssueMap(issueKeys, signal){
+  const uniqueKeys = Array.from(new Set((Array.isArray(issueKeys) ? issueKeys : []).map((item) => String(item || '').trim()).filter(Boolean)));
+  const entries = await withPool(uniqueKeys, 8, async (issueKey) => {
+    const issue = await proxyRequestJson('GET', ytIssueApiUrl(issueKey), {
+      Accept: 'application/json',
+      Authorization: `Bearer ${String(ui.ytToken.value || '').trim()}`
+    }, undefined, signal, 'youtrack');
+    return [issueKey, issue];
+  });
+  const map = new Map();
+  for(const entry of entries){
+    if(!Array.isArray(entry) || entry.length < 2) continue;
+    map.set(entry[0], entry[1]);
+  }
+  return map;
+}
+
+function chooseReleaseForCandidate(candidate, issue, selectedReleasesSet){
+  if(candidate.bandRelease && selectedReleasesSet.has(candidate.bandRelease)){
+    return { release: candidate.bandRelease, source: 'band' };
+  }
+  const issueReleaseInfo = readIssueReleaseInfo(issue, candidate.platformKey);
+  const ytReleases = issueReleaseInfo.versions.filter((release) => selectedReleasesSet.has(release)).sort(compareRelease);
+  if(ytReleases.length === 1){
+    return { release: ytReleases[0], source: 'youtrack', ytReleases };
+  }
+  if(candidate.intervalRelease && selectedReleasesSet.has(candidate.intervalRelease)){
+    return { release: candidate.intervalRelease, source: 'interval', ytReleases };
+  }
+  if(ytReleases.length){
+    return { release: ytReleases[0], source: 'youtrack', ytReleases };
+  }
+  return { release: '', source: '', ytReleases };
+}
+
+function mergeRowState(target, candidate, issue, releaseChoice){
+  if(!target.substream || target.substream === '—'){
+    const stream = normalizeStream(pickFieldNames(issue, 'Stream'));
+    const substream = pickSubstreamDynamic(issue, stream)[0] || '—';
+    target.substream = substream;
+    target.stream = stream || '—';
+  }
+  if(!target.releaseSource || releaseChoice.source === 'band' || (releaseChoice.source === 'youtrack' && target.releaseSource === 'interval')){
+    target.releaseSource = releaseChoice.source || target.releaseSource;
+  }
+  target.ytReleases = Array.from(new Set([...(target.ytReleases || []), ...(releaseChoice.ytReleases || [])])).sort(compareRelease);
+  target.bandMatchedReleases = Array.from(new Set([...(target.bandMatchedReleases || []), ...(candidate.bandMatchedReleases || [])])).sort(compareRelease);
+  target.reactionNames = Array.from(new Set([...(target.reactionNames || []), ...(candidate.reactionNames || [])])).sort();
+  target.bandPostCount = Number(target.bandPostCount || 0) + 1;
+  if(!Number.isFinite(target.broughtAtMs) || candidate.broughtAtMs < target.broughtAtMs){
+    target.broughtAtMs = candidate.broughtAtMs;
+    target.broughtAtText = candidate.broughtAtText;
+    target.broughtBy = candidate.broughtBy;
+    target.bandText = candidate.bandText;
+    target.postId = candidate.postId;
+  }
+  if(candidate.mrUrl && !target.mrUrl){
+    target.mrUrl = candidate.mrUrl;
+  }
+  if(candidate.approvalKind === 'rejected'){
+    target.approvalKind = 'rejected';
+    target.approvalIcon = '❌';
+    target.approvalLabel = 'Крестик';
+  }else if(target.approvalKind !== 'rejected' && candidate.approvalKind === 'approved'){
+    target.approvalKind = 'approved';
+    target.approvalIcon = '✅';
+    target.approvalLabel = 'Галочка';
+  }else if(!target.approvalKind){
+    target.approvalKind = candidate.approvalKind || 'none';
+    target.approvalIcon = candidate.approvalIcon || '';
+    target.approvalLabel = candidate.approvalLabel || '';
+  }
+}
+
+function buildRowsFromCandidates(candidateBundle, issueMap, releases){
+  const selectedReleasesSet = new Set(releases);
+  const rowMap = new Map();
+  let skippedNotBank = 0;
+  let skippedNoRelease = 0;
+
+  for(const candidate of candidateBundle.candidates){
+    const issue = issueMap.get(candidate.issueKey);
+    if(!issue) continue;
+    const stream = normalizeStream(pickFieldNames(issue, 'Stream'));
+    if(!matchesSelectedStreamLabel(stream)){
+      skippedNotBank += 1;
+      continue;
+    }
+    const releaseChoice = chooseReleaseForCandidate(candidate, issue, selectedReleasesSet);
+    if(!releaseChoice.release){
+      skippedNoRelease += 1;
+      continue;
+    }
+    const rowKey = `${candidate.platformKey}|${releaseChoice.release}|${candidate.issueKey}`;
+    if(!rowMap.has(rowKey)){
+      rowMap.set(rowKey, {
+        rowKey,
+        platformKey: candidate.platformKey,
+        release: releaseChoice.release,
+        issueKey: candidate.issueKey,
+        issueUrl: youTrackIssueUrl(candidate.issueKey),
+        substream: '—',
+        stream: '—',
+        broughtBy: candidate.broughtBy,
+        broughtAtMs: candidate.broughtAtMs,
+        broughtAtText: candidate.broughtAtText,
+        approvalKind: '',
+        approvalIcon: '',
+        approvalLabel: '',
+        mrUrl: candidate.mrUrl || '',
+        mergedAtMs: NaN,
+        mergedAtText: '—',
+        mergedIntoRelease: false,
+        mrTargetBranch: '',
+        releaseSource: releaseChoice.source || '',
+        ytReleases: [],
+        bandMatchedReleases: [],
+        reactionNames: [],
+        bandPostCount: 0,
+        bandText: candidate.bandText,
+        postId: candidate.postId
+      });
+    }
+    mergeRowState(rowMap.get(rowKey), candidate, issue, releaseChoice);
+  }
+
+  const rows = Array.from(rowMap.values())
+    .sort((left, right) => compareRelease(left.release, right.release)
+      || ((left.broughtAtMs || 0) - (right.broughtAtMs || 0))
+      || left.issueKey.localeCompare(right.issueKey, 'ru'));
+
+  return { rows, skippedNotBank, skippedNoRelease };
+}
+
+function buildGitlabMrApiUrl(projectPath, iid){
+  return `${GITLAB_BASE}/api/v4/projects/${encodeURIComponent(projectPath)}/merge_requests/${encodeURIComponent(String(iid || '').trim())}`;
+}
+
+function buildGitlabBranchMrListUrl(projectPath, release, page){
+  const url = new URL(`${GITLAB_BASE}/api/v4/projects/${encodeURIComponent(projectPath)}/merge_requests`);
+  url.searchParams.set('state', 'merged');
+  url.searchParams.set('target_branch', `release/${release}`);
+  url.searchParams.set('scope', 'all');
+  url.searchParams.set('per_page', String(GITLAB_PAGE_SIZE));
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('order_by', 'updated_at');
+  url.searchParams.set('sort', 'desc');
+  return url.toString();
+}
+
+function parseGitlabMrUrl(url){
+  const match = String(url || '').trim().match(/^https?:\/\/gitlab\.wildberries\.ru\/(.+?)\/-\/merge_requests\/(\d+)\/?$/i);
+  if(!match) return null;
+  return {
+    projectPath: decodeURIComponent(match[1]),
+    iid: match[2]
+  };
+}
+
+function normalizeGitlabMr(mr){
+  return {
+    iid: Number(mr?.iid || 0) || null,
+    title: String(mr?.title || '').trim(),
+    description: String(mr?.description || '').trim(),
+    sourceBranch: String(mr?.source_branch || '').trim(),
+    targetBranch: String(mr?.target_branch || '').trim(),
+    mergedAt: String(mr?.merged_at || mr?.updated_at || '').trim(),
+    state: String(mr?.state || '').trim().toLowerCase(),
+    webUrl: String(mr?.web_url || '').trim()
+  };
+}
+
+function isMrMergedIntoReleaseBranch(mr, release){
+  if(!mr) return false;
+  if(String(mr.state || '').toLowerCase() !== 'merged') return false;
+  return normalizeReleaseFromBranch(mr.targetBranch) === normalizeRelease(release);
+}
+
+function mrReferencesIssue(mr, issueKey){
+  const escaped = String(issueKey || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(^|[^A-Z0-9])${escaped}(?=$|[^A-Z0-9])`, 'i');
+  const blob = [mr?.title, mr?.description, mr?.sourceBranch].filter(Boolean).join('\n');
+  return pattern.test(blob);
+}
+
+const gitlabMrDetailCache = new Map();
+const gitlabBranchCache = new Map();
+
+async function fetchGitlabMrDetail(projectPath, iid, signal){
+  const cacheKey = `${projectPath}!${iid}`;
+  if(gitlabMrDetailCache.has(cacheKey)) return gitlabMrDetailCache.get(cacheKey);
+  const detail = normalizeGitlabMr(await proxyRequestJson('GET', buildGitlabMrApiUrl(projectPath, iid), {
+    Accept: 'application/json',
+    'PRIVATE-TOKEN': normalizeGitlabToken(ui.gitlabToken.value)
+  }, undefined, signal, 'gitlab'));
+  gitlabMrDetailCache.set(cacheKey, detail);
+  return detail;
+}
+
+async function fetchGitlabReleaseBranchMrs(platformKey, release, signal){
+  const cacheKey = `${platformKey}:${release}`;
+  if(gitlabBranchCache.has(cacheKey)) return gitlabBranchCache.get(cacheKey);
+  const config = PLATFORM_CONFIG[platformKey];
+  const items = [];
+  for(let page = 1; page <= 20; page += 1){
+    const data = await proxyRequestJson('GET', buildGitlabBranchMrListUrl(config.projectPath, release, page), {
+      Accept: 'application/json',
+      'PRIVATE-TOKEN': normalizeGitlabToken(ui.gitlabToken.value)
+    }, undefined, signal, 'gitlab');
+    const batch = Array.isArray(data) ? data.map(normalizeGitlabMr) : [];
+    items.push(...batch);
+    if(batch.length < GITLAB_PAGE_SIZE) break;
+  }
+  gitlabBranchCache.set(cacheKey, items);
+  return items;
+}
+
+async function enrichRowsWithGitlab(rows, signal){
+  const enriched = await withPool(rows, 6, async (row) => {
+    let detail = null;
+    const parsedUrl = parseGitlabMrUrl(row.mrUrl);
+    if(parsedUrl){
+      try{
+        detail = await fetchGitlabMrDetail(parsedUrl.projectPath, parsedUrl.iid, signal);
+      }catch(error){
+        logLine(`GitLab MR ${row.issueKey}: ${error.message || error}`, 'warn');
+      }
+    }
+    if(!isMrMergedIntoReleaseBranch(detail, row.release)){
+      const branchMrs = await fetchGitlabReleaseBranchMrs(row.platformKey, row.release, signal);
+      const fallback = branchMrs.find((mr) => mrReferencesIssue(mr, row.issueKey));
+      if(fallback) detail = fallback;
+    }
+    if(detail){
+      row.mrUrl = row.mrUrl || detail.webUrl || '';
+      row.mrTargetBranch = detail.targetBranch || '';
+      row.mergedIntoRelease = isMrMergedIntoReleaseBranch(detail, row.release);
+      row.mergedAtMs = Date.parse(detail.mergedAt || '');
+      row.mergedAtText = row.mergedIntoRelease && Number.isFinite(row.mergedAtMs)
+        ? formatMskDateTime(row.mergedAtMs)
+        : '—';
+    }else{
+      row.mergedIntoRelease = false;
+      row.mergedAtText = '—';
+    }
+    return row;
+  });
+  return enriched.filter(Boolean);
+}
+
+function buildPlatformTable(rows, platformKey){
+  if(!rows.length){
+    return `<div class="empty-state">По этой платформе в выбранном диапазоне не нашлось задач выбранного стрима из Band.</div>`;
+  }
+  const sortedRows = getSortedRows(platformKey, rows);
+  return `
+    <div class="table-wrap">
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>${buildSortHeader(platformKey, 'release', 'Релиз')}</th>
+            <th>${buildSortHeader(platformKey, 'issueKey', 'Номер задачи')}</th>
+            <th>${buildSortHeader(platformKey, 'substream', 'Саб стрим')}</th>
+            <th>${buildSortHeader(platformKey, 'broughtBy', 'Кто принёс')}</th>
+            <th>${buildSortHeader(platformKey, 'broughtAtMs', 'Время прихода на согласование')}</th>
+            <th>${buildSortHeader(platformKey, 'approvalKind', 'Статус согласования')}</th>
+            <th>${buildSortHeader(platformKey, 'mergedAtMs', 'Время влития')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sortedRows.map((row) => {
+            const statusClass = row.approvalKind === 'approved' ? 'is-ok' : (row.approvalKind === 'rejected' ? 'is-bad' : '');
+            const statusTitle = row.reactionNames && row.reactionNames.length
+              ? `Реакции: ${row.reactionNames.join(', ')}`
+              : 'Нет реакций';
+            return `
+              <tr>
+                <td>
+                  <span class="release-pill" title="Источник релиза: ${escapeHtml(row.releaseSource || 'unknown')}">
+                    ${escapeHtml(displayRelease(row.release))}
+                  </span>
+                </td>
+                <td>
+                  <a class="data-link" href="${escapeHtml(row.issueUrl)}" target="_blank" rel="noreferrer">
+                    ${escapeHtml(row.issueKey)}
+                  </a>
+                </td>
+                <td>${escapeHtml(row.substream || '—')}</td>
+                <td>${escapeHtml(row.broughtBy || '—')}</td>
+                <td class="mono">${escapeHtml(row.broughtAtText || '—')}</td>
+                <td>
+                  ${row.approvalIcon
+                    ? `<span class="status-pill ${statusClass}" title="${escapeHtml(statusTitle)}">${escapeHtml(row.approvalIcon)}</span>`
+                    : ''}
+                </td>
+                <td class="mono">${escapeHtml(row.mergedAtText || '—')}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderPlatformPanel(platformKey){
+  const panel = platformKey === 'ios' ? ui.iosPanel : ui.androidPanel;
+  const rows = (appState.result?.rows || []).filter((row) => row.platformKey === platformKey);
+  panel.innerHTML = buildPlatformTable(rows, platformKey);
+}
+
+function renderMiniSummary(result){
+  if(!ui.summaryBar) return;
+  const rows = Array.isArray(result?.rows) ? result.rows : [];
+  ui.summaryBar.innerHTML = ['android', 'ios'].map((platformKey) => {
+    const platformRows = rows.filter((row) => row.platformKey === platformKey);
+    const approvedCount = platformRows.filter((row) => row.approvalKind === 'approved').length;
+    const rejectedCount = platformRows.filter((row) => row.approvalKind === 'rejected').length;
+    return `
+      <article class="mini-summary-card">
+        <div class="mini-summary-label">${escapeHtml(PLATFORM_CONFIG[platformKey].label)}</div>
+        <div class="mini-summary-metrics">
+          <div class="mini-summary-metric is-ok">
+            <div class="mini-summary-metric-label">Согласовано</div>
+            <div class="mini-summary-metric-value">${escapeHtml(String(approvedCount))}</div>
+          </div>
+          <div class="mini-summary-metric is-bad">
+            <div class="mini-summary-metric-label">Не согласовано</div>
+            <div class="mini-summary-metric-value">${escapeHtml(String(rejectedCount))}</div>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function renderResult(result){
+  appState.result = result;
+  renderMiniSummary(result);
+  renderPlatformPanel('android');
+  renderPlatformPanel('ios');
+  const hasRows = !!(Array.isArray(result?.rows) && result.rows.length);
+  ui.exportExcelBtn.disabled = !hasRows;
+  ui.exportPdfBtn.disabled = !hasRows;
+}
+
+function renderEmptyState(){
+  appState.result = null;
+  if(ui.summaryBar) ui.summaryBar.innerHTML = '';
+  const empty = '<div class="empty-state">Запусти сбор, и здесь появится таблица по релизам.</div>';
+  ui.androidPanel.innerHTML = empty;
+  ui.iosPanel.innerHTML = empty;
+  ui.exportExcelBtn.disabled = true;
+  ui.exportPdfBtn.disabled = true;
+}
+
+function applyActiveTab(platformKey){
+  appState.activePlatform = platformKey === 'ios' ? 'ios' : 'android';
+  ui.androidTabBtn.classList.toggle('is-active', appState.activePlatform === 'android');
+  ui.iosTabBtn.classList.toggle('is-active', appState.activePlatform === 'ios');
+  ui.androidTabBtn.setAttribute('aria-selected', String(appState.activePlatform === 'android'));
+  ui.iosTabBtn.setAttribute('aria-selected', String(appState.activePlatform === 'ios'));
+  ui.androidPanel.hidden = appState.activePlatform !== 'android';
+  ui.iosPanel.hidden = appState.activePlatform !== 'ios';
+}
+
+function handlePanelSortClick(event){
+  const button = event.target.closest('[data-sort-key]');
+  if(!button) return;
+  const platformKey = String(button.getAttribute('data-platform') || '').trim();
+  const sortKey = String(button.getAttribute('data-sort-key') || '').trim();
+  togglePlatformSort(platformKey, sortKey);
+}
+
+function getRowsForPlatform(platformKey){
+  const rows = Array.isArray(appState.result?.rows) ? appState.result.rows : [];
+  return getSortedRows(platformKey, rows.filter((row) => row.platformKey === platformKey));
+}
+
+function buildExportBaseName(){
+  return [
+    'chp_release_range',
+    normalizeRelease(ui.startRel.value) || 'from',
+    normalizeRelease(ui.endRel.value) || 'to',
+    new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16)
+  ].join('_');
+}
+
+function chunkRows(rows, size){
+  const out = [];
+  const list = Array.isArray(rows) ? rows : [];
+  const chunkSize = Math.max(1, Number(size) || 1);
+  for(let index = 0; index < list.length; index += chunkSize){
+    out.push(list.slice(index, index + chunkSize));
+  }
+  return out;
+}
+
+function getPlatformApprovalCounts(rows){
+  return {
+    approved: rows.filter((row) => row.approvalKind === 'approved').length,
+    rejected: rows.filter((row) => row.approvalKind === 'rejected').length
+  };
+}
+
+function buildPdfSheetHtml(platformKey, pageRows, allRows, pageIndex, totalPages){
+  const platform = PLATFORM_CONFIG[platformKey];
+  const totalRows = Array.isArray(allRows) ? allRows : [];
+  const counts = getPlatformApprovalCounts(totalRows);
+  const currentRows = Array.isArray(pageRows) ? pageRows : [];
+  const rangeText = `${displayRelease(normalizeRelease(ui.startRel.value) || ui.startRel.value)} - ${displayRelease(normalizeRelease(ui.endRel.value) || ui.endRel.value)}`;
+  const exportedAt = formatMskDateTime(Date.now());
+  const rowsHtml = currentRows.length ? currentRows.map((row) => `
+    <tr>
+      <td>${escapeHtml(displayRelease(row.release))}</td>
+      <td>${escapeHtml(row.issueKey || '—')}</td>
+      <td>${escapeHtml(row.substream || '—')}</td>
+      <td>${escapeHtml(row.broughtBy || '—')}</td>
+      <td>${escapeHtml(row.broughtAtText || '—')}</td>
+      <td style="text-align:center;font-size:14px;">${escapeHtml(row.approvalIcon || '')}</td>
+      <td>${escapeHtml(row.mergedAtText || '—')}</td>
+    </tr>
+  `).join('') : `
+    <tr>
+      <td colspan="7" style="text-align:center;color:#64748b;">Нет данных по этой платформе.</td>
+    </tr>
+  `;
+  return `
+    <div style="width:1480px;background:#ffffff;color:#111827;padding:30px 34px;font-family:Arial,sans-serif;box-sizing:border-box;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px;">
+        <div>
+          <div style="font-size:28px;font-weight:800;line-height:1.1;">ЧП за релиз</div>
+          <div style="font-size:18px;font-weight:700;color:#4c1d95;margin-top:4px;">${escapeHtml(platform.label)}</div>
+          <div style="font-size:12px;color:#64748b;margin-top:8px;">Диапазон релизов: ${escapeHtml(rangeText)}</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px;">Экспорт: ${escapeHtml(exportedAt)} МСК</div>
+        </div>
+        <div style="font-size:12px;color:#64748b;text-align:right;">Страница ${pageIndex + 1} / ${totalPages}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px;">
+        <div style="border:1px solid #ecebff;border-radius:14px;padding:12px 14px;background:#fcfbff;">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">Строк</div>
+          <div style="font-size:22px;font-weight:800;">${escapeHtml(String(totalRows.length))}</div>
+        </div>
+        <div style="border:1px solid rgba(34,197,94,.22);border-radius:14px;padding:12px 14px;background:rgba(34,197,94,.06);">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">Согласовано</div>
+          <div style="font-size:22px;font-weight:800;">${escapeHtml(String(counts.approved))}</div>
+        </div>
+        <div style="border:1px solid rgba(244,63,94,.22);border-radius:14px;padding:12px 14px;background:rgba(244,63,94,.06);">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">Не согласовано</div>
+          <div style="font-size:22px;font-weight:800;">${escapeHtml(String(counts.rejected))}</div>
+        </div>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr>
+            <th style="border:1px solid #e5e7eb;background:#f7f5ff;color:#5b21b6;padding:8px 10px;text-align:left;">Релиз</th>
+            <th style="border:1px solid #e5e7eb;background:#f7f5ff;color:#5b21b6;padding:8px 10px;text-align:left;">Номер задачи</th>
+            <th style="border:1px solid #e5e7eb;background:#f7f5ff;color:#5b21b6;padding:8px 10px;text-align:left;">Саб стрим</th>
+            <th style="border:1px solid #e5e7eb;background:#f7f5ff;color:#5b21b6;padding:8px 10px;text-align:left;">Кто принёс</th>
+            <th style="border:1px solid #e5e7eb;background:#f7f5ff;color:#5b21b6;padding:8px 10px;text-align:left;">Время прихода на согласование</th>
+            <th style="border:1px solid #e5e7eb;background:#f7f5ff;color:#5b21b6;padding:8px 10px;text-align:center;">Статус</th>
+            <th style="border:1px solid #e5e7eb;background:#f7f5ff;color:#5b21b6;padding:8px 10px;text-align:left;">Время влития</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function createPdfSheetElement(platformKey, pageRows, allRows, pageIndex, totalPages){
+  const node = document.createElement('div');
+  node.style.position = 'fixed';
+  node.style.left = '-20000px';
+  node.style.top = '0';
+  node.style.zIndex = '-1';
+  node.style.background = '#ffffff';
+  node.innerHTML = buildPdfSheetHtml(platformKey, pageRows, allRows, pageIndex, totalPages);
+  document.body.appendChild(node);
+  return node;
+}
+
+async function waitNextFrame(){
+  await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+function addCanvasToPdf(pdf, canvas, pageIndex){
+  const pdfW = pdf.internal.pageSize.getWidth();
+  const pdfH = pdf.internal.pageSize.getHeight();
+  const margin = 8;
+  const maxW = pdfW - margin * 2;
+  const maxH = pdfH - margin * 2;
+  const ratio = canvas.height / canvas.width;
+  let imgW = maxW;
+  let imgH = imgW * ratio;
+  if(imgH > maxH){
+    imgH = maxH;
+    imgW = imgH / ratio;
+  }
+  const x = Math.max(margin, (pdfW - imgW) / 2);
+  const y = Math.max(margin, (pdfH - imgH) / 2);
+  if(pageIndex > 0) pdf.addPage();
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 0, pdfW, pdfH, 'F');
+  pdf.addImage(canvas.toDataURL('image/jpeg', 0.98), 'JPEG', x, y, imgW, imgH, undefined, 'FAST');
+}
+
+function exportExcel(){
+  if(typeof XLSX === 'undefined' || !XLSX?.utils){
+    showToast('Не загружена библиотека XLSX');
+    return;
+  }
+  const rows = Array.isArray(appState.result?.rows) ? appState.result.rows : [];
+  if(!rows.length){
+    showToast('Нет данных для выгрузки');
+    return;
+  }
+  const workbook = XLSX.utils.book_new();
+  for(const platformKey of ['android', 'ios']){
+    const platformRows = getRowsForPlatform(platformKey)
+      .map((row) => ({
+        'Релиз': displayRelease(row.release),
+        'Номер задачи': row.issueKey,
+        'Саб стрим': row.substream || '—',
+        'Кто принёс': row.broughtBy || '—',
+        'Время прихода на согласование': row.broughtAtText || '—',
+        'Статус согласования': row.approvalIcon || '',
+        'Время влития': row.mergedAtText || '—'
+      }));
+    const sheetRows = platformRows.length ? platformRows : [{
+      'Релиз': '',
+      'Номер задачи': '',
+      'Саб стрим': '',
+      'Кто принёс': '',
+      'Время прихода на согласование': '',
+      'Статус согласования': '',
+      'Время влития': ''
+    }];
+    const sheet = XLSX.utils.json_to_sheet(sheetRows);
+    sheet['!cols'] = [
+      { wch: 10 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 28 },
+      { wch: 25 },
+      { wch: 22 },
+      { wch: 20 }
+    ];
+    XLSX.utils.book_append_sheet(workbook, sheet, PLATFORM_CONFIG[platformKey].label);
+  }
+  const filename = `${buildExportBaseName()}.xlsx`;
+  XLSX.writeFile(workbook, filename, { compression: true });
+}
+
+async function exportPdf(){
+  if(!window.html2canvas){
+    showToast('Не загружена библиотека html2canvas');
+    return;
+  }
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    showToast('Не загружена библиотека jsPDF');
+    return;
+  }
+  const hasRows = Array.isArray(appState.result?.rows) && appState.result.rows.length;
+  if(!hasRows){
+    showToast('Нет данных для выгрузки');
+    return;
+  }
+
+  const originalText = ui.exportPdfBtn?.textContent || 'PDF';
+  if(ui.exportPdfBtn){
+    ui.exportPdfBtn.disabled = true;
+    ui.exportPdfBtn.textContent = 'PDF...';
+  }
+
+  try{
+    try{
+      await (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve());
+    }catch(_){}
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: false });
+    const pages = [];
+    for(const platformKey of ['android', 'ios']){
+      const rows = getRowsForPlatform(platformKey);
+      const chunks = chunkRows(rows, PDF_ROWS_PER_PAGE);
+      const pageChunks = chunks.length ? chunks : [[]];
+      for(let index = 0; index < pageChunks.length; index += 1){
+        pages.push({
+          platformKey,
+          pageRows: pageChunks[index],
+          allRows: rows,
+          pageIndex: index,
+          totalPages: pageChunks.length
+        });
+      }
+    }
+
+    let globalPageIndex = 0;
+    for(const page of pages){
+      const sheet = createPdfSheetElement(page.platformKey, page.pageRows, page.allRows, page.pageIndex, page.totalPages);
+      try{
+        await waitNextFrame();
+        const canvas = await window.html2canvas(sheet, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          useCORS: true,
+          logging: false
+        });
+        addCanvasToPdf(pdf, canvas, globalPageIndex);
+        globalPageIndex += 1;
+      }finally{
+        sheet.remove();
+      }
+    }
+
+    pdf.save(`${buildExportBaseName()}.pdf`);
+  }finally{
+    if(ui.exportPdfBtn){
+      ui.exportPdfBtn.disabled = !(Array.isArray(appState.result?.rows) && appState.result.rows.length);
+      ui.exportPdfBtn.textContent = originalText;
+    }
+  }
+}
+
+function validateInputs(){
+  if(!String(ui.ytToken.value || '').trim()) throw new Error('Заполни YouTrack токен.');
+  if(!normalizeGitlabToken(ui.gitlabToken.value)) throw new Error('Заполни GitLab token.');
+  if(!getSelectedStreamName()) throw new Error('Заполни Stream.');
+  if(!String(ui.bandCookies.value || '').trim()) throw new Error('Заполни Band cookies.');
+  const start = normalizeRelease(ui.startRel.value);
+  const end = normalizeRelease(ui.endRel.value);
+  if(!start || !end) throw new Error('Укажи корректный диапазон релизов.');
+  return { start, end };
+}
+
+async function runReport(){
+  let releases = [];
+  try{
+    saveInputs();
+    clearLogs();
+    renderEmptyState();
+    gitlabMrDetailCache.clear();
+    gitlabBranchCache.clear();
+
+    ui.runBtn.disabled = true;
+    ui.exportExcelBtn.disabled = true;
+    ui.exportPdfBtn.disabled = true;
+    setProgress(5);
+    setStatus('Проверяю входные данные…');
+
+    const { start, end } = validateInputs();
+    releases = expandReleaseRange(start, end);
+
+    setProgress(15);
+    setStatus('Читаю интервалы релизов из YouTrack…');
+    const controller = new AbortController();
+    const releaseMeta = await loadReleaseMeta(releases, controller.signal);
+    appState.releaseMeta = releaseMeta;
+    const overallWindow = buildOverallWindow(releaseMeta);
+
+    setProgress(35);
+    setStatus('Читаю пользователей и сообщения из Band…');
+    const [bandUsers, bandPosts] = await Promise.all([
+      fetchBandChannelUsers(controller.signal),
+      fetchBandChannelPostsWindow(overallWindow.sinceMs, overallWindow.untilMs, controller.signal)
+    ]);
+    logLine(`Band users: ${bandUsers.size}`, 'ok');
+    logLine(`Band posts: ${bandPosts.length}`, 'ok');
+
+    const candidateBundle = buildBandCandidates(bandPosts, bandUsers, releases, releaseMeta);
+    logLine(`Band posts c задачами: ${candidateBundle.postsWithKeys}`, candidateBundle.postsWithKeys ? 'ok' : 'warn');
+    logLine(`Кандидатов по задачам: ${candidateBundle.candidates.length}`, candidateBundle.candidates.length ? 'ok' : 'warn');
+
+    setProgress(55);
+    setStatus(`Подтягиваю задачи из YouTrack и фильтрую ${getSelectedStreamName()}…`);
+    const issueMap = await fetchIssueMap(candidateBundle.candidates.map((item) => item.issueKey), controller.signal);
+    const rowBundle = buildRowsFromCandidates(candidateBundle, issueMap, releases);
+    logLine(`Стрим ${getSelectedStreamName()}: ${rowBundle.rows.length} строк`, rowBundle.rows.length ? 'ok' : 'warn');
+    if(rowBundle.skippedNotBank) logLine(`Отсечено не по стриму ${getSelectedStreamName()}: ${rowBundle.skippedNotBank}`, 'warn');
+    if(rowBundle.skippedNoRelease) logLine(`Отсечено без релиза: ${rowBundle.skippedNoRelease}`, 'warn');
+
+    setProgress(78);
+    setStatus('Проверяю merge в GitLab release-ветках…');
+    const enrichedRows = await enrichRowsWithGitlab(rowBundle.rows, controller.signal);
+
+    setProgress(96);
+    const result = {
+      releases,
+      releaseMeta,
+      overallWindow,
+      rows: enrichedRows,
+      postsWithKeys: candidateBundle.postsWithKeys,
+      bandPostsCount: bandPosts.length,
+      skippedNotBank: rowBundle.skippedNotBank,
+      skippedNoRelease: rowBundle.skippedNoRelease
+    };
+    renderResult(result);
+    applyActiveTab(appState.activePlatform);
+
+    setProgress(100);
+    setStatus('Готово.', 'ok');
+    logLine(`Готово: ${enrichedRows.length} строк`, 'ok');
+    showToast('Отчёт собран');
+  }catch(error){
+    setStatus('Ошибка сборки', 'err');
+    setProgress(100);
+    logLine(`Ошибка: ${error?.message || error}`, 'err');
+    showToast('Ошибка сборки');
+    if(!releases.length) renderEmptyState();
+  }finally{
+    ui.runBtn.disabled = false;
+  }
+}
+
+ui.runBtn.addEventListener('click', runReport);
+ui.checkProxyBtn.addEventListener('click', async () => {
+  try{
+    setStatus('Проверяю прокси…');
+    const info = await checkProxyHealth();
+    setStatus('Прокси OK', 'ok');
+    logLine(`Proxy ${info.proxy || 'ok'} ${info.host || ''}:${info.port || ''}`, 'ok');
+    showToast('Прокси OK');
+  }catch(error){
+    setStatus('Прокси ошибка', 'err');
+    logLine(`Proxy ERR: ${error?.message || error}`, 'err');
+    showToast('Прокси ошибка');
+  }
+});
+ui.exportExcelBtn.addEventListener('click', exportExcel);
+ui.exportPdfBtn.addEventListener('click', () => {
+  exportPdf().catch((error) => {
+    logLine(`PDF export error: ${error?.message || error}`, 'err');
+    showToast('Ошибка PDF выгрузки');
+  });
+});
+ui.androidTabBtn.addEventListener('click', () => applyActiveTab('android'));
+ui.iosTabBtn.addEventListener('click', () => applyActiveTab('ios'));
+ui.androidPanel.addEventListener('click', handlePanelSortClick);
+ui.iosPanel.addEventListener('click', handlePanelSortClick);
+
+['startRel', 'endRel', 'ytToken', 'gitlabToken', 'streamName', 'bandCookies'].forEach((key) => {
+  const element = ui[key];
+  element?.addEventListener('change', saveInputs);
+  element?.addEventListener('input', () => {
+    clearTimeout(element.__saveTimer);
+    element.__saveTimer = setTimeout(saveInputs, 200);
+  });
+});
+
+restoreInputs();
+renderEmptyState();
+applyActiveTab('android');
+</script>
+</body>
+</html>

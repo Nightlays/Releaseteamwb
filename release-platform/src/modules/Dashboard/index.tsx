@@ -51,13 +51,27 @@ import {
   type DashboardHistoryPoint,
   type DashboardPrediction,
 } from '../../services/releasePrediction';
-import type { AllureLaunchResult } from '../../types';
+import {
+  loadLatestDashboardSnapshot,
+  loadDashboardSnapshotHistory,
+  saveDashboardSnapshot,
+  type DashboardStoredSnapshot,
+} from '../../services/dashboardSupabase';
+import { GOOGLE_APPS_SCRIPT_URL, type AllureLaunchResult } from '../../types';
 import { useApp, isDarkTheme, type ThemeMode } from '../../context/AppContext';
 
 Chart.register(DoughnutController, ArcElement, BarController, LineController, LineElement, PointElement, CategoryScale, LinearScale, BarElement, Filler, Tooltip, Legend);
 
 const DASHBOARD_SNAPSHOT_KEY = 'rp_dashboard_last_v1';
 const DASHBOARD_HISTORY_KEY = 'rp_dashboard_history_v1';
+const DASHBOARD_FORM_KEY = 'rp_dashboard_form_v1';
+const DASHBOARD_REMOTE_HISTORY_LIMIT = 48;
+const MOSCOW_UTC_OFFSET_MS = 3 * 3_600_000;
+
+interface DashboardFormState {
+  version: string;
+  customDeadline: string;
+}
 
 interface DashboardChartPalette {
   text: string;
@@ -83,6 +97,31 @@ function createEmptyUwuAgg(): Record<DashboardGroupLabel, DashboardUwuCounts> {
   ) as Record<DashboardGroupLabel, DashboardUwuCounts>;
 }
 
+function readDashboardForm(): DashboardFormState {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DASHBOARD_FORM_KEY) || 'null') as Partial<DashboardFormState> | null;
+    const version = String(raw?.version || '').trim();
+    const customDeadline = String(raw?.customDeadline || '').trim();
+    return {
+      version: version || '7.3.5420',
+      customDeadline,
+    };
+  } catch {
+    return { version: '7.3.5420', customDeadline: '' };
+  }
+}
+
+function writeDashboardForm(value: DashboardFormState) {
+  try {
+    localStorage.setItem(DASHBOARD_FORM_KEY, JSON.stringify({
+      version: String(value.version || '').trim(),
+      customDeadline: String(value.customDeadline || '').trim(),
+    }));
+  } catch {
+    /* ignore */
+  }
+}
+
 function sanitizeHistoryPoint(raw: unknown): DashboardHistoryPoint | null {
   if (!raw || typeof raw !== 'object') return null;
   const value = raw as Partial<DashboardHistoryPoint>;
@@ -96,6 +135,9 @@ function sanitizeHistoryPoint(raw: unknown): DashboardHistoryPoint | null {
     total: Number(value.total || 0),
     finished: Number(value.finished || 0),
     manualFinished: Number(value.manualFinished || 0),
+    manualTimedFinished: Number(value.manualTimedFinished || 0),
+    manualWindowStartTs: value.manualWindowStartTs == null ? null : Number(value.manualWindowStartTs || 0),
+    manualWindowStopTs: value.manualWindowStopTs == null ? null : Number(value.manualWindowStopTs || 0),
     remaining: Number(value.remaining || 0),
     launches: Number(value.launches || 0),
     assigned: Number(value.assigned || 0),
@@ -110,6 +152,8 @@ function sanitizeHistoryPoint(raw: unknown): DashboardHistoryPoint | null {
     noPassedAlerts: Number(value.noPassedAlerts || 0),
     uwuTotal: Number(value.uwuTotal || 0),
     uwuLeft: Number(value.uwuLeft || 0),
+    activePeopleCount: Number(value.activePeopleCount || 0),
+    activePeopleLogins: Array.isArray(value.activePeopleLogins) ? value.activePeopleLogins.map(item => String(item || '').trim()).filter(Boolean) : [],
   };
 }
 
@@ -157,8 +201,38 @@ function writeSnapshot(snapshot: DashboardHistoryPoint) {
   }
 }
 
+function mergeHistoryPoints(version: string, ...chunks: DashboardHistoryPoint[][]) {
+  const unique = new Map<string, DashboardHistoryPoint>();
+  chunks.flat().forEach(point => {
+    if (!point || point.version !== version || !point.updatedAt) return;
+    unique.set(`${point.version}:${point.updatedAt}`, point);
+  });
+  return [...unique.values()]
+    .sort((left, right) => Number(left.updatedAt || 0) - Number(right.updatedAt || 0))
+    .slice(-DASHBOARD_REMOTE_HISTORY_LIMIT);
+}
+
+function latestHistoryPoint(history: DashboardHistoryPoint[]) {
+  return history.length ? history[history.length - 1] : null;
+}
+
+function normalizeStoredAgg(agg: DashboardStoredSnapshot['agg']) {
+  return { ...createEmptyAgg(), ...(agg || {}) };
+}
+
+function normalizeStoredUwu(uwu: DashboardStoredSnapshot['uwu']) {
+  return { ...createEmptyUwuAgg(), ...(uwu || {}) };
+}
+
 function formatNumber(value: number) {
   return new Intl.NumberFormat('ru-RU').format(Math.round(value || 0));
+}
+
+function formatPercent(value: number, fractionDigits = 1) {
+  return `${new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(Number.isFinite(value) ? value : 0)}%`;
 }
 
 function formatDelta(current: number, previous?: number | null) {
@@ -186,6 +260,35 @@ function formatDateTime(ts?: number | null) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(ts);
+}
+
+function formatDateTimeMsk(ts?: number | null) {
+  if (!ts) return '—';
+  return new Intl.DateTimeFormat('ru-RU', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Moscow',
+  }).format(ts);
+}
+
+function parseMoscowDateTimeLocal(value: string) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) return NaN;
+  const [, year, month, day, hour, minute] = match;
+  const utcTs = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    0,
+    0
+  );
+  return utcTs - MOSCOW_UTC_OFFSET_MS;
 }
 
 function formatLaunchStatus(status?: string | null) {
@@ -283,6 +386,9 @@ function buildHistorySnapshot(
   updatedAt: number,
   activePeopleCount = 0,
   activePeopleLogins: string[] = [],
+  manualTimedFinished = 0,
+  manualWindowStartTs: number | null = null,
+  manualWindowStopTs: number | null = null,
 ): DashboardHistoryPoint {
   const criticalLabels = DASHBOARD_ORDER.filter(label => label.includes('[High/Blocker]'));
   const selectiveLabels = DASHBOARD_ORDER.filter(label => label.includes('[Selective]'));
@@ -305,6 +411,9 @@ function buildHistorySnapshot(
     total,
     finished,
     manualFinished,
+    manualTimedFinished,
+    manualWindowStartTs,
+    manualWindowStopTs,
     remaining,
     launches: launchesCount,
     assigned,
@@ -471,10 +580,89 @@ function SummaryBarChart({ agg }: { agg: Record<DashboardGroupLabel, DashboardGr
     return () => chartRef.current?.destroy();
   }, [agg, palette, theme]);
 
-  return <canvas ref={ref} style={{ display: 'block', height: 280 }} />;
+  return (
+    <div style={{ position: 'relative', height: 280, minHeight: 280, width: '100%' }}>
+      <canvas ref={ref} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+    </div>
+  );
 }
 
-function GroupDonut({ row }: { row: DashboardGroupCounts }) {
+function SummaryBarInsights({ agg }: { agg: Record<DashboardGroupLabel, DashboardGroupCounts> }) {
+  const rows = DASHBOARD_ORDER.map(label => {
+    const row = agg[label];
+    const total = Number(row?.total || 0);
+    const finished = Number(row?.finished || 0);
+    const left = Number(row?.remaining_total || 0);
+    const assigned = Number(row?.remaining || 0);
+    const inProgress = Number(row?.in_progress || 0);
+    return {
+      label: compactLabel(label),
+      total,
+      finished,
+      left,
+      assigned,
+      inProgress,
+      pct: total > 0 ? Math.round((finished / Math.max(1, total)) * 100) : 0,
+    };
+  });
+  const mostLeft = [...rows].sort((a, b) => b.left - a.left)[0];
+  const mostWork = [...rows].sort((a, b) => (b.assigned + b.inProgress) - (a.assigned + a.inProgress))[0];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
+        {rows.map(row => (
+          <div
+            key={row.label}
+            style={{
+              minWidth: 0,
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) auto',
+              alignItems: 'center',
+              gap: 8,
+              padding: '7px 9px',
+              borderRadius: 10,
+              border: '1px solid var(--border)',
+              background: 'var(--surface-soft)',
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {row.label}
+              </div>
+              <div style={{ marginTop: 5 }}>
+                <Progress value={row.pct} height={4} color={row.pct >= 90 ? 'green' : row.pct >= 70 ? 'yellow' : 'red'} />
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontSize: 12, fontWeight: 850, color: row.pct >= 90 ? '#22C55E' : row.pct >= 70 ? '#F59E0B' : '#EF4444' }}>{row.pct}%</div>
+              <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>
+                хвост {formatNumber(row.left)}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        gap: 12,
+        flexWrap: 'wrap',
+        padding: '7px 10px',
+        borderRadius: 10,
+        background: 'var(--surface-soft-2)',
+        color: 'var(--text-3)',
+        fontSize: 11,
+        fontWeight: 650,
+      }}>
+        <span>Самый большой хвост: <b style={{ color: 'var(--text)' }}>{mostLeft?.label || '—'}</b> · {formatNumber(mostLeft?.left || 0)}</span>
+        <span>Назначено/в работе максимум: <b style={{ color: 'var(--text)' }}>{mostWork?.label || '—'}</b> · {formatNumber((mostWork?.assigned || 0) + (mostWork?.inProgress || 0))}</span>
+      </div>
+    </div>
+  );
+}
+
+function GroupDonut({ row, size = 132 }: { row: DashboardGroupCounts; size?: number }) {
   const { theme } = useApp();
   const palette = useDashboardChartPalette(theme);
   const ref = useRef<HTMLCanvasElement>(null);
@@ -482,7 +670,7 @@ function GroupDonut({ row }: { row: DashboardGroupCounts }) {
   const finished = Number(row.finished || 0);
   const left = Number(row.remaining_total || 0);
   const total = Math.max(0, finished + left);
-  const pct = total > 0 ? Math.round((finished / total) * 100) : 0;
+  const pct = total > 0 ? (finished / total) * 100 : 0;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -539,7 +727,7 @@ function GroupDonut({ row }: { row: DashboardGroupCounts }) {
           ctx.textBaseline = 'middle';
           ctx.fillStyle = palette.text;
           ctx.font = '700 18px Inter, system-ui';
-          ctx.fillText(`${pct}%`, x, y - 2);
+          ctx.fillText(formatPercent(pct), x, y - 2);
           ctx.fillStyle = palette.textSoft;
           ctx.font = '600 10px Inter, system-ui';
           ctx.fillText('готово', x, y + 16);
@@ -551,33 +739,35 @@ function GroupDonut({ row }: { row: DashboardGroupCounts }) {
     return () => chartRef.current?.destroy();
   }, [finished, left, pct, total, palette, theme]);
 
-  return <canvas ref={ref} width={132} height={132} style={{ display: 'block' }} />;
+  return <canvas ref={ref} width={size} height={size} style={{ display: 'block' }} />;
 }
 
 function GroupCard({
   label,
   row,
   uwu,
+  compact = false,
 }: {
   label: DashboardGroupLabel;
   row: DashboardGroupCounts;
   uwu: DashboardUwuCounts;
+  compact?: boolean;
 }) {
   const hasUwu = label.includes('[High/Blocker]');
   return (
-    <Card>
-      <CardHeader>
+    <Card style={{ height: '100%' }}>
+      <CardHeader style={{ padding: compact ? '12px 14px 0' : undefined }}>
         <div>
           <CardTitle>{compactLabel(label)}</CardTitle>
           <CardHint>{hasUwu ? 'Реальный exact-count + UwU по leaf/testcase overview' : 'Selective без UwU, как в legacy dashboard'}</CardHint>
         </div>
         <Badge color={row.total > 0 && row.finished / Math.max(1, row.total) >= 0.9 ? 'green' : row.total > 0 ? 'yellow' : 'gray'}>
-          {row.total > 0 ? `${Math.round((row.finished / Math.max(1, row.total)) * 100)}%` : '0%'}
+          {formatPercent(row.total > 0 ? (row.finished / Math.max(1, row.total)) * 100 : 0)}
         </Badge>
       </CardHeader>
-      <CardBody style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 12, alignItems: 'center' }}>
+      <CardBody style={{ display: 'grid', gridTemplateColumns: compact ? '112px 1fr' : '140px 1fr', gap: compact ? 10 : 12, alignItems: 'center', padding: compact ? '10px 14px 12px' : undefined }}>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <GroupDonut row={row} />
+          <GroupDonut row={row} size={compact ? 112 : 132} />
         </div>
         <div>
           <InfoRow label="Всего" value={formatNumber(row.total)} />
@@ -601,9 +791,9 @@ function GroupCard({
                 <div style={{ marginTop: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>
                     <span>UwU прогресс</span>
-                    <span>{Math.round((uwu.done / Math.max(1, uwu.total)) * 100)}%</span>
+                    <span>{formatPercent((uwu.done / Math.max(1, uwu.total)) * 100)}</span>
                   </div>
-                  <Progress value={Math.round((uwu.done / Math.max(1, uwu.total)) * 100)} height={5} color={uwu.left === 0 ? 'green' : uwu.done / Math.max(1, uwu.total) >= 0.7 ? 'yellow' : 'red'} />
+                  <Progress value={(uwu.done / Math.max(1, uwu.total)) * 100} height={5} color={uwu.left === 0 ? 'green' : uwu.done / Math.max(1, uwu.total) >= 0.7 ? 'yellow' : 'red'} />
                 </div>
               )}
             </>
@@ -622,9 +812,9 @@ function GroupsPanel({
   uwu: Record<DashboardGroupLabel, DashboardUwuCounts>;
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, height: '100%' }}>
       {DASHBOARD_ORDER.map(label => (
-        <GroupCard key={label} label={label} row={agg[label]} uwu={uwu[label]} />
+        <GroupCard key={label} label={label} row={agg[label]} uwu={uwu[label]} compact />
       ))}
     </div>
   );
@@ -788,8 +978,8 @@ function PredictionCard({
                 </span>
               }
             />
-            <InfoRow label="Ориентировочное окончание ХБ" value={prediction.etaTs ? formatDateTime(prediction.etaTs) : 'недостаточно истории'} />
-            <InfoRow label="Дедлайн" value={formatDateTime(prediction.deadlineTs)} />
+            <InfoRow label="Ориентировочное окончание ХБ" value={prediction.etaTs ? formatDateTimeMsk(prediction.etaTs) : 'недостаточно истории'} />
+            <InfoRow label="Дедлайн" value={formatDateTimeMsk(prediction.deadlineTs)} />
             <InfoRow
               label="Наблюдаемый / прогнозный ручной темп"
               value={`${formatRate(prediction.observedVelocityPerHour)} / ${formatRate(prediction.forecastVelocityPerHour)}`}
@@ -1023,13 +1213,24 @@ function BurndownChart({ history, deadlineTs }: { history: DashboardHistoryPoint
   const chartRef = useRef<Chart | null>(null);
 
   const cleanHistory = useMemo(() => {
-    if (history.length < 2) return history;
-    const result: DashboardHistoryPoint[] = [history[0]];
-    for (let i = 1; i < history.length; i++) {
+    const baseHistory = (() => {
+      if (history.length >= 2) return history;
+      const single = history[0];
+      if (!single || single.manualFinished <= 0) return history;
+      const originTs = Number(single.manualWindowStartTs || 0);
+      if (!originTs || originTs >= single.updatedAt) return history;
+      return [
+        { ...single, updatedAt: originTs, manualFinished: 0, finished: 0 },
+        single,
+      ];
+    })();
+    if (baseHistory.length < 2) return baseHistory;
+    const result: DashboardHistoryPoint[] = [baseHistory[0]];
+    for (let i = 1; i < baseHistory.length; i++) {
       const prev = result[result.length - 1];
-      const cur = history[i];
-      const prevMax = Math.max(prev.finished, 1);
-      if (cur.finished < prevMax * 0.2 && prevMax > 500) continue;
+      const cur = baseHistory[i];
+      const prevMax = Math.max(prev.manualFinished, 1);
+      if (cur.manualFinished < prevMax * 0.2 && prevMax > 500) continue;
       result.push(cur);
     }
     return result;
@@ -1047,13 +1248,13 @@ function BurndownChart({ history, deadlineTs }: { history: DashboardHistoryPoint
 
     const allTs = cleanHistory.map(p => p.updatedAt);
     const labels = cleanHistory.map(p => makeBurndownLabel(p.updatedAt, allTs));
-    const finishedData = cleanHistory.map(p => p.finished);
+    const finishedData = cleanHistory.map(p => p.manualFinished);
     const totalRef = cleanHistory[cleanHistory.length - 1]?.total || 0;
 
     const forecastLabels = [...labels];
     // Начинаем прогноз с последней реальной точки чтобы не было разрыва на графике
     const forecastData: (number | null)[] = cleanHistory.map(() => null);
-    forecastData[cleanHistory.length - 1] = cleanHistory[cleanHistory.length - 1].finished;
+    forecastData[cleanHistory.length - 1] = cleanHistory[cleanHistory.length - 1].manualFinished;
 
     if (deadlineTs && cleanHistory.length >= 2) {
       const last = cleanHistory[cleanHistory.length - 1];
@@ -1063,7 +1264,7 @@ function BurndownChart({ history, deadlineTs }: { history: DashboardHistoryPoint
       for (let i = 1; i < cleanHistory.length; i++) {
         const dtH = (cleanHistory[i].updatedAt - cleanHistory[i - 1].updatedAt) / 3_600_000;
         if (dtH >= 1.0) {
-          totalDelta += Math.max(0, cleanHistory[i].finished - cleanHistory[i - 1].finished);
+          totalDelta += Math.max(0, cleanHistory[i].manualFinished - cleanHistory[i - 1].manualFinished);
           totalHours += dtH;
         }
       }
@@ -1079,7 +1280,7 @@ function BurndownChart({ history, deadlineTs }: { history: DashboardHistoryPoint
         for (let i = 1; i <= steps; i++) {
           const ts = allForecastTs[i];
           forecastLabels.push(makeBurndownLabel(ts, spanTs));
-          forecastData.push(Math.min(totalRef, Math.round(last.finished + velocity * (hoursLeft / steps) * i)));
+          forecastData.push(Math.min(totalRef, Math.round(last.manualFinished + velocity * (hoursLeft / steps) * i)));
         }
       }
     }
@@ -1506,13 +1707,14 @@ function HistoryTable({ history }: { history: DashboardHistoryPoint[] }) {
 
 export function Dashboard() {
   const { settings } = useSettings();
-  const [version, setVersion] = useState('7.3.5420');
+  const initialForm = useMemo(readDashboardForm, []);
+  const [version, setVersion] = useState(initialForm.version);
   const [launches, setLaunches] = useState<AllureLaunchResult[]>([]);
   const [agg, setAgg] = useState<Record<DashboardGroupLabel, DashboardGroupCounts>>(createEmptyAgg);
   const [uwu, setUwu] = useState<Record<DashboardGroupLabel, DashboardUwuCounts>>(createEmptyUwuAgg);
   const [readiness, setReadiness] = useState<ReadinessLaunchSummary[]>([]);
   const [alerts, setAlerts] = useState<DashboardAlertEntry[]>([]);
-  const [history, setHistory] = useState<DashboardHistoryPoint[]>(() => readHistory('7.3.5420'));
+  const [history, setHistory] = useState<DashboardHistoryPoint[]>(() => readHistory(initialForm.version));
   const [prediction, setPrediction] = useState<DashboardPrediction | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadedPct, setLoadedPct] = useState(0);
@@ -1521,9 +1723,10 @@ export function Dashboard() {
   const [elapsed, setElapsed] = useState(0);
   const loadStartRef = useRef(0);
   const [error, setError] = useState('');
-  const [previousSnapshot, setPreviousSnapshot] = useState<DashboardHistoryPoint | null>(() => readSnapshot('7.3.5420'));
+  const [storageStatus, setStorageStatus] = useState('Supabase: история не загружена');
+  const [previousSnapshot, setPreviousSnapshot] = useState<DashboardHistoryPoint | null>(() => readSnapshot(initialForm.version));
   const [showBlockerBanner, setShowBlockerBanner] = useState(false);
-  const [customDeadline, setCustomDeadline] = useState('');
+  const [customDeadline, setCustomDeadline] = useState(initialForm.customDeadline);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(600);
   const abortRef = useRef<AbortController | null>(null);
@@ -1547,6 +1750,16 @@ export function Dashboard() {
       inProgress: 0,
     });
   }, [agg]);
+
+  const applyStoredSnapshot = useCallback((stored: DashboardStoredSnapshot) => {
+    setLaunches(stored.launches);
+    setAgg(normalizeStoredAgg(stored.agg));
+    setUwu(normalizeStoredUwu(stored.uwu));
+    setReadiness(stored.readiness);
+    setAlerts(stored.alerts);
+    setPrediction(stored.prediction);
+    setPreviousSnapshot(stored.historyPoint);
+  }, []);
 
   const load = useCallback(async () => {
     if (!settings.allureBase || !settings.projectId || !settings.allureToken) {
@@ -1573,14 +1786,24 @@ export function Dashboard() {
         useProxy: settings.useProxy,
       };
 
-      setLoadingStep('Читаем предыдущий срез…');
-      const prev = readSnapshot(version);
+      setLoadingStep('Читаем историю Supabase…');
+      let remoteHistory: DashboardHistoryPoint[] = [];
+      try {
+        remoteHistory = await loadDashboardSnapshotHistory(version, settings.projectId, DASHBOARD_REMOTE_HISTORY_LIMIT);
+        setStorageStatus(remoteHistory.length ? `Supabase: загружено ${remoteHistory.length} срезов` : 'Supabase: история по версии пока пустая');
+      } catch (storageError) {
+        setStorageStatus(`Supabase: fallback на localStorage (${(storageError as Error).message || 'ошибка чтения'})`);
+      }
+      const localHistory = readHistory(version);
+      const baselineHistory = remoteHistory.length ? remoteHistory : localHistory;
+      const prev = latestHistoryPoint(baselineHistory) || readSnapshot(version);
       setPreviousSnapshot(prev);
+      setHistory(baselineHistory);
       setLoadedPct(12);
 
        const cachedDashboard = readCachedDashboardAggregate(version);
        const cachedReadiness = readCachedDashboardReadiness(version);
-       const customDeadlineTs = customDeadline ? new Date(customDeadline).getTime() : undefined;
+       const customDeadlineTs = customDeadline ? parseMoscowDateTimeLocal(customDeadline) : undefined;
 
        if (cachedDashboard) {
          setLaunches(cachedDashboard.launches);
@@ -1600,10 +1823,16 @@ export function Dashboard() {
              uwu: cachedDashboard.uwu,
              readiness: cachedReadiness,
              alerts: cachedDashboard.alerts,
-             history: readHistory(version),
+             history: baselineHistory,
              nowTs: Date.now(),
              customDeadlineTs: customDeadlineTs && Number.isFinite(customDeadlineTs) ? customDeadlineTs : undefined,
-             gasConfig: { gasUrl: settings.gasUrl, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
+             activePeopleCount: cachedDashboard.activePeopleCount,
+             activePeopleLogins: cachedDashboard.activePeopleLogins,
+             manualTimedFinished: cachedDashboard.manualTimedFinished,
+             manualWindowStartTs: cachedDashboard.manualWindowStartTs,
+             manualWindowStopTs: cachedDashboard.manualWindowStopTs,
+             gasConfig: { gasUrl: GOOGLE_APPS_SCRIPT_URL, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
+             launchCreatedTs: cachedDashboard.launchCreatedTs ?? undefined,
            }).then(nextPrediction => {
              setPrediction(nextPrediction);
            }).catch(() => {
@@ -1616,7 +1845,7 @@ export function Dashboard() {
 
       setLoadingStep('Загружаем данные Allure (статусы, memberstats)…');
       const [dashboardData, readinessData] = await Promise.all([
-        fetchDashboardAggregate(cfg, version).then(data => {
+        fetchDashboardAggregate(cfg, version, { forceRefreshDetails: true }).then(data => {
           setLoadedPct(62);
           setLoadingStep('Загружаем готовностный launch…');
           return data;
@@ -1646,15 +1875,20 @@ export function Dashboard() {
         snapshotTs,
         dashboardData.activePeopleCount,
         dashboardData.activePeopleLogins,
+        dashboardData.manualTimedFinished,
+        dashboardData.manualWindowStartTs,
+        dashboardData.manualWindowStopTs,
       );
-      const nextHistory = writeSnapshot(nextSnapshot);
+      const nextLocalHistory = writeSnapshot(nextSnapshot);
+      const nextHistory = mergeHistoryPoints(version, baselineHistory, nextLocalHistory, [nextSnapshot]);
       setHistory(nextHistory);
       setLoadedPct(90);
 
       setLoadingStep('Считаем ML-прогноз (CatBoost)…');
 
+      let nextPrediction: DashboardPrediction | null = null;
       try {
-        const nextPrediction = await buildDashboardPrediction({
+        nextPrediction = await buildDashboardPrediction({
           version,
           agg: dashboardData.agg,
           uwu: dashboardData.uwu,
@@ -1665,12 +1899,38 @@ export function Dashboard() {
           customDeadlineTs: customDeadlineTs && Number.isFinite(customDeadlineTs) ? customDeadlineTs : undefined,
           activePeopleCount: dashboardData.activePeopleCount,
           activePeopleLogins: dashboardData.activePeopleLogins,
-          gasConfig: { gasUrl: settings.gasUrl, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
+          manualTimedFinished: dashboardData.manualTimedFinished,
+          manualWindowStartTs: dashboardData.manualWindowStartTs,
+          manualWindowStopTs: dashboardData.manualWindowStopTs,
+          gasConfig: { gasUrl: GOOGLE_APPS_SCRIPT_URL, proxyBase: settings.proxyBase, useProxy: settings.useProxy },
           launchCreatedTs: dashboardData.launchCreatedTs ?? undefined,
         });
         setPrediction(nextPrediction);
       } catch {
+        nextPrediction = null;
         setPrediction(null);
+      }
+
+      setLoadedPct(96);
+      setLoadingStep('Записываем Supabase snapshot…');
+      try {
+        const saved = await saveDashboardSnapshot({
+          projectId: settings.projectId,
+          version,
+          snapshot: nextSnapshot,
+          previousSnapshot: prev,
+          agg: dashboardData.agg,
+          uwu: dashboardData.uwu,
+          readiness: readinessData,
+          launches: dashboardData.launches,
+          alerts: dashboardData.alerts,
+          prediction: nextPrediction,
+        });
+        const savedHistory = mergeHistoryPoints(version, saved.history, [nextSnapshot]);
+        setHistory(savedHistory);
+        setStorageStatus(`Supabase: snapshot записан${saved.id ? ` · ${saved.id.slice(0, 8)}` : ''} · ${savedHistory.length} срезов`);
+      } catch (storageError) {
+        setStorageStatus(`Supabase: не удалось записать snapshot (${(storageError as Error).message || 'ошибка записи'})`);
       }
 
       setLoadedPct(100);
@@ -1692,9 +1952,59 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
-    setHistory(readHistory(version));
-    setPreviousSnapshot(readSnapshot(version));
-  }, [version]);
+    let active = true;
+    const localHistory = readHistory(version);
+    setHistory(localHistory);
+    setPreviousSnapshot(latestHistoryPoint(localHistory) || readSnapshot(version));
+    setStorageStatus('Supabase: читаем историю…');
+
+    Promise.all([
+      loadDashboardSnapshotHistory(version, settings.projectId, DASHBOARD_REMOTE_HISTORY_LIMIT),
+      loadLatestDashboardSnapshot(version, settings.projectId),
+    ])
+      .then(([remoteHistory, latestSnapshot]) => {
+        if (!active) return;
+        if (remoteHistory.length) {
+          setHistory(remoteHistory);
+          setPreviousSnapshot(latestHistoryPoint(remoteHistory));
+          setStorageStatus(`Supabase: загружено ${remoteHistory.length} срезов${latestSnapshot ? ' · UI восстановлен' : ''}`);
+        } else {
+          setStorageStatus('Supabase: история по версии пока пустая');
+        }
+        if (latestSnapshot) {
+          applyStoredSnapshot(latestSnapshot);
+        } else {
+          const cachedDashboard = readCachedDashboardAggregate(version);
+          const cachedReadiness = readCachedDashboardReadiness(version);
+          if (cachedDashboard) {
+            setLaunches(cachedDashboard.launches);
+            setAgg(cachedDashboard.agg);
+            setUwu(cachedDashboard.uwu);
+            setAlerts(cachedDashboard.alerts);
+            setReadiness(cachedReadiness);
+          } else {
+            setLaunches([]);
+            setAgg(createEmptyAgg());
+            setUwu(createEmptyUwuAgg());
+            setReadiness([]);
+            setAlerts([]);
+            setPrediction(null);
+          }
+        }
+      })
+      .catch(storageError => {
+        if (!active) return;
+        setStorageStatus(`Supabase: fallback на localStorage (${(storageError as Error).message || 'ошибка чтения'})`);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [version, settings.projectId, applyStoredSnapshot]);
+
+  useEffect(() => {
+    writeDashboardForm({ version, customDeadline });
+  }, [version, customDeadline]);
 
   useEffect(() => {
     if (didAutoLoadRef.current) return;
@@ -1771,7 +2081,7 @@ export function Dashboard() {
   const overallPct = summary.total > 0 ? Math.round((summary.finished / summary.total) * 100) : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
@@ -1791,7 +2101,7 @@ export function Dashboard() {
             <Input value={version} onChange={event => setVersion(event.target.value)} placeholder="7.3.5420" style={{ width: 150 }} />
           </div>
           <div>
-            <FieldLabel>Дедлайн (вручную)</FieldLabel>
+            <FieldLabel>Дедлайн (вручную, МСК)</FieldLabel>
             <Input
               type="datetime-local"
               value={customDeadline}
@@ -1855,7 +2165,8 @@ export function Dashboard() {
                 { label: 'Allure API', from: 15, to: 62 },
                 { label: 'Readiness', from: 62, to: 76 },
                 { label: 'История', from: 76, to: 90 },
-                { label: 'ML', from: 90, to: 100 },
+                { label: 'ML', from: 90, to: 96 },
+                { label: 'Supabase', from: 96, to: 100 },
               ].map(step => {
                 const done = loadedPct > step.to;
                 const active = loadedPct >= step.from && loadedPct <= step.to && !done;
@@ -1923,6 +2234,24 @@ export function Dashboard() {
           />
           Показать баннер критического пути
         </label>
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          minHeight: 26,
+          padding: '4px 10px',
+          borderRadius: 999,
+          border: '1px solid var(--border)',
+          background: 'var(--surface-soft)',
+          color: storageStatus.includes('не удалось') || storageStatus.includes('fallback') ? '#F59E0B' : '#22C55E',
+          fontSize: 11,
+          fontWeight: 700,
+          maxWidth: 520,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {storageStatus}
+        </span>
       </div>
 
       {/* A2: Critical blocker banner — shown only if checkbox active */}
@@ -1930,7 +2259,7 @@ export function Dashboard() {
 
       {/* Metric cards */}
       {!loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(220px, 1fr))', gap: 12 }}>
           <MetricCard label="Всего кейсов" value={formatNumber(summary.total)} delta={formatDelta(summary.total, previousSnapshot?.total)} sub="Σ по Critical + Selective" />
           <MetricCard
             label="Пройдено"
@@ -1962,7 +2291,7 @@ export function Dashboard() {
       )}
 
       {/* A1: Burndown chart */}
-      {history.length >= 2 && (
+      {history.length >= 1 && (
         <Card>
           <CardHeader>
             <div>
@@ -1978,7 +2307,7 @@ export function Dashboard() {
       )}
 
       {/* Bar chart + Alerts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(360px, 460px)', gap: 12, alignItems: 'start' }}>
         <Card>
           <CardHeader>
             <div>
@@ -1989,6 +2318,7 @@ export function Dashboard() {
           </CardHeader>
           <CardBody style={{ paddingTop: 8 }}>
             <SummaryBarChart agg={agg} />
+            <SummaryBarInsights agg={agg} />
           </CardBody>
         </Card>
 
@@ -1996,15 +2326,15 @@ export function Dashboard() {
       </div>
 
       {/* Groups + Prediction */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 12 }}>
-        <Card>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(420px, .65fr)', gap: 12, alignItems: 'stretch' }}>
+        <Card style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <CardHeader>
             <div>
               <CardTitle>Детализация по 4 группам</CardTitle>
               <CardHint>Бублики, реальные counts и UwU там, где считается в legacy.</CardHint>
             </div>
           </CardHeader>
-          <CardBody style={{ paddingTop: 8 }}>
+          <CardBody style={{ paddingTop: 8, flex: 1 }}>
             <GroupsPanel agg={agg} uwu={uwu} />
           </CardBody>
         </Card>

@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WB · Regress Dashboard — Автозапуск ранов Allure TestOps</title>
+  <meta name="color-scheme" content="light" />
+  <style>
+    :root{
+      --bg-grad: radial-gradient(1200px 600px at -10% -20%, #f8e7ff 0%, transparent 60%),
+                 radial-gradient(1000px 500px at 120% -10%, #ffe6f4 0%, transparent 60%),
+                 linear-gradient(#f8f7fc, #f5f2fa);
+      --card:#ffffff;
+      --text:#1b1b24;
+      --muted:#7b7f8a;
+      --border:#e9e7f4;
+      --chip:#f3efff;
+      --accent1:#9b5cff;
+      --accent2:#ff55aa;
+      --danger:#ff6b6b;
+      --shadow: 0 12px 40px rgba(54,33,103,.08);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font:14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+      color:var(--text); background:var(--bg-grad) fixed;
+    }
+    .container{max-width:1100px; margin:0 auto; padding:28px; display:grid; gap:22px}
+    header.app{display:flex; align-items:center; gap:12px}
+    .logo{
+      display:inline-grid; place-items:center; width:36px; height:36px; border-radius:999px;
+      background:conic-gradient(from 140deg, var(--accent1), var(--accent2)); color:#fff; font-weight:800;
+      box-shadow: 0 10px 24px rgba(155,92,255,.35);
+    }
+    .brand{font-weight:800; letter-spacing:.2px}
+    .subtitle{color:var(--muted)}
+    .card{
+      background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+      box-shadow:var(--shadow); padding:20px;
+    }
+    .title{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px}
+    .title h2{margin:0; font-size:18px}
+    .badge{font-size:12px; padding:6px 10px; border-radius:999px; background:var(--chip); color:#5c4bff; font-weight:700}
+    .grid{display:grid; gap:18px}
+    .field{display:flex; flex-direction:column; gap:6px}
+    .field label{font-size:12px; font-weight:700; color:#585d6b; letter-spacing:.2px}
+    input, select{
+      width:100%; background:#fff; color:var(--text);
+      border:1px solid var(--border); border-radius:12px; padding:12px 14px; outline:none;
+      transition:border-color .15s ease, box-shadow .15s ease;
+      box-shadow: 0 2px 0 rgba(18, 18, 22, .02) inset;
+    }
+    input:focus, select:focus{ border-color:#cfc8ff; box-shadow:0 0 0 4px rgba(155,92,255,.12) }
+    .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+    .grow{flex:1 1 260px}
+    .note{color:var(--muted); font-size:12px}
+    .btn{
+      border:0; border-radius:12px; padding:12px 16px; font-weight:800; letter-spacing:.2px; cursor:pointer;
+      background:linear-gradient(90deg, var(--accent1), var(--accent2)); color:#fff;
+      box-shadow: 0 10px 24px rgba(155,92,255,.35);
+    }
+    .error{display:none; background:#fff3f3; color:#a32323; border:1px solid #ffd0d6; padding:12px 14px; border-radius:12px; margin-bottom:10px}
+    .log{
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12.5px; white-space:pre-wrap;
+      background:#fbfbff; color:#2a2a38; border-radius:12px; padding:14px;
+      border:1px solid var(--border); max-height:360px; overflow:auto;
+    }
+    .log a{ color:#5c4bff; text-decoration:underline; }
+    footer{color:var(--muted); font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="app">
+      <div class="logo">WB</div>
+      <div>
+        <div class="brand">Regress Dashboard</div>
+        <div class="subtitle">Автозапуск ранов Allure TestOps • клиентская утилита</div>
+      </div>
+    </header>
+
+    <!-- Блок настроек -->
+    <section class="card">
+      <div class="title">
+        <h2>Настройки для создания ранов</h2>
+        <span class="badge">ХФ/РУ/ХУ/NAPI</span>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label>Base URL</label>
+          <input id="inp-base" type="text" value="https://allure-testops.wb.ru" />
+        </div>
+
+        <div class="row">
+          <div class="field grow">
+            <label>Project ID</label>
+            <input id="inp-proj" type="text" value="7" />
+          </div>
+          <div class="field grow">
+            <label>Версия (пример: 7.3.2)</label>
+            <input id="inp-release" type="text" placeholder="например: 7.3.1000" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>API токен</label>
+          <input id="inp-token" type="text" placeholder="Api-Token …" />
+        </div>
+
+        <div class="row">
+          <label class="row" style="gap:10px">
+            <input id="chk-proxy" type="checkbox" />
+            <span class="note">Через прокси (запросы на <code>/api</code> этого сайта)</span>
+          </label>
+          <label class="row" style="gap:10px">
+            <input id="chk-store" type="checkbox" />
+            <span class="note">Сохранять токен в браузере</span>
+          </label>
+        </div>
+
+        <div class="row">
+          <div class="field grow">
+            <label>Формат рана</label>
+            <select id="sel-mode">
+              <option value="1">1 — ХФ Android</option>
+              <option value="2">2 — ХФ iOS</option>
+              <option value="3">3 — NAPI</option>
+              <option value="4">4 — Воскресные раны устройств</option>
+            </select>
+          </div>
+          <div class="row" style="margin-left:auto">
+            <button id="btn-run" class="btn">Создать</button>
+          </div>
+        </div>
+
+        <div class="note">Добавь <code>?debug=1</code> к адресу страницы для подробного лога.</div>
+      </div>
+    </section>
+
+    <!-- Результат -->
+    <section class="card">
+      <div class="title"><h2>Результат</h2></div>
+      <div id="error" class="error"></div>
+      <div id="log" class="log" aria-live="polite" aria-atomic="false"></div>
+      <div class="note" style="margin-top:8px">
+        Если видишь <code>Failed to fetch</code> — почти наверняка это CORS. Включи «Через прокси» или размести страницу на том же домене, что и API.
+      </div>
+    </section>
+
+    <footer>© WB · утилита для запуска ранов Allure TestOps. Токен хранится локально только при включённой галке.</footer>
+  </div>
+
+  <!-- ====== Скрипт с новой бизнес-логикой (режимы 1–6), UI не трогал ====== -->
+  <script>
+  const $ = (s, r=document)=>r.querySelector(s);
+  const $log = $('#log'), $err = $('#error');
+  const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+  const state = { aborter: null };
+
+  // Платформенные теги
+  const TAG_ANDROID = 4115, TAG_IOS = 1711;
+
+  // Тест-планы (из новой версии)
+  const TP_CP_ANDROID = 1998, TP_CP_IOS = 3258;
+  const TP_NAPI_BASE = 1036, TP_NAPI_IOS = 1869, TP_NAPI_ANDROID = 1871;
+  const TP_SMOKE_RUSTORE = 999, TP_SMOKE_APPGALLERY = 1000;
+
+  // утилиты логирования с HTML-ссылками
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function info(s, {html=false}={}){ $log.innerHTML += (html ? s : esc(s)) + '<br/>'; $log.scrollTop = $log.scrollHeight; }
+  function showError(e){ $err.style.display='block'; $err.textContent=(e&&e.message)||String(e||'Неизвестная ошибка'); if(DEBUG&&e&&e.stack) console.error(e.stack); }
+  function clearError(){ $err.style.display='none'; $err.textContent=''; }
+  function ams_now_str(){ const fmt=new Intl.DateTimeFormat('ru-RU',{timeZone:'Europe/Amsterdam',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); const p=Object.fromEntries(fmt.formatToParts(new Date()).map(x=>[x.type,x.value])); return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`; }
+
+  function makeHeaders(token){ return { 'Accept':'application/json','Content-Type':'application/json','Authorization':`Api-Token ${token}` }; }
+  function computeApiBase(){
+    const base = $('#inp-base').value.replace(/\/+$/,''); const viaProxy = $('#chk-proxy').checked;
+    return { apiBase: viaProxy ? `${location.origin}/api` : `${base}/api`, publicBase: base };
+  }
+  async function postJson(path, payload, token, {timeoutMs=30000}={}){
+    const { apiBase } = computeApiBase();
+    const url = path.startsWith('/') ? `${apiBase}${path}` : `${apiBase}/${path}`;
+    const controller=new AbortController(); const timer=setTimeout(()=>controller.abort('timeout'), timeoutMs); state.aborter=controller;
+    try{
+      const resp = await fetch(url,{ method:'POST', mode:'cors', credentials:'omit', headers:makeHeaders(token), body:payload!==undefined?JSON.stringify(payload):null, signal:controller.signal });
+      const text = await resp.text();
+      if (Math.floor(resp.status/100)!==2) throw new Error(`Запрос ${url} вернул ${resp.status}:\n${text}`);
+      if (text.trim()) { try{return JSON.parse(text)}catch{return text} } return null;
+    } catch(e){
+      if (e && (e.name==='TypeError' || String(e).includes('Failed to fetch'))) {
+        const tip = $('#chk-proxy').checked ? 'Проверь прокси: /api → публичный Allure /api.' : 'Похоже CORS: включи «Через прокси» или размести страницу на том же домене, что и API.';
+        throw new Error(`HTTP ошибка при POST ${url}: ${e.message || e}. ${tip}`);
+      }
+      if (e.name==='AbortError') throw new Error(`HTTP ошибка при POST ${url}: Прервано (timeout/отмена)`);
+      throw new Error(`HTTP ошибка при POST ${url}: ${e.message || e}`);
+    } finally { clearTimeout(timer); state.aborter=null; }
+  }
+
+  // API операции
+  async function create_tag(name, token){
+    const data = await postJson('/launch/tag', { name }, token);
+    if (!data || typeof data!=='object' || !('id' in data)) throw new Error(`Не удалось создать тег '${name}'. Ответ: ${JSON.stringify(data)}`);
+    return Number(data.id);
+  }
+  async function run_testplan(tp_id, launch_name, tag_ids, token){
+    const payload = { launchName: launch_name, tags: tag_ids.map(id=>({id})) };
+    const data = await postJson(`/testplan/${tp_id}/run`, payload, token);
+    if (!data || typeof data!=='object' || !('id' in data)) throw new Error(`Тест-план ${tp_id} запустился не как ожидалось. Ответ: ${JSON.stringify(data)}`);
+    return data;
+  }
+  async function sync_testplan(tp_id, token){ await postJson(`/testplan/${tp_id}/sync`, null, token); }
+
+  // кликабельная ссылка
+  function launchLink(launch_json){
+    const { publicBase } = computeApiBase();
+    const lid = launch_json.id; const name = launch_json.name || `Запуск ${lid}`;
+    const url = `${publicBase}/launch/${lid}`;
+    return `Ран: <a href="${url}" target="_blank" rel="noopener noreferrer">${esc(name)}</a>`;
+  }
+
+  // сценарии 1–6 из новой версии
+  async function scenario(mode, release, token){
+    clearError(); $log.innerHTML='';
+    info(`──────── Автозапуск ранов Allure TestOps (WB) ────────`);
+    info(`Время (AMS): ${ams_now_str()}`);
+    info(`Режим: ${mode} • Релиз: ${release}`);
+    info(`──────────────────────────────────────────────────────`);
+
+    info(`Создаю тег релиза...`);
+    const tag_release = await create_tag(release, token);
+    info(`Тег релиза создан: id=${tag_release}`); info('');
+
+    if (mode==='1'){ // ХФ Android
+      const ln = `[SWAT][Крит-путь][Android] ${release}`;
+      info(`Запускаю тест-план ${TP_CP_ANDROID} → ${ln}`);
+      const run = await run_testplan(TP_CP_ANDROID, ln, [TAG_ANDROID, tag_release], token);
+      info(''); info(`Готово. Сформировано сообщение:`); info(`Привет, новый крит-путь для ХФ Android, релиз ${release}`); info('Сборка:'); info(launchLink(run), {html:true});
+
+    } else if (mode==='2'){ // ХФ iOS
+      const ln = `[SWAT][Крит-путь][iOS] ${release}`;
+      info(`Запускаю тест-план ${TP_CP_IOS} → ${ln}`);
+      const run = await run_testplan(TP_CP_IOS, ln, [tag_release, TAG_IOS], token);
+      info(''); info(`Готово. Сформировано сообщение:`); info(`Привет, новый крит-путь для ХФ iOS, релиз ${release}`); info('Сборка:'); info(launchLink(run), {html:true});
+
+    } else if (mode==='3'){ // NAPI
+      info(`Синхронизирую тест-кейсы NAPI (${TP_NAPI_BASE}, ${TP_NAPI_IOS}, ${TP_NAPI_ANDROID})...`);
+      for (const tp of [TP_NAPI_BASE, TP_NAPI_IOS, TP_NAPI_ANDROID]){ info(`  sync testplan ${tp} ...`); await sync_testplan(tp, token); await new Promise(r=>setTimeout(r,300)); }
+      const tag_napi = await create_tag('napi', token);
+
+      const ln1 = `[SWAT][Android и iOS] Релиз Napi ${release}`;
+      info(``); info(`Запускаю ${TP_NAPI_BASE} → ${ln1}`);
+      const run1 = await run_testplan(TP_NAPI_BASE, ln1, [TAG_ANDROID, TAG_IOS, tag_release, tag_napi], token);
+
+      const ln2 = `[SWAT][Финтех + Корзина][iOS] Релиз Napi ${release}`;
+      info(`Запускаю ${TP_NAPI_IOS} → ${ln2}`);
+      const run2 = await run_testplan(TP_NAPI_IOS, ln2, [TAG_IOS, tag_release, tag_napi], token);
+
+      const ln3 = `[SWAT][Финтех + Корзина][Android] Релиз Napi ${release}`;
+      info(`Запускаю ${TP_NAPI_ANDROID} → ${ln3}`);
+      const run3 = await run_testplan(TP_NAPI_ANDROID, ln3, [tag_release, TAG_ANDROID, tag_napi], token);
+
+      info(''); info(`Готово. Сформировано сообщение:`); info(`Привет, новый регресс для NAPI, релиз ${release}`);
+      info('Сборка:'); info(launchLink(run1), {html:true}); info(launchLink(run2), {html:true}); info(launchLink(run3), {html:true});
+
+    } else if (mode==='4'){ // воскресные устройства
+      const ln_a_old = `[SWAT][Крит-путь][Android] Тест UI Старых устройств ${release}`;
+      info(`Запускаю ${TP_CP_ANDROID} → ${ln_a_old}`);
+      const run_a_old = await run_testplan(TP_CP_ANDROID, ln_a_old, [TAG_ANDROID, tag_release], token);
+
+      const ln_a_fold = `[SWAT][Крит-путь][Android] Раскладушки (FOLD) ${release}`;
+      info(`Запускаю ${TP_CP_ANDROID} → ${ln_a_fold}`);
+      const run_a_fold = await run_testplan(TP_CP_ANDROID, ln_a_fold, [TAG_ANDROID, tag_release], token);
+
+      const ln_i_old = `[SWAT][Крит-путь][IOS] Тест UI Старых устройств ${release}`;
+      info(`Запускаю ${TP_CP_IOS} → ${ln_i_old}`);
+      const run_i_old = await run_testplan(TP_CP_IOS, ln_i_old, [TAG_IOS, tag_release], token);
+
+      const ln_i_ipad = `[SWAT][Крит-путь][IOS] iPAD ${release}`;
+      info(`Запускаю ${TP_CP_IOS} → ${ln_i_ipad}`);
+      const run_i_ipad = await run_testplan(TP_CP_IOS, ln_i_ipad, [TAG_IOS, tag_release], token);
+
+      info(''); info(`Готово. Сформировано сообщение:`); info(`Привет, новые воскресные раны устройств, релиз ${release}`);
+      info('Сборка:'); info(launchLink(run_a_old), {html:true}); info(launchLink(run_a_fold), {html:true}); info(launchLink(run_i_old), {html:true}); info(launchLink(run_i_ipad), {html:true});
+
+    } else if (mode==='5'){ // RuStore/AppGallery крит-путь
+      const tag_app = await create_tag('AppGallery', token);
+      const tag_ru  = await create_tag('RuStore', token);
+
+      const ln_app = `[SWAT][Крит-путь] AppGallery ${release}`;
+      info(`Запускаю ${TP_CP_ANDROID} → ${ln_app}`);
+      const run_app = await run_testplan(TP_CP_ANDROID, ln_app, [TAG_ANDROID, tag_release, tag_app], token);
+
+      const ln_ru = `[SWAT][Крит-путь] RuStore ${release}`;
+      info(`Запускаю ${TP_CP_ANDROID} → ${ln_ru}`);
+      const run_ru = await run_testplan(TP_CP_ANDROID, ln_ru, [TAG_ANDROID, tag_release, tag_ru], token);
+
+      info(''); info(`Готово. Сформировано сообщение:`); info(`Привет, новый крит-путь для ХФ Android, релиз ${release}`);
+      info('Сборка:'); info(launchLink(run_app), {html:true}); info(launchLink(run_ru), {html:true});
+
+    } else if (mode==='6'){ // RuStore/AppGallery Smoke
+      const tag_app = await create_tag('AppGallery', token);
+      const tag_ru  = await create_tag('RuStore', token);
+
+      const ln_ru_smoke = `[SWAT][Android][Smoke] RuStore ${release}`;
+      info(`Запускаю ${TP_SMOKE_RUSTORE} → ${ln_ru_smoke}`);
+      const run_ru_smoke = await run_testplan(TP_SMOKE_RUSTORE, ln_ru_smoke, [TAG_ANDROID, tag_release, tag_ru], token);
+
+      const ln_app_smoke = `[SWAT][Android][Smoke] AppGallery ${release}`;
+      info(`Запускаю ${TP_SMOKE_APPGALLERY} → ${ln_app_smoke}`);
+      const run_app_smoke = await run_testplan(TP_SMOKE_APPGALLERY, ln_app_smoke, [TAG_ANDROID, tag_release, tag_app], token);
+
+      info(''); info(`Готово. Сформировано сообщение:`); info(`Привет, новый Smoke для ХФ Android, релиз ${release}`);
+      info('Сборка:'); info(launchLink(run_ru_smoke), {html:true}); info(launchLink(run_app_smoke), {html:true});
+    }
+  }
+
+  // инициализация UI
+  document.addEventListener('DOMContentLoaded', () => {
+    const $mode=$('#sel-mode'), $release=$('#inp-release'), $token=$('#inp-token');
+    const $store=$('#chk-store'), $run=$('#btn-run');
+
+    // добавим пункты 5–6 не меняя макет/стили
+    if (!$mode.querySelector('option[value="5"]')) {
+      const opt5 = document.createElement('option'); opt5.value='5'; opt5.textContent='5 — RuStore / AppGallery (Крит-путь)';
+      const opt6 = document.createElement('option'); opt6.value='6'; opt6.textContent='6 — RuStore / AppGallery (Smoke)';
+      $mode.append(opt5, opt6);
+    }
+
+    try { const savedToken=localStorage.getItem('wb_allure_token'); if(savedToken){ $token.value=savedToken; $store.checked=true; } } catch {}
+    function persistToken(){ try{ if($store.checked && $token.value) localStorage.setItem('wb_allure_token',$token.value); else localStorage.removeItem('wb_allure_token'); }catch{} }
+
+    $run.addEventListener('click', async () => {
+      clearError();
+      const mode=$mode.value, release=$release.value.trim(), token=$token.value.trim();
+      if (!['1','2','3','4','5','6'].includes(mode)) return showError('Некорректный режим (1–6).');
+      if (!release) return showError('Номер релиза не должен быть пустым.');
+      if (!token)   return showError('Токен обязателен.');
+      persistToken();
+      $run.disabled = true;
+      try{ await scenario(mode, release, token); } catch(e){ showError(e); } finally { $run.disabled = false; }
+    });
+  });
+  </script>
+</body>
+</html>
