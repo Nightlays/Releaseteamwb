@@ -388,6 +388,71 @@ async function bandFetchChannelPostsSince(
   return collectBandPosts(unwrapBandPayload(raw));
 }
 
+async function bandFetchActiveRootPostsWindow(
+  proxyBase: string,
+  cookies: string,
+  channelId: string,
+  sinceMs: number,
+  signal?: AbortSignal,
+  options?: { perPage?: number; pageLimit?: number },
+): Promise<BandPost[]> {
+  const minCreatedAt = Number(sinceMs);
+  const perPage = Math.max(10, Math.min(200, Number(options?.perPage) || 100));
+  const pageLimit = Math.max(1, Math.min(120, Number(options?.pageLimit) || 60));
+  const postsById = new Map<string, BandPost>();
+  let beforeId = '';
+
+  for (let page = 0; page < pageLimit; page += 1) {
+    if (signal?.aborted) break;
+    const url = new URL(`${BAND_BASE}/api/v4/channels/${encodeURIComponent(channelId)}/posts`);
+    url.searchParams.set('page', '0');
+    url.searchParams.set('per_page', String(perPage));
+    if (beforeId) url.searchParams.set('before', beforeId);
+    url.searchParams.set('skipFetchThreads', 'false');
+    url.searchParams.set('collapsedThreads', 'true');
+    url.searchParams.set('collapsedThreadsExtended', 'false');
+
+    const raw = await proxyRequest<unknown>(proxyBase, 'GET', url.toString(), bandReadHeaders(cookies), undefined, signal);
+    const payload = unwrapBandPayload(raw);
+    const postsMap = payload?.posts && typeof payload.posts === 'object' ? payload.posts : {};
+    const order = Array.isArray(payload?.order) ? payload.order : Object.keys(postsMap);
+    if (!order.length && !Object.keys(postsMap).length) break;
+
+    const batch: BandPost[] = [];
+    for (const id of order) {
+      const post = postsMap[id];
+      if (post && typeof post === 'object') {
+        batch.push(post);
+        if (!postsById.has(String(id))) postsById.set(String(id), post);
+      }
+    }
+    for (const [id, post] of Object.entries(postsMap)) {
+      if (post && typeof post === 'object' && !postsById.has(String(id))) {
+        postsById.set(String(id), post);
+      }
+    }
+
+    batch.sort((a, b) => getBandCreateAt(b) - getBandCreateAt(a));
+    const oldestPost = batch[batch.length - 1] || null;
+    const oldestId = String(oldestPost?.id || '').trim();
+    const oldestCreateAt = oldestPost ? getBandCreateAt(oldestPost) : 0;
+
+    if (!oldestId || oldestId === beforeId) break;
+    beforeId = oldestId;
+    if (order.length < perPage) break;
+    if (Number.isFinite(minCreatedAt) && oldestCreateAt && oldestCreateAt < minCreatedAt) break;
+  }
+
+  return [...postsById.values()]
+    .filter(post => {
+      if (!isActiveBandRootPost(post)) return false;
+      const createdAt = getBandCreateAt(post);
+      if (Number.isFinite(minCreatedAt) && createdAt && createdAt < minCreatedAt) return false;
+      return createdAt > 0;
+    })
+    .sort((a, b) => getBandCreateAt(b) - getBandCreateAt(a));
+}
+
 async function bandFetchThreadPosts(
   proxyBase: string,
   cookies: string,
@@ -757,7 +822,19 @@ export async function updateBandGroupForPlatform(
 // ─── DEPLOY LAB ────────────────────────────────────────────────
 
 function normalizeDeployLabVersion(version: string): string {
-  return String(version || '').replace(/\D+/g, '.').replace(/^\.+|\.+$/g, '');
+  const raw = String(version || '').trim();
+  const match = raw.match(/^(\d+)\.(\d+)\.(\d{1,4})$/);
+  if (!match) return raw.replace(/\D+/g, '.').replace(/^\.+|\.+$/g, '');
+
+  const major = String(Number(match[1]));
+  const minor = String(Number(match[2]));
+  const buildRaw = String(match[3] || '').trim();
+  if (buildRaw.length >= 4) return `${major}.${minor}.${buildRaw.padStart(4, '0')}`;
+
+  const buildNum = Number(buildRaw);
+  if (!Number.isFinite(buildNum)) return raw;
+  const buildNorm = String(buildNum * Math.pow(10, 4 - buildRaw.length)).padStart(4, '0');
+  return `${major}.${minor}.${buildNorm}`;
 }
 
 function buildDeployLabReleaseId(platform: 'ios' | 'android', version: string): string {
@@ -776,6 +853,47 @@ function buildDeployLabHeaders(token: string): Record<string, string> {
     referer: 'https://deploy-lab.wb.ru/',
     'X-Proxy-Cookie': '',
   };
+}
+
+function safeParseJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function unwrapDeployLabPayload(payload: unknown): unknown {
+  let node = payload;
+  for (let i = 0; i < 4; i += 1) {
+    if (Array.isArray(node)) return node;
+    if (node && typeof node === 'object' && Array.isArray((node as Record<string, unknown>).components)) return node;
+
+    if (node && typeof node === 'object' && (node as Record<string, unknown>).body !== undefined) {
+      const body = (node as Record<string, unknown>).body;
+      if (typeof body === 'string') {
+        const parsed = safeParseJson(body);
+        if (parsed !== null) { node = parsed; continue; }
+      } else if (body && typeof body === 'object') {
+        node = body;
+        continue;
+      }
+    }
+
+    if (node && typeof node === 'object' && (node as Record<string, unknown>).data !== undefined) {
+      const data = (node as Record<string, unknown>).data;
+      if (typeof data === 'string') {
+        const parsed = safeParseJson(data);
+        if (parsed !== null) { node = parsed; continue; }
+      } else if (data && typeof data === 'object') {
+        node = data;
+        continue;
+      }
+    }
+
+    break;
+  }
+  return node;
 }
 
 function extractDeployLabComponents(payload: unknown): string[] {
@@ -2299,9 +2417,19 @@ export function buildMajorThreadTemplate(platform: 'ios' | 'android', release: s
 }
 
 export function buildMajorPollText(streamNames: string[]): string {
-  const labels = [...new Set(streamNames.filter(Boolean))];
-  if (!labels.length) throw new Error('Нет стримов для опроса');
-  const esc = (s: string) => s.replace(/"/g, '\\"');
+  const excluded = buildHardcodedExcludeSet();
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const item of Array.isArray(streamNames) ? streamNames : []) {
+    const label = String(item || '').trim();
+    if (!label) continue;
+    if (excluded.has(normStr(label))) continue;
+    if (seen.has(label)) continue;
+    seen.add(label);
+    labels.push(label);
+  }
+  if (!labels.length) throw new Error('Allure не вернул ни одного стрима для опроса');
+  const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const parts = [
     `/poll "${esc(MAJOR_POLL_TITLE)}"`,
     ...labels.map(l => `"${esc(l)}"`),
@@ -2436,13 +2564,20 @@ export async function syncMajorWorkflowState(
       readinessRun = null;
     }
   }
+  let streamsSheetExists = false;
+  try {
+    const sheetState = await checkMajorReleaseStreamsSheet(normalizedRelease, proxyBase, signal);
+    streamsSheetExists = Boolean(sheetState.exists);
+  } catch {
+    streamsSheetExists = false;
+  }
 
   if (!String(cookies || '').trim()) {
     return {
       statuses: [
         'pending', // 1: Feed Post
         'pending', // 2: Fill Duty
-        'pending', // 3: Streams Sheet
+        streamsSheetExists ? 'done' : 'pending', // 3: Streams Sheet
         'pending', // 4: Poll
         'pending', // 5: Reminder
         'pending', // 6: Components
@@ -2467,7 +2602,7 @@ export async function syncMajorWorkflowState(
       statuses: [
         'pending', // 1: Feed Post
         'pending', // 2: Fill Duty
-        'pending', // 3: Streams Sheet
+        streamsSheetExists ? 'done' : 'pending', // 3: Streams Sheet
         'pending', // 4: Poll
         'pending', // 5: Reminder
         'pending', // 6: Components
@@ -2495,7 +2630,7 @@ export async function syncMajorWorkflowState(
   const statuses: MajorWorkflowResolvedStatus[] = [
     'done', // 1: Feed Post (root post found means step 1 done)
     dutyLines.length ? 'done' : 'pending', // 2: Fill Duty
-    'pending', // 3: Streams Sheet (idempotent, always pending for re-run)
+    streamsSheetExists ? 'done' : 'pending', // 3: Streams Sheet
     hasOwnThreadReply(threadPosts, rootId, userId, (_text, post) => isBandPollPost(post)) ? 'done' : 'pending', // 4: Poll
     hasOwnThreadReply(threadPosts, rootId, userId, (text) => text.includes(reminderNeedle)) ? 'done' : 'pending', // 5: Reminder
     hasOwnThreadReply(threadPosts, rootId, userId, (text) => text.startsWith('Компоненты:')) ? 'done' : 'pending', // 6: Components
@@ -2933,9 +3068,30 @@ function launchLink(run: LaunchRecord): string {
   return `[${run.name}](${run.url})`;
 }
 
+function runMessageLink(run: LaunchRecord): string {
+  return `Ран: ${launchLink(run)}`;
+}
+
+function buildRunCreatorMessage(greeting: string, runs: LaunchRecord[], buildValue: string, includeBuildSection: boolean): string {
+  const runList = (Array.isArray(runs) ? runs : []).filter(Boolean);
+  if (!includeBuildSection) {
+    return [greeting, ...runList.map(runMessageLink)].join('\n').trim();
+  }
+
+  const buildText = String(buildValue || '').trim();
+  if (buildText) {
+    return [greeting, `Сборка: ${buildText}`, ...runList.map(runMessageLink)].join('\n').trim();
+  }
+  if (runList.length) {
+    const [firstRun, ...restRuns] = runList;
+    return [greeting, `Сборка: ${runMessageLink(firstRun)}`, ...restRuns.map(runMessageLink)].join('\n').trim();
+  }
+  return [greeting, 'Сборка:'].join('\n').trim();
+}
+
 export async function runCreatorScenario(
   mode: RunMode, release: string, settings: AppSettings,
-  onLog: (msg: string, level?: LogLevel) => void, signal?: AbortSignal,
+  onLog: (msg: string, level?: LogLevel) => void, signal?: AbortSignal, buildValue = '',
 ): Promise<ScenarioResult> {
   const token = String(settings.allureToken || '').replace(/^Api-Token\s+/i, '').trim();
   if (!token) throw new Error('Не задан Allure токен — заполни в Настройках.');
@@ -2960,7 +3116,7 @@ export async function runCreatorScenario(
     const run = await runTestplan(token, RUN_TP_CP_ANDROID, name, [RUN_TAG_ANDROID, tagRelease], signal);
     onLog(`Ран: ${launchLink(run)}`, run.reused ? 'warn' : 'ok');
     runs.push(run);
-    return { runs, message: `Привет, новый крит-путь для ХФ Android, релиз ${release}\n${launchLink(run)}` };
+    return { runs, message: buildRunCreatorMessage(`Привет, новый крит-путь для ХФ Android, релиз ${release}`, runs, buildValue, true) };
   }
 
   if (mode === 'hf_ios') {
@@ -2970,7 +3126,7 @@ export async function runCreatorScenario(
     const run = await runTestplan(token, RUN_TP_CP_IOS, name, [tagRelease, RUN_TAG_IOS], signal);
     onLog(`Ран: ${launchLink(run)}`, run.reused ? 'warn' : 'ok');
     runs.push(run);
-    return { runs, message: `Привет, новый крит-путь для ХФ iOS, релиз ${release}\n${launchLink(run)}` };
+    return { runs, message: buildRunCreatorMessage(`Привет, новый крит-путь для ХФ iOS, релиз ${release}`, runs, buildValue, true) };
   }
 
   if (mode === 'napi') {
@@ -3001,7 +3157,7 @@ export async function runCreatorScenario(
       onLog(`Ран: ${launchLink(run)}`, 'ok');
       runs.push(run);
     }
-    return { runs, message: `Привет, новый регресс для NAPI, релиз ${release}\n${runs.map(launchLink).join('\n')}` };
+    return { runs, message: buildRunCreatorMessage(`Привет, новый регресс для NAPI, релиз ${release}`, runs, buildValue, false) };
   }
 
   if (mode === 'sunday_devices') {
@@ -3019,7 +3175,7 @@ export async function runCreatorScenario(
       onLog(`Ран: ${launchLink(run)}`, run.reused ? 'warn' : 'ok');
       runs.push(run);
     }
-    return { runs, message: `Привет, новые воскресные раны устройств, релиз ${release}\n${runs.map(launchLink).join('\n')}` };
+    return { runs, message: buildRunCreatorMessage(`Привет, новые воскресные раны устройств, релиз ${release}`, runs, buildValue, true) };
   }
 
   if (mode === 'rustore_critical') {
@@ -3036,7 +3192,7 @@ export async function runCreatorScenario(
       onLog(`Ран: ${launchLink(run)}`, run.reused ? 'warn' : 'ok');
       runs.push(run);
     }
-    return { runs, message: `Привет, новый крит-путь для RuStore / AppGallery, релиз ${release}\n${runs.map(launchLink).join('\n')}` };
+    return { runs, message: buildRunCreatorMessage(`Привет, новый крит-путь для RuStore / AppGallery, релиз ${release}`, runs, buildValue, true) };
   }
 
   if (mode === 'rustore_smoke') {
@@ -3053,7 +3209,7 @@ export async function runCreatorScenario(
       onLog(`Ран: ${launchLink(run)}`, run.reused ? 'warn' : 'ok');
       runs.push(run);
     }
-    return { runs, message: `Привет, новый Smoke для RuStore / AppGallery, релиз ${release}\n${runs.map(launchLink).join('\n')}` };
+    return { runs, message: buildRunCreatorMessage(`Привет, новый Smoke для RuStore / AppGallery, релиз ${release}`, runs, buildValue, true) };
   }
 
   return { runs: [], message: '' };
@@ -3061,29 +3217,172 @@ export async function runCreatorScenario(
 
 // ─── STREAMS SHEET ─────────────────────────────────────────────
 
-export async function ensureMajorStreamsSheet(
-  platform: 'ios' | 'android', release: string, proxyBase: string,
-  onLog: (msg: string, level?: LogLevel) => void, signal?: AbortSignal,
-): Promise<void> {
-  const label = platform === 'ios' ? 'iOS' : 'Android';
-  onLog(`[${label}] Проверяю таблицу стримов в Google Sheets...`);
-  const url = new URL(DUTY_EDITOR_SCRIPT_URL);
-  url.searchParams.set('op', 'releaseStreamsSheetCheck');
-  url.searchParams.set('platform', platform);
-  url.searchParams.set('release', release);
-  try {
-    const data = await proxyRequest<{ ok?: boolean; created?: boolean; url?: string; sheetUrl?: string }>(
-      proxyBase, 'GET', url.toString(), { Accept: 'application/json' }, undefined, signal,
-    );
-    const sheetUrl = data?.url || data?.sheetUrl || '';
-    if (data?.created) {
-      onLog(`[${label}] Таблица стримов создана${sheetUrl ? ': ' + sheetUrl : ''}.`, 'ok');
-    } else {
-      onLog(`[${label}] Таблица стримов уже существует${sheetUrl ? ': ' + sheetUrl : ''}.`, 'ok');
-    }
-  } catch (e) {
-    onLog(`[${label}] Не удалось проверить таблицу стримов: ${e instanceof Error ? e.message : e}`, 'warn');
+interface ReleaseStreamsSheetResponse {
+  exists: boolean;
+  created: boolean;
+  releaseCode: string;
+  sheetName: string;
+  sheetUrl: string;
+  sheetId: number | null;
+}
+
+function normalizeReleaseStreamsSheetResponse(payload: unknown): ReleaseStreamsSheetResponse {
+  const source = payload && typeof payload === 'object' && 'data' in payload && (payload as { data?: unknown }).data
+    ? (payload as { data?: unknown }).data
+    : payload;
+  if (!source || typeof source !== 'object') {
+    throw new Error('Apps Script вернул пустой ответ по таблице стримов');
   }
+  const root = source as Record<string, unknown>;
+  return {
+    exists: Boolean(root.exists),
+    created: Boolean(root.created),
+    releaseCode: String(root.releaseCode || '').trim(),
+    sheetName: String(root.sheetName || '').trim(),
+    sheetUrl: String(root.sheetUrl || root.url || '').trim(),
+    sheetId: root.sheetId == null ? null : Number(root.sheetId),
+  };
+}
+
+async function requestReleaseStreamsSheet(
+  proxyBase: string,
+  payload: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<ReleaseStreamsSheetResponse> {
+  const parsed = await proxyRequest<unknown>(
+    proxyBase,
+    'POST',
+    DUTY_EDITOR_SCRIPT_URL,
+    { 'Content-Type': 'text/plain;charset=utf-8' },
+    JSON.stringify(payload),
+    signal,
+  );
+  if (parsed && typeof parsed === 'object' && (parsed as { ok?: boolean }).ok === false) {
+    throw new Error(String((parsed as { error?: unknown }).error || 'Apps Script не обработал таблицу стримов'));
+  }
+  return normalizeReleaseStreamsSheetResponse(parsed);
+}
+
+export async function checkMajorReleaseStreamsSheet(
+  release: string,
+  proxyBase: string,
+  signal?: AbortSignal,
+): Promise<ReleaseStreamsSheetResponse> {
+  const normalizedRelease = String(release || '').trim();
+  if (!normalizedRelease) {
+    return { exists: false, created: false, releaseCode: '', sheetName: '', sheetUrl: '', sheetId: null };
+  }
+  return requestReleaseStreamsSheet(proxyBase, {
+    op: 'releaseStreamsSheetCheck',
+    release: normalizedRelease,
+  }, signal);
+}
+
+function replaceMajorReleaseLine(text: string, lineLabel: string, lineValue: string): string {
+  const source = String(text || '');
+  const label = String(lineLabel || '').trim();
+  const value = String(lineValue || '').trim();
+  if (!label) return source;
+  const pattern = new RegExp(`^(${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(?:[ \\t]*[^\\n]*)?$`, 'm');
+  if (pattern.test(source)) return source.replace(pattern, value ? `$1 ${value}` : '$1');
+  if (!source.trim()) return value ? `${label} ${value}` : label;
+  return `${source.replace(/\s*$/, '')}\n${value ? `${label} ${value}` : label}`;
+}
+
+async function findMajorReleaseMainPost(
+  platform: 'ios' | 'android',
+  release: string,
+  proxyBase: string,
+  cookies: string,
+  signal?: AbortSignal,
+): Promise<{ mainPost: BandPost; text: string }> {
+  const userId = getCurrentBandUserId(cookies);
+  const rootPost = await majorFindFeedRoot(proxyBase, cookies, platform, release, signal);
+  const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, String(rootPost.id || ''), signal);
+  const mainPost = findEarliestOwnThreadPost(threadPosts, String(rootPost.id || ''), userId);
+  if (!mainPost) throw new Error('Основное сообщение в треде не найдено — сначала выполни шаг 1.');
+  return { mainPost, text: normBandText(mainPost.message) };
+}
+
+async function resolveMajorReleaseExpectedFinishValue(
+  platform: 'ios' | 'android',
+  release: string,
+  threadText: string,
+  proxyBase: string,
+  cookies: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const localValue = getMajorReleaseLineValue(threadText, 'Ожидаемое время окончания проверки:');
+  if (localValue) return localValue;
+  const details = await findMajorReleaseMainPost(platform, release, proxyBase, cookies, signal);
+  const threadValue = getMajorReleaseLineValue(details.text, 'Ожидаемое время окончания проверки:');
+  if (!threadValue) throw new Error('Не нашёл строку "Ожидаемое время окончания проверки:" в треде релиза.');
+  return threadValue;
+}
+
+async function updateMajorReleaseThreadLine(
+  platform: 'ios' | 'android',
+  release: string,
+  lineLabel: string,
+  lineValue: string,
+  proxyBase: string,
+  cookies: string,
+  signal?: AbortSignal,
+): Promise<'updated' | 'unchanged'> {
+  const details = await findMajorReleaseMainPost(platform, release, proxyBase, cookies, signal);
+  const updated = replaceMajorReleaseLine(details.text, lineLabel, lineValue);
+  if (updated === details.text) return 'unchanged';
+  await bandPatchPost(proxyBase, cookies, details.mainPost, updated, signal);
+  return 'updated';
+}
+
+export async function ensureMajorStreamsSheet(
+  platform: 'ios' | 'android', release: string, allureToken: string, proxyBase: string, cookies: string,
+  onLog: (msg: string, level?: LogLevel) => void, signal?: AbortSignal, threadText = '',
+): Promise<ReleaseStreamsSheetResponse> {
+  const label = platform === 'ios' ? 'iOS' : 'Android';
+  const normalizedRelease = String(release || '').trim();
+  if (!normalizedRelease) throw new Error(`Укажи версию ${label}.`);
+  if (!String(allureToken || '').trim()) throw new Error('Allure token не задан — он нужен для списка стримов.');
+  if (!String(cookies || '').trim()) throw new Error('Band cookies не заданы — они нужны для обновления ссылки в треде.');
+
+  onLog(`[${label}] Загружаю стримы из Allure для таблицы...`);
+  const streams = await fetchDutyEditorAllureStreams(allureToken, signal);
+  if (!streams.length) throw new Error('Не удалось получить стримы из Allure для таблицы.');
+  onLog(`[${label}] Получено стримов: ${streams.length}.`, 'ok');
+
+  const expectedFinish = await resolveMajorReleaseExpectedFinishValue(platform, normalizedRelease, threadText, proxyBase, cookies, signal);
+  onLog(`[${label}] Ожидаемое время окончания проверки: ${expectedFinish}`, 'ok');
+
+  onLog(`[${label}] Создаю или проверяю вкладку таблицы стримов...`);
+  const result = await requestReleaseStreamsSheet(proxyBase, {
+    op: 'releaseStreamsSheetEnsure',
+    release: normalizedRelease,
+    expectedFinish,
+    streams,
+  }, signal);
+
+  if (result.sheetUrl) {
+    try {
+      const status = await updateMajorReleaseThreadLine(
+        platform, normalizedRelease, 'Таблица для стримов:', result.sheetUrl, proxyBase, cookies, signal,
+      );
+      if (status === 'updated') {
+        onLog(`[${label}] Ссылка на таблицу обновлена в треде.`, 'ok');
+      } else {
+        onLog(`[${label}] Ссылка на таблицу уже актуальна в треде.`, 'ok');
+      }
+    } catch (error) {
+      onLog(`[${label}] Таблица готова, но ссылку в треде обновить не удалось: ${error instanceof Error ? error.message : String(error)}`, 'warn');
+    }
+  }
+
+  if (result.created) {
+    onLog(`[${label}] Вкладка ${result.sheetName || result.releaseCode} создана.`, 'ok');
+  } else {
+    onLog(`[${label}] Вкладка ${result.sheetName || result.releaseCode} уже существует.`, 'ok');
+  }
+  return result;
 }
 
 // ─── RELEASE NOTICE ────────────────────────────────────────────
@@ -3094,8 +3393,16 @@ async function fetchDeployLabReleaseInfo(
   const releaseId = buildDeployLabReleaseId(platform, release);
   const url = `${DEPLOY_LAB_BASE_URL}/releaseboss/admin_panel/release/${encodeURIComponent(releaseId)}`;
   try {
-    const data = await proxyRequest<Record<string, unknown>>(proxyBase, 'GET', url, buildDeployLabHeaders(deployLabToken), undefined, signal);
-    const raw = data?.cutoff ?? data?.cutoffDate ?? data?.cut_off ?? data?.cutoff_at ?? data?.cutoffAt;
+    const data = await proxyRequest<unknown>(proxyBase, 'GET', url, buildDeployLabHeaders(deployLabToken), undefined, signal);
+    const payload = unwrapDeployLabPayload(data);
+    const source = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+    const raw = source.date
+      ?? source.cutoff_date
+      ?? source.cutoff
+      ?? source.cutoffDate
+      ?? source.cut_off
+      ?? source.cutoff_at
+      ?? source.cutoffAt;
     return { cutoff: raw ? String(raw) : undefined };
   } catch {
     return {};
@@ -3114,9 +3421,13 @@ function noticeTwo(value: number): string {
 function parseDeployLabCutoffMs(value?: string): number {
   const raw = String(value || '').trim();
   if (!raw) return NaN;
-  const normalized = raw.includes('T') && !/[zZ]|[+-]\d\d:?\d\d$/.test(raw)
-    ? `${raw}+03:00`
-    : raw;
+  const iso = raw
+    .replace(/(\.\d{3})\d+(?=[Z+\-])/, '$1')
+    .replace(/(\.\d{2})(?=[Z+\-])/, '$10')
+    .replace(/(\.\d)(?=[Z+\-])/, '$100');
+  const normalized = iso.includes('T') && !/[zZ]|[+-]\d\d:?\d\d$/.test(iso)
+    ? `${iso}+03:00`
+    : iso;
   return new Date(normalized).getTime();
 }
 
@@ -3320,7 +3631,7 @@ export async function postDutyPingToThread(
   if (!message.trim()) throw new Error('Сообщение пинга пусто.');
   const label = platform === 'ios' ? 'iOS' : 'Android';
   const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
-  const rootPost = await majorFindFeedRoot(proxyBase, cookies, platform, release, signal);
+  const rootPost = await findDutyPingReleaseFeedRoot(platform, release, proxyBase, cookies, signal);
   const rootId = rootPost.id;
   const userId = getCurrentBandUserId(cookies);
   const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, rootId, signal, {
@@ -3344,7 +3655,7 @@ export async function findExistingDutyPingMessage(
 ): Promise<string> {
   if (!cookies.trim() || !release.trim()) return '';
   const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
-  const rootPost = await majorFindFeedRoot(proxyBase, cookies, platform, release, signal);
+  const rootPost = await findDutyPingReleaseFeedRoot(platform, release, proxyBase, cookies, signal);
   const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, rootPost.id, signal, {
     perPage: 200,
     updatesOnly: true,
@@ -3534,6 +3845,7 @@ function buildDutyPingEtaFromHHMM(baseMs: number, hh: number, mm: number): strin
 
 // ─── DUTY PING ETA PARSING ────────────────────────────────────
 
+const DUTY_PING_RELEASE_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 const DUTY_PING_THREAD_FROM_UPDATE_AT = 1565303257750;
 const DUTY_PING_OK  = ':green_verify:';
 const DUTY_PING_ETA = ':spiral_calendar_pad:';
@@ -3913,6 +4225,51 @@ function findDutyPingBasePost(
   return found;
 }
 
+function findDutyPingRootPostFromFeedPosts(
+  platform: 'ios' | 'android',
+  release: string,
+  feedPosts: BandPost[],
+): BandPost | null {
+  const platformTag = platform === 'ios' ? '#ios' : '#android';
+  const releaseNeedle = String(release || '').trim().toLocaleLowerCase('ru-RU');
+  let found: BandPost | null = null;
+
+  for (const post of Array.isArray(feedPosts) ? feedPosts : []) {
+    if (!isActiveBandRootPost(post)) continue;
+    const lowered = normBandText(post.message).toLocaleLowerCase('ru-RU');
+    if (!lowered.includes(platformTag) || !lowered.includes('#release') || !lowered.includes(releaseNeedle)) continue;
+    if (!found || getBandCreateAt(post) > getBandCreateAt(found)) found = post;
+  }
+
+  return found;
+}
+
+async function findDutyPingReleaseFeedRoot(
+  platform: 'ios' | 'android',
+  release: string,
+  proxyBase: string,
+  cookies: string,
+  signal?: AbortSignal,
+): Promise<BandPost> {
+  const sinceMs = Date.now() - DUTY_PING_RELEASE_LOOKBACK_MS;
+  const activePosts = await bandFetchActiveRootPostsWindow(proxyBase, cookies, FEED_CHANNEL_ID, sinceMs, signal, {
+    perPage: 200,
+    pageLimit: 24,
+  });
+  let rootPost = findDutyPingRootPostFromFeedPosts(platform, release, activePosts);
+
+  if (!rootPost) {
+    const fallbackPosts = await bandFetchChannelPostsSince(proxyBase, cookies, FEED_CHANNEL_ID, sinceMs, signal);
+    rootPost = findDutyPingRootPostFromFeedPosts(platform, release, fallbackPosts);
+  }
+
+  if (!rootPost) {
+    const platformLabel = platform === 'ios' ? 'iOS' : 'Android';
+    throw new Error(`Тред релиза для ${platformLabel} ${release} не найден в ленте релизов — сначала выполни шаг 1.`);
+  }
+  return rootPost;
+}
+
 async function dutyPingTestResultExistsInLaunch(
   testResultId: string,
   launchId: string,
@@ -3999,7 +4356,7 @@ export async function runDutyPingPolling(
   if (!initialPendingMap.size) {
     let syncedMessage = '';
     try {
-      const rootPost = await majorFindFeedRoot(proxyBase, cookies, platform, release, signal);
+      const rootPost = await findDutyPingReleaseFeedRoot(platform, release, proxyBase, cookies, signal);
       const threadPosts = await bandFetchThreadPosts(proxyBase, cookies, rootPost.id, signal, {
         perPage: 200,
         updatesOnly: true,
@@ -4081,7 +4438,7 @@ export async function runDutyPingPolling(
     return;
   }
 
-  const rootPost = await majorFindFeedRoot(proxyBase, cookies, platform, release, signal);
+  const rootPost = await findDutyPingReleaseFeedRoot(platform, release, proxyBase, cookies, signal);
   const rootId = rootPost.id;
   const myUserId = getCurrentBandUserId(cookies);
 
@@ -4439,6 +4796,7 @@ const RELEASE_ANDROID_BOT_USERNAME = 'release-android-bot';
 const IOS_BUILDS_CHANNEL_ID = 'sm7z55bao7gmumy7cbxq31159y';
 const IOS_BUILDS_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const ANDROID_BOT_REPLY_DELAY_MS = 10_000;
+const ANDROID_BOT_POLL_MS = 2_000;
 const ANDROID_BOT_TIMEOUT_MS = 30_000;
 
 function formatReleaseShort(release: string): string {
@@ -4486,8 +4844,17 @@ export async function resolveIosBuildFromBand(
   const rel = String(release || '').trim();
   if (!rel) throw new Error('Укажи версию релиза.');
   const sinceMs = Date.now() - IOS_BUILDS_LOOKBACK_MS;
-  onLog(`iOS сборка: читаю канал сборок за последние 7 дней...`);
-  const posts = await bandFetchChannelPostsSince(proxyBase, cookies, IOS_BUILDS_CHANNEL_ID, sinceMs, signal);
+  onLog(`Сборка: ищу iOS сборку по релизу ${rel} в канале сборок...`);
+  let posts: BandPost[] = [];
+  try {
+    onLog('Сборка: читаю канал сборок за последние 7 дней...');
+    posts = await bandFetchActiveRootPostsWindow(proxyBase, cookies, IOS_BUILDS_CHANNEL_ID, sinceMs, signal, {
+      perPage: 100,
+      pageLimit: 60,
+    });
+  } catch (error) {
+    onLog(`iOS сборка: не удалось прочитать канал сборок: ${error instanceof Error ? error.message : String(error)}`, 'warn');
+  }
   const re = new RegExp(`${escapeRegExp(rel)}\\s*\\((\\d+)\\)`, 'i');
   let found: { buildValue: string; createdAt: number } | null = null;
   for (const post of posts) {
@@ -4502,7 +4869,7 @@ export async function resolveIosBuildFromBand(
     if (!found || createdAt > found.createdAt) found = { buildValue, createdAt };
   }
   if (!found) { onLog('iOS сборка: не найдена в канале.', 'warn'); return ''; }
-  onLog(`iOS сборка найдена: ${found.buildValue}`, 'ok');
+  onLog(`Сборка найдена: ${found.buildValue}`, 'ok');
   return found.buildValue;
 }
 
@@ -4529,7 +4896,13 @@ export async function resolveAndroidBuildFromBot(
 
   const rootPost = await bandPostMessage(proxyBase, cookies, command, { channelId }, signal);
   const rootId = String(rootPost.id || '').trim();
-  if (!rootId) throw new Error('Не удалось отправить сообщение боту.');
+  if (!rootId) {
+    if (mode === 'hf_android') {
+      onLog('Сборка: не удалось создать тред запроса к release-android-bot, продолжаю без pipeline.', 'warn');
+      return '';
+    }
+    throw new Error('Не удалось отправить сообщение боту.');
+  }
 
   onLog('Жду ответ бота...');
   await new Promise<void>((resolve, reject) => {
@@ -4539,6 +4912,7 @@ export async function resolveAndroidBuildFromBot(
 
   const deadline = Date.now() + ANDROID_BOT_TIMEOUT_MS;
   const pipelineRe = /https:\/\/gitlab\.wildberries\.ru\/[^\s)]+\/-\/pipelines\/\d+(?:[^\s)]*)?/i;
+  let lastBotMessage = '';
 
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -4546,15 +4920,22 @@ export async function resolveAndroidBuildFromBot(
     for (const reply of replies) {
       if (reply.id === rootId || reply.user_id !== botUser.id) continue;
       const msg = String(reply.message || '');
+      if (msg.trim()) lastBotMessage = msg;
       const m = msg.match(pipelineRe);
       if (m) { onLog(`Pipeline URL найден: ${m[0]}`, 'ok'); return m[0]; }
     }
     await new Promise<void>((resolve, reject) => {
-      const t = setTimeout(resolve, 3000);
+      const t = setTimeout(resolve, ANDROID_BOT_POLL_MS);
       signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
     });
   }
 
-  onLog('Бот не ответил в течение 30 секунд.', 'warn');
-  return '';
+  const tail = lastBotMessage
+    ? ` Последний ответ бота: ${lastBotMessage.replace(/\s+/g, ' ').trim().slice(0, 220)}`
+    : '';
+  if (mode === 'hf_android') {
+    onLog(`Сборка: pipeline ещё не появился, продолжаю без него.${tail}`, 'warn');
+    return '';
+  }
+  throw new Error(`Не удалось получить ссылку на pipeline от release-android-bot.${tail}`);
 }

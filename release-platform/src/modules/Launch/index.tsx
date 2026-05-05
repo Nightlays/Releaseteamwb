@@ -86,7 +86,7 @@ interface PushStepDef {
 const PUSH_IOS_STEPS: PushStepDef[] = [
   { code: '1', title: 'Опубликовать в ленту релизов' },
   { code: '2', title: 'Добавить дежурных из сбора' },
-  { code: '3', title: 'Таблица стримов (Google Sheets)' },
+  { code: '3', title: 'Создать новую страницу таблицы для стримов' },
   { code: '4', title: 'Отправить опрос в тред' },
   { code: '5', title: 'Напоминание @qadutyios' },
   { code: '6', title: 'Опубликовать компоненты' },
@@ -97,7 +97,7 @@ const PUSH_IOS_STEPS: PushStepDef[] = [
 const PUSH_AND_STEPS: PushStepDef[] = [
   { code: '1', title: 'Опубликовать в ленту релизов' },
   { code: '2', title: 'Добавить дежурных из сбора' },
-  { code: '3', title: 'Таблица стримов (Google Sheets)' },
+  { code: '3', title: 'Создать новую страницу таблицы для стримов' },
   { code: '4', title: 'Отправить опрос в тред' },
   { code: '5', title: 'Напоминание @qadutyandr' },
   { code: '6', title: 'Опубликовать компоненты' },
@@ -151,6 +151,11 @@ interface ComponentTimerUiState {
 
 function emptyDutyPingState(): DutyPingUiState {
   return { streams: [], message: '', logs: [], loading: false, running: false, polling: false, pollState: null };
+}
+
+function countMajorPollOptions(pollCommand: string): number {
+  const quotedArgs = String(pollCommand || '').match(/"(?:\\.|[^"\\])*"/g) || [];
+  return Math.max(0, quotedArgs.length - 1);
 }
 
 function emptyComponentTimerState(): ComponentTimerUiState {
@@ -440,15 +445,20 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
 }
 
 // ─── MODES ──────────────────────────────────────────────────────
-const MODES: Array<{ id: RunMode; icon: string; desc: string }> = [
+const MODES: Array<{ id: RunMode; icon: React.ReactNode; desc: string }> = [
   { id: 'major',            icon: '🚀', desc: 'Полный цикл Android + iOS' },
-  { id: 'hf_android',       icon: '🤖', desc: 'Хот-фикс для Android' },
-  { id: 'hf_ios',           icon: '🍎', desc: 'Хот-фикс для iOS' },
+  { id: 'hf_android',       icon: <ModeAndroidIcon />, desc: 'Хот-фикс для Android' },
+  { id: 'hf_ios',           icon: <ModeIosIcon />, desc: 'Хот-фикс для iOS' },
   { id: 'napi',             icon: '⚡', desc: 'Native API платёжного модуля' },
   { id: 'sunday_devices',   icon: '📱', desc: 'Еженедельный прогон устройств' },
-  { id: 'rustore_critical', icon: '🏪', desc: 'RuStore / AppGallery — Крит-путь' },
-  { id: 'rustore_smoke',    icon: '🏪', desc: 'RuStore / AppGallery — Smoke' },
+  { id: 'rustore_critical', icon: <StorefrontModeIcons />, desc: 'RuStore / AppGallery — Крит-путь' },
+  { id: 'rustore_smoke',    icon: <StorefrontModeIcons />, desc: 'RuStore / AppGallery — Smoke' },
 ];
+
+const NON_MAJOR_BUILD_MODES = new Set<RunMode>(['hf_android', 'hf_ios', 'rustore_critical', 'rustore_smoke']);
+function isNonMajorBuildMode(mode: RunMode): boolean {
+  return NON_MAJOR_BUILD_MODES.has(mode);
+}
 
 // ─── HELPERS ────────────────────────────────────────────────────
 const STATUS_ICONS: Record<PushStatus, string> = {
@@ -799,32 +809,6 @@ function DutyEditorSearchOption({
   );
 }
 
-function rowBg(status: PushStatus, isCurrent: boolean, isLocked: boolean): string {
-  if (status === 'done')    return 'rgba(34,197,94,.06)';
-  if (status === 'skipped') return 'rgba(239,68,68,.06)';
-  if (status === 'error')   return 'rgba(239,68,68,.08)';
-  if (status === 'running') return 'rgba(245,158,11,.08)';
-  if (isCurrent) return 'rgba(155,92,255,.05)';
-  if (isLocked) return 'rgba(0,0,0,.02)';
-  return 'var(--surface-soft)';
-}
-function rowBorder(status: PushStatus, isCurrent: boolean, isLocked: boolean): string {
-  if (status === 'done')    return 'rgba(34,197,94,.15)';
-  if (status === 'skipped') return 'rgba(239,68,68,.15)';
-  if (status === 'error')   return 'rgba(239,68,68,.2)';
-  if (status === 'running') return 'rgba(245,158,11,.2)';
-  if (isCurrent) return 'rgba(155,92,255,.25)';
-  return 'var(--surface-soft-4)';
-}
-
-function workflowStatusLabel(status: PushStatus): string {
-  if (status === 'done') return 'Выполнено';
-  if (status === 'skipped') return 'Пропущено';
-  if (status === 'running') return 'Выполняется';
-  if (status === 'error') return 'Ошибка';
-  return 'Ожидает';
-}
-
 function MiniIcon({ children }: { children: React.ReactNode }) {
   return (
     <span style={{ width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, lineHeight: 0 }}>
@@ -877,6 +861,21 @@ function PlayIcon() {
   );
 }
 
+function LaunchRunButton({
+  running,
+  onClick,
+}: {
+  running: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button variant={running ? 'danger' : 'primary'} size="sm" onClick={onClick}>
+      {!running && <PlayIcon />}
+      {running ? 'Остановить' : 'Запустить'}
+    </Button>
+  );
+}
+
 function IosPlatformIcon() {
   return (
     <MiniIcon>
@@ -899,6 +898,54 @@ function AndroidPlatformIcon() {
         <circle cx="10.6" cy="4.9" r=".45" fill="var(--card)" />
       </svg>
     </MiniIcon>
+  );
+}
+
+function ModeAndroidIcon() {
+  return (
+    <span title="Android" style={{ color: '#34C759', display: 'inline-flex', transform: 'scale(1.18)', transformOrigin: 'left center' }}>
+      <AndroidPlatformIcon />
+    </span>
+  );
+}
+
+function ModeIosIcon() {
+  return (
+    <span title="iOS" style={{ color: '#8B5CF6', display: 'inline-flex', transform: 'scale(1.18)', transformOrigin: 'left center' }}>
+      <IosPlatformIcon />
+    </span>
+  );
+}
+
+function RuStoreModeIcon() {
+  return (
+    <span title="RuStore" style={{ display: 'inline-flex', width: 18, height: 18, flexShrink: 0 }}>
+      <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="#0B78FF" />
+        <path d="M5.2 11.9V5.6h3.9c1.6 0 2.6.8 2.6 2.1 0 .9-.5 1.6-1.3 1.9l1.7 2.3H9.9L8.5 9.8H7.1v2.1H5.2Zm1.9-3.6h1.8c.6 0 1-.2 1-.7s-.4-.7-1-.7H7.1v1.4Z" fill="#fff" />
+      </svg>
+    </span>
+  );
+}
+
+function AppGalleryModeIcon() {
+  return (
+    <span title="AppGallery" style={{ display: 'inline-flex', width: 18, height: 18, flexShrink: 0 }}>
+      <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="#E60012" />
+        <path d="M9 4.4c1.2 1 2 2.1 2 3.4 0 .9-.4 1.7-1.1 2.2.6.5 1 1.2 1 2.1H7.1c0-.9.4-1.6 1-2.1A2.7 2.7 0 0 1 7 7.8c0-1.3.8-2.4 2-3.4Z" fill="#fff" />
+        <path d="M4.5 8.9c1.4-.2 2.6.2 3.4 1.1.5.6.8 1.3.8 2.1H5.3c-.9 0-1.6-.7-1.6-1.6 0-.7.3-1.2.8-1.6ZM13.5 8.9c-1.4-.2-2.6.2-3.4 1.1-.5.6-.8 1.3-.8 2.1h3.4c.9 0 1.6-.7 1.6-1.6 0-.7-.3-1.2-.8-1.6Z" fill="#fff" opacity=".9" />
+      </svg>
+    </span>
+  );
+}
+
+function StorefrontModeIcons() {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <RuStoreModeIcon />
+      <AppGalleryModeIcon />
+    </span>
   );
 }
 
@@ -1012,11 +1059,173 @@ function CollectionStatusIcon({ missing }: { missing: boolean }) {
 }
 
 // ─── PUSH STEP ROW ───────────────────────────────────────────────
+function LegacyWorkflowButton({
+  children,
+  variant = 'soft',
+  muted = false,
+  running = false,
+  small = false,
+  disabled,
+  style,
+  type,
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'soft' | 'grad';
+  muted?: boolean;
+  running?: boolean;
+  small?: boolean;
+}) {
+  const disabledStyle: React.CSSProperties = disabled && !running
+    ? {
+        background: 'var(--surface-soft-3)',
+        borderColor: 'var(--border)',
+        boxShadow: 'none',
+        color: 'var(--text-3)',
+        cursor: 'not-allowed',
+      }
+    : {};
+  const variantStyle: React.CSSProperties = variant === 'grad'
+    ? {
+        background: 'linear-gradient(90deg,#9b5cff,#ff5ac8)',
+        boxShadow: '0 10px 30px rgba(155,92,255,.25)',
+        color: '#fff',
+        textShadow: '0 1px 2px rgba(31,41,55,.35)',
+      }
+    : {
+        background: 'var(--surface-soft-4)',
+        borderColor: 'var(--border-hi)',
+        color: muted ? 'var(--text-3)' : 'var(--accent)',
+      };
+  const runningStyle: React.CSSProperties = running
+    ? {
+        background: 'linear-gradient(90deg,#f59e0b,#f97316)',
+        borderColor: 'rgba(249,115,22,.38)',
+        boxShadow: '0 10px 24px rgba(249,115,22,.24)',
+        color: '#fff',
+        cursor: 'progress',
+        textShadow: 'none',
+      }
+    : {};
+
+  return (
+    <button
+      type={type || 'button'}
+      disabled={disabled}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        border: '1px solid transparent',
+        borderRadius: 14,
+        padding: small ? '6px 10px' : '8px 14px',
+        fontFamily: 'inherit',
+        fontSize: small ? 12 : 13,
+        fontWeight: 600,
+        lineHeight: 1.2,
+        transition: 'background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease',
+        userSelect: 'none',
+        WebkitFontSmoothing: 'antialiased',
+        backfaceVisibility: 'hidden',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        ...variantStyle,
+        ...disabledStyle,
+        ...runningStyle,
+        ...style,
+      }}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
+}
+
+function pushWorkflowMeta(status: PushStatus, isLocked: boolean): {
+  icon: string;
+  text: string;
+  badgeStyle: React.CSSProperties;
+} {
+  if (isLocked) {
+    return {
+      icon: '🔒',
+      text: 'Заблокирован',
+      badgeStyle: { color: 'var(--text-3)', background: 'var(--surface-soft-4)', boxShadow: 'inset 0 0 0 1px var(--border)' },
+    };
+  }
+  if (status === 'done') {
+    return {
+      icon: '✅',
+      text: 'Выполнено',
+      badgeStyle: { color: 'var(--green)', background: 'color-mix(in srgb, var(--card) 82%, var(--green) 18%)', boxShadow: 'inset 0 0 0 1px rgba(34,197,94,.28)' },
+    };
+  }
+  if (status === 'skipped') {
+    return {
+      icon: '❌',
+      text: 'Пропущено',
+      badgeStyle: { color: 'var(--red)', background: 'color-mix(in srgb, var(--card) 82%, var(--red) 18%)', boxShadow: 'inset 0 0 0 1px rgba(239,68,68,.28)' },
+    };
+  }
+  if (status === 'running') {
+    return {
+      icon: '⏳',
+      text: 'Выполняется',
+      badgeStyle: { color: 'var(--yellow)', background: 'color-mix(in srgb, var(--card) 82%, var(--yellow) 18%)', boxShadow: 'inset 0 0 0 1px rgba(245,158,11,.30)' },
+    };
+  }
+  if (status === 'error') {
+    return {
+      icon: '✕',
+      text: 'Ошибка',
+      badgeStyle: { color: 'var(--red)', background: 'color-mix(in srgb, var(--card) 82%, var(--red) 18%)', boxShadow: 'inset 0 0 0 1px rgba(239,68,68,.28)' },
+    };
+  }
+  return {
+    icon: '○',
+    text: 'Ожидает',
+    badgeStyle: { color: 'var(--text-3)', background: 'var(--surface-soft-4)', boxShadow: 'inset 0 0 0 1px var(--border-hi)' },
+  };
+}
+
+function pushWorkflowRowStyle(status: PushStatus, isCurrent: boolean, isLocked: boolean): React.CSSProperties {
+  const base: React.CSSProperties = {
+    borderRadius: 16,
+    padding: 12,
+  };
+  if (status === 'done') {
+    return { ...base, background: 'color-mix(in srgb, var(--card) 88%, var(--green) 12%)', boxShadow: 'inset 0 0 0 1px rgba(34,197,94,.24)' };
+  }
+  if (status === 'skipped' || status === 'error') {
+    return { ...base, background: 'color-mix(in srgb, var(--card) 88%, var(--red) 12%)', boxShadow: 'inset 0 0 0 1px rgba(239,68,68,.24)' };
+  }
+  if (isCurrent) {
+    return {
+      ...base,
+      background: 'color-mix(in srgb, var(--card) 88%, var(--accent) 12%)',
+      boxShadow: '0 0 0 1px color-mix(in srgb, var(--accent) 40%, var(--border-hi)), 0 8px 18px rgba(109,40,217,.08)',
+    };
+  }
+  if (isLocked) {
+    return {
+      ...base,
+      background: 'var(--surface-soft-2)',
+      boxShadow: 'inset 0 0 0 1px var(--border)',
+      opacity: 0.72,
+    };
+  }
+  return {
+    ...base,
+    background: 'var(--surface-soft)',
+    boxShadow: 'inset 0 0 0 1px var(--border)',
+  };
+}
+
 function PushStepRow({
   step, idx, status, currentIdx, running,
   onExecute, onSkip, onRetry,
   manualActionLabel,
   onManualAction,
+  scheduleControls,
 }: {
   step: PushStepDef;
   idx: number;
@@ -1028,60 +1237,78 @@ function PushStepRow({
   onRetry: () => void;
   manualActionLabel?: string;
   onManualAction?: () => void;
+  scheduleControls?: React.ReactNode;
 }) {
-  const isCurrent = status === 'pending' && idx === currentIdx;
-  const isLocked  = status === 'pending' && idx > currentIdx;
-  const isDoneOrSkip = status === 'done' || status === 'skipped';
+  const isCurrent = idx === currentIdx;
+  const isLocked = status === 'pending' && idx > currentIdx;
+  const meta = pushWorkflowMeta(status, isLocked);
+  const rowStyle = pushWorkflowRowStyle(status, isCurrent, isLocked);
+  const retryVisible = status === 'done' || status === 'skipped' || status === 'error';
+  const executeVisible = !retryVisible;
+  const actionRunning = status === 'running';
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
-      padding: '10px 14px', borderRadius: 12,
-      background: rowBg(status, isCurrent, isLocked),
-      border: `1px solid ${rowBorder(status, isCurrent, isLocked)}`,
-      opacity: isLocked ? 0.6 : 1,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{
-          fontSize: 13, width: 16, textAlign: 'center', flexShrink: 0,
-          color: STATUS_COLORS[status],
-          animation: status === 'running' ? 'spin .8s linear infinite' : 'none',
-        }}>{STATUS_ICONS[status]}</span>
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-            {step.code}. {step.title}
+    <div style={rowStyle}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 200 }}>
+          <span style={{ fontSize: 16, lineHeight: '24px', flexShrink: 0 }}>{meta.icon}</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+              {step.code}. {step.title}
+            </div>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                marginTop: 4,
+                padding: '2px 8px',
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                lineHeight: 1.25,
+                ...meta.badgeStyle,
+              }}
+            >
+              {meta.text}
+            </span>
+            {scheduleControls}
           </div>
-          {isLocked && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Заблокирован</div>}
-          {status === 'done' && <div style={{ fontSize: 10, color: '#22C55E', marginTop: 2 }}>Выполнено</div>}
-          {status === 'skipped' && <div style={{ fontSize: 10, color: '#EF4444', marginTop: 2 }}>Пропущено</div>}
-          {status === 'error' && <div style={{ fontSize: 10, color: '#EF4444', marginTop: 2 }}>Ошибка</div>}
         </div>
-      </div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-        {isDoneOrSkip && (
-          <>
-            {status === 'done' && manualActionLabel && onManualAction && (
-              <Button variant="ghost" size="sm" disabled={running} onClick={onManualAction}>
-                {manualActionLabel}
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" disabled={running} onClick={onRetry}>Повторить</Button>
-          </>
-        )}
-        {!isDoneOrSkip && (
-          <>
-            <Button variant="ghost" size="sm" disabled={running || isLocked || status === 'running'} onClick={onSkip}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {retryVisible && (
+            <LegacyWorkflowButton
+              disabled={running || isLocked}
+              onClick={onRetry}
+            >
+              Повторить
+            </LegacyWorkflowButton>
+          )}
+          {status === 'done' && manualActionLabel && onManualAction && (
+            <LegacyWorkflowButton small disabled={running} onClick={onManualAction}>
+              {manualActionLabel}
+            </LegacyWorkflowButton>
+          )}
+          {status === 'pending' && (
+            <LegacyWorkflowButton
+              muted
+              disabled={running || status !== 'pending'}
+              onClick={onSkip}
+            >
               Пропустить
-            </Button>
-            <Button
-              variant="primary" size="sm"
-              disabled={running || isLocked || !isCurrent}
+            </LegacyWorkflowButton>
+          )}
+          {executeVisible && (
+            <LegacyWorkflowButton
+              variant="grad"
+              running={actionRunning}
+              disabled={running || !isCurrent || status !== 'pending'}
+              aria-busy={actionRunning ? true : undefined}
               onClick={onExecute}
             >
-              Выполнить
-            </Button>
-          </>
-        )}
+              {actionRunning ? 'Выполняется…' : 'Выполнить'}
+            </LegacyWorkflowButton>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1097,7 +1324,6 @@ function CollectionStepRow({
   step,
   onYes,
   onNo,
-  onRetry,
 }: {
   idx: number;
   status: PushStatus;
@@ -1108,72 +1334,67 @@ function CollectionStepRow({
   step: { code: string; title: string };
   onYes: () => void;
   onNo: () => void;
-  onRetry: () => void;
 }) {
   const finished = currentIdx >= COLLECTION_WORKFLOW_STEPS.length;
   const isCurrent = !finished && idx === currentIdx;
   const isLockedByCollection = idx === 0 && !hasCollectionRows;
   const isLockedBySequence = !finished && status === 'pending' && idx > currentIdx;
   const isLocked = isLockedByCollection || isLockedBySequence;
-  const doneOrSkipped = status === 'done' || status === 'skipped';
-  const icon = isLocked ? '🔒' : status === 'done' ? '✅' : status === 'skipped' ? '❌' : status === 'running' ? '⏳' : status === 'error' ? '✕' : '○';
-  const badgeColor = isLocked ? 'gray' : status === 'done' ? 'green' : status === 'skipped' ? 'red' : status === 'running' ? 'yellow' : status === 'error' ? 'red' : 'gray';
+  const locked = running || finished || !isCurrent || status !== 'pending' || isLockedByCollection;
+  const meta = pushWorkflowMeta(status, isLocked);
+  const rowStyle = pushWorkflowRowStyle(status, isCurrent, isLocked);
+  const actionRunning = status === 'running';
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 10,
-        padding: '10px 14px',
-        borderRadius: 12,
-        background: rowBg(status, isCurrent, isLocked),
-        border: `1px solid ${rowBorder(status, isCurrent, isLocked)}`,
-        opacity: isLocked ? 0.7 : 1,
-      }}
-    >
-      <div style={{ display: 'flex', gap: 10, minWidth: 260 }}>
-        <span style={{ fontSize: 14, lineHeight: '20px', width: 16, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-            {step.code}. {step.title}
-          </div>
-          <div style={{ marginTop: 4 }}>
-            <Badge color={badgeColor}>{isLocked ? 'Заблокирован' : workflowStatusLabel(status)}</Badge>
-          </div>
-          {idx === 0 && pingFound && (
-            <div style={{ fontSize: 11, marginTop: 6, color: '#22C55E' }}>
-              Сообщение пинг найдено
+    <div style={rowStyle}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 260 }}>
+          <span style={{ fontSize: 16, lineHeight: '24px', flexShrink: 0 }}>{meta.icon}</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+              {step.code}. {step.title}
             </div>
-          )}
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                marginTop: 4,
+                padding: '2px 8px',
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                lineHeight: 1.25,
+                ...meta.badgeStyle,
+              }}
+            >
+              {meta.text}
+            </span>
+            {isLockedByCollection && (
+              <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-3)' }}>
+                Начните сбор дежурных и дождитесь выполнения
+              </div>
+            )}
+            {idx === 0 && pingFound && (
+              <div style={{ fontSize: 11, marginTop: 4, color: 'var(--green)' }}>
+                Сообщение пинг-найдено
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-        {doneOrSkipped ? (
-          <Button variant="ghost" size="sm" disabled={running} onClick={onRetry}>
-            Повторить
-          </Button>
-        ) : (
-          <>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={running || finished || !isCurrent || status !== 'pending' || isLockedByCollection}
-              onClick={onYes}
-            >
-              Да
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={running || finished || !isCurrent || status !== 'pending' || isLockedByCollection}
-              onClick={onNo}
-            >
-              Нет
-            </Button>
-          </>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <LegacyWorkflowButton
+            variant="grad"
+            running={actionRunning}
+            disabled={locked}
+            aria-busy={actionRunning ? true : undefined}
+            onClick={onYes}
+          >
+            {actionRunning ? 'Выполняется…' : 'Да'}
+          </LegacyWorkflowButton>
+          <LegacyWorkflowButton disabled={locked} onClick={onNo}>
+            Нет
+          </LegacyWorkflowButton>
+        </div>
       </div>
     </div>
   );
@@ -1312,18 +1533,27 @@ function SchedulePicker({ onSchedule }: { onSchedule: (targetMs: number) => void
 }
 
 // ─── SCHEDULING HELPERS ──────────────────────────────────────────
-const LS_STEP_SCHEDULES = 'wb_rl_step_schedules_v1';
+const LS_STEP_SCHEDULES = 'wb_release_launch_step_schedules_v1';
+const LEGACY_REACT_STEP_SCHEDULE_KEYS = ['wb_rl_step_schedules_v1'];
 const LS_AUTOMATION_PLAN = 'wb_rl_automation_v1';
+const LS_MAJOR_RELEASE = 'wb_release_launch_major_release_v1';
+const LEGACY_MAJOR_RELEASE_KEYS = [
+  'wb_release_launch_major_duty_ping_release_v1',
+  'wb_release_launch_major_push_ios_release_v1',
+  'wb_release_launch_major_push_android_release_v1',
+];
 const MSK_OFF_S = 3 * 60 * 60 * 1000;
 
 interface StepSchedulePlan {
   key: string;
+  scope?: 'push';
   platform: 'ios' | 'android';
   stepIdx: number;
   targetMs: number;
   triggerMode: 'delay' | 'schedule';
   delayMinutes: number | null;
   note?: string;
+  createdAt?: number;
 }
 
 interface AutomationPlan {
@@ -1359,6 +1589,13 @@ function formatMskDateTimeShort(ms: number): string {
   const d = new Date(ms + MSK_OFF_S);
   return `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')} ${mskTimeStr(ms)}`;
 }
+function formatMskDateTimeHuman(ms: number): string {
+  const d = new Date(ms + MSK_OFF_S);
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}.${month}.${year} ${mskTimeStr(ms)} (МСК)`;
+}
 function schedCountdown(targetMs: number): string {
   const delta = Math.max(0, targetMs - Date.now());
   const min = Math.ceil(delta / 60000);
@@ -1369,12 +1606,71 @@ function schedCountdown(targetMs: number): string {
   if (h) return `${h} ч`;
   return `${m} мин`;
 }
-function stepSK(platform: string, stepIdx: number) { return `push-${platform}-${stepIdx}`; }
+function stepSK(platform: string, stepIdx: number) { return `push::${platform}::${stepIdx}`; }
+function formatStepScheduleStatus(plan?: StepSchedulePlan): { text: string; color: string } {
+  if (!plan) {
+    return {
+      text: 'Можно запланировать этот шаг по таймеру или к точному времени.',
+      color: '#64748b',
+    };
+  }
+  const when = formatMskDateTimeHuman(plan.targetMs);
+  const note = String(plan.note || '').trim();
+  if (note) {
+    return {
+      text: Date.now() >= plan.targetMs
+        ? `Ожидает выполнения: ${note} · ${when}`
+        : `Повторная попытка ${when} · ${note}`,
+      color: '#b45309',
+    };
+  }
+  if (Date.now() >= plan.targetMs) {
+    return { text: `Время наступило: ${when}`, color: '#b45309' };
+  }
+  return { text: `Запланировано на ${when}`, color: '#0369a1' };
+}
+function normalizeStepSchedulePlan(raw: unknown): StepSchedulePlan | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const source = raw as Record<string, unknown>;
+  const scope = source.scope === 'push' || String(source.key || '').startsWith('push') ? 'push' : 'push';
+  const platform = source.platform === 'android' ? 'android' : source.platform === 'ios' ? 'ios' : null;
+  const stepIdx = Number(source.stepIdx);
+  const targetMs = Number(source.targetMs);
+  if (!platform || !Number.isFinite(stepIdx) || stepIdx < 0 || !Number.isFinite(targetMs)) return null;
+  const triggerMode = source.triggerMode === 'schedule' ? 'schedule' : 'delay';
+  const delayMinutes = Number(source.delayMinutes) > 0 ? Math.max(1, Math.round(Number(source.delayMinutes))) : null;
+  return {
+    key: stepSK(platform, stepIdx),
+    scope,
+    platform,
+    stepIdx,
+    targetMs,
+    triggerMode,
+    delayMinutes,
+    note: String(source.note || '').trim(),
+    createdAt: Number(source.createdAt) || Date.now(),
+  };
+}
 function loadStepSchedules(): Record<string, StepSchedulePlan> {
-  try { return JSON.parse(localStorage.getItem(LS_STEP_SCHEDULES) || '{}') || {}; } catch { return {}; }
+  const out: Record<string, StepSchedulePlan> = {};
+  const keys = [LS_STEP_SCHEDULES, ...LEGACY_REACT_STEP_SCHEDULE_KEYS];
+  for (const storageKey of keys) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(storageKey) || '{}') || {};
+      if (!raw || typeof raw !== 'object') continue;
+      for (const value of Object.values(raw as Record<string, unknown>)) {
+        const plan = normalizeStepSchedulePlan(value);
+        if (plan) out[plan.key] = plan;
+      }
+    } catch {}
+  }
+  return out;
 }
 function saveStepSchedules(s: Record<string, StepSchedulePlan>) {
-  try { localStorage.setItem(LS_STEP_SCHEDULES, JSON.stringify(s)); } catch {}
+  try {
+    localStorage.setItem(LS_STEP_SCHEDULES, JSON.stringify(s));
+    for (const key of LEGACY_REACT_STEP_SCHEDULE_KEYS) localStorage.removeItem(key);
+  } catch {}
 }
 function loadAutomationPlan(): AutomationPlan | null {
   try {
@@ -1387,6 +1683,25 @@ function saveAutomationPlan(plan: AutomationPlan | null) {
   try {
     if (plan) localStorage.setItem(LS_AUTOMATION_PLAN, JSON.stringify(plan));
     else localStorage.removeItem(LS_AUTOMATION_PLAN);
+  } catch {}
+}
+function loadMajorReleaseStorage(): string {
+  try {
+    const primary = String(localStorage.getItem(LS_MAJOR_RELEASE) || '').trim();
+    if (primary) return primary;
+    for (const key of LEGACY_MAJOR_RELEASE_KEYS) {
+      const value = String(localStorage.getItem(key) || '').trim();
+      if (value) return value;
+    }
+  } catch {}
+  return '';
+}
+function saveMajorReleaseStorage(value: string) {
+  try {
+    const normalized = String(value || '').trim();
+    if (normalized) localStorage.setItem(LS_MAJOR_RELEASE, normalized);
+    else localStorage.removeItem(LS_MAJOR_RELEASE);
+    for (const key of LEGACY_MAJOR_RELEASE_KEYS) localStorage.removeItem(key);
   } catch {}
 }
 
@@ -1406,31 +1721,48 @@ function StepScheduleBlock({
   const [delayMin, setDelayMin] = useState(10);
   const [date, setDate] = useState(() => mskDateStr(def15));
   const [time, setTime] = useState(() => mskTimeStr(def15));
+  useEffect(() => {
+    if (!plan) return;
+    setDate(mskDateStr(plan.targetMs));
+    setTime(mskTimeStr(plan.targetMs));
+    if (plan.delayMinutes) setDelayMin(plan.delayMinutes);
+  }, [plan?.key, plan?.targetMs, plan?.delayMinutes]);
+  const statusMeta = formatStepScheduleStatus(plan);
+  const delayActive = plan?.triggerMode === 'delay';
+  const scheduleActive = plan?.triggerMode === 'schedule';
   const inputStyle: React.CSSProperties = {
-    padding: '4px 8px', borderRadius: 8,
+    padding: '6px 8px',
+    borderRadius: 12,
     border: '1px solid var(--border-hi)',
-    background: 'var(--surface-soft-4)', color: 'var(--text)',
-    fontSize: 12, outline: 'none',
+    background: 'var(--surface-soft-4)',
+    color: 'var(--text)',
+    fontSize: 12,
+    outline: 'none',
+    lineHeight: 1.2,
+  };
+  const activeScheduleButton: React.CSSProperties = {
+    background: 'color-mix(in srgb, var(--card) 84%, var(--blue) 16%)',
+    borderColor: 'rgba(59,130,246,.34)',
+    boxShadow: 'inset 0 0 0 1px rgba(59,130,246,.12)',
+    color: 'var(--blue)',
   };
   return (
-    <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,0,0,.1)', border: '1px solid var(--border)' }}>
-      {plan && (
-        <div style={{ fontSize: 11, color: '#22C55E', marginBottom: 6 }}>
-          ⏰ через {schedCountdown(plan.targetMs)}{plan.note ? ` · ${plan.note}` : ''}
-        </div>
-      )}
+    <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 16, background: 'var(--surface-soft)', boxShadow: 'inset 0 0 0 1px var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontSize: 11, color: statusMeta.color }}>
+        {statusMeta.text}
+      </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
           type="number" min={1} step={1} value={delayMin}
           onChange={e => setDelayMin(Math.max(1, Number(e.target.value) || 1))}
-          disabled={disabled} style={{ ...inputStyle, width: 56 }}
+          disabled={disabled} style={{ ...inputStyle, width: 96 }}
         />
-        <Button variant="ghost" size="sm" disabled={disabled} onClick={() => onDelay(delayMin)}>Таймер</Button>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} disabled={disabled} style={inputStyle} />
-        <input type="time" value={time} step={60} onChange={e => setTime(e.target.value)} disabled={disabled} style={inputStyle} />
-        <Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAtTime(date, time)}>По времени</Button>
+        <LegacyWorkflowButton small disabled={disabled} aria-pressed={delayActive} style={delayActive ? activeScheduleButton : undefined} onClick={() => onDelay(delayMin)}>Таймер</LegacyWorkflowButton>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} disabled={disabled} style={{ ...inputStyle, width: 144 }} />
+        <input type="time" value={time} step={60} onChange={e => setTime(e.target.value)} disabled={disabled} style={{ ...inputStyle, width: 112 }} />
+        <LegacyWorkflowButton small disabled={disabled} aria-pressed={scheduleActive} style={scheduleActive ? activeScheduleButton : undefined} onClick={() => onAtTime(date, time)}>По времени</LegacyWorkflowButton>
         {plan && (
-          <Button variant="ghost" size="sm" style={{ color: '#EF4444' }} disabled={disabled} onClick={onCancel}>Отменить</Button>
+          <LegacyWorkflowButton small disabled={disabled} style={{ color: '#e11d48' }} onClick={onCancel}>Отменить</LegacyWorkflowButton>
         )}
       </div>
     </div>
@@ -1438,21 +1770,12 @@ function StepScheduleBlock({
 }
 
 // ─── AUTOMATION BLOCK ────────────────────────────────────────────
-const AUTOMATION_SUPPORTED: RunMode[] = ['major', 'hf_android', 'hf_ios', 'napi', 'sunday_devices', 'rustore_critical', 'rustore_smoke'];
-const AUTOMATION_FEED_BLOCKED = new Set<RunMode>(['napi', 'sunday_devices']);
+const AUTOMATION_SUPPORTED: RunMode[] = ['major'];
 
-function buildAutomationScenarioText(mode: RunMode): string {
-  if (mode === 'major') {
-    return 'Сценарий: выполнит сбор дежурных и затем автоматически пройдёт шаги 1–5 с ответом «Да».';
-  }
-  if (mode === 'napi') {
-    return 'Сценарий: создаст NAPI раны, опубликует SWAT Team Only.';
-  }
-  if (mode === 'sunday_devices') {
-    return 'Сценарий: создаст воскресные раны устройств, опубликует SWAT Team Only.';
-  }
-  return 'Сценарий: создаст ран, опубликует SWAT Team Only, обновит ленту релизов.';
+function buildAutomationScenarioText(_mode: RunMode): string {
+  return 'Сценарий: выполнит сбор дежурных и затем автоматически пройдёт шаги 1–5 с ответом «Да».';
 }
+
 function AutomationBlock({
   mode, running, automationRunning, plan, tick, onSchedule, onCancel, withDivider = true,
 }: {
@@ -1643,6 +1966,8 @@ export function Launch() {
   const [release, setRelease] = useState('');
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<Array<{ text: string; level: LogLevel }>>([]);
+  const [nonMajorLogPanelOpen, setNonMajorLogPanelOpen] = useState(false);
+  const [nonMajorLogPanelSize, setNonMajorLogPanelSize] = useState({ width: 430, height: 330 });
   const [createdRuns, setCreatedRuns] = useState<LaunchRecord[]>([]);
   const [steps, setSteps] = useState<Array<{ id: string; label: string; status: StepStatus; detail?: string }>>([]);
   const [buildValue, setBuildValue] = useState('');
@@ -1659,6 +1984,21 @@ export function Launch() {
   const [scheduleTick, setScheduleTick] = useState(0);
   const scheduleTickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const executeMajorStepRef = useRef<((platform: 'ios' | 'android', stepIdx: number) => Promise<void>) | null>(null);
+  const syncMajorPlatformRef = useRef<((platform: 'ios' | 'android', options?: {
+    silent?: boolean;
+    preserveLocal?: boolean;
+    seedStatuses?: PushStatus[];
+    applyThreadText?: boolean;
+  }) => Promise<void>) | null>(null);
+  const majorWorkflowBusyRef = useRef({
+    running: false,
+    collectionRunning: false,
+    iosRunning: false,
+    andRunning: false,
+    iosSyncing: false,
+    andSyncing: false,
+    automationRunning: false,
+  });
 
   // ─── automation plan ───────────────────────────────────────────
   const [automationPlan, setAutomationPlan] = useState<AutomationPlan | null>(loadAutomationPlan);
@@ -1671,8 +2011,9 @@ export function Launch() {
 
   const [streams, setStreams] = useState<DutyStream[]>([]);
   const [pollText, setPollText] = useState('');
-  const [iosRelease, setIosRelease] = useState('');
-  const [andRelease, setAndRelease] = useState('');
+  const [majorPollStatusText, setMajorPollStatusText] = useState('Получаем стримы из Allure...');
+  const [iosRelease, setIosRelease] = useState(loadMajorReleaseStorage);
+  const [andRelease, setAndRelease] = useState(loadMajorReleaseStorage);
   const [iosText, setIosText] = useState('');
   const [andText, setAndText] = useState('');
   const [iosStatuses, setIosStatuses] = useState<PushStatus[]>(PUSH_IOS_STEPS.map(() => 'pending' as PushStatus));
@@ -1693,6 +2034,7 @@ export function Launch() {
   const [noticeText, setNoticeText] = useState('');
   const [noticeLoading, setNoticeLoading] = useState(false);
   const [noticeRunning, setNoticeRunning] = useState(false);
+  const [noticeError, setNoticeError] = useState('');
   const [noticeStatusByChannel, setNoticeStatusByChannel] = useState<Record<string, { state: NoticeChannelState; message: string }>>({});
 
   const [dutyPingStates, setDutyPingStates] = useState<Record<MajorPlatform, DutyPingUiState>>({
@@ -1738,6 +2080,18 @@ export function Launch() {
   const [resultsCollapsed, setResultsCollapsed] = useState(false);
   const [pingCollapsed, setPingCollapsed] = useState(false);
   const collectionAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    majorWorkflowBusyRef.current = {
+      running,
+      collectionRunning,
+      iosRunning,
+      andRunning,
+      iosSyncing,
+      andSyncing,
+      automationRunning,
+    };
+  }, [running, collectionRunning, iosRunning, andRunning, iosSyncing, andSyncing, automationRunning]);
 
   const [editorLoading, setEditorLoading] = useState(false);
   const [editorSaving, setEditorSaving] = useState(false);
@@ -1788,6 +2142,7 @@ export function Launch() {
   const updateMajorSharedRelease = useCallback((value: string) => {
     setIosRelease(value);
     setAndRelease(value);
+    saveMajorReleaseStorage(value);
     setNoticeText('');
   }, []);
 
@@ -1927,11 +2282,6 @@ export function Launch() {
     }
   }, [collectionCopyStates, collectionRows, collectionRunning, editorStreamGroups, editorLoadedOnce, proxyBase, token, collLog]);
 
-  const majorPollStatusText = useMemo(() => {
-    if (!pollText.trim()) return 'Получаем стримы из Allure...';
-    return 'Опрос готов к отправке.';
-  }, [pollText]);
-
   const mapRowsToDutyStreams = useCallback((rows: CollectionRow[]): DutyStream[] => {
     return rows.map(row => {
       const leadList = [...new Set([...row.iosLeads, ...row.androidLeads])];
@@ -2032,6 +2382,28 @@ export function Launch() {
     log,
   ]);
 
+  useEffect(() => {
+    syncMajorPlatformRef.current = syncMajorPlatform;
+  }, [syncMajorPlatform]);
+
+  const refreshMajorPollFromAllure = useCallback(async (signal?: AbortSignal): Promise<string> => {
+    setMajorPollStatusText('Получаем стримы из Allure...');
+    setPollText('Загружаю стримы из Allure...');
+    try {
+      if (!String(token || '').trim()) throw new Error('Нужен Allure token для опроса.');
+      const freshPollText = await refreshMajorPollTextFromAllure(token, proxyBase, signal);
+      setPollText(freshPollText);
+      setMajorPollStatusText(`Стримов из Allure: ${countMajorPollOptions(freshPollText)}. Текст опроса только для просмотра.`);
+      return freshPollText;
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') throw error;
+      const message = error instanceof Error ? error.message : String(error || 'Не удалось получить стримы из Allure');
+      setPollText('');
+      setMajorPollStatusText(message);
+      throw error;
+    }
+  }, [token, proxyBase]);
+
   const applyCollectionResult = useCallback((
     result: CollectionResult,
     preserveStatuses = false,
@@ -2061,9 +2433,12 @@ export function Launch() {
     setStreams(dutyStreams);
     if (dutyStreams.length) {
       try {
-        setPollText(buildMajorPollText(dutyStreams.map(stream => stream.name)));
-      } catch {
-        // ignore poll generation errors
+        const nextPollText = buildMajorPollText(dutyStreams.map(stream => stream.name));
+        setPollText(nextPollText);
+        setMajorPollStatusText(`Стримов из Allure: ${countMajorPollOptions(nextPollText)}. Текст опроса только для просмотра.`);
+      } catch (error) {
+        setPollText('');
+        setMajorPollStatusText(error instanceof Error ? error.message : String(error || 'Не удалось получить стримы из Allure'));
       }
     }
 
@@ -2114,16 +2489,6 @@ export function Launch() {
     setCollectionWorkflowStatuses(nextStatuses);
     setCollectionWorkflowCurrentIdx(firstPendingIndex(nextStatuses));
     collLog(`${COLLECTION_WORKFLOW_STEPS[idx]?.title || `Шаг ${idx + 1}`}: пропущено по решению пользователя.`, 'warn');
-  }, [collectionRunning, collectionWorkflowStatuses, collLog]);
-
-  const retryCollectionWorkflowStep = useCallback((idx: number) => {
-    if (collectionRunning) return;
-    const nextStatuses = collectionWorkflowStatuses.map((status, currentIdx) =>
-      currentIdx === idx ? 'pending' : status,
-    );
-    setCollectionWorkflowStatuses(nextStatuses);
-    setCollectionWorkflowCurrentIdx(Math.min(idx, firstPendingIndex(nextStatuses)));
-    collLog(`${COLLECTION_WORKFLOW_STEPS[idx]?.title || `Шаг ${idx + 1}`}: повтор.`, 'warn');
   }, [collectionRunning, collectionWorkflowStatuses, collLog]);
 
   const executeCollectionWorkflowStep = useCallback(async (idx: number) => {
@@ -2767,6 +3132,17 @@ export function Launch() {
   }, [mode, majorTab, iosRelease, andRelease, syncMajorPlatform]);
 
   useEffect(() => {
+    if (mode !== 'major' || majorTab !== 'release') return;
+    const ac = new AbortController();
+    void refreshMajorPollFromAllure(ac.signal).catch(error => {
+      if ((error as Error)?.name !== 'AbortError') {
+        console.warn('[Major poll] failed to refresh from Allure', error);
+      }
+    });
+    return () => ac.abort();
+  }, [mode, majorTab, refreshMajorPollFromAllure]);
+
+  useEffect(() => {
     if (mode === 'major' && majorTab === 'editor' && !editorLoadedOnce) {
       loadEditor();
     }
@@ -2937,21 +3313,14 @@ export function Launch() {
           break;
         }
         case 2:
-          await ensureMajorStreamsSheet(platform, rel, proxyBase, log, ac.signal);
+          await ensureMajorStreamsSheet(platform, rel, token, proxyBase, cookies, log, ac.signal, threadTxt);
+          updatePlatformWorkflow('ios', iosStatusesRef.current.map((status, idx) => idx === 2 ? 'done' : status));
+          updatePlatformWorkflow('android', andStatusesRef.current.map((status, idx) => idx === 2 ? 'done' : status));
           break;
         case 3: {
-          let activePollText = pollText;
-          if (token) {
-            try {
-              log(`[${isIos ? 'iOS' : 'Android'}] Обновляю список стримов из Allure...`);
-              const freshPollText = await refreshMajorPollTextFromAllure(token, proxyBase, ac.signal);
-              setPollText(freshPollText);
-              activePollText = freshPollText;
-              log(`[${isIos ? 'iOS' : 'Android'}] Список стримов обновлён.`, 'ok');
-            } catch (pollErr) {
-              log(`[${isIos ? 'iOS' : 'Android'}] Не удалось обновить стримы: ${pollErr instanceof Error ? pollErr.message : String(pollErr)}`, 'warn');
-            }
-          }
+          log(`[${isIos ? 'iOS' : 'Android'}] Обновляю список стримов из Allure...`);
+          const activePollText = await refreshMajorPollFromAllure(ac.signal);
+          log(`[${isIos ? 'iOS' : 'Android'}] Список стримов обновлён.`, 'ok');
           await majorPublishPoll(platform, rel, activePollText, proxyBase, cookies, log, ac.signal);
           break;
         }
@@ -3008,7 +3377,6 @@ export function Launch() {
     proxyBase,
     cookies,
     adminCookies,
-    pollText,
     settings.deployLabToken,
     settings.ytBase,
     settings.ytToken,
@@ -3016,6 +3384,7 @@ export function Launch() {
     log,
     ensureCollectionRowsForMajorStep,
     mapRowsToDutyStreams,
+    refreshMajorPollFromAllure,
     updatePlatformWorkflow,
     syncMajorPlatform,
   ]);
@@ -3131,6 +3500,35 @@ export function Launch() {
     log(`[${platform === 'ios' ? 'iOS' : 'Android'}] Таймер автообновления компонентов запущен на ${new Date(nextMs).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}.`, 'ok');
   }, [armComponentsTimer, getNextHourTwoMs, log]);
 
+  const startNonMajorLogPanelResize = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = nonMajorLogPanelSize.width;
+    const startHeight = nonMajorLogPanelSize.height;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const maxWidth = Math.max(320, window.innerWidth - 36);
+      const maxHeight = Math.max(220, window.innerHeight - 36);
+      setNonMajorLogPanelSize({
+        width: Math.min(maxWidth, Math.max(320, startWidth + startX - moveEvent.clientX)),
+        height: Math.min(maxHeight, Math.max(220, startHeight + startY - moveEvent.clientY)),
+      });
+    };
+
+    const onUp = () => {
+      document.body.style.userSelect = prevUserSelect;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [nonMajorLogPanelSize.height, nonMajorLogPanelSize.width]);
+
   const startCollectionLogPanelResize = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -3218,25 +3616,28 @@ export function Launch() {
 
   const openNoticeModal = useCallback(async () => {
     setNoticeOpen(true);
+    setNoticeError('');
     setNoticeStatusByChannel(Object.fromEntries(NOTICE_CHANNELS.map(channel => [channel.id, { state: 'idle' as NoticeChannelState, message: '' }])));
-    if (noticeText) return;
     setNoticeLoading(true);
+    setNoticeText('Формирую текст оповещения...');
     try {
       const text = await fetchMajorReleaseNoticeText(
         iosRelease, andRelease, settings.deployLabToken || '', proxyBase,
       );
       setNoticeText(text);
-    } catch {
+    } catch (error) {
+      setNoticeError(error instanceof Error ? error.message : String(error));
       setNoticeText('');
     } finally {
       setNoticeLoading(false);
     }
-  }, [noticeText, iosRelease, andRelease, settings.deployLabToken, proxyBase]);
+  }, [iosRelease, andRelease, settings.deployLabToken, proxyBase]);
 
   const publishNotice = useCallback(async () => {
     if (noticeRunning || !noticeText.trim()) return;
     const ac = new AbortController();
     setNoticeRunning(true);
+    setNoticeError('');
     setNoticeStatusByChannel(Object.fromEntries(NOTICE_CHANNELS.map(channel => [channel.id, { state: 'idle' as NoticeChannelState, message: '' }])));
     try {
       await majorPublishReleaseNotice(
@@ -3249,9 +3650,10 @@ export function Launch() {
           setNoticeStatusByChannel(prev => ({ ...prev, [channelId]: { state, message } }));
         },
       );
-      setNoticeOpen(false);
     } catch (error) {
-      log(error instanceof Error ? error.message : String(error), 'error');
+      const message = error instanceof Error ? error.message : String(error);
+      setNoticeError(message);
+      log(message, 'error');
     } finally {
       setNoticeRunning(false);
     }
@@ -3451,6 +3853,29 @@ export function Launch() {
     return [...common, ...(byMode[m] ?? [])];
   }
 
+  const resolveBuildValueForMode = useCallback(async (
+    targetMode: RunMode,
+    targetRelease: string,
+    signal?: AbortSignal,
+  ): Promise<string> => {
+    const rel = String(targetRelease || '').trim();
+    if (!isNonMajorBuildMode(targetMode)) return '';
+    if (!rel) throw new Error('Укажи номер релиза.');
+
+    if (!cookies) {
+      if (targetMode === 'hf_android') {
+        log('Сборка: Cookies для чтения не заданы, продолжаю без pipeline.', 'warn');
+        return '';
+      }
+      throw new Error('Заполни Band cookies для запроса сборки.');
+    }
+
+    if (targetMode === 'hf_ios') {
+      return resolveIosBuildFromBand(rel, proxyBase, cookies, log, signal);
+    }
+    return resolveAndroidBuildFromBot(targetMode, rel, proxyBase, cookies, log, signal);
+  }, [cookies, log, proxyBase]);
+
   const runWorkflow = useCallback(async () => {
     if (running) {
       abortRef.current?.abort();
@@ -3502,12 +3927,18 @@ export function Launch() {
       }
 
       const runStep = newSteps.find(step => step.id === 'create_run');
+      let resolvedBuildValue = buildValue;
       let runResult: { runs: LaunchRecord[]; message: string } | null = null;
       if (runStep) {
         stepLog('create_run', 'running');
         log(`${runStep.label}...`);
         try {
-          runResult = await runCreatorScenario(mode, release, settings, log, ac.signal);
+          if (isNonMajorBuildMode(mode)) {
+            setBuildResolving(true);
+            resolvedBuildValue = await resolveBuildValueForMode(mode, release, ac.signal);
+            setBuildValue(resolvedBuildValue);
+          }
+          runResult = await runCreatorScenario(mode, release, settings, log, ac.signal, resolvedBuildValue);
           setCreatedRuns(runResult.runs);
           setNonMajorCopyMessage(runResult.message);
           const detail = runResult.runs.length ? runResult.runs.map(run => `#${run.id}`).join(', ') : 'Завершено';
@@ -3517,6 +3948,7 @@ export function Launch() {
           const message = error instanceof Error ? error.message : String(error);
           stepLog('create_run', 'error', message.slice(0, 80));
           log(`✗ ${message}`, 'error');
+          return;
         }
       }
 
@@ -3551,10 +3983,11 @@ export function Launch() {
     } catch {
       log('Запуск прерван', 'warn');
     } finally {
+      setBuildResolving(false);
       setRunning(false);
       abortRef.current = null;
     }
-  }, [mode, running, proxyBase, settings, release, log]);
+  }, [mode, running, proxyBase, settings, release, log, buildValue, resolveBuildValueForMode]);
 
   // ─── STEP SCHEDULE CALLBACKS ─────────────────────────────────
   const armStepSchedule = useCallback((plan: StepSchedulePlan) => {
@@ -3571,13 +4004,37 @@ export function Launch() {
 	    const delayMs = Math.max(0, plan.targetMs - Date.now());
 	    stepTimersRef.current[key] = setTimeout(async () => {
 	      delete stepTimersRef.current[key];
+        if (Date.now() < Number(plan.targetMs)) {
+          armStepSchedule(plan);
+          return;
+        }
+        const busy = majorWorkflowBusyRef.current;
+        if (
+          busy.running ||
+          busy.collectionRunning ||
+          busy.automationRunning ||
+          (plan.platform === 'ios' ? (busy.iosRunning || busy.iosSyncing) : (busy.andRunning || busy.andSyncing))
+        ) {
+          const nextPlan = { ...plan, targetMs: Date.now() + 30 * 1000, note: 'интерфейс занят' };
+          armStepSchedule(nextPlan);
+          log(`⏰ ${plan.platform === 'ios' ? 'iOS' : 'Android'} шаг ${plan.stepIdx + 1} перенесён: интерфейс занят`, 'warn');
+          return;
+        }
+        try {
+          await syncMajorPlatformRef.current?.(plan.platform, {
+            silent: true,
+            preserveLocal: true,
+            applyThreadText: true,
+          });
+        } catch {}
 	      const statuses = plan.platform === 'ios' ? iosStatusesRef.current : andStatusesRef.current;
 	      const currentStatus = statuses[plan.stepIdx] ?? 'pending';
 	      const hasBusyStep = statuses.some(status => status === 'running');
 	      const waitsPrevious = statuses
 	        .slice(0, plan.stepIdx)
 	        .some(status => status !== 'done' && status !== 'skipped');
-	      if (hasBusyStep || waitsPrevious) {
+        const waitsCurrent = plan.stepIdx !== firstPendingIndex(statuses);
+	      if (hasBusyStep || waitsPrevious || waitsCurrent) {
 	        const note = hasBusyStep ? 'интерфейс занят' : 'ждёт предыдущие шаги';
 	        const nextPlan = { ...plan, targetMs: Date.now() + 30 * 1000, note };
 	        armStepSchedule(nextPlan);
@@ -3597,7 +4054,19 @@ export function Launch() {
 	        log(`⏰ ${plan.platform === 'ios' ? 'iOS' : 'Android'} шаг ${plan.stepIdx + 1} уже не ожидает выполнения, расписание снято.`, 'info');
 	        return;
 	      }
-	      try { await executeMajorStepRef.current?.(plan.platform, plan.stepIdx); } catch {}
+        if (!executeMajorStepRef.current) {
+          armStepSchedule({ ...plan, targetMs: Date.now() + 30 * 1000, note: 'интерфейс занят' });
+          return;
+        }
+	      try {
+          await executeMajorStepRef.current(plan.platform, plan.stepIdx);
+          const nextStatuses = plan.platform === 'ios' ? iosStatusesRef.current : andStatusesRef.current;
+          if (nextStatuses[plan.stepIdx] === 'error') {
+            armStepSchedule({ ...plan, targetMs: Date.now() + 60 * 1000, note: 'ошибка выполнения' });
+          }
+        } catch {
+          armStepSchedule({ ...plan, targetMs: Date.now() + 60 * 1000, note: 'ошибка выполнения' });
+        }
 	    }, delayMs);
     if (!scheduleTickerRef.current) {
       scheduleTickerRef.current = setInterval(() => setScheduleTick(t => t + 1), 1000);
@@ -3635,7 +4104,17 @@ export function Launch() {
       targetMs = Date.now() + Math.max(1, delayMin) * 60 * 1000;
     }
     const key = stepSK(platform, stepIdx);
-    armStepSchedule({ key, platform, stepIdx, targetMs, triggerMode, delayMinutes: triggerMode === 'delay' ? delayMin : null });
+    armStepSchedule({
+      key,
+      scope: 'push',
+      platform,
+      stepIdx,
+      targetMs,
+      triggerMode,
+      delayMinutes: triggerMode === 'delay' ? delayMin : null,
+      note: '',
+      createdAt: Date.now(),
+    });
     log(`⏰ ${platform === 'ios' ? 'iOS' : 'Android'} шаг ${stepIdx + 1} — запланирован через ${schedCountdown(targetMs)}`, 'ok');
   }, [armStepSchedule, log]);
 
@@ -3767,7 +4246,7 @@ export function Launch() {
   ]);
 
   const executeAutomation = useCallback(async (plan: AutomationPlan) => {
-    const { mode: m, release: rel, buildValue: bv, swatLead: lead } = plan.snapshot;
+    const { mode: m, release: rel } = plan.snapshot;
     if (running || collectionRunning || iosRunning || andRunning) {
       const postponedPlan = { ...plan, targetMs: Date.now() + 60 * 1000 };
       log('Автозапуск: интерфейс занят, переношу на 1 минуту.', 'warn');
@@ -3786,28 +4265,8 @@ export function Launch() {
         return;
       }
 
-      const result = await runCreatorScenario(m, rel, settings, log);
-      setCreatedRuns(result.runs);
-      setNonMajorCopyMessage(result.message);
-      if (cookies) {
-        const leadTag = lead === 'viktor' ? '@dolgov.viktor7' : lead === 'roman' ? '@kolosov.roman' : '';
-        let napiHosts = '';
-        if (m === 'napi') { try { napiHosts = await fetchNapiHostsText(proxyBase, cookies); } catch {} }
-        const swatText = buildNonMajorSwatText(result.message, leadTag, napiHosts);
-        await bandPostMessage(proxyBase, cookies, swatText, { channelId: SWAT_CHANNEL_ID });
-        log('✓ SWAT Team Only опубликован', 'ok');
-        if (!AUTOMATION_FEED_BLOCKED.has(m)) {
-          try {
-            await publishNonMajorFeedPosts(m, rel, result.runs, bv, '', '', '', proxyBase, cookies, log);
-            log('✓ Лента релизов опубликована', 'ok');
-          } catch (fe) {
-            log(`Лента: ${fe instanceof Error ? fe.message : String(fe)}`, 'warn');
-          }
-        }
-      } else {
-        log('Band cookies не заданы — публикация SWAT Team Only пропущена.', 'warn');
-      }
-      log('✓ Автозапуск завершён', 'ok');
+      log('Автозапуск для второстепенных запусков отключён.', 'warn');
+      return;
     } catch (e) {
       log(`✗ Автозапуск: ${e instanceof Error ? e.message : String(e)}`, 'error');
     } finally {
@@ -3831,6 +4290,11 @@ export function Launch() {
   const armAutomationPlan = useCallback((plan: AutomationPlan) => {
     if (automationTimerRef.current) { clearTimeout(automationTimerRef.current); automationTimerRef.current = null; }
     if (automTickerRef.current) { clearInterval(automTickerRef.current); automTickerRef.current = null; }
+    if (plan.snapshot.mode !== 'major') {
+      setAutomationPlan(null);
+      saveAutomationPlan(null);
+      return;
+    }
     const targetMs = Number(plan.targetMs);
     if (!Number.isFinite(targetMs)) return;
     if (Date.now() - targetMs > 15 * 60 * 1000) { setAutomationPlan(null); saveAutomationPlan(null); return; }
@@ -3858,6 +4322,10 @@ export function Launch() {
   const scheduleAutomation = useCallback((
     triggerMode: 'delay' | 'schedule', delayMin: number, date: string, time: string,
   ) => {
+    if (mode !== 'major') {
+      log('Автозапуск для второстепенных запусков отключён.', 'warn');
+      return;
+    }
     let targetMs: number;
     if (triggerMode === 'schedule') {
       targetMs = parseMskToUtcMs(date, time);
@@ -3896,27 +4364,6 @@ export function Launch() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const resolveBuild = useCallback(async () => {
-    if (!cookies) { log('✗ Band cookies не заданы — укажи в Настройках', 'error'); return; }
-    if (!release) { log('✗ Укажи номер релиза', 'error'); return; }
-    setBuildResolving(true);
-    log('Поиск номера сборки...');
-    try {
-      let result: string;
-      if (mode === 'hf_ios') {
-        result = await resolveIosBuildFromBand(release, proxyBase, cookies, log);
-      } else {
-        result = await resolveAndroidBuildFromBot(mode, release, proxyBase, cookies, log);
-      }
-      setBuildValue(result);
-      log(`✓ Сборка найдена: ${result}`, 'ok');
-    } catch (err) {
-      log(`✗ Не удалось найти сборку: ${err instanceof Error ? err.message : String(err)}`, 'error');
-    } finally {
-      setBuildResolving(false);
-    }
-  }, [cookies, log, mode, proxyBase, release]);
 
   const publishSwatPost = useCallback(async (scheduledAtMs?: number) => {
     if (!cookies) { log('✗ Band cookies не заданы — укажи в Настройках', 'error'); return; }
@@ -4066,12 +4513,6 @@ export function Launch() {
       return [];
     }
   }, [mode, release, createdRuns, buildValue, nonMajorYtData]);
-
-  const runProxyCheck = useCallback(async () => {
-    log('Проверка прокси...');
-    const ok = await checkProxy(proxyBase).catch(() => false);
-    log(ok ? `Прокси доступен: ${proxyBase}` : `Прокси недоступен: ${proxyBase}`, ok ? 'ok' : 'error');
-  }, [log, proxyBase]);
 
   const noticeStatusMeta = (state: NoticeChannelState) => {
     switch (state) {
@@ -4242,30 +4683,13 @@ export function Launch() {
       </Card>
     );
   };
-  const renderMajorReleaseNumberCard = () => (
-    <Card style={{ borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 34px rgba(15,23,42,.06)' }}>
-      <CardHeader style={{ alignItems: 'flex-start', gap: 14, flexWrap: 'wrap', padding: '18px 20px 0' }}>
-        <div>
-          <CardTitle>Номер релиза</CardTitle>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
-            Один номер используется для вкладок «Пинг дежурных» и «Релиз».
-          </div>
-        </div>
-      </CardHeader>
-      <CardBody style={{ padding: '14px 20px 18px' }}>
-        <div style={{ maxWidth: 420 }}>
-          <FieldLabel>Версия релиза</FieldLabel>
-          <Input
-            value={majorSharedRelease}
-            onChange={event => updateMajorSharedRelease(event.target.value)}
-            placeholder="например: 7.5.5"
-          />
-        </div>
-      </CardBody>
-    </Card>
-  );
   const dutyPingLogActive = dutyPingStates.android.loading || dutyPingStates.android.running || dutyPingStates.android.polling
     || dutyPingStates.ios.loading || dutyPingStates.ios.running || dutyPingStates.ios.polling;
+  const nonMajorBuildMode = isNonMajorBuildMode(mode);
+  const nonMajorSwatLeadMode = mode === 'hf_android' || mode === 'hf_ios' || mode === 'napi' || mode === 'rustore_critical' || mode === 'rustore_smoke';
+  const nonMajorHasSwatAction = steps.some(step => step.id === 'notify_swat');
+  const nonMajorHasFeedAction = steps.some(step => step.id === 'feed_post');
+  const nonMajorLogActive = running || automationRunning || buildResolving;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -4288,7 +4712,7 @@ export function Launch() {
                 fontFamily: 'inherit',
               }}
             >
-              <div style={{ fontSize: 20, marginBottom: 6 }}>{item.icon}</div>
+              <div style={{ fontSize: 20, marginBottom: 6, minHeight: 22, display: 'flex', alignItems: 'center', gap: 5, lineHeight: 1 }}>{item.icon}</div>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>{RUN_MODE_LABELS[item.id]}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{item.desc}</div>
             </button>
@@ -4304,65 +4728,186 @@ export function Launch() {
 	            {!settings.bandCookiesAdmin && <Badge color="yellow">Нет admin cookies для групп</Badge>}
 	          </div>
 
-          <Modal open={noticeOpen} onClose={() => setNoticeOpen(false)} title="Оповещение о запуске мажора" width={540}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                Публикует оповещение в 4 канала: mp-ios-release, mp-Релиз Андроид, Олеся и Лиды QA, SWAT QA
-              </div>
-              {noticeLoading ? (
-                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Загрузка текста оповещения...</div>
-              ) : (
-                <Textarea
-                  rows={5}
-                  value={noticeText}
-                  onChange={e => setNoticeText(e.target.value)}
-                  placeholder="Запуск мажора! Версия iOS X.X.XXXX / Android X.X.XXXX"
-                  style={{ fontFamily: 'var(--mono)', fontSize: 12 }}
-                />
-              )}
-              <div style={{ display: 'grid', gap: 6 }}>
-                {NOTICE_CHANNELS.map(channel => {
-                  const status = noticeStatusByChannel[channel.id] ?? { state: 'idle' as NoticeChannelState, message: '' };
-                  const meta = noticeStatusMeta(status.state);
-                  return (
-                    <div
-                      key={channel.id}
+          {noticeOpen && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="majorReleaseNoticeModalTitle"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 5000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 24,
+                background: 'rgba(15,23,42,.36)',
+                backdropFilter: 'blur(3px)',
+              }}
+              onMouseDown={() => setNoticeOpen(false)}
+            >
+              <div
+                style={{
+                  width: 'min(760px, calc(100vw - 32px))',
+                  maxHeight: 'calc(100vh - 32px)',
+                  overflow: 'auto',
+                  borderRadius: 20,
+                  background: '#fff',
+                  boxShadow: '0 24px 64px rgba(15,23,42,.28)',
+                  border: '1px solid rgba(226,232,240,.95)',
+                }}
+                onMouseDown={event => event.stopPropagation()}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, padding: '24px 24px 8px' }}>
+                  <div id="majorReleaseNoticeModalTitle" style={{ fontSize: 24, lineHeight: 1.12, fontWeight: 800, color: '#3f3f53' }}>
+                    Опубликовать оповещение
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Закрыть окно оповещения"
+                    onClick={() => setNoticeOpen(false)}
+                    style={{
+                      border: 0,
+                      background: 'transparent',
+                      color: '#8b90a0',
+                      fontSize: 34,
+                      lineHeight: 1,
+                      padding: 0,
+                      width: 40,
+                      height: 40,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div style={{ display: 'grid', gap: 14, padding: '10px 24px 24px' }}>
+                  {noticeError && (
+                    <div style={{ padding: '10px 12px', borderRadius: 12, background: '#fff1f2', border: '1px solid #fecdd3', color: '#b91c1c', fontSize: 13, fontWeight: 600 }}>
+                      {noticeError}
+                    </div>
+                  )}
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#6b7280' }}>Текст</span>
+                    <textarea
+                      value={noticeText}
+                      onChange={event => setNoticeText(event.target.value)}
+                      rows={7}
+                      spellCheck={false}
+                      readOnly={noticeLoading}
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        gap: 10,
-                        alignItems: 'center',
-                        padding: '7px 9px',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        background: 'var(--surface-soft)',
+                        width: '100%',
+                        minHeight: 176,
+                        resize: 'vertical',
+                        borderRadius: 12,
+                        border: '1px solid #ecebff',
+                        background: '#fff',
+                        color: '#111827',
+                        padding: '10px 14px',
+                        fontFamily: 'var(--mono)',
+                        fontSize: 13,
+                        lineHeight: 1.45,
+                        outline: 'none',
+                      }}
+                    />
+                  </label>
+                  <div style={{ border: '1px solid #ecebff', borderRadius: 16, background: '#fbfcff', padding: '14px 16px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#475569', marginBottom: 10 }}>Каналы</div>
+                    <div style={{ display: 'grid', gap: 0 }}>
+                      {NOTICE_CHANNELS.map((channel, idx) => {
+                        const status = noticeStatusByChannel[channel.id] ?? { state: 'idle' as NoticeChannelState, message: '' };
+                        return (
+                          <div
+                            key={channel.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 16,
+                              padding: '10px 0',
+                              borderTop: idx === 0 ? 'none' : '1px solid #ecebff',
+                            }}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: '#334155' }}>{channel.name}</div>
+                              <div style={{ marginTop: 2, fontSize: 11, color: '#94a3b8' }}>({channel.id})</div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: 128 }}>
+                              {status.state === 'loading' ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, fontSize: 12, fontWeight: 700, color: '#475569' }}>
+                                  <span style={{ width: 14, height: 14, borderRadius: 999, border: '2px solid #cbd5e1', borderTopColor: '#475569', animation: 'spin .8s linear infinite' }} />
+                                  <span>Отправляю...</span>
+                                </span>
+                              ) : status.state === 'success' ? (
+                                <span title="Отправлено" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 999, border: '1px solid #bbf7d0', background: '#dcfce7', color: '#15803d', fontSize: 12, fontWeight: 800, lineHeight: 1 }}>
+                                  ✓
+                                </span>
+                              ) : status.state === 'error' ? (
+                                <span title={status.message || 'Ошибка отправки'} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, fontSize: 12, fontWeight: 700, color: '#b91c1c', textAlign: 'right' }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 999, border: '1px solid #fecdd3', background: '#ffe4e6', color: '#b91c1c', fontSize: 12, fontWeight: 800, lineHeight: 1 }}>
+                                    ✕
+                                  </span>
+                                  <span>{status.message || 'Ошибка'}</span>
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textAlign: 'right' }}>Не отправлено</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+                    <button
+                      type="button"
+                      onClick={() => setNoticeOpen(false)}
+                      style={{
+                        minWidth: 140,
+                        minHeight: 48,
+                        borderRadius: 12,
+                        border: '1px solid transparent',
+                        color: '#fff',
+                        background: 'linear-gradient(90deg,#ef4444,#dc2626)',
+                        fontFamily: 'inherit',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        cursor: 'pointer',
                       }}
                     >
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 650, color: 'var(--text)' }}>{channel.name}</div>
-                        {status.message && (
-                          <div style={{ fontSize: 11, color: status.state === 'error' ? '#F87171' : 'var(--text-3)', marginTop: 2 }}>
-                            {status.message}
-                          </div>
-                        )}
-                      </div>
-                      <Badge color={meta.color} dot={meta.dot}>{meta.label}</Badge>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <Button variant="secondary" size="sm" onClick={() => setNoticeOpen(false)}>Отмена</Button>
-                <Button
-                  variant="primary" size="sm"
-                  disabled={noticeRunning || noticeLoading || !noticeText.trim()}
-                  onClick={() => void publishNotice()}
-                >
-                  {noticeRunning ? 'Публикуется...' : 'Опубликовать'}
-                </Button>
+                      Отмена
+                    </button>
+                    <button
+                      type="button"
+                      disabled={noticeRunning || noticeLoading || !noticeText.trim()}
+                      onClick={() => void publishNotice()}
+                      style={{
+                        minWidth: 180,
+                        minHeight: 48,
+                        borderRadius: 12,
+                        border: '1px solid transparent',
+                        color: '#fff',
+                        background: noticeRunning || noticeLoading || !noticeText.trim()
+                          ? '#cbd5e1'
+                          : 'linear-gradient(90deg,#9b5cff,#ff5ac8)',
+                        boxShadow: noticeRunning || noticeLoading || !noticeText.trim()
+                          ? 'none'
+                          : '0 10px 30px rgba(155,92,255,.25)',
+                        fontFamily: 'inherit',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        cursor: noticeRunning || noticeLoading || !noticeText.trim() ? 'not-allowed' : 'pointer',
+                        textShadow: noticeRunning || noticeLoading || !noticeText.trim() ? 'none' : '0 1px 2px rgba(31,41,55,.35)',
+                      }}
+                    >
+                      {noticeRunning ? 'Публикую...' : 'Опубликовать'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </Modal>
+          )}
 
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', background: 'var(--surface)', borderRadius: '12px 12px 0 0', padding: '0 16px' }}>
 	            {([
@@ -4431,10 +4976,7 @@ export function Launch() {
                       <EyeOffIcon />
                       {resultsCollapsed ? 'Показать' : 'Скрыть'}
                     </Button>
-                    <Button variant={collectionRunning ? 'danger' : 'primary'} size="sm" onClick={startCollection}>
-                      {!collectionRunning && <PlayIcon />}
-                      {collectionRunning ? 'Остановить' : 'Запустить'}
-                    </Button>
+                    <LaunchRunButton running={collectionRunning} onClick={startCollection} />
                   </div>
                 </CardHeader>
                 <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '18px 20px 16px' }}>
@@ -4507,16 +5049,14 @@ export function Launch() {
                 </Card>
               )}
 
-              <Card>
-                <CardHeader>
-                  <div>
-                    <CardTitle>Пошаговый запуск</CardTitle>
-                  </div>
-                  <Button variant="secondary" size="sm" onClick={resetCollectionWorkflow}>
+              <Card style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 22, boxShadow: 'var(--shadow-soft)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Пошаговый запуск</div>
+                  <LegacyWorkflowButton disabled={collectionRunning} onClick={resetCollectionWorkflow}>
                     Сбросить шаги
-                  </Button>
-                </CardHeader>
-                <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  </LegacyWorkflowButton>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {COLLECTION_WORKFLOW_STEPS.map((step, idx) => (
                     <CollectionStepRow
                       key={step.code}
@@ -4529,21 +5069,35 @@ export function Launch() {
                       hasCollectionRows={collectionRows.length > 0}
                       onYes={() => executeCollectionWorkflowStep(idx)}
                       onNo={() => skipCollectionWorkflowStep(idx)}
-                      onRetry={() => retryCollectionWorkflowStep(idx)}
                     />
                   ))}
-                </CardBody>
+                </div>
               </Card>
             </div>
           )}
 
 	          {majorTab === 'release' && (
 	            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-	              {renderMajorReleaseNumberCard()}
-
 	              <Card>
-	                <CardBody style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-	                  <Button variant="ghost" onClick={() => void openNoticeModal()}>
+	                <CardBody style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+	                  <div style={{ flex: '1 1 280px' }}>
+	                    <FieldLabel>Номер релиза</FieldLabel>
+	                    <Input
+	                      value={majorSharedRelease}
+	                      onChange={event => updateMajorSharedRelease(event.target.value)}
+	                      placeholder="например: 7.5.5"
+	                    />
+	                  </div>
+	                  <Button
+                      variant="secondary"
+                      onClick={() => void openNoticeModal()}
+                      style={{
+                        background: '#2563eb',
+                        borderColor: '#2563eb',
+                        color: '#fff',
+                        boxShadow: '0 8px 18px rgba(37,99,235,.22)',
+                      }}
+                    >
 	                    Опубликовать оповещение
 	                  </Button>
 	                </CardBody>
@@ -4554,8 +5108,8 @@ export function Launch() {
 	                  <CardHeader><CardTitle>iOS</CardTitle></CardHeader>
 	                  <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 	                    <div>
-	                      <FieldLabel>Тред iOS</FieldLabel>
-	                      <Textarea value={iosText} onChange={event => setIosText(event.target.value)} rows={14} style={{ fontFamily: 'var(--mono)', fontSize: 11 }} />
+	                      <FieldLabel>Сообщение в тред</FieldLabel>
+	                      <Textarea value={iosText} onChange={event => setIosText(event.target.value)} rows={20} style={{ fontFamily: 'var(--mono)', fontSize: 11 }} />
 	                    </div>
 	                  </CardBody>
                 </Card>
@@ -4563,8 +5117,8 @@ export function Launch() {
 	                  <CardHeader><CardTitle>Android</CardTitle></CardHeader>
 	                  <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 	                    <div>
-	                      <FieldLabel>Тред Android</FieldLabel>
-	                      <Textarea value={andText} onChange={event => setAndText(event.target.value)} rows={14} style={{ fontFamily: 'var(--mono)', fontSize: 11 }} />
+	                      <FieldLabel>Сообщение в тред</FieldLabel>
+	                      <Textarea value={andText} onChange={event => setAndText(event.target.value)} rows={20} style={{ fontFamily: 'var(--mono)', fontSize: 11 }} />
 	                    </div>
                   </CardBody>
                 </Card>
@@ -4573,54 +5127,39 @@ export function Launch() {
               <Card>
                 <CardHeader>
                   <CardTitle>Опрос по стримам</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(pollText)} disabled={!pollText.trim()}>
-                    Скопировать
-                  </Button>
                 </CardHeader>
                 <CardBody>
-                  <Textarea value={pollText} readOnly rows={5} style={{ fontFamily: 'var(--mono)', fontSize: 11 }} />
+                  <FieldLabel>Текст опроса (получаем из Allure / только просмотр)</FieldLabel>
+                  <Textarea value={pollText} readOnly rows={6} style={{ fontFamily: 'var(--mono)', fontSize: 11 }} />
                   <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 8 }}>{majorPollStatusText}</div>
                 </CardBody>
               </Card>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Workflow релиза</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>Паритет со старым major-релизом: лента → дежурные → опрос → reminder → компоненты → раны → готовность.</div>
-                </div>
-                <Button variant="secondary" size="sm" onClick={resetMajorWorkflow}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '0 4px' }}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Пошаговая публикация в ленту релизов</div>
+                <LegacyWorkflowButton disabled={iosRunning || andRunning || iosSyncing || andSyncing} onClick={resetMajorWorkflow}>
                   Сбросить шаги
-                </Button>
+                </LegacyWorkflowButton>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Card style={{ borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 34px rgba(15,23,42,.06)' }}>
-                  <CardHeader style={{ alignItems: 'flex-start', gap: 14, flexWrap: 'wrap', padding: '18px 20px 0' }}>
-                    <CardTitle>Workflow iOS</CardTitle>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      {iosSyncing && <Badge color="yellow">Синхронизация...</Badge>}
-                      <Button variant="ghost" size="sm" disabled={iosRunning || iosSyncing} onClick={() => void syncMajorPlatform('ios', { silent: false, applyThreadText: true })}>
-                        Синхронизировать
-                      </Button>
-                      <Badge color={iosRunning || iosSyncing ? 'yellow' : 'green'}>{iosStatuses.filter(status => status === 'done').length}/{PUSH_IOS_STEPS.length}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+                <Card style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 22, boxShadow: 'var(--shadow-soft)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)', padding: '0 4px' }}>iOS</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {PUSH_IOS_STEPS.map((step, idx) => {
                       const sk = stepSK('ios', idx);
                       const st = iosStatuses[idx] ?? 'pending';
                       return (
-                        <div key={step.code}>
-                          <PushStepRow
-                            step={step} idx={idx} status={st}
-                            currentIdx={iosCurrentIdx} running={iosRunning || iosSyncing}
-                            onExecute={() => executeMajorStep('ios', idx)}
-                            onSkip={() => skipMajorStep('ios', idx)}
-                            onRetry={() => retryMajorStep('ios', idx)}
-                            manualActionLabel={idx === 5 && st === 'done' ? 'Обновить сообщение' : undefined}
-                            onManualAction={idx === 5 ? () => void refreshComponentsMessage('ios', { updateExisting: true, source: 'manual' }) : undefined}
-                          />
-                          {st === 'pending' && (
+                        <PushStepRow
+                          key={step.code}
+                          step={step} idx={idx} status={st}
+                          currentIdx={iosCurrentIdx} running={iosRunning || iosSyncing}
+                          onExecute={() => executeMajorStep('ios', idx)}
+                          onSkip={() => skipMajorStep('ios', idx)}
+                          onRetry={() => retryMajorStep('ios', idx)}
+                          manualActionLabel={idx === 5 && st === 'done' ? 'Обновить сообщение' : undefined}
+                          onManualAction={idx === 5 ? () => void refreshComponentsMessage('ios', { updateExisting: true, source: 'manual' }) : undefined}
+                          scheduleControls={st === 'pending' ? (
                             <StepScheduleBlock
                               plan={stepSchedules[sk]} tick={scheduleTick}
                               disabled={iosRunning || iosSyncing}
@@ -4628,39 +5167,29 @@ export function Launch() {
                               onAtTime={(d, t) => scheduleStep('ios', idx, 'schedule', 0, d, t)}
                               onCancel={() => cancelStepSchedule(sk)}
                             />
-                          )}
-                        </div>
+                          ) : undefined}
+                        />
                       );
                     })}
-                  </CardBody>
+                  </div>
                 </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Workflow Android</CardTitle>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      {andSyncing && <Badge color="yellow">Синхронизация...</Badge>}
-                      <Button variant="ghost" size="sm" disabled={andRunning || andSyncing} onClick={() => void syncMajorPlatform('android', { silent: false, applyThreadText: true })}>
-                        Синхронизировать
-                      </Button>
-                      <Badge color={andRunning || andSyncing ? 'yellow' : 'green'}>{andStatuses.filter(status => status === 'done').length}/{PUSH_AND_STEPS.length}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Card style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 22, boxShadow: 'var(--shadow-soft)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)', padding: '0 4px' }}>Android</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {PUSH_AND_STEPS.map((step, idx) => {
                       const sk = stepSK('android', idx);
                       const st = andStatuses[idx] ?? 'pending';
                       return (
-                        <div key={step.code}>
-                          <PushStepRow
-                            step={step} idx={idx} status={st}
-                            currentIdx={andCurrentIdx} running={andRunning || andSyncing}
-                            onExecute={() => executeMajorStep('android', idx)}
-                            onSkip={() => skipMajorStep('android', idx)}
-                            onRetry={() => retryMajorStep('android', idx)}
-                            manualActionLabel={idx === 5 && st === 'done' ? 'Обновить сообщение' : undefined}
-                            onManualAction={idx === 5 ? () => void refreshComponentsMessage('android', { updateExisting: true, source: 'manual' }) : undefined}
-                          />
-                          {st === 'pending' && (
+                        <PushStepRow
+                          key={step.code}
+                          step={step} idx={idx} status={st}
+                          currentIdx={andCurrentIdx} running={andRunning || andSyncing}
+                          onExecute={() => executeMajorStep('android', idx)}
+                          onSkip={() => skipMajorStep('android', idx)}
+                          onRetry={() => retryMajorStep('android', idx)}
+                          manualActionLabel={idx === 5 && st === 'done' ? 'Обновить сообщение' : undefined}
+                          onManualAction={idx === 5 ? () => void refreshComponentsMessage('android', { updateExisting: true, source: 'manual' }) : undefined}
+                          scheduleControls={st === 'pending' ? (
                             <StepScheduleBlock
                               plan={stepSchedules[sk]} tick={scheduleTick}
                               disabled={andRunning || andSyncing}
@@ -4668,28 +5197,13 @@ export function Launch() {
                               onAtTime={(d, t) => scheduleStep('android', idx, 'schedule', 0, d, t)}
                               onCancel={() => cancelStepSchedule(sk)}
                             />
-                          )}
-                        </div>
+                          ) : undefined}
+                        />
                       );
                     })}
-                  </CardBody>
+                  </div>
                 </Card>
               </div>
-
-              <Card>
-                <CardHeader>
-                  <div>
-                    <CardTitle>Автообновление компонентов</CardTitle>
-                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
-                      Таймер публикует свежий список на ближайшей отметке :02 каждого часа.
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardBody style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {renderComponentTimerControls('ios')}
-                  {renderComponentTimerControls('android')}
-                </CardBody>
-              </Card>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Card>
@@ -4740,22 +5254,18 @@ export function Launch() {
 
 	          {majorTab === 'ping' && (
 	            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-	              {renderMajorReleaseNumberCard()}
-
 	              <Card>
-	                <CardHeader>
+	                <CardBody>
 	                  <div>
-	                    <CardTitle>Пинг дежурных</CardTitle>
-                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
-                      Android и iOS запускаются независимо, как в legacy-версии.
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardBody style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {!cookies && <Badge color="red">Нужны Band cookies</Badge>}
-                  {!token && <Badge color="yellow">Нужен Allure токен для загрузки незакрытых стримов</Badge>}
-                </CardBody>
-              </Card>
+	                    <FieldLabel>Номер релиза</FieldLabel>
+	                    <Input
+	                      value={majorSharedRelease}
+	                      onChange={event => updateMajorSharedRelease(event.target.value)}
+	                      placeholder="например: 7.3.1000"
+	                    />
+	                  </div>
+	                </CardBody>
+	              </Card>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {renderDutyPingCard('android')}
@@ -5101,61 +5611,50 @@ export function Launch() {
       )}
 
       {mode !== 'major' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
           <Card>
             <CardHeader><CardTitle>Параметры</CardTitle></CardHeader>
             <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <FieldLabel>Номер релиза</FieldLabel>
-                <Input value={release} onChange={event => setRelease(event.target.value)} placeholder="например: 7.3.5420" />
-              </div>
-              {(mode === 'hf_android' || mode === 'hf_ios' || mode === 'rustore_critical' || mode === 'rustore_smoke') && (
-                <div>
-                  <FieldLabel>Номер сборки (необязательно)</FieldLabel>
-                  <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 180px', minWidth: 180 }}>
+                  <FieldLabel>Номер релиза</FieldLabel>
+                  <Input value={release} onChange={event => setRelease(event.target.value)} placeholder="например: 7.3.5420" />
+                </div>
+                {nonMajorBuildMode && (
+                  <div style={{ flex: '1 1 240px', minWidth: 220 }}>
+                    <FieldLabel>Номер сборки (необязательно)</FieldLabel>
                     <Input
                       value={buildValue}
                       onChange={event => setBuildValue(event.target.value)}
-                      placeholder="например: 12345"
-                      style={{ flex: 1 }}
+                      placeholder="ссылка или номер сборки"
+                      disabled={buildResolving || running}
                     />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={resolveBuild}
-                      disabled={buildResolving || running || !cookies}
-                    >
-                      {buildResolving ? '...' : 'Найти'}
-                    </Button>
                   </div>
-                </div>
-              )}
-              {(mode === 'hf_android' || mode === 'hf_ios' || mode === 'napi' || mode === 'rustore_critical' || mode === 'rustore_smoke') && (
-                <div>
-                  <FieldLabel>Дежурный SWAT (необязательно)</FieldLabel>
-                  <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-                    {(['none', 'viktor', 'roman'] as const).map(v => (
-                      <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12, color: 'var(--text-2)' }}>
-                        <input
-                          type="radio"
-                          name="swatLead"
-                          checked={swatLead === v}
-                          onChange={() => setSwatLead(v)}
-                          style={{ accentColor: '#9B5CFF' }}
-                        />
-                        {v === 'none' ? 'Никто' : v === 'viktor' ? '@dolgov.viktor7' : '@kolosov.roman'}
-                      </label>
-                    ))}
+                )}
+                {nonMajorSwatLeadMode && (
+                  <div style={{ flex: '1 1 300px', minWidth: 260 }}>
+                    <FieldLabel>Дежурный SWAT (необязательно)</FieldLabel>
+                    <div style={{ display: 'flex', gap: 12, minHeight: 34, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {(['none', 'viktor', 'roman'] as const).map(v => (
+                        <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12, color: 'var(--text-2)' }}>
+                          <input
+                            type="radio"
+                            name="swatLead"
+                            checked={swatLead === v}
+                            onChange={() => setSwatLead(v)}
+                            style={{ accentColor: '#9B5CFF' }}
+                          />
+                          {v === 'none' ? 'Никто' : v === 'viktor' ? '@dolgov.viktor7' : '@kolosov.roman'}
+                        </label>
+                      ))}
+                    </div>
                   </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
+                  <LaunchRunButton running={running} onClick={runWorkflow} />
                 </div>
-              )}
-              <Divider />
-              <Button variant={running ? 'danger' : 'primary'} onClick={runWorkflow}>
-                {running ? '■ Остановить' : '▷ Запустить'}
-              </Button>
-              <Button variant="secondary" onClick={runProxyCheck}>
-                Проверить прокси
-              </Button>
+              </div>
+
               {(!settings.allureToken || !settings.ytToken || !settings.bandCookies) && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {!settings.allureToken && <Badge color="red">Нужен Allure токен</Badge>}
@@ -5163,52 +5662,43 @@ export function Launch() {
                   {!settings.bandCookies && <Badge color="red">Нужны Band cookies</Badge>}
                 </div>
               )}
-
-              <AutomationBlock
-                mode={mode} running={running} automationRunning={automationRunning}
-                plan={automationPlan} tick={automTick}
-                onSchedule={scheduleAutomation} onCancel={cancelAutomation}
-              />
-
-              {steps.some(step => step.id === 'notify_swat') && (
+              {(nonMajorHasSwatAction || nonMajorHasFeedAction || createdRuns.length > 0) && (
                 <>
                   <Divider />
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>SWAT</div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <Button variant="ghost" size="sm" onClick={() => publishSwatPost()}>
-                      SWAT Team Only
-                    </Button>
-	                    <SchedulePicker onSchedule={targetMs => publishSwatPost(targetMs)} />
-                  </div>
-                </>
-              )}
-
-              {steps.some(step => step.id === 'feed_post') && (
-                <>
-                  <Divider />
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Лента</div>
-                  <Button variant="ghost" size="sm" onClick={publishFeedPost}>
-                    Лента релизов
-                  </Button>
-                </>
-              )}
-
-              {createdRuns.length > 0 && (
-                <>
-                  <Divider />
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Созданные раны</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {createdRuns.map(run => (
-                      <a
-                        key={run.id}
-                        href={run.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontSize: 12, color: '#9B5CFF', textDecoration: 'none' }}
-                      >
-                        #{run.id} {run.name}{run.reused ? ' ↩' : ''}
-                      </a>
-                    ))}
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {nonMajorHasSwatAction && (
+                      <>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>SWAT</span>
+                        <Button variant="ghost" size="sm" onClick={() => publishSwatPost()}>
+                          SWAT Team Only
+                        </Button>
+                        <SchedulePicker onSchedule={targetMs => publishSwatPost(targetMs)} />
+                      </>
+                    )}
+                    {nonMajorHasFeedAction && (
+                      <>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Лента</span>
+                        <Button variant="ghost" size="sm" onClick={publishFeedPost}>
+                          Лента релизов
+                        </Button>
+                      </>
+                    )}
+                    {createdRuns.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Раны</span>
+                        {createdRuns.map(run => (
+                          <a
+                            key={run.id}
+                            href={run.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 12, color: '#9B5CFF', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                          >
+                            #{run.id}{run.reused ? ' ↩' : ''}
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -5348,23 +5838,164 @@ export function Launch() {
                 </CardBody>
               </Card>
             )}
-            <Card>
-              <CardHeader>
-                <CardTitle>Лог</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setLogs([])}>Очистить</Button>
-              </CardHeader>
-              <CardBody>
-                {logs.length === 0
-                  ? <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Нажмите «Запустить» для начала</div>
-                  : <LogView lines={logs} />
-                }
-                {logs.length > 0 && (
-                  <Button variant="secondary" size="sm" style={{ marginTop: 10 }} onClick={() => navigator.clipboard.writeText(logs.map(line => line.text).join('\n'))}>
-                    Скопировать лог
-                  </Button>
-                )}
-              </CardBody>
-            </Card>
+          </div>
+        </div>
+      )}
+
+      {mode !== 'major' && logs.length > 0 && !nonMajorLogPanelOpen && (
+        <button
+          type="button"
+          onClick={() => setNonMajorLogPanelOpen(true)}
+          title="Открыть лог запуска"
+          aria-label="Открыть лог запуска"
+          style={{
+            position: 'fixed',
+            right: 18,
+            bottom: 18,
+            zIndex: 520,
+            width: 46,
+            height: 46,
+            borderRadius: 12,
+            border: '1.5px solid var(--border-hi)',
+            background: 'var(--card)',
+            color: 'var(--text)',
+            boxShadow: '0 14px 42px rgba(0,0,0,.24)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            fontWeight: 900,
+          }}
+        >
+          ≡
+          <span
+            style={{
+              position: 'absolute',
+              top: -7,
+              right: -7,
+              minWidth: 20,
+              height: 20,
+              padding: '0 5px',
+              borderRadius: 999,
+              background: nonMajorLogActive ? '#A855F7' : '#64748B',
+              color: '#fff',
+              fontSize: 10,
+              lineHeight: '20px',
+              fontWeight: 800,
+              border: '2px solid var(--card)',
+            }}
+          >
+            {logs.length}
+          </span>
+        </button>
+      )}
+      {mode !== 'major' && logs.length > 0 && nonMajorLogPanelOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            right: 18,
+            bottom: 18,
+            zIndex: 520,
+            width: nonMajorLogPanelSize.width,
+            height: nonMajorLogPanelSize.height,
+            minWidth: 320,
+            minHeight: 220,
+            maxWidth: 'calc(100vw - 36px)',
+            maxHeight: 'calc(100vh - 36px)',
+            border: '1.5px solid var(--border-hi)',
+            borderRadius: 12,
+            background: 'var(--card)',
+            boxShadow: '0 20px 70px rgba(0,0,0,.30)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <button
+            type="button"
+            onMouseDown={startNonMajorLogPanelResize}
+            title="Изменить размер"
+            aria-label="Изменить размер лога"
+            style={{
+              position: 'absolute',
+              left: -1,
+              top: -1,
+              zIndex: 2,
+              width: 18,
+              height: 18,
+              border: '1px solid var(--border-hi)',
+              borderRadius: '12px 0 8px 0',
+              background: 'var(--surface-soft-2)',
+              cursor: 'nwse-resize',
+              padding: 0,
+            }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'var(--card-hi)' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase' }}>Лог запуска</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Badge color={nonMajorLogActive ? 'purple' : 'gray'}>{logs.length}</Badge>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(logs.map(line => line.text).join('\n'))}
+                title="Скопировать лог"
+                aria-label="Скопировать лог"
+                style={{
+                  height: 26,
+                  borderRadius: 8,
+                  border: '1px solid var(--border-hi)',
+                  background: 'var(--surface-soft)',
+                  color: 'var(--text-2)',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: '0 8px',
+                }}
+              >
+                Копировать
+              </button>
+              <button
+                type="button"
+                onClick={() => setLogs([])}
+                title="Очистить лог"
+                aria-label="Очистить лог"
+                style={{
+                  height: 26,
+                  borderRadius: 8,
+                  border: '1px solid var(--border-hi)',
+                  background: 'var(--surface-soft)',
+                  color: 'var(--text-2)',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: '0 8px',
+                }}
+              >
+                Очистить
+              </button>
+              <button
+                type="button"
+                onClick={() => setNonMajorLogPanelOpen(false)}
+                title="Скрыть лог"
+                aria-label="Скрыть лог"
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 8,
+                  border: '1px solid var(--border-hi)',
+                  background: 'var(--surface-soft)',
+                  color: 'var(--text-2)',
+                  cursor: 'pointer',
+                  fontSize: 15,
+                  lineHeight: 1,
+                }}
+              >
+                x
+              </button>
+            </div>
+          </div>
+          <div style={{ padding: 10, flex: 1, minHeight: 0 }}>
+            <LogView lines={logs} maxHeight="100%" style={{ height: '100%', boxSizing: 'border-box' }} />
           </div>
         </div>
       )}
