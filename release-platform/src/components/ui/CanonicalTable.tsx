@@ -28,8 +28,11 @@ export interface CanonicalTableProps<T> {
   emptyColumnsText?: ReactNode;
   rowHeight?: number | ((row: T, index: number) => number);
   maxHeight?: number | string;
+  minHeight?: number | string;
   minWidth?: number | string;
   overscanRight?: number;
+  hideHorizontalOverflow?: boolean;
+  variant?: 'default' | 'clean';
   loading?: boolean;
   loadingText?: ReactNode;
   isRowHighlighted?: (row: T, index: number) => boolean;
@@ -116,8 +119,11 @@ export function CanonicalTable<T>({
   emptyColumnsText = 'Не выбрано ни одной колонки',
   rowHeight = 72,
   maxHeight = '70vh',
+  minHeight,
   minWidth,
   overscanRight = 16,
+  hideHorizontalOverflow = false,
+  variant = 'default',
   loading = false,
   loadingText = 'Загружаю данные...',
   isRowHighlighted,
@@ -132,6 +138,16 @@ export function CanonicalTable<T>({
   const previewRef = useRef<HTMLDivElement | null>(null);
   const resizeStorageKeyRef = useRef(columnResizeStorageKey);
   const skeletonRowHeight = typeof rowHeight === 'number' ? rowHeight : 72;
+  const clean = variant === 'clean';
+  const outerBorder = clean ? '1px solid var(--border)' : '1.5px solid var(--border-hi)';
+  const headerBorder = clean ? '1px solid var(--border)' : '1.5px solid var(--border-hi)';
+  const rowBorder = clean ? '1px solid color-mix(in srgb, var(--border) 72%, transparent)' : '1px solid var(--border-hi)';
+  const columnBorder = clean ? '1px solid color-mix(in srgb, var(--border) 54%, transparent)' : '1px solid var(--border-hi)';
+  const cellColumnBorder = clean ? '1px solid color-mix(in srgb, var(--border) 42%, transparent)' : '1px solid var(--border)';
+  const headerBackground = 'var(--card-hi)';
+  const headerShadow = clean
+    ? '0 1px 0 var(--border), 0 10px 16px -20px rgba(0,0,0,.65)'
+    : undefined;
   const getEffectiveRowHeight = useCallback((row: T, index: number) => (
     typeof rowHeight === 'function' ? rowHeight(row, index) : rowHeight
   ), [rowHeight]);
@@ -166,23 +182,37 @@ export function CanonicalTable<T>({
   }, []);
 
   const startColumnResize = useCallback((column: CanonicalTableColumn<T>, event: React.MouseEvent<HTMLSpanElement>) => {
-    if (typeof column.width !== 'number') return;
     event.preventDefault();
     event.stopPropagation();
 
     const startX = event.clientX;
     const header = event.currentTarget.closest('th') as HTMLTableCellElement | null;
-    const startWidth = header?.getBoundingClientRect().width || column.width;
+    const headerRow = header?.parentElement;
+    const measuredWidths = tableColumns.reduce<Record<string, number>>((acc, item, index) => {
+      const cell = headerRow?.children.item(index) as HTMLTableCellElement | null;
+      const width = cell?.getBoundingClientRect().width;
+      if (width && Number.isFinite(width)) acc[item.id] = Math.round(width);
+      return acc;
+    }, {});
+    const startWidth = header?.getBoundingClientRect().width || (typeof column.width === 'number' ? column.width : 140);
     const prevUserSelect = document.body.style.userSelect;
     const prevCursor = document.body.style.cursor;
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
 
+    if (Object.keys(measuredWidths).length) {
+      setColumnWidths(prev => {
+        const next = { ...prev, ...measuredWidths };
+        persistColumnWidths(next);
+        return next;
+      });
+    }
+
     const onMove = (moveEvent: MouseEvent) => {
       const nextWidth = Math.round(clamp(startWidth + moveEvent.clientX - startX, minColumnWidth, maxColumnWidth));
       setColumnWidths(prev => {
         if (prev[column.id] === nextWidth) return prev;
-        const next = { ...prev, [column.id]: nextWidth };
+        const next = { ...prev, ...measuredWidths, [column.id]: nextWidth };
         persistColumnWidths(next);
         return next;
       });
@@ -197,7 +227,7 @@ export function CanonicalTable<T>({
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, [maxColumnWidth, minColumnWidth, persistColumnWidths]);
+  }, [maxColumnWidth, minColumnWidth, persistColumnWidths, tableColumns]);
 
   const updateClippedCell = (key: string, clipped: boolean) => {
     setClippedCells(prev => {
@@ -269,12 +299,14 @@ export function CanonicalTable<T>({
         style={{
           width: '100%',
           maxHeight,
-          overflow: 'auto',
+          minHeight: cssSize(minHeight),
+          overflowX: hideHorizontalOverflow ? 'hidden' : 'auto',
+          overflowY: 'auto',
           paddingRight: overscanRight,
-          border: '1.5px solid var(--border-hi)',
+          border: outerBorder,
           borderRadius: 8,
           background: 'var(--card)',
-          boxShadow: '0 1px 2px rgba(0,0,0,.04)',
+          boxShadow: clean ? '0 1px 2px rgba(0,0,0,.025)' : '0 1px 2px rgba(0,0,0,.04)',
         }}
         onMouseLeave={scheduleClosePreview}
       >
@@ -305,11 +337,11 @@ export function CanonicalTable<T>({
                       zIndex: 4,
                       height: GROUP_HEADER_HEIGHT,
                       padding: '10px 12px',
-                      borderRight: '1px solid var(--border-hi)',
-                      borderBottom: '1.5px solid var(--border-hi)',
-                      background: 'var(--card-hi)',
+                      borderRight: columnBorder,
+                      borderBottom: headerBorder,
+                      background: headerBackground,
                       backgroundClip: 'border-box',
-                      boxShadow: '0 3px 0 var(--card-hi), 0 4px 0 var(--border-hi)',
+                      boxShadow: clean ? headerShadow : '0 3px 0 var(--card-hi), 0 4px 0 var(--border-hi)',
                       color: 'var(--text)',
                       fontSize: 11,
                       fontWeight: 800,
@@ -327,7 +359,7 @@ export function CanonicalTable<T>({
               {tableColumns.map((column, columnIndex) => {
                 const stickyLeft = stickyLeftOffsets[columnIndex];
                 const isStickyLeft = typeof stickyLeft === 'number';
-                const headerBg = 'var(--card-hi)';
+                const headerBg = headerBackground;
                 return (
                 <th
                   key={column.id}
@@ -338,13 +370,15 @@ export function CanonicalTable<T>({
                     zIndex: isStickyLeft ? 7 : 3,
                     height: 40,
                     padding: '8px 10px',
-                    borderRight: '1px solid var(--border-hi)',
-                    borderBottom: '1.5px solid var(--border-hi)',
+                    borderRight: columnBorder,
+                    borderBottom: headerBorder,
                     background: headerBg,
                     backgroundClip: 'border-box',
-                    boxShadow: isStickyLeft
-                      ? '3px 0 0 var(--border-hi), 0 4px 0 var(--card-hi), 0 5px 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)'
-                      : '0 4px 0 var(--card-hi), 0 5px 0 var(--border-hi)',
+                    boxShadow: clean
+                      ? headerShadow
+                      : isStickyLeft
+                        ? '3px 0 0 var(--border-hi), 0 4px 0 var(--card-hi), 0 5px 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)'
+                        : '0 4px 0 var(--card-hi), 0 5px 0 var(--border-hi)',
                     color: 'var(--text-2)',
                     fontSize: 10.5,
                     fontWeight: 800,
@@ -356,7 +390,7 @@ export function CanonicalTable<T>({
                   }}
                 >
                     {column.title}
-                    {typeof column.width === 'number' && (
+                    {column.width != null && (
                       <span
                         role="separator"
                         aria-label={`Изменить ширину колонки ${textFromNode(column.title) || column.id}`}
@@ -409,7 +443,7 @@ export function CanonicalTable<T>({
                       padding: '22px 24px',
                       textAlign: 'center',
                       color: 'var(--text-2)',
-                      borderBottom: '1px solid var(--border-hi)',
+                      borderBottom: rowBorder,
                       background: 'var(--card)',
                     }}
                   >
@@ -461,11 +495,11 @@ export function CanonicalTable<T>({
                             zIndex: isStickyLeft ? 2 : 1,
                             height: skeletonRowHeight,
                             padding: '12px 10px',
-                            borderRight: '1px solid var(--border)',
-                            borderBottom: '1px solid var(--border-hi)',
+                            borderRight: cellColumnBorder,
+                            borderBottom: rowBorder,
                             background: rowBg,
                             backgroundClip: 'padding-box',
-                            boxShadow: isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : undefined,
+                            boxShadow: clean ? undefined : isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : undefined,
                           }}
                         >
                           <div
@@ -530,7 +564,11 @@ export function CanonicalTable<T>({
                   const isButtonPreview = canPreview && previewTrigger === 'button';
                   const rowBg = rowHighlighted
                     ? 'color-mix(in srgb, var(--accent) 13%, var(--card))'
-                    : (rowStripe === 0 ? 'var(--card)' : 'color-mix(in srgb, var(--card) 96%, var(--surface-soft-6))');
+                    : rowStripe === 0
+                      ? 'var(--card)'
+                      : clean
+                        ? 'color-mix(in srgb, var(--card) 98%, var(--surface-soft-3))'
+                        : 'color-mix(in srgb, var(--card) 96%, var(--surface-soft-6))';
                   const stickyRowBg = rowBg;
                   const stickyLeft = stickyLeftOffsets[columnIndex];
                   const isStickyLeft = typeof stickyLeft === 'number';
@@ -558,14 +596,14 @@ export function CanonicalTable<T>({
                         height: effectiveRowHeight,
                         maxHeight: effectiveRowHeight,
                         padding: '8px 10px',
-                        borderRight: '1px solid var(--border)',
-                        borderBottom: '1px solid var(--border-hi)',
+                        borderRight: cellColumnBorder,
+                        borderBottom: rowBorder,
                         color: 'var(--text-2)',
                         fontSize: 12,
                         verticalAlign: 'top',
                         background: cellBg,
                         backgroundClip: 'padding-box',
-                        boxShadow: isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : undefined,
+                        boxShadow: clean ? undefined : isStickyLeft ? '3px 0 0 var(--border-hi), 10px 0 16px -16px rgba(0,0,0,.65)' : undefined,
                         animation: rowHighlighted ? 'pulse 1.8s ease-in-out 2' : undefined,
                         transition: 'background .25s ease',
                         textAlign: column.align || 'left',

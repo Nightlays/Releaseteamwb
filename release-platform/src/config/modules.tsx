@@ -257,7 +257,7 @@ export const MODULES: ModuleDefinition[] = [
     id: 'uvu',
     legacyId: 'УВУ.html',
     label: 'Расчёт uWu',
-    sub: 'Управление версионными обновлениями',
+    sub: 'Информация по продуктивности на основе uWu',
     section: 'Аналитика',
     icon: icUvu,
   },

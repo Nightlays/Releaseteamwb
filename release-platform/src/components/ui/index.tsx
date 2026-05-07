@@ -133,6 +133,208 @@ export function Select({ style, ...props }: SelectHTMLAttributes<HTMLSelectEleme
   );
 }
 
+interface CanonicalValueSelectProps {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyText?: string;
+  clearLabel?: string;
+  disabled?: boolean;
+  style?: React.CSSProperties;
+}
+
+export function CanonicalValueSelect({
+  value,
+  options,
+  onChange,
+  placeholder = 'Выбрать значение',
+  searchPlaceholder = 'Поиск',
+  emptyText = 'Значений не найдено',
+  clearLabel = 'Сбросить',
+  disabled = false,
+  style,
+}: CanonicalValueSelectProps) {
+  const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState('');
+  const [position, setPosition] = React.useState({ left: 0, top: 0, width: 280 });
+  const buttonRef = React.useRef<HTMLButtonElement | null>(null);
+  const panelRef = React.useRef<HTMLDivElement | null>(null);
+  const normalizedOptions = React.useMemo(() => (
+    Array.from(new Set(options.map(option => String(option || '').trim()).filter(Boolean)))
+      .sort((left, right) => left.localeCompare(right, 'ru', { sensitivity: 'base' }))
+  ), [options]);
+  const filteredOptions = React.useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase('ru-RU');
+    if (!needle) return normalizedOptions;
+    return normalizedOptions.filter(option => option.toLocaleLowerCase('ru-RU').includes(needle));
+  }, [normalizedOptions, query]);
+
+  const updatePosition = React.useCallback(() => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.min(360, Math.max(260, rect.width));
+    const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12));
+    const top = Math.min(rect.bottom + 8, Math.max(12, window.innerHeight - 320));
+    setPosition({ left, top, width });
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return undefined;
+    updatePosition();
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onScrollOrResize = () => updatePosition();
+
+    document.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('resize', onScrollOrResize);
+    document.addEventListener('scroll', onScrollOrResize, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('resize', onScrollOrResize);
+      document.removeEventListener('scroll', onScrollOrResize, true);
+    };
+  }, [open, updatePosition]);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          updatePosition();
+          setOpen(true);
+        }}
+        style={{
+          ...inputBase,
+          height: 36,
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0,1fr) 16px',
+          alignItems: 'center',
+          gap: 8,
+          textAlign: 'left',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.64 : 1,
+          ...style,
+        }}
+      >
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: value ? 'var(--text)' : 'var(--text-3)' }}>
+          {value || placeholder}
+        </span>
+        <span style={{ color: 'var(--text-3)', fontSize: 12 }}>▾</span>
+      </button>
+      {open && (
+        <div
+          ref={panelRef}
+          onClick={event => event.stopPropagation()}
+          style={{
+            position: 'fixed',
+            left: position.left,
+            top: position.top,
+            zIndex: 6500,
+            width: position.width,
+            maxHeight: 300,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            padding: 10,
+            borderRadius: 10,
+            border: '1.5px solid var(--border-hi)',
+            background: 'var(--card)',
+            boxShadow: '0 22px 70px rgba(0,0,0,.34)',
+            color: 'var(--text)',
+          }}
+        >
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder={searchPlaceholder}
+            autoFocus
+            style={{
+              ...inputBase,
+              height: 32,
+              padding: '0 10px',
+              borderRadius: 8,
+              fontSize: 12,
+            }}
+          />
+          <div style={{ maxHeight: 218, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, paddingRight: 2 }}>
+            <button
+              type="button"
+              onClick={() => {
+                onChange('');
+                setOpen(false);
+                setQuery('');
+              }}
+              style={{
+                minHeight: 30,
+                padding: '6px 8px',
+                borderRadius: 7,
+                border: '1px solid transparent',
+                background: value ? 'var(--surface-soft-4)' : 'transparent',
+                color: value ? 'var(--text)' : 'var(--text-3)',
+                textAlign: 'left',
+                fontFamily: 'inherit',
+                fontSize: 12,
+                fontWeight: 750,
+                cursor: 'pointer',
+              }}
+            >
+              {clearLabel}
+            </button>
+            {filteredOptions.map(option => {
+              const selected = option === value;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  title={option}
+                  onClick={() => {
+                    onChange(option);
+                    setOpen(false);
+                    setQuery('');
+                  }}
+                  style={{
+                    minHeight: 30,
+                    padding: '6px 8px',
+                    borderRadius: 7,
+                    border: `1px solid ${selected ? 'rgba(168,85,247,.34)' : 'transparent'}`,
+                    background: selected ? 'rgba(168,85,247,.14)' : 'transparent',
+                    color: selected ? 'var(--accent)' : 'var(--text-2)',
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                    fontSize: 12,
+                    fontWeight: selected ? 800 : 650,
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {option}
+                </button>
+              );
+            })}
+            {!filteredOptions.length && (
+              <div style={{ padding: '12px 8px', color: 'var(--text-3)', fontSize: 12 }}>
+                {emptyText}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function Textarea({ style, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   const [focused, setFocused] = React.useState(false);
   return (
@@ -169,6 +371,68 @@ export function Progress({ value, max = 100, color = 'accent', height = 5, style
     <div style={{ height, borderRadius: 99, background: 'var(--surface-soft-5)', overflow: 'hidden', ...style }}>
       <div style={{ height: '100%', width: `${pct}%`, borderRadius: 99, background: c, transition: 'width .4s ease' }} />
     </div>
+  );
+}
+
+type RunStatusTone = 'neutral' | 'ok' | 'warn' | 'error';
+
+interface CanonicalRunLineProps {
+  controls: ReactNode;
+  actions: ReactNode;
+  showStatus?: boolean;
+  status?: ReactNode;
+  statusTone?: RunStatusTone;
+  progress?: number;
+  progressMax?: number;
+  progressColor?: ProgressColor;
+  progressLabel?: ReactNode;
+  style?: React.CSSProperties;
+  bodyStyle?: React.CSSProperties;
+}
+
+const RUN_STATUS_COLORS: Record<RunStatusTone, string> = {
+  neutral: 'var(--text-2)',
+  ok: '#4ADE80',
+  warn: '#FCD34D',
+  error: '#F87171',
+};
+
+export function CanonicalRunLine({
+  controls,
+  actions,
+  showStatus = false,
+  status,
+  statusTone = 'neutral',
+  progress = 0,
+  progressMax = 100,
+  progressColor = 'accent',
+  progressLabel,
+  style,
+  bodyStyle,
+}: CanonicalRunLineProps) {
+  const safeProgress = Math.round(Math.min(progressMax, Math.max(0, progress)));
+  return (
+    <Card style={{ borderRadius: 10, border: '1.5px solid var(--border-hi)', boxShadow: '0 8px 22px rgba(15,23,42,.06)', ...style }}>
+      <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px', ...bodyStyle }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flexWrap: 'wrap' }}>
+            {controls}
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            {actions}
+          </div>
+        </div>
+        {showStatus ? (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: RUN_STATUS_COLORS[statusTone] }}>{status}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--mono)' }}>{progressLabel ?? `${safeProgress}%`}</span>
+            </div>
+            <Progress value={progress} max={progressMax} color={progressColor} height={7} />
+          </div>
+        ) : null}
+      </CardBody>
+    </Card>
   );
 }
 
@@ -406,7 +670,7 @@ export function Modal({ open, onClose, title, children, width = 560 }: {
   if (!open) return null;
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ position: 'fixed', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onMouseDown={onClose}
     >
       <div

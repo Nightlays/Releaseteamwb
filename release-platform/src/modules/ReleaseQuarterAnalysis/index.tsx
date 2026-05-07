@@ -4,13 +4,13 @@ import {
   Button,
   Card,
   CardBody,
+  CanonicalRunLine,
   CanonicalTable,
   ColumnFilterDropdown,
   ColumnVisibilityDropdown,
   type CanonicalTableColumn,
   Input,
   LogView,
-  Progress,
   SegmentControl,
 } from '../../components/ui';
 import { useSettings } from '../../context/SettingsContext';
@@ -1913,89 +1913,85 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <Card>
-        <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: 12, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>Релиз:</span>
-              <Input
-                value={releaseFrom}
-                onChange={event => updateRelease(event.target.value)}
-                placeholder="7.5.6000"
-                style={{ width: 112, height: 34, padding: '6px 10px', minWidth: 0 }}
+      <CanonicalRunLine
+        controls={(
+          <>
+            <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>Релиз:</span>
+            <Input
+              value={releaseFrom}
+              onChange={event => updateRelease(event.target.value)}
+              placeholder="7.5.6000"
+              style={{ width: 112, height: 34, padding: '6px 10px', minWidth: 0 }}
+            />
+            <label
+              title="Собирать несколько мажорных релизов"
+              style={{
+                height: 34,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '0 9px',
+                borderRadius: 8,
+                border: `1.5px solid ${rangeEnabled ? 'rgba(168,85,247,.46)' : 'var(--border-hi)'}`,
+                background: 'var(--card)',
+                color: rangeEnabled ? 'var(--accent)' : 'var(--text-2)',
+                fontSize: 11,
+                fontWeight: 650,
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={rangeEnabled}
+                onChange={event => updateRangeEnabled(event.target.checked)}
+                style={{ margin: 0, accentColor: 'var(--accent)' }}
               />
-              <label
-                title="Собирать несколько мажорных релизов"
+              <span>Диапазон</span>
+            </label>
+            {rangeEnabled && (
+              <>
+                <span style={{ fontSize: 11, fontWeight: 650, color: 'var(--text-3)' }}>по</span>
+                <Input
+                  value={releaseTo}
+                  onChange={event => updateReleaseTo(event.target.value)}
+                  placeholder="7.6.0000"
+                  style={{ width: 112, height: 34, padding: '6px 10px', minWidth: 0 }}
+                />
+              </>
+            )}
+          </>
+        )}
+        actions={(
+          <>
+            {busy ? (
+              <Button variant="danger" onClick={stop}>Остановить</Button>
+            ) : (
+              <Button variant="primary" disabled={loadingSaved || pendingRows.length > 0 || !canRunCollection} onClick={() => void run()}>Собрать</Button>
+            )}
+            {canSaveRows && (
+              <Button
+                variant="secondary"
+                disabled={!pendingRows.length || busy || saving || loadingSaved}
+                onClick={() => void saveRows()}
                 style={{
-                  height: 34,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  padding: '0 9px',
-                  borderRadius: 8,
-                  border: `1.5px solid ${rangeEnabled ? 'rgba(168,85,247,.46)' : 'var(--border-hi)'}`,
-                  background: 'var(--card)',
-                  color: rangeEnabled ? 'var(--accent)' : 'var(--text-2)',
-                  fontSize: 11,
-                  fontWeight: 650,
-                  cursor: 'pointer',
-                  userSelect: 'none',
+                  borderColor: pendingRows.length ? 'rgba(34,197,94,.32)' : undefined,
+                  color: pendingRows.length ? '#4ADE80' : undefined,
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={rangeEnabled}
-                  onChange={event => updateRangeEnabled(event.target.checked)}
-                  style={{ margin: 0, accentColor: 'var(--accent)' }}
-                />
-                <span>Диапазон</span>
-              </label>
-              {rangeEnabled && (
-                <>
-                  <span style={{ fontSize: 11, fontWeight: 650, color: 'var(--text-3)' }}>по</span>
-                  <Input
-                    value={releaseTo}
-                    onChange={event => updateReleaseTo(event.target.value)}
-                    placeholder="7.6.0000"
-                    style={{ width: 112, height: 34, padding: '6px 10px', minWidth: 0 }}
-                  />
-                </>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              {busy ? (
-                <Button variant="danger" onClick={stop}>Остановить</Button>
-              ) : (
-                <Button variant="primary" disabled={loadingSaved || pendingRows.length > 0 || !canRunCollection} onClick={() => void run()}>Собрать</Button>
-              )}
-              {canSaveRows && (
-                <Button
-                  variant="secondary"
-                  disabled={!pendingRows.length || busy || saving || loadingSaved}
-                  onClick={() => void saveRows()}
-                  style={{
-                    borderColor: pendingRows.length ? 'rgba(34,197,94,.32)' : undefined,
-                    color: pendingRows.length ? '#4ADE80' : undefined,
-                  }}
-                >
-                  {saving ? 'Записываю...' : 'Записать'}
-                </Button>
-              )}
-              <Button variant="secondary" disabled={!visibleRows.length || loadingSaved} onClick={() => exportCsv(visibleRows, platform, csvRangeLabel)}>CSV</Button>
-              <Button variant="secondary" disabled={!visibleRows.length || loadingSaved} onClick={() => exportPdf(visibleRows, platform, csvRangeLabel)}>PDF</Button>
-            </div>
-          </div>
-          {showRunStatus && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: statusTone === 'error' ? '#F87171' : statusTone === 'warn' ? '#FCD34D' : statusTone === 'ok' ? '#4ADE80' : 'var(--text-2)' }}>{status}</span>
-                <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--mono)' }}>{progress}%</span>
-              </div>
-              <Progress value={progress} color={progressColor} height={7} />
-            </div>
-          )}
-        </CardBody>
-      </Card>
+                {saving ? 'Записываю...' : 'Записать'}
+              </Button>
+            )}
+            <Button variant="secondary" disabled={!visibleRows.length || loadingSaved} onClick={() => exportCsv(visibleRows, platform, csvRangeLabel)}>CSV</Button>
+            <Button variant="secondary" disabled={!visibleRows.length || loadingSaved} onClick={() => exportPdf(visibleRows, platform, csvRangeLabel)}>PDF</Button>
+          </>
+        )}
+        showStatus={showRunStatus}
+        status={status}
+        statusTone={statusTone}
+        progress={progress}
+        progressColor={progressColor}
+      />
 
       <Card style={{
         borderRadius: 10,
@@ -2176,6 +2172,7 @@ export function ReleaseQuarterAnalysis({ role = 'viewer' }: ReleaseQuarterAnalys
             emptyText="Данных по выбранному фильтру нет."
             emptyColumnsText="Не выбрано ни одной колонки"
             columnResizeStorageKey={COLUMN_WIDTHS_STORAGE_KEY}
+            variant="clean"
           />
         ) : (
           <QuarterChartsView
