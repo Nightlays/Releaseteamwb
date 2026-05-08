@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>WB YouTrack Issues - релизные задачи</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Tailwind CDN removed for VPN compatibility; minimal local utility subset is inlined below. -->
+  <style>
+    .min-h-screen { min-height: 100vh; }
+    .max-w-screen-2xl { max-width: 1536px; }
+    .mx-auto { margin-left: auto; margin-right: auto; }
+    .grid { display: grid; }
+    .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    .flex { display: flex; }
+    .inline-flex { display: inline-flex; }
+    .block { display: block; }
+    .w-full { width: 100%; }
+    .fixed { position: fixed; }
+    .left-1\/2 { left: 50%; }
+    .bottom-6 { bottom: 1.5rem; }
+    .-translate-x-1\/2 { transform: translateX(-50%); }
+    .items-center { align-items: center; }
+    .items-end { align-items: end; }
+    .justify-between { justify-content: space-between; }
+    .justify-center { justify-content: center; }
+    .flex-wrap { flex-wrap: wrap; }
+    .gap-1 { gap: 0.25rem; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-3 { gap: 0.75rem; }
+    .gap-4 { gap: 1rem; }
+    .p-3 { padding: 0.75rem; }
+    .p-4 { padding: 1rem; }
+    .p-5 { padding: 1.25rem; }
+    .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+    .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-5 { margin-top: 1.25rem; }
+    .mb-1 { margin-bottom: 0.25rem; }
+    .rounded-full { border-radius: 9999px; }
+    .rounded-2xl { border-radius: 1rem; }
+    .border { border-width: 1px; border-style: solid; border-color: #e5e7eb; }
+    .border-\[\#ecebff\] { border-color: #ecebff; }
+    .bg-white { background: #fff; }
+    .bg-white\/70 { background: rgba(255, 255, 255, 0.7); }
+    .bg-white\/90 { background: rgba(255, 255, 255, 0.9); }
+    .ring-1 { --tw-ring-color: rgba(15, 23, 42, 0.08); box-shadow: 0 0 0 1px var(--tw-ring-color); }
+    .ring-\[\#ecebff\] { --tw-ring-color: #ecebff; }
+    .ring-\[\#cfd6df\] { --tw-ring-color: #cfd6df; }
+    .text-\[\#111827\] { color: #111827; }
+    .text-\[11px\] { font-size: 11px; line-height: 1; }
+    .text-xs { font-size: 0.75rem; line-height: 1rem; }
+    .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+    .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+    .text-slate-500 { color: #64748b; }
+    .text-slate-600 { color: #475569; }
+    .text-slate-700 { color: #334155; }
+    .font-semibold { font-weight: 600; }
+    .font-extrabold { font-weight: 800; }
+    .leading-tight { line-height: 1.25; }
+    .pointer-events-none { pointer-events: none; }
+    .opacity-0 { opacity: 0; }
+    .transition-opacity { transition-property: opacity; }
+    .duration-200 { transition-duration: 200ms; }
+    .hover\:bg-white:hover { background: #fff; }
+    .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.75rem; }
+    .shadow { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06); }
+    @media (min-width: 768px) {
+      .md\:grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+      .md\:col-span-2 { grid-column: span 2 / span 2; }
+      .md\:col-span-4 { grid-column: span 4 / span 4; }
+      .md\:col-span-6 { grid-column: span 6 / span 6; }
+    }
+  </style>
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    .msg-block {
+      background: #eef1f5;
+      border: 1px solid #d7dde5;
+      border-radius: 16px;
+      box-shadow: 0 12px 24px rgba(31, 41, 55, 0.08);
+      color: #111827;
+    }
+
+    .msg-head {
+      border-bottom: 1px solid #d7dde5;
+      padding: 12px 16px;
+      font-weight: 700;
+      color: #111827;
+      letter-spacing: 0.2px;
+    }
+
+    .msg-pre {
+      margin: 0;
+      padding: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 17px;
+      line-height: 1.52;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      min-height: 320px;
+      background: #eef1f5;
+      color: #111827 !important;
+      opacity: 1;
+    }
+
+    .msg-pre .anchor {
+      color: #1d4ed8;
+      text-decoration: none;
+    }
+
+    #loadBtn.btn-grad {
+      background: linear-gradient(90deg, var(--wb-primary), var(--wb-secondary)) !important;
+      color: #fff !important;
+      border-color: transparent !important;
+    }
+
+    #loadBtn.btn-grad:hover,
+    #loadBtn.btn-grad:focus {
+      background: linear-gradient(90deg, var(--wb-primary), var(--wb-secondary)) !important;
+      color: #fff !important;
+      filter: saturate(1.05);
+      transform: translateY(-1px);
+    }
+
+    #loadBtn.btn-danger {
+      background: linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95)) !important;
+      color: #fff !important;
+      border-color: transparent !important;
+    }
+
+    #loadBtn.btn-danger:hover,
+    #loadBtn.btn-danger:focus {
+      background: linear-gradient(90deg, rgba(244,63,94,1), rgba(255,90,200,.95)) !important;
+      color: #fff !important;
+      filter: saturate(1.05);
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body class="min-h-screen wb-graphs">
+  <div class="max-w-screen-2xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="brand-badge">
+        <span class="brand-dot"></span>
+        <div>
+          <div class="flex items-center gap-2">
+            <div class="font-extrabold leading-tight">WB YouTrack Issues</div>
+            <span id="appVersion" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-[#ecebff] text-slate-600">
+              <span aria-hidden="true">🏷️</span><span>v0.2.23</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="mt-5 grid grid-cols-1 gap-4">
+      <section class="card p-5 space-y-3">
+        <div>
+          <h2 class="text-lg font-semibold">Параметры запуска</h2>
+          <div class="hint">Заполни параметры и нажми «Запустить сбор».</div>
+        </div>
+
+        <form class="w-full" onsubmit="return false;">
+          <div class="border border-[#ecebff] rounded-2xl bg-white p-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold text-[#111827] mb-1" for="release">Номер релиза</label>
+                <input class="input" id="release" placeholder="7.5.1000" />
+              </div>
+              <div class="md:col-span-6">
+                <label class="block text-xs font-semibold text-[#111827] mb-1" for="token">YouTrack token</label>
+                <input class="input" id="token" type="password" autocomplete="off" placeholder="Вставьте токен" />
+              </div>
+              <div class="md:col-span-2">
+                <button id="loadBtn" type="button" class="btn btn-grad w-full">Запустить сбор</button>
+                <button id="stopBtn" type="button" class="btn btn-danger w-full" style="display:none;">Отменить сбор</button>
+                <button id="proxyBtn" type="button" class="mt-2 w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#ecebff] text-slate-700 hover:bg-white">
+                  Проверить прокси
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <div id="status" class="text-sm text-slate-500">Введите релиз и токен, затем нажмите «Запустить сбор».</div>
+        <div id="summary" class="flex flex-wrap gap-2"></div>
+      </section>
+
+      <section class="card p-3">
+        <div class="flex justify-center">
+          <div class="tabs" role="tablist" aria-label="Режим выгрузки">
+            <button id="tabElena" type="button" class="tab" aria-selected="true">Елена</button>
+            <button id="tabNadezhda" type="button" class="tab" aria-selected="false">Надежда</button>
+            <button id="tabDarya" type="button" class="tab" aria-selected="false">Дарья</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card p-5">
+        <div class="msg-block">
+          <div class="msg-head flex items-center justify-between gap-3">
+            <span id="outputTitle">Текст для отправки</span>
+            <button id="copyBtn" type="button" class="inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-2xl bg-white/70 ring-1 ring-[#cfd6df] text-slate-700 hover:bg-white">
+              Копировать
+            </button>
+          </div>
+          <pre id="output" class="msg-pre">Здесь будет сформирован текст.</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 opacity-0 transition-opacity duration-200">
+    <div id="toastInner" class="px-4 py-2 rounded-2xl text-sm font-semibold bg-white/90 ring-1 ring-[#ecebff] text-slate-700 shadow"></div>
+  </div>
+
+  <script>
+    // Hardcoded from HAR-derived flow.
+    const APP_VERSION = "v0.2.22";
+    const LS_RANGE_KEY = "swat_uwu_release_range";
+    const LS_YT_TOKEN_KEY = "wb_all_table_yt_token";
+    const PROXY_BASE = "http://localhost:8787";
+    const YT_BASE_URL = "https://youtrack.wildberries.ru";
+    const SORTED_ISSUES_FIELDS = "tree(id,matches,ordered,parentId,summaryTextSearchResult(highlightRanges(endOffset,startOffset),textRange(endOffset,startOffset)))";
+    const AGILE_SPRINTS_FIELDS = "archived,finish,goal,id,isDefault,isStarted,name,ordinal,report(id),start";
+    const ISSUES_GETTER_FIELDS =
+      "$type,attachments(id),canAddPublicComment,canUpdateVisibility,commentsCount,created,fields($type,hasStateMachine,id,isUpdatable,name,projectCustomField($type,bundle(id),canBeEmpty,emptyFieldText,field(fieldType(isMultiValue,valueType),id,localizedName,name,ordinal),id,isEstimation,isPublic,isSpentTime,ordinal,size),value($type,archived,avatarUrl,buildIntegration,buildLink,color(background,foreground,id),description,fullName,id,isResolved,localizedName,login,markdownText,minutes,name,presentation,ringId,text)),hasEmail,id,idReadable,project($type,id,isDemo,leader(id),name,plugins(helpDeskSettings(enabled)),ringId,shortName),reporter($type,avatarUrl,banBadge,banned,canReadProfile,email,fullName,id,isEmailVerified,isLocked,issueRelatedGroup(icon),login,name,online,profiles(general(trackOnlineStatus)),ringId,userType(id)),resolved,summary,tags(color(id),id,isUpdatable,isUsable,name,owner(id),query),transaction(authorId,timestamp),updated,updater($type,avatarUrl,banBadge,banned,canReadProfile,email,fullName,id,isEmailVerified,isLocked,issueRelatedGroup(icon),login,name,online,profiles(general(trackOnlineStatus)),ringId,userType(id)),visibility($type,implicitPermittedUsers($type,avatarUrl,banBadge,banned,canReadProfile,email,fullName,id,isEmailVerified,isLocked,issueRelatedGroup(icon),login,name,online,profiles(general(trackOnlineStatus)),ringId,userType(id)),permittedGroups($type,allUsersGroup,icon,id,name,ringId),permittedUsers($type,avatarUrl,banBadge,banned,canReadProfile,email,fullName,id,isEmailVerified,isLocked,issueRelatedGroup(icon),login,name,online,profiles(general(trackOnlineStatus)),ringId,userType(id))),voters(hasVote),votes,watchers(hasStar)";
+    const ISSUE_FALLBACK_FIELDS =
+      "id,idReadable,summary,description,fields($type,name,projectCustomField(field(name)),value($type,name,localizedName,text,markdownText,presentation))";
+    const TOP_ROOT = 101;
+    const MODE_ELENA = "elena";
+    const MODE_NADEZHDA = "nadezhda";
+    const MODE_DARYA = "darya";
+    const IOS_SPRINT_FIELD = "{Версия релиза (ex. Sprint) iOS}";
+    const ANDROID_SPRINT_FIELD = "{Версия релиза (ex. Sprint) Android}";
+    const PLATFORM_CFG = [
+      { key: "ios", sprintField: "{Версия релиза (ex. Sprint) iOS}", agileId: "83-469" },
+      { key: "android", sprintField: "{Версия релиза (ex. Sprint) Android}", agileId: "83-2175" }
+    ];
+
+    const ui = {
+      appVersion: document.getElementById("appVersion"),
+      release: document.getElementById("release"),
+      token: document.getElementById("token"),
+      loadBtn: document.getElementById("loadBtn"),
+      stopBtn: document.getElementById("stopBtn"),
+      proxyBtn: document.getElementById("proxyBtn"),
+      copyBtn: document.getElementById("copyBtn"),
+      status: document.getElementById("status"),
+      summary: document.getElementById("summary"),
+      output: document.getElementById("output"),
+      outputTitle: document.getElementById("outputTitle"),
+      tabElena: document.getElementById("tabElena"),
+      tabNadezhda: document.getElementById("tabNadezhda"),
+      tabDarya: document.getElementById("tabDarya")
+    };
+    const sprintBoardInfoCache = new Map();
+    let activeMode = MODE_ELENA;
+    let activeRunController = null;
+
+    function setStatus(text, type) {
+      ui.status.textContent = text;
+      ui.status.className = "text-sm";
+      if (type === "ok") {
+        ui.status.classList.add("text-emerald-600", "font-semibold");
+        return;
+      }
+      if (type === "err") {
+        ui.status.classList.add("text-rose-600", "font-semibold");
+        return;
+      }
+      ui.status.classList.add("text-slate-500");
+    }
+
+    function renderSummary(chips) {
+      ui.summary.innerHTML = "";
+      chips.forEach(text => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = text;
+        ui.summary.appendChild(chip);
+      });
+    }
+
+    function setRunning(running) {
+      if (running) {
+        ui.loadBtn.style.display = "none";
+        ui.stopBtn.style.display = "";
+        ui.loadBtn.disabled = true;
+        ui.stopBtn.disabled = false;
+        return;
+      }
+      ui.stopBtn.style.display = "none";
+      ui.loadBtn.style.display = "";
+      ui.stopBtn.disabled = true;
+      ui.loadBtn.disabled = false;
+    }
+
+    function setMode(mode) {
+      if (activeRunController) return;
+      if (mode === MODE_NADEZHDA) {
+        activeMode = MODE_NADEZHDA;
+      } else if (mode === MODE_DARYA) {
+        activeMode = MODE_DARYA;
+      } else {
+        activeMode = MODE_ELENA;
+      }
+      const isElena = activeMode === MODE_ELENA;
+      ui.tabElena.setAttribute("aria-selected", isElena ? "true" : "false");
+      ui.tabNadezhda.setAttribute("aria-selected", activeMode === MODE_NADEZHDA ? "true" : "false");
+      ui.tabDarya.setAttribute("aria-selected", activeMode === MODE_DARYA ? "true" : "false");
+      if (ui.outputTitle) {
+        ui.outputTitle.textContent = isElena ? "Текст для отправки" : "Текст для копирования";
+      }
+      ui.output.textContent = isElena
+        ? "Здесь будет сформирован текст."
+        : "Здесь будет сформирован список задач.";
+      ui.summary.innerHTML = "";
+      setStatus("Введите релиз и токен, затем нажмите «Запустить сбор».", "");
+    }
+
+    function createAbortError() {
+      try {
+        return new DOMException("Aborted", "AbortError");
+      } catch (_) {
+        const err = new Error("Aborted");
+        err.name = "AbortError";
+        return err;
+      }
+    }
+
+    function isAbortError(error) {
+      return error?.name === "AbortError";
+    }
+
+    function waitWithAbort(ms, signal) {
+      if (!signal) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+      if (signal.aborted) return Promise.reject(createAbortError());
+      return new Promise((resolve, reject) => {
+        const t = setTimeout(() => {
+          signal.removeEventListener("abort", onAbort);
+          resolve();
+        }, ms);
+        const onAbort = () => {
+          clearTimeout(t);
+          signal.removeEventListener("abort", onAbort);
+          reject(createAbortError());
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+      });
+    }
+
+    function asBearer(rawToken) {
+      const token = String(rawToken || "").trim();
+      if (!token) return "";
+      return /^bearer\s+/i.test(token) ? token : `Bearer ${token}`;
+    }
+
+    function buildQuery(release, sprintField) {
+      return `(Type: Epic OR Type: {User Story}) AND (${sprintField}: ${release}) AND State: -Rejected`;
+    }
+
+    function showToast(msg, ok = true) {
+      const el = document.getElementById("toast");
+      const inner = document.getElementById("toastInner");
+      if (!el || !inner) return;
+
+      inner.textContent = msg;
+      inner.className = "px-4 py-2 rounded-2xl text-sm font-semibold ring-1 shadow " + (ok
+        ? "bg-white/90 ring-[#ecebff] text-slate-700"
+        : "bg-rose-50 ring-rose-200 text-rose-700");
+      el.style.opacity = "1";
+      clearTimeout(showToast.__t);
+      showToast.__t = setTimeout(() => { el.style.opacity = "0"; }, 1800);
+    }
+
+    async function fetchWithRetry(fetcher, { maxTries = 5, baseDelay = 200, signal } = {}) {
+      let lastErr;
+      for (let i = 0; i < maxTries; i += 1) {
+        if (signal?.aborted) throw createAbortError();
+        try {
+          return await fetcher();
+        } catch (error) {
+          if (isAbortError(error) || signal?.aborted) throw error;
+          lastErr = error;
+          if (i < maxTries - 1) {
+            const jitter = Math.floor(Math.random() * 120);
+            const waitMs = baseDelay * (2 ** i) + jitter;
+            await waitWithAbort(waitMs, signal);
+            continue;
+          }
+        }
+      }
+      throw lastErr;
+    }
+
+    async function proxyRequestJson(targetUrl, { method = "GET", headers = {}, body, signal } = {}) {
+      const p = new URL(PROXY_BASE + "/proxy");
+      p.searchParams.set("url", targetUrl);
+
+      return fetchWithRetry(async () => {
+        const response = await fetch(p.toString(), {
+          method,
+          headers,
+          body,
+          signal
+        });
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(`Proxy HTTP ${response.status}${text ? `. ${text}` : ""}`);
+        }
+        return response.json();
+      }, { signal });
+    }
+
+    async function proxyGetJson(targetUrl, headers, signal) {
+      return proxyRequestJson(targetUrl, { method: "GET", headers, signal });
+    }
+
+    async function fetchSortedIssueIds(query, authHeader, signal) {
+      const params = new URLSearchParams();
+      params.set("$top", "-1");
+      params.set("fields", SORTED_ISSUES_FIELDS);
+      params.set("flatten", "true");
+      params.set("query", query);
+      params.set("skipRoot", "0");
+      params.set("topRoot", String(TOP_ROOT));
+      params.set("unresolvedOnly", "false");
+
+      const data = await proxyGetJson(
+        `${YT_BASE_URL}/api/sortedIssues?${params.toString()}`,
+        {
+          Accept: "application/json",
+          Authorization: authHeader
+        },
+        signal
+      );
+      const tree = Array.isArray(data?.tree) ? data.tree : [];
+      return tree.map(node => node?.id).filter(Boolean);
+    }
+
+    async function fetchIssueDetails(ids, authHeader, signal) {
+      if (!Array.isArray(ids) || ids.length === 0) return [];
+
+      const params = new URLSearchParams();
+      params.set("$top", "-1");
+      params.set("fields", ISSUES_GETTER_FIELDS);
+      params.set("fieldsVisibleOnList", "true");
+
+      const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+      const fetchByIds = async list => {
+        const payload = list.map(id => ({ id }));
+        const data = await proxyRequestJson(`${YT_BASE_URL}/api/issuesGetter?${params.toString()}`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: authHeader
+          },
+          body: JSON.stringify(payload),
+          signal
+        });
+        return Array.isArray(data) ? data : [];
+      };
+      const fetchOneIssueById = async id => {
+        const p = new URLSearchParams();
+        p.set("fields", ISSUE_FALLBACK_FIELDS);
+        const data = await proxyGetJson(
+          `${YT_BASE_URL}/api/issues/${encodeURIComponent(id)}?${p.toString()}`,
+          {
+            Accept: "application/json",
+            Authorization: authHeader
+          },
+          signal
+        );
+        return data && typeof data === "object" ? data : null;
+      };
+
+      const byId = new Map();
+      const firstPass = await fetchByIds(uniqueIds);
+      firstPass.forEach(item => {
+        if (item?.id) byId.set(item.id, item);
+      });
+
+      const missing = uniqueIds.filter(id => !byId.has(id));
+      if (missing.length > 0) {
+        const batchSize = 20;
+        for (let i = 0; i < missing.length; i += batchSize) {
+          const chunk = missing.slice(i, i + batchSize);
+          const recovered = await fetchByIds(chunk);
+          recovered.forEach(item => {
+            if (item?.id) byId.set(item.id, item);
+          });
+        }
+      }
+
+      const stillMissing = uniqueIds.filter(id => !byId.has(id));
+      if (stillMissing.length > 0) {
+        for (const id of stillMissing) {
+          let recovered = await fetchByIds([id]);
+          if (!Array.isArray(recovered) || recovered.length === 0) {
+            const single = await fetchOneIssueById(id);
+            if (single?.id) {
+              byId.set(single.id, single);
+              continue;
+            }
+            continue;
+          }
+          recovered.forEach(item => {
+            if (item?.id) byId.set(item.id, item);
+          });
+        }
+      }
+
+      return Array.from(byId.values());
+    }
+
+    async function fetchAgileSprints(agileId, authHeader, signal) {
+      const params = new URLSearchParams();
+      params.set("issuesQuery", "");
+      params.set("$top", "-1");
+      params.set("fields", AGILE_SPRINTS_FIELDS);
+
+      const data = await proxyGetJson(
+        `${YT_BASE_URL}/api/agiles/${agileId}/sprints/?${params.toString()}`,
+        {
+          Accept: "application/json",
+          Authorization: authHeader
+        },
+        signal
+      );
+      return Array.isArray(data) ? data : [];
+    }
+
+    function normalizeReleaseName(value) {
+      return String(value || "").trim();
+    }
+
+    function parseDateMs(value) {
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string") {
+        const raw = value.trim();
+        if (!raw) return NaN;
+        const asNumber = Number(raw);
+        if (Number.isFinite(asNumber)) return asNumber;
+        const parsed = Date.parse(raw);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return NaN;
+    }
+
+    function formatStoreDate(ms) {
+      if (!Number.isFinite(ms)) return "";
+      try {
+        return new Intl.DateTimeFormat("ru-RU", {
+          timeZone: "Europe/Moscow",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric"
+        }).format(new Date(ms));
+      } catch (_) {
+        const d = new Date(ms);
+        const dd = String(d.getDate()).padStart(2, "0");
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const yyyy = d.getFullYear();
+        return `${dd}.${mm}.${yyyy}`;
+      }
+    }
+
+    function latestStoreDate(results) {
+      const candidates = results
+        .map(item => item?.releaseFinishMs)
+        .filter(v => Number.isFinite(v));
+      if (candidates.length === 0) return "";
+      return formatStoreDate(Math.max(...candidates));
+    }
+
+    async function fetchBoardInfoForRelease(agileId, release, authHeader, signal) {
+      const releaseNorm = normalizeReleaseName(release);
+      const cacheKey = `${agileId}::${releaseNorm}`;
+      if (sprintBoardInfoCache.has(cacheKey)) {
+        return sprintBoardInfoCache.get(cacheKey);
+      }
+
+      const sprints = await fetchAgileSprints(agileId, authHeader, signal);
+      const sprint = sprints.find(item => normalizeReleaseName(item?.name) === releaseNorm);
+      const url = sprint?.id
+        ? `${YT_BASE_URL}/agiles/${agileId}/${sprint.id}`
+        : `${YT_BASE_URL}/agiles/${agileId}/current`;
+      const finishMs = parseDateMs(sprint?.finish);
+      const info = {
+        url,
+        releaseFinishMs: Number.isFinite(finishMs) ? finishMs : null
+      };
+
+      sprintBoardInfoCache.set(cacheKey, info);
+      return info;
+    }
+
+    function issueFieldName(field) {
+      return String(field?.name || field?.projectCustomField?.field?.name || "").trim();
+    }
+
+    function extractFieldText(value) {
+      if (typeof value === "string") return value;
+      if (!value) return "";
+      if (typeof value.text === "string") return value.text;
+      if (typeof value.markdownText === "string") return value.markdownText;
+      if (typeof value.name === "string") return value.name;
+      if (typeof value.localizedName === "string") return value.localizedName;
+      if (Array.isArray(value)) {
+        return value.map(item => extractFieldText(item)).filter(Boolean).join(" ");
+      }
+      return "";
+    }
+
+    function readIssueType(issue) {
+      const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+      for (const field of fields) {
+        const fieldName = issueFieldName(field).toLowerCase();
+        if (fieldName !== "type" && fieldName !== "тип") continue;
+        return extractFieldText(field?.value).trim();
+      }
+      return "";
+    }
+
+    function readIssueDescription(issue) {
+      if (typeof issue?.description === "string") return issue.description;
+      const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+      for (const field of fields) {
+        const fieldName = issueFieldName(field).toLowerCase();
+        if (fieldName !== "description" && fieldName !== "описание") continue;
+        return extractFieldText(field?.value).trim();
+      }
+      return "";
+    }
+
+    function readIssueState(issue) {
+      const fields = Array.isArray(issue?.fields) ? issue.fields : [];
+      for (const field of fields) {
+        const fieldName = issueFieldName(field).toLowerCase();
+        if (
+          fieldName !== "state" &&
+          fieldName !== "status" &&
+          fieldName !== "состояние" &&
+          fieldName !== "статус"
+        ) continue;
+        return extractFieldText(field?.value).trim();
+      }
+      return "";
+    }
+
+    function isRejectedState(rawState) {
+      const value = String(rawState || "").trim().toLowerCase().replace(/\s+/g, " ");
+      return value === "rejected" || value.startsWith("rejected ");
+    }
+
+    function normalizeTypeBucket(rawType) {
+      const value = String(rawType || "").trim().toLowerCase();
+      if (value === "user story" || value === "userstory" || value === "история пользователя") {
+        return "user_story";
+      }
+      if (value === "epic" || value === "эпик") {
+        return "epic";
+      }
+      if (value === "task" || value === "задача") {
+        return "task";
+      }
+      return "";
+    }
+
+    function normalizeIssue(issue) {
+      const type = readIssueType(issue);
+      const state = readIssueState(issue);
+      return {
+        key: String(issue?.idReadable || issue?.id || "-"),
+        summary: String(issue?.summary || "").trim(),
+        type,
+        typeBucket: normalizeTypeBucket(type),
+        description: readIssueDescription(issue),
+        state,
+        isRejected: isRejectedState(state)
+      };
+    }
+
+    function orderedIssueRows(idsInOrder, issueItems, { keepMissing = false } = {}) {
+      const byId = new Map();
+      issueItems.forEach(item => {
+        if (item && item.id) byId.set(item.id, item);
+      });
+      return idsInOrder
+        .map(id => byId.get(id) || (keepMissing ? {
+          id,
+          idReadable: id,
+          summary: "Нет данных по задаче (issuesGetter)"
+        } : null))
+        .filter(Boolean)
+        .map(normalizeIssue);
+    }
+
+    function issueLink(key) {
+      return `${YT_BASE_URL}/issue/${encodeURIComponent(key)}`;
+    }
+
+    function asTableCell(value) {
+      return String(value || "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+    }
+
+    function buildIssueLinks(rows) {
+      return rows.map(row => {
+        const key = asTableCell(row.key);
+        return `[${key}](${issueLink(key)})`;
+      }).join(", ");
+    }
+
+    function normalizeSummaryForMatch(value) {
+      return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+    }
+
+    function buildCommonRows(iosRows, androidRows) {
+      const iosMap = new Map();
+      const androidMap = new Map();
+
+      iosRows.forEach(row => {
+        const k = normalizeSummaryForMatch(row.summary);
+        if (!k) return;
+        if (!iosMap.has(k)) iosMap.set(k, []);
+        iosMap.get(k).push(row);
+      });
+
+      androidRows.forEach(row => {
+        const k = normalizeSummaryForMatch(row.summary);
+        if (!k) return;
+        if (!androidMap.has(k)) androidMap.set(k, []);
+        androidMap.get(k).push(row);
+      });
+
+      const common = [];
+      const commonKeys = new Set();
+      iosMap.forEach((iosList, key) => {
+        const andList = androidMap.get(key);
+        if (!andList || andList.length === 0) return;
+        commonKeys.add(key);
+        const sampleSummary = iosList[0]?.summary || andList[0]?.summary || "";
+        common.push({
+          issueRef: `${buildIssueLinks(iosList)} / ${buildIssueLinks(andList)}`,
+          summary: asTableCell(sampleSummary)
+        });
+      });
+
+      common.sort((a, b) => a.summary.localeCompare(b.summary, "ru", { sensitivity: "base" }));
+      return { rows: common, keys: commonKeys };
+    }
+
+    function withoutCommonRows(rows, commonKeys) {
+      return rows.filter(row => !commonKeys.has(normalizeSummaryForMatch(row.summary)));
+    }
+
+    function buildPlatformTable(title, rows, boardLabel, boardUrl) {
+      const lines = [];
+      lines.push(`${title}`);
+      if (boardUrl) {
+        const safeUrl = String(boardUrl).trim();
+        lines.push(`[Ссылка на доску ${boardLabel}](${safeUrl})`);
+      }
+      lines.push("| Номер задачи | Название задачи |");
+      lines.push("| --- | --- |");
+      if (rows.length === 0) {
+        lines.push("| - | Нет задач по запросу |");
+      } else {
+        rows.forEach(row => {
+          const key = asTableCell(row.key);
+          const summary = asTableCell(row.summary);
+          lines.push(`| [${key}](${issueLink(key)}) | ${summary} |`);
+        });
+      }
+      return lines;
+    }
+
+    function buildCommonTable(commonRows) {
+      const lines = [];
+      lines.push("Общие крупные задачи.");
+      lines.push("| Номер задачи | Название задачи |");
+      lines.push("| --- | --- |");
+      if (commonRows.length === 0) {
+        lines.push("| - | Нет общих задач по названию |");
+      } else {
+        commonRows.forEach(row => {
+          lines.push(`| ${row.issueRef} | ${row.summary} |`);
+        });
+      }
+      return lines;
+    }
+
+    function buildMessageText(release, releaseStoreDate, iosRows, iosBoardUrl, androidRows, androidBoardUrl) {
+      const lines = [];
+      const common = buildCommonRows(iosRows, androidRows);
+      const iosPlatformRows = withoutCommonRows(iosRows, common.keys);
+      const androidPlatformRows = withoutCommonRows(androidRows, common.keys);
+      if (releaseStoreDate) {
+        lines.push(`Релиз ${release}. Плановая дата отправки релиза в стор ${releaseStoreDate}.`);
+      } else {
+        lines.push(`Релиз ${release}.`);
+      }
+      lines.push("");
+      lines.push(...buildPlatformTable("iOS крупные задачи.", iosPlatformRows, "IOS", iosBoardUrl));
+      lines.push("");
+      lines.push(...buildPlatformTable("Android крупные задачи.", androidPlatformRows, "Android", androidBoardUrl));
+      lines.push("");
+      lines.push(...buildCommonTable(common.rows));
+      return {
+        text: lines.join("\n"),
+        iosCount: iosPlatformRows.length,
+        androidCount: androidPlatformRows.length,
+        commonCount: common.rows.length
+      };
+    }
+
+    function buildStoryEpicQueryByField(release, sprintField) {
+      return `(${sprintField}: ${release}) AND (Type: {User Story} OR Type: {Epic}) AND State: -Rejected`;
+    }
+
+    function buildTasksQueryByField(release, sprintField) {
+      return `(${sprintField}: ${release}) AND (Type: -{User Story}) AND (Type: -{Epic}) AND State: -Rejected AND ((description: флаг OR description: enable OR description: 'фф') OR (summary: флаг OR summary: enable OR summary: 'фф'))`;
+    }
+
+    function appendNadezhdaSection(lines, title, rows) {
+      lines.push(`${title}:`);
+      if (rows.length === 0) {
+        lines.push("Нет задач");
+        lines.push("");
+        return;
+      }
+      rows.forEach(row => {
+        const key = asTableCell(row.key);
+        const summary = asTableCell(row.summary);
+        lines.push(`[${key}](${issueLink(key)}) ${summary}`);
+      });
+      lines.push("");
+    }
+
+    function buildNadezhdaTable(userStoryRows, epicRows, taskRows) {
+      const lines = [];
+      appendNadezhdaSection(lines, "User Story", userStoryRows);
+      appendNadezhdaSection(lines, "Epic", epicRows);
+      appendNadezhdaSection(lines, "Другие задачи", taskRows);
+      return lines.join("\n").trimEnd();
+    }
+
+    function buildNadezhdaMessage(release, platformLabel, emoji, boardLabel, boardUrl, userStoryRows, epicRows, taskRows) {
+      const lines = [];
+      lines.push(`**Привет! ${release} ${platformLabel}  ${emoji}**`);
+      lines.push("**Проверьте пожалуйста флаги в задачах релиза**");
+      if (boardUrl) {
+        const safeUrl = String(boardUrl).trim();
+        lines.push(`[Ссылка на доску ${boardLabel}](${safeUrl})`);
+      }
+      lines.push("");
+      lines.push(buildNadezhdaTable(userStoryRows, epicRows, taskRows));
+      return lines.join("\n");
+    }
+
+    function persistInputs() {
+      try {
+        localStorage.setItem(LS_YT_TOKEN_KEY, ui.token.value || "");
+      } catch (_) {
+      }
+      try {
+        const release = String(ui.release.value || "").trim();
+        localStorage.setItem(LS_RANGE_KEY, JSON.stringify({ from: release, to: release }));
+      } catch (_) {
+      }
+    }
+
+    function restoreInputs() {
+      try {
+        const yt = localStorage.getItem(LS_YT_TOKEN_KEY);
+        if (typeof yt === "string") ui.token.value = yt;
+      } catch (_) {
+      }
+      try {
+        const raw = localStorage.getItem(LS_RANGE_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (data?.from) {
+          ui.release.value = data.from;
+          return;
+        }
+        if (data?.to) ui.release.value = data.to;
+      } catch (_) {
+      }
+    }
+
+    async function collectPlatformLines(release, authHeader, cfg, signal) {
+      const query = buildQuery(release, cfg.sprintField);
+      const [boardInfo, sortedIds] = await Promise.all([
+        fetchBoardInfoForRelease(cfg.agileId, release, authHeader, signal),
+        fetchSortedIssueIds(query, authHeader, signal)
+      ]);
+      const issueItems = await fetchIssueDetails(sortedIds, authHeader, signal);
+      const rows = orderedIssueRows(sortedIds, issueItems);
+      return {
+        ids: sortedIds,
+        rows,
+        boardUrl: boardInfo?.url || "",
+        releaseFinishMs: boardInfo?.releaseFinishMs ?? null
+      };
+    }
+
+    async function collectRowsByQuery(query, authHeader, signal) {
+      const sortedIds = await fetchSortedIssueIds(query, authHeader, signal);
+      const issueItems = await fetchIssueDetails(sortedIds, authHeader, signal);
+      return orderedIssueRows(sortedIds, issueItems, { keepMissing: true });
+    }
+
+    async function runElena(release, authHeader, signal) {
+      const [iosResult, androidResult] = await Promise.all([
+        collectPlatformLines(release, authHeader, PLATFORM_CFG[0], signal),
+        collectPlatformLines(release, authHeader, PLATFORM_CFG[1], signal)
+      ]);
+
+      const releaseStoreDate = latestStoreDate([iosResult, androidResult]);
+      const message = buildMessageText(
+        release,
+        releaseStoreDate,
+        iosResult.rows,
+        iosResult.boardUrl,
+        androidResult.rows,
+        androidResult.boardUrl
+      );
+
+      return {
+        text: message.text,
+        chips: [
+          `Релиз: ${release}`,
+          `iOS: ${message.iosCount}`,
+          `Android: ${message.androidCount}`,
+          `Всего: ${message.iosCount + message.androidCount + message.commonCount}`
+        ]
+      };
+    }
+
+    async function runNadezhdaLike(release, authHeader, signal, cfg) {
+      const [storyEpicRows, taskRowsRaw, boardInfo] = await Promise.all([
+        collectRowsByQuery(buildStoryEpicQueryByField(release, cfg.sprintField), authHeader, signal),
+        collectRowsByQuery(buildTasksQueryByField(release, cfg.sprintField), authHeader, signal),
+        fetchBoardInfoForRelease(cfg.agileId, release, authHeader, signal)
+      ]);
+
+      const userStoryRows = storyEpicRows.filter(row => row.typeBucket === "user_story");
+      const epicRows = storyEpicRows.filter(row => row.typeBucket !== "user_story");
+      const taskRows = taskRowsRaw;
+      const totalCount = userStoryRows.length + epicRows.length + taskRows.length;
+
+      return {
+        text: buildNadezhdaMessage(
+          release,
+          cfg.platformLabel,
+          cfg.emoji,
+          cfg.boardLabel,
+          boardInfo?.url || "",
+          userStoryRows,
+          epicRows,
+          taskRows
+        ),
+        chips: [
+          `Режим: ${cfg.modeLabel}`,
+          `Релиз: ${release}`,
+          `User Story: ${userStoryRows.length}`,
+          `Epic: ${epicRows.length}`,
+          `Tasks: ${taskRows.length}`,
+          `Всего: ${totalCount}`
+        ]
+      };
+    }
+
+    async function runNadezhda(release, authHeader, signal) {
+      return runNadezhdaLike(release, authHeader, signal, {
+        sprintField: IOS_SPRINT_FIELD,
+        agileId: PLATFORM_CFG[0].agileId,
+        boardLabel: "IOS",
+        platformLabel: "iOS",
+        emoji: ":apple_company:",
+        modeLabel: "Надежда (iOS)"
+      });
+    }
+
+    async function runDarya(release, authHeader, signal) {
+      return runNadezhdaLike(release, authHeader, signal, {
+        sprintField: ANDROID_SPRINT_FIELD,
+        agileId: PLATFORM_CFG[1].agileId,
+        boardLabel: "Android",
+        platformLabel: "Android",
+        emoji: ":android:",
+        modeLabel: "Дарья (Android)"
+      });
+    }
+
+    async function run() {
+      const release = String(ui.release.value || "").trim();
+      const authHeader = asBearer(ui.token.value);
+
+      if (!release) {
+        setStatus("Укажите номер релиза.", "err");
+        return;
+      }
+      if (!authHeader) {
+        setStatus("Укажите YouTrack token.", "err");
+        return;
+      }
+      if (activeRunController) {
+        setStatus("Сбор уже выполняется.", "");
+        return;
+      }
+
+      persistInputs();
+      const controller = new AbortController();
+      activeRunController = controller;
+      setRunning(true);
+      ui.copyBtn.disabled = true;
+      setStatus("Сбор задач из YouTrack...", "");
+
+      try {
+        let result;
+        if (activeMode === MODE_NADEZHDA) {
+          result = await runNadezhda(release, authHeader, controller.signal);
+        } else if (activeMode === MODE_DARYA) {
+          result = await runDarya(release, authHeader, controller.signal);
+        } else {
+          result = await runElena(release, authHeader, controller.signal);
+        }
+
+        ui.output.textContent = result.text;
+        renderSummary(result.chips);
+        setStatus("Готово.", "ok");
+      } catch (error) {
+        if (isAbortError(error)) {
+          setStatus("Сбор остановлен.", "");
+          showToast("Сбор остановлен", false);
+        } else {
+          setStatus(error?.message || "Ошибка при загрузке задач.", "err");
+        }
+      } finally {
+        activeRunController = null;
+        setRunning(false);
+        ui.copyBtn.disabled = false;
+      }
+    }
+
+    function cancelRun() {
+      if (!activeRunController) return;
+      activeRunController.abort();
+    }
+
+    async function checkProxy() {
+      try {
+        const r = await fetch(PROXY_BASE + "/health", { cache: "no-store" });
+        const j = await r.json();
+        const ok = !!(j && j.ok === true && Number(j.port) === 8787);
+        if (!ok) {
+          showToast("Прокси не отвечает", false);
+          return;
+        }
+        showToast(`Прокси OK (порт ${j.port})`, true);
+      } catch (_) {
+        showToast("Прокси не отвечает", false);
+      }
+    }
+
+    async function copyOutput() {
+      const text = String(ui.output.textContent || "").trim();
+      if (!text) {
+        showToast("Нечего копировать", false);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("Текст скопирован в буфер обмена", true);
+      } catch (_) {
+        showToast("Не удалось скопировать автоматически", false);
+      }
+    }
+
+    if (ui.appVersion) {
+      ui.appVersion.innerHTML = `<span aria-hidden="true">🏷️</span><span>${APP_VERSION}</span>`;
+    }
+    restoreInputs();
+    setRunning(false);
+    setMode(MODE_ELENA);
+    ui.release.addEventListener("input", persistInputs);
+    ui.release.addEventListener("change", persistInputs);
+    ui.token.addEventListener("input", persistInputs);
+    ui.token.addEventListener("change", persistInputs);
+    ui.loadBtn.addEventListener("click", run);
+    ui.stopBtn.addEventListener("click", cancelRun);
+    ui.proxyBtn.addEventListener("click", checkProxy);
+    ui.copyBtn.addEventListener("click", copyOutput);
+    ui.tabElena.addEventListener("click", () => setMode(MODE_ELENA));
+    ui.tabNadezhda.addEventListener("click", () => setMode(MODE_NADEZHDA));
+    ui.tabDarya.addEventListener("click", () => setMode(MODE_DARYA));
+  </script>
+</body>
+</html>

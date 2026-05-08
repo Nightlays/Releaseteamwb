@@ -1,0 +1,32 @@
+{
+  "model": "catboost-release-risk",
+  "version": "2026-03-11T19:22:50Z",
+  "trainedAt": "2026-03-11T19:22:50Z",
+  "bundleName": "wb_graphs_v0_2_9_catboost_bundle.json",
+  "metaName": "wb_graphs_v0_2_9_catboost_meta.json",
+  "featureKeys": [
+    "tc_total",
+    "tc_total_delta",
+    "tc_total_delta_pct",
+    "tc_volatility",
+    "tc_slope_pct",
+    "cov_swat_delta_pct",
+    "cov_stream_delta_pct",
+    "sel_swat_delta_pct",
+    "sel_stream_delta_pct",
+    "avg_total_delta",
+    "chp_total_delta_pct",
+    "chp_ios_delta_pct",
+    "chp_android_delta_pct",
+    "release_anoms",
+    "type_anoms",
+    "platform_anoms",
+    "anom_score"
+  ],
+  "dataset": {
+    "totalRecords": 16,
+    "labeledOk": 14,
+    "labeledFail": 2,
+    "source": "https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec?op=get&name=wb_graphs_v0_2_9_ml_dataset.json"
+  }
+}

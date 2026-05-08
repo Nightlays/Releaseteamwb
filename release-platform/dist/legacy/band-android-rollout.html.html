@@ -1,0 +1,2402 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Band Android Rollout</title>
+  <style>
+    :root{
+      --bg:#f7f8fc;
+      --bg-accent:#eef1f8;
+      --card:#ffffff;
+      --card-soft:#fafbff;
+      --text:#231f2f;
+      --muted:#756b8a;
+      --line:#e3e8f2;
+      --line-strong:#cdd6e7;
+      --brand:#cb11ab;
+      --brand-2:#7f5cff;
+      --ok:#0f9d77;
+      --warn:#c98512;
+      --danger:#d1456b;
+      --shadow:0 16px 34px rgba(52, 64, 109, 0.08);
+      --radius:18px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color:var(--text);
+      background:
+        linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+      min-height:100vh;
+    }
+
+    body.modal-open{
+      overflow:hidden;
+    }
+
+    .page{
+      width:min(1580px, calc(100vw - 28px));
+      margin:14px auto 28px;
+    }
+
+    .platform-tabs{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin:0 0 12px;
+    }
+
+    .platform-tab{
+      appearance:none;
+      border:1px solid var(--line);
+      background:#fff;
+      color:#5d5472;
+      border-radius:999px;
+      padding:9px 14px;
+      font:inherit;
+      font-weight:800;
+      cursor:pointer;
+      transition:all .16s ease;
+    }
+
+    .platform-tab.is-active{
+      background:linear-gradient(135deg, var(--brand-2), var(--brand));
+      color:#fff;
+      border-color:transparent;
+      box-shadow:0 10px 26px rgba(171, 57, 216, 0.2);
+    }
+
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(320px, 0.9fr) minmax(640px, 1.1fr);
+      gap:14px;
+      align-items:start;
+      margin-bottom:14px;
+    }
+
+    .panel{
+      background:rgba(255,255,255,0.96);
+      border:1px solid rgba(205,214,231,0.88);
+      border-radius:20px;
+      box-shadow:var(--shadow);
+    }
+
+    .hero-copy{
+      padding:14px 16px;
+      min-width:0;
+      align-self:start;
+      border-right:1px solid var(--line);
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-size:12px;
+      letter-spacing:.28em;
+      text-transform:uppercase;
+      color:#7b7092;
+      margin-bottom:10px;
+    }
+
+    .eyebrow::before{
+      content:"";
+      width:9px;
+      height:9px;
+      border-radius:999px;
+      background:linear-gradient(135deg, #2bd2a0, #6ce7cb);
+      box-shadow:0 0 0 6px rgba(43,210,160,0.12);
+    }
+
+    h1{
+      margin:0 0 6px;
+      font-size:clamp(22px, 2.8vw, 30px);
+      line-height:1.06;
+      letter-spacing:-0.04em;
+    }
+
+    .hero-copy p{
+      margin:0;
+      max-width:none;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.42;
+    }
+
+    .hero-controls{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:10px;
+      margin-top:10px;
+    }
+
+    .hero-fact{
+      padding:9px 10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:#fafcff;
+      min-width:0;
+    }
+
+    .hero-control{
+      padding:10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:#fafcff;
+      min-width:0;
+    }
+
+    .hero-fact-label{
+      display:block;
+      margin-bottom:4px;
+      color:#8b81a3;
+      font-size:10px;
+      font-weight:700;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+    }
+
+    .hero-fact-value{
+      display:block;
+      color:#3c334f;
+      font-size:12px;
+      line-height:1.35;
+      font-weight:700;
+    }
+
+    .hero-actions{
+      padding:12px 14px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      min-width:0;
+      justify-content:space-between;
+    }
+
+    .section-title{
+      margin:0 0 2px;
+      font-size:11px;
+      letter-spacing:.22em;
+      text-transform:uppercase;
+      color:#8579a0;
+    }
+
+    .section-subtitle{
+      margin:0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
+    }
+
+    .settings-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:10px;
+      margin-top:4px;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+
+    .channel-meta{
+      min-height:44px;
+      display:flex;
+      align-items:center;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:var(--card-soft);
+      color:#5f5578;
+      font-size:13px;
+      line-height:1.4;
+    }
+
+    .field.span-2{grid-column:1 / -1}
+
+    label{
+      font-size:10px;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+      color:#8d80a8;
+      font-weight:700;
+    }
+
+    input, textarea{
+      width:100%;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:var(--card-soft);
+      color:var(--text);
+      padding:10px 12px;
+      font:inherit;
+      outline:none;
+      transition:border-color .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+
+    textarea{
+      min-height:64px;
+      resize:vertical;
+    }
+
+    input:focus, textarea:focus{
+      border-color:#bc9bff;
+      box-shadow:0 0 0 4px rgba(163, 109, 255, 0.14);
+      background:#fff;
+    }
+
+    .actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:2px;
+    }
+
+    .action-note{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px dashed var(--line);
+      background:#fafcff;
+      color:#665c7f;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .channel-link-inline{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      margin-top:6px;
+      color:#5a56c9;
+      font-size:12px;
+      font-weight:600;
+      text-decoration:none;
+      word-break:break-all;
+    }
+
+    .channel-link-inline:hover{
+      text-decoration:underline;
+    }
+
+    .modal{
+      position:fixed;
+      inset:0;
+      z-index:50;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+    }
+
+    .modal.is-hidden{
+      display:none;
+    }
+
+    .modal-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(24, 30, 52, 0.28);
+      backdrop-filter:blur(4px);
+    }
+
+    .modal-dialog{
+      position:relative;
+      z-index:1;
+      width:min(720px, calc(100vw - 24px));
+      max-height:min(88vh, 920px);
+      overflow:auto;
+      padding:16px;
+      background:rgba(255,255,255,0.98);
+      border:1px solid rgba(205,214,231,0.92);
+      border-radius:20px;
+      box-shadow:0 24px 54px rgba(25, 35, 69, 0.16);
+    }
+
+    .modal-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:12px;
+    }
+
+    .modal-head h3{
+      margin:0 0 4px;
+      font-size:20px;
+      letter-spacing:-0.03em;
+    }
+
+    .modal-head p{
+      margin:0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.4;
+    }
+
+    .settings-logic{
+      margin-top:14px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .settings-section-head strong{
+      display:block;
+      margin-bottom:4px;
+      font-size:14px;
+    }
+
+    .settings-section-head p{
+      margin:0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .settings-logic-facts{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:8px;
+    }
+
+    .settings-logic-facts .hero-fact{
+      background:#fff;
+    }
+
+    .settings-hint-box{
+      margin-top:0;
+    }
+
+    button, .link-btn{
+      appearance:none;
+      border:none;
+      cursor:pointer;
+      border-radius:12px;
+      font:inherit;
+      font-weight:700;
+      padding:10px 13px;
+      transition:transform .16s ease, opacity .16s ease, box-shadow .16s ease, background .16s ease;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+    }
+
+    button:hover, .link-btn:hover{transform:translateY(-1px)}
+    button:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+    .btn-primary{
+      color:#fff;
+      background:linear-gradient(135deg, var(--brand-2), var(--brand));
+      box-shadow:0 12px 28px rgba(171, 57, 216, 0.24);
+    }
+
+    .btn-secondary{
+      color:#5d5177;
+      background:#fff;
+      border:1px solid var(--line);
+    }
+
+    .btn-ghost{
+      color:#6a5d86;
+      background:rgba(255,255,255,0.66);
+      border:1px dashed var(--line-strong);
+    }
+
+    .status-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin:0 0 14px;
+    }
+
+    .status-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      border:1px solid transparent;
+      background:#fff;
+    }
+
+    .status-pill::before{
+      content:"";
+      width:9px;
+      height:9px;
+      border-radius:999px;
+      background:currentColor;
+      opacity:.8;
+    }
+
+    .status-idle{color:#756b8a;border-color:var(--line)}
+    .status-ok{color:var(--ok);border-color:rgba(15,157,119,0.18);background:rgba(15,157,119,0.08)}
+    .status-warn{color:var(--warn);border-color:rgba(201,133,18,0.2);background:rgba(201,133,18,0.08)}
+    .status-error{color:var(--danger);border-color:rgba(209,69,107,0.18);background:rgba(209,69,107,0.08)}
+
+    .summary{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+      gap:12px;
+      margin-bottom:16px;
+    }
+
+    .summary-card{
+      padding:12px 14px;
+      background:rgba(255,255,255,0.96);
+      border:1px solid rgba(205,214,231,0.88);
+      border-radius:14px;
+      box-shadow:var(--shadow);
+    }
+
+    .summary-card .label{
+      display:block;
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.22em;
+      color:#8a7fa3;
+      margin-bottom:8px;
+    }
+
+    .summary-card .value{
+      display:block;
+      font-size:24px;
+      line-height:1;
+      font-weight:800;
+      letter-spacing:-0.04em;
+    }
+
+    .summary-card .hint{
+      display:block;
+      color:var(--muted);
+      margin-top:6px;
+      font-size:11px;
+      line-height:1.4;
+    }
+
+    .layout{
+      display:grid;
+      grid-template-columns:minmax(0, 1.65fr) 320px;
+      gap:14px;
+      align-items:start;
+    }
+
+    .results-panel{
+      padding:14px;
+      min-width:0;
+    }
+
+    .results-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:12px;
+      margin-bottom:10px;
+      flex-wrap:wrap;
+    }
+
+    .results-head h2{
+      margin:0;
+      font-size:20px;
+      letter-spacing:-0.03em;
+    }
+
+    .results-head p{
+      margin:4px 0 0;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .results-actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .release-meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
+
+    .mini-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:5px 9px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:var(--card-soft);
+      color:#685b81;
+      font-size:10px;
+      font-weight:700;
+    }
+
+    .table-wrap{
+      border:1px solid var(--line);
+      border-radius:14px;
+      overflow:auto;
+      background:#fff;
+    }
+
+    .results-table{
+      width:100%;
+      min-width:1320px;
+      border-collapse:separate;
+      border-spacing:0;
+    }
+
+    .results-table thead th{
+      position:sticky;
+      top:0;
+      z-index:1;
+      background:#f6f8fc;
+      color:#65587f;
+      text-align:left;
+      padding:10px 12px;
+      font-size:10px;
+      text-transform:uppercase;
+      letter-spacing:.18em;
+      border-bottom:1px solid var(--line);
+      white-space:nowrap;
+    }
+
+    .results-table tbody td{
+      padding:10px 12px;
+      border-bottom:1px solid #edf1f7;
+      vertical-align:top;
+      font-size:12px;
+      background:#fff;
+    }
+
+    .results-table tbody tr:hover td{
+      background:#fafcff;
+    }
+
+    .results-table tbody tr:last-child td{
+      border-bottom:none;
+    }
+
+    .table-release{
+      font-size:18px;
+      font-weight:800;
+      letter-spacing:-0.03em;
+      line-height:1;
+      margin-bottom:6px;
+      white-space:nowrap;
+    }
+
+    .table-versions{
+      color:#5e5378;
+      font-size:11px;
+      line-height:1.45;
+      max-width:260px;
+      white-space:normal;
+      word-break:break-word;
+    }
+
+    .table-point{
+      font-size:14px;
+      line-height:1.2;
+      font-weight:800;
+      color:#2c2740;
+      margin-bottom:5px;
+      white-space:nowrap;
+    }
+
+    .table-muted{
+      display:block;
+      color:var(--muted);
+      font-size:11px;
+      line-height:1.45;
+      margin-top:2px;
+      white-space:normal;
+      word-break:break-word;
+    }
+
+    .table-empty{
+      display:inline-block;
+      color:#9a90b1;
+      font-size:12px;
+      font-weight:700;
+    }
+
+    .store-tag{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:3px 7px;
+      margin-bottom:6px;
+      border-radius:999px;
+      background:#eef4ff;
+      border:1px solid #d5e2ff;
+      color:#4b5f8a;
+      font-size:10px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+    }
+
+    .table-inline-details{
+      margin:0;
+    }
+
+    .table-inline-details summary{
+      cursor:pointer;
+      list-style:none;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 9px;
+      border-radius:10px;
+      border:1px solid var(--line);
+      background:#fff;
+      color:#5a4e73;
+      font-size:11px;
+      font-weight:700;
+      user-select:none;
+    }
+
+    .table-inline-details summary::-webkit-details-marker{display:none}
+
+    .table-inline-details[open] summary{
+      margin-bottom:10px;
+      background:#f7f2ff;
+    }
+
+    .table-match-list{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:340px;
+    }
+
+    .table-match-item{
+      border-radius:10px;
+      border:1px solid var(--line);
+      background:var(--card-soft);
+      padding:8px 10px;
+    }
+
+    .table-match-head{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      font-size:10px;
+      color:#6a5f82;
+      margin-bottom:6px;
+    }
+
+    .table-match-text{
+      white-space:pre-wrap;
+      word-break:break-word;
+      color:#312945;
+      font-size:11px;
+      line-height:1.45;
+    }
+
+    .side-panel{
+      padding:14px;
+      position:sticky;
+      top:18px;
+    }
+
+    .side-panel h2{
+      margin:0 0 6px;
+      font-size:18px;
+      letter-spacing:-0.03em;
+    }
+
+    .side-panel p{
+      margin:0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.45;
+    }
+
+    .hint-box,
+    .log-box{
+      margin-top:14px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:var(--card-soft);
+      padding:12px;
+    }
+
+    .hint-box strong{
+      display:block;
+      margin-bottom:10px;
+      font-size:13px;
+    }
+
+    .hint-box ul{
+      margin:0;
+      padding-left:18px;
+      color:#5e5378;
+      line-height:1.55;
+      font-size:12px;
+    }
+
+    .log-box{
+      max-height:360px;
+      overflow:auto;
+    }
+
+    .log-line{
+      font-size:11px;
+      line-height:1.45;
+      color:#625777;
+      padding:7px 0;
+      border-bottom:1px dashed rgba(209,188,255,0.66);
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+
+    .log-line:last-child{border-bottom:none}
+
+    .empty-state{
+      padding:20px 16px;
+      text-align:center;
+      border:1px dashed var(--line-strong);
+      border-radius:14px;
+      background:#fafcff;
+      color:var(--muted);
+    }
+
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+
+    @media (max-width: 1180px){
+      .hero,
+      .layout{
+        grid-template-columns:1fr;
+      }
+
+      .hero-copy{
+        border-right:none;
+        border-bottom:1px solid var(--line);
+      }
+
+      .side-panel{
+        position:static;
+      }
+    }
+
+    @media (max-width: 760px){
+      .page{
+        width:min(100vw - 20px, 100%);
+        margin:10px auto 28px;
+      }
+
+      .hero-copy,
+      .hero-actions,
+      .results-panel,
+      .side-panel{
+        padding:14px;
+      }
+
+      .settings-grid,
+      .summary,
+      .settings-logic-facts,
+      .hero-controls{
+        grid-template-columns:1fr;
+      }
+
+      h1{font-size:36px}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="platform-tabs" role="tablist" aria-label="Platform tabs">
+      <button id="androidTabBtn" class="platform-tab is-active" type="button" role="tab" aria-selected="true">Android</button>
+      <button id="iosTabBtn" class="platform-tab" type="button" role="tab" aria-selected="false">iOS</button>
+    </div>
+
+    <section class="hero panel">
+      <div class="hero-copy">
+        <div class="eyebrow">Band Release Queries</div>
+        <h1 id="heroTitle">Android store rollout report</h1>
+        <p id="heroDescription">Отчёт по Android announcement: страница читает сообщения из Band, группирует их по release-family и показывает контрольные точки для <strong>Google Play</strong>, а также найденные версии для <strong>RuStore</strong> и <strong>AppGallery</strong>.</p>
+        <div class="hero-controls">
+          <div class="hero-control">
+            <label for="bandCookiesInput">Band cookies</label>
+            <textarea id="bandCookiesInput" placeholder="Вставь cookies чтения из band.wb.ru"></textarea>
+          </div>
+          <div class="hero-control">
+            <div class="settings-grid">
+              <div class="field">
+                <label for="releaseFromInput">С релиза</label>
+                <input id="releaseFromInput" type="text" placeholder="например 7.5 или 7.5.6000" />
+              </div>
+              <div class="field">
+                <label for="releaseToInput">По релиз</label>
+                <input id="releaseToInput" type="text" placeholder="например 7.5 или 7.5.6990" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-actions">
+        <div>
+          <div class="section-title">Действия</div>
+          <p id="sourceSubtitle" class="section-subtitle">Загрузи отчёт по выбранной платформе. Параметры proxy, глубины и канал вынесены в настройки.</p>
+        </div>
+
+        <div class="action-note">
+          <div id="channelMeta">Android announcement · канал зафиксирован в коде</div>
+          <a id="channelMetaLink" class="channel-link-inline" href="https://band.wb.ru/mobile-team/channels/android-announcement" target="_blank" rel="noopener noreferrer">https://band.wb.ru/mobile-team/channels/android-announcement ↗</a>
+        </div>
+
+        <div class="actions">
+          <button id="loadBtn" class="btn-primary" type="button">Загрузить релизы</button>
+          <button id="settingsBtn" class="btn-secondary" type="button">Настройки</button>
+          <a id="openChannelLink" class="link-btn btn-ghost" href="https://band.wb.ru/mobile-team/channels/android-announcement" target="_blank" rel="noopener noreferrer">Открыть канал ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="status-row">
+      <span id="proxyStatus" class="status-pill status-idle">Proxy не проверен</span>
+      <span id="bandStatus" class="status-pill status-idle">Band cookies не проверены</span>
+      <span id="dataStatus" class="status-pill status-idle">Данные не загружены</span>
+    </div>
+
+    <section class="summary">
+      <article class="summary-card">
+        <span id="summaryReleasesLabel" class="label">Релизы</span>
+        <span id="summaryReleases" class="value">0</span>
+        <span id="summaryReleasesHint" class="hint">Сколько release-семейств найдено по выбранному диапазону.</span>
+      </article>
+      <article class="summary-card">
+        <span id="summaryEventsLabel" class="label">События</span>
+        <span id="summaryEvents" class="value">0</span>
+        <span id="summaryEventsHint" class="hint">Сколько сообщений удалось распарсить.</span>
+      </article>
+      <article class="summary-card">
+        <span id="summaryOnePercentLabel" class="label">ПР старт</span>
+        <span id="summaryOnePercent" class="value">0</span>
+        <span id="summaryOnePercentHint" class="hint">Сколько релизов имеют точку входа на 1%.</span>
+      </article>
+      <article class="summary-card">
+        <span id="summaryHundredPercentLabel" class="label">ПР 100%</span>
+        <span id="summaryHundredPercent" class="value">0</span>
+        <span id="summaryHundredPercentHint" class="hint">Сколько релизов дошли до 100% хотя бы одной версией семейства.</span>
+      </article>
+      <article id="summaryCardExtraA" class="summary-card">
+        <span id="summaryExtraALabel" class="label">RuStore</span>
+        <span id="summaryRuStore" class="value">0</span>
+        <span id="summaryExtraAHint" class="hint">Сколько релизов имеют найденную версию или событие в RuStore.</span>
+      </article>
+      <article id="summaryCardExtraB" class="summary-card">
+        <span id="summaryExtraBLabel" class="label">AppGallery</span>
+        <span id="summaryAppGallery" class="value">0</span>
+        <span id="summaryExtraBHint" class="hint">Сколько релизов имеют найденную версию или событие в AppGallery.</span>
+      </article>
+    </section>
+
+    <section class="layout">
+      <div class="panel results-panel">
+        <div class="results-head">
+          <div>
+            <h2 id="resultsTitle">Релизы и магазины</h2>
+            <p id="resultsSubtitle">Табличный отчёт по release-family: отдельные колонки для Google Play, RuStore и AppGallery.</p>
+          </div>
+          <div class="results-actions">
+            <button id="exportCsvBtn" class="btn-secondary" type="button">CSV</button>
+            <button id="exportExcelBtn" class="btn-secondary" type="button">Excel</button>
+            <button id="exportPdfBtn" class="btn-secondary" type="button">PDF</button>
+            <div class="mini-chip"><span id="resultsCount">0</span> строк</div>
+          </div>
+        </div>
+        <div id="results" class="release-list">
+          <div class="empty-state">Пока пусто. Заполни настройки и нажми «Загрузить релизы».</div>
+        </div>
+      </div>
+
+      <aside class="panel side-panel">
+        <h2>Журнал загрузки</h2>
+        <p>Технический лог чтения Band, проверки proxy и формирования итоговой таблицы.</p>
+        <div class="log-box" id="logBox"></div>
+      </aside>
+    </section>
+  </div>
+
+  <div id="settingsModal" class="modal is-hidden" aria-hidden="true">
+    <div id="settingsBackdrop" class="modal-backdrop"></div>
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <div>
+          <h3>Настройки</h3>
+          <p>Параметры источника и proxy вынесены отдельно, чтобы основной экран оставался компактным.</p>
+        </div>
+        <button id="settingsCloseBtn" class="btn-secondary" type="button">Закрыть</button>
+      </div>
+
+      <div class="settings-grid">
+        <div class="field">
+          <label for="proxyBaseInput">Proxy base</label>
+          <input id="proxyBaseInput" type="text" placeholder="http://localhost:8787" />
+        </div>
+        <div class="field">
+          <label for="lookbackDaysInput">Глубина, дней</label>
+          <input id="lookbackDaysInput" type="number" min="1" step="1" placeholder="180" />
+        </div>
+        <div class="field span-2">
+          <label>Канал</label>
+          <div id="settingsChannelMeta" class="channel-meta">Android announcement · канал зафиксирован в коде</div>
+        </div>
+      </div>
+
+      <div class="settings-logic">
+        <div class="settings-section-head">
+          <strong id="settingsRulesTitle">Логика Android отчёта</strong>
+          <p id="settingsRulesIntro">Группировка строится по base-release: версия вида <span class="mono">7.5.6002</span> попадает в семейство <span class="mono">7.5.6000</span>. Это позволяет видеть, какой hotfix довёл релиз до 100% и какие версии ушли в другие stores.</p>
+        </div>
+
+        <div id="settingsLogicFacts" class="settings-logic-facts">
+          <div class="hero-fact">
+            <span class="hero-fact-label">Канал</span>
+            <span class="hero-fact-value">Android announcement</span>
+          </div>
+        </div>
+
+        <div class="hint-box settings-hint-box">
+          <strong>Правила обработки</strong>
+          <ul id="settingsRulesList">
+            <li>В поле <span class="mono">ПР старт</span> берётся первое найденное процентное сообщение для семейства релиза. Если 1% нет, берётся следующее доступное значение, например 5%.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="proxyCheckBtn" class="btn-secondary" type="button">Проверить proxy</button>
+        <a id="settingsOpenChannelLink" class="link-btn btn-ghost" href="https://band.wb.ru/mobile-team/channels/android-announcement" target="_blank" rel="noopener noreferrer">Открыть канал ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const LS_PREFIX = 'band_android_rollout_v1';
+    const LS_PROXY_BASE = LS_PREFIX + '_proxy_base';
+    const LS_BAND_COOKIES = LS_PREFIX + '_band_cookies';
+    const LS_LOOKBACK_DAYS = LS_PREFIX + '_lookback_days';
+    const LS_RELEASE_FROM = LS_PREFIX + '_release_from';
+    const LS_RELEASE_TO = LS_PREFIX + '_release_to';
+    const LS_RELEASE_FILTER = LS_PREFIX + '_release_filter';
+    const LS_ACTIVE_PLATFORM = LS_PREFIX + '_active_platform';
+    const PROXY_COOKIE_HEADER = 'X-Proxy-Cookie';
+    const DEFAULT_PROXY_BASE = 'http://localhost:8787';
+    const DEFAULT_LOOKBACK_DAYS = 180;
+    const MSK_TIMEZONE = 'Europe/Moscow';
+    const PAGE_SIZE = 30;
+    const PAGE_LIMIT = 400;
+    const PLATFORM_CONFIG = {
+      android: {
+        id: 'android',
+        label: 'Android',
+        channelId: 'mccs6h69jtdhu8uzeeg3nz1wxa',
+        channelUrl: 'https://band.wb.ru/mobile-team/channels/android-announcement',
+        heroTitle: 'Android rollout report',
+        heroDescription: 'Отчёт по Android announcement: показывает старт процента раскатки и финал раскатки в <strong>Google Play</strong>, а также последние найденные версии в <strong>RuStore</strong> и <strong>AppGallery</strong>.',
+        heroFacts: [
+          { label: 'Канал', value: 'Android announcement' },
+          { label: 'Старт', value: 'Первое процентное сообщение: 1%, 5%, 10% и т.д.' },
+          { label: 'Финал', value: 'Последнее сообщение процента раскатки на 100%, включая hotfix 0001 / 0002' },
+          { label: 'Доп. stores', value: 'Последние версии RuStore и AppGallery' }
+        ],
+        sourceSubtitle: 'Band cookies + proxy. Канал выбирается вкладкой и скрыт в коде.',
+        channelMeta: 'Android announcement · канал зафиксирован в коде',
+        openLinkLabel: 'Открыть Android канал ↗',
+        resultsTitle: 'Android релизы и магазины',
+        resultsSubtitle: 'Табличный отчёт по release-family: старт процента раскатки, финал раскатки и отдельные колонки для RuStore и AppGallery.',
+        rulesTitle: 'Как считается Android отчёт',
+        rulesIntro: 'Группировка строится по base-release: версия вида <span class="mono">7.5.6002</span> попадает в семейство <span class="mono">7.5.6000</span>. Это позволяет видеть, какой hotfix довёл релиз до 100% и какие версии ушли в другие stores.',
+        rules: [
+          'В поле <span class="mono">ПР старт</span> берётся первое найденное процентное сообщение для семейства релиза. Если 1% отсутствует, используется следующее доступное значение, например <span class="mono">5%</span>.',
+          'В поле <span class="mono">ПР 100%</span> берётся последнее найденное сообщение на 100% и показывается фактическая версия, например <span class="mono">7.5.6002</span>.',
+          'Для <span class="mono">RuStore</span> и <span class="mono">AppGallery</span> показывается последнее найденное сообщение по семейству и его фактическая версия.',
+          'Сообщения без версии или без store-маркера не участвуют.',
+          'Диапазон релизов работает inclusively: можно задать <span class="mono">7.5</span> → <span class="mono">7.6</span> или точные версии.'
+        ]
+      },
+      ios: {
+        id: 'ios',
+        label: 'iOS',
+        channelId: 'kg4eed6pdpy1pfhhitjtmqqhpe',
+        channelUrl: 'https://band.wb.ru/wb/channels/mp-ios-releases',
+        heroTitle: 'iOS rollout report',
+        heroDescription: 'Отчёт по каналу iOS releases: показывает первое процентное событие в <strong>AppStore</strong> и финальную версию, которой раскатка была завершена.',
+        heroFacts: [
+          { label: 'Канал', value: 'mp-ios-releases' },
+          { label: 'Старт', value: 'Первое процентное сообщение: 1%, 2%, 5%, 10% и т.д.' },
+          { label: 'Финал', value: 'Сообщение “Раскатка в AppStore завершена” или “Успех”' },
+          { label: 'Семейство', value: 'Hotfix привязывается к base-release как в Android' }
+        ],
+        sourceSubtitle: 'Band cookies + proxy. Канал iOS зафиксирован в коде.',
+        channelMeta: 'mp-ios-releases · канал зафиксирован в коде',
+        openLinkLabel: 'Открыть iOS канал ↗',
+        resultsTitle: 'iOS релизы',
+        resultsSubtitle: 'Табличный отчёт по release-family: старт раскатки в AppStore, финальная версия и все matched-сообщения.',
+        rulesTitle: 'Как считается iOS отчёт',
+        rulesIntro: 'Группировка строится по base-release так же, как в Android. Версия вида <span class="mono">7.5.6002</span> попадает в семейство <span class="mono">7.5.6000</span>, чтобы можно было увидеть фактический hotfix, которым завершили раскатку.',
+        rules: [
+          'В поле <span class="mono">AS старт</span> берётся первое найденное процентное сообщение для семейства релиза, даже если это 2%, 5% или 10%.',
+          'В поле <span class="mono">AS финал</span> берётся последнее сообщение, где раскатка в <span class="mono">AppStore</span> завершена, либо последнее 100%-сообщение, если оно есть.',
+          'Финальной считается версия из сообщения вида <span class="mono">Раскатка в AppStore завершена</span>.',
+          'Сообщения без версии или без <span class="mono">AppStore</span> не участвуют.',
+          'Диапазон релизов работает inclusively: можно задать <span class="mono">7.5</span> → <span class="mono">7.6</span> или точные версии.'
+        ]
+      }
+    };
+
+    const state = {
+      loading: false,
+      abortController: null,
+      activePlatform: 'android',
+      groups: [],
+      events: []
+    };
+
+    const ui = {
+      androidTabBtn: document.getElementById('androidTabBtn'),
+      iosTabBtn: document.getElementById('iosTabBtn'),
+      heroTitle: document.getElementById('heroTitle'),
+      heroDescription: document.getElementById('heroDescription'),
+      sourceSubtitle: document.getElementById('sourceSubtitle'),
+      channelMeta: document.getElementById('channelMeta'),
+      channelMetaLink: document.getElementById('channelMetaLink'),
+      settingsChannelMeta: document.getElementById('settingsChannelMeta'),
+      proxyBaseInput: document.getElementById('proxyBaseInput'),
+      bandCookiesInput: document.getElementById('bandCookiesInput'),
+      lookbackDaysInput: document.getElementById('lookbackDaysInput'),
+      releaseFromInput: document.getElementById('releaseFromInput'),
+      releaseToInput: document.getElementById('releaseToInput'),
+      loadBtn: document.getElementById('loadBtn'),
+      settingsBtn: document.getElementById('settingsBtn'),
+      settingsModal: document.getElementById('settingsModal'),
+      settingsBackdrop: document.getElementById('settingsBackdrop'),
+      settingsCloseBtn: document.getElementById('settingsCloseBtn'),
+      proxyCheckBtn: document.getElementById('proxyCheckBtn'),
+      openChannelLink: document.getElementById('openChannelLink'),
+      settingsOpenChannelLink: document.getElementById('settingsOpenChannelLink'),
+      proxyStatus: document.getElementById('proxyStatus'),
+      bandStatus: document.getElementById('bandStatus'),
+      dataStatus: document.getElementById('dataStatus'),
+      summaryReleasesLabel: document.getElementById('summaryReleasesLabel'),
+      summaryReleases: document.getElementById('summaryReleases'),
+      summaryReleasesHint: document.getElementById('summaryReleasesHint'),
+      summaryEventsLabel: document.getElementById('summaryEventsLabel'),
+      summaryEvents: document.getElementById('summaryEvents'),
+      summaryEventsHint: document.getElementById('summaryEventsHint'),
+      summaryOnePercentLabel: document.getElementById('summaryOnePercentLabel'),
+      summaryOnePercent: document.getElementById('summaryOnePercent'),
+      summaryOnePercentHint: document.getElementById('summaryOnePercentHint'),
+      summaryHundredPercentLabel: document.getElementById('summaryHundredPercentLabel'),
+      summaryHundredPercent: document.getElementById('summaryHundredPercent'),
+      summaryHundredPercentHint: document.getElementById('summaryHundredPercentHint'),
+      summaryCardExtraA: document.getElementById('summaryCardExtraA'),
+      summaryExtraALabel: document.getElementById('summaryExtraALabel'),
+      summaryRuStore: document.getElementById('summaryRuStore'),
+      summaryExtraAHint: document.getElementById('summaryExtraAHint'),
+      summaryCardExtraB: document.getElementById('summaryCardExtraB'),
+      summaryExtraBLabel: document.getElementById('summaryExtraBLabel'),
+      summaryAppGallery: document.getElementById('summaryAppGallery'),
+      summaryExtraBHint: document.getElementById('summaryExtraBHint'),
+      resultsTitle: document.getElementById('resultsTitle'),
+      resultsSubtitle: document.getElementById('resultsSubtitle'),
+      results: document.getElementById('results'),
+      resultsCount: document.getElementById('resultsCount'),
+      exportCsvBtn: document.getElementById('exportCsvBtn'),
+      exportExcelBtn: document.getElementById('exportExcelBtn'),
+      exportPdfBtn: document.getElementById('exportPdfBtn'),
+      settingsLogicFacts: document.getElementById('settingsLogicFacts'),
+      settingsRulesTitle: document.getElementById('settingsRulesTitle'),
+      settingsRulesIntro: document.getElementById('settingsRulesIntro'),
+      settingsRulesList: document.getElementById('settingsRulesList'),
+      logBox: document.getElementById('logBox')
+    };
+
+    function escHtml(value){
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function safeJson(value){
+      try{
+        return JSON.parse(value);
+      }catch(_){
+        return null;
+      }
+    }
+
+    function normalizeText(value){
+      return String(value || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\r/g, '')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+
+    function log(message){
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.textContent = `[${new Date().toLocaleTimeString('ru-RU')}] ${String(message || '').trim()}`;
+      ui.logBox.prepend(line);
+    }
+
+    function setStatus(node, text, mode){
+      node.textContent = text;
+      node.className = `status-pill ${mode}`;
+    }
+
+    function setSettingsModalOpen(open){
+      const isOpen = !!open;
+      ui.settingsModal.classList.toggle('is-hidden', !isOpen);
+      ui.settingsModal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+      document.body.classList.toggle('modal-open', isOpen);
+    }
+
+    function getActivePlatformConfig(){
+      return PLATFORM_CONFIG[state.activePlatform] || PLATFORM_CONFIG.android;
+    }
+
+    function resetComputedData(){
+      state.groups = [];
+      state.events = [];
+      ui.results.innerHTML = '<div class="empty-state">Пока пусто. Заполни настройки и нажми «Загрузить релизы».</div>';
+      ui.resultsCount.textContent = '0';
+      ui.summaryReleases.textContent = '0';
+      ui.summaryEvents.textContent = '0';
+      ui.summaryOnePercent.textContent = '0';
+      ui.summaryHundredPercent.textContent = '0';
+      ui.summaryRuStore.textContent = '0';
+      ui.summaryAppGallery.textContent = '0';
+      updateExportButtons();
+    }
+
+    function renderPlatformMeta(){
+      const platform = getActivePlatformConfig();
+      ui.heroTitle.textContent = platform.heroTitle;
+      ui.heroDescription.innerHTML = platform.heroDescription;
+      ui.settingsLogicFacts.innerHTML = platform.heroFacts.map((item) => `
+        <div class="hero-fact">
+          <span class="hero-fact-label">${escHtml(item.label)}</span>
+          <span class="hero-fact-value">${escHtml(item.value)}</span>
+        </div>
+      `).join('');
+      ui.sourceSubtitle.textContent = platform.sourceSubtitle;
+      ui.channelMeta.textContent = platform.channelMeta;
+      ui.channelMetaLink.href = platform.channelUrl;
+      ui.channelMetaLink.textContent = `${platform.channelUrl} ↗`;
+      ui.settingsChannelMeta.textContent = platform.channelMeta;
+      ui.openChannelLink.href = platform.channelUrl;
+      ui.openChannelLink.textContent = platform.openLinkLabel;
+      ui.settingsOpenChannelLink.href = platform.channelUrl;
+      ui.settingsOpenChannelLink.textContent = platform.openLinkLabel;
+      ui.resultsTitle.textContent = platform.resultsTitle;
+      ui.resultsSubtitle.textContent = platform.resultsSubtitle;
+      ui.settingsRulesTitle.textContent = platform.rulesTitle;
+      ui.settingsRulesIntro.innerHTML = platform.rulesIntro;
+      ui.settingsRulesList.innerHTML = platform.rules.map((rule) => `<li>${rule}</li>`).join('');
+
+      ui.androidTabBtn.classList.toggle('is-active', state.activePlatform === 'android');
+      ui.androidTabBtn.setAttribute('aria-selected', state.activePlatform === 'android' ? 'true' : 'false');
+      ui.iosTabBtn.classList.toggle('is-active', state.activePlatform === 'ios');
+      ui.iosTabBtn.setAttribute('aria-selected', state.activePlatform === 'ios' ? 'true' : 'false');
+
+      ui.summaryReleasesLabel.textContent = 'Релизы';
+      ui.summaryReleasesHint.textContent = 'Сколько release-семейств найдено по выбранному диапазону.';
+      ui.summaryEventsLabel.textContent = 'События';
+      ui.summaryEventsHint.textContent = 'Сколько сообщений удалось распарсить.';
+
+      if(state.activePlatform === 'android'){
+        ui.summaryOnePercentLabel.textContent = 'ПР старт';
+        ui.summaryOnePercentHint.textContent = 'Сколько релизов имеют первое найденное процентное событие раскатки.';
+        ui.summaryHundredPercentLabel.textContent = 'ПР 100%';
+        ui.summaryHundredPercentHint.textContent = 'Сколько релизов дошли до 100% хотя бы одной версией семейства.';
+        ui.summaryExtraALabel.textContent = 'RuStore';
+        ui.summaryExtraAHint.textContent = 'Сколько релизов имеют найденную версию или событие в RuStore.';
+        ui.summaryExtraBLabel.textContent = 'AppGallery';
+        ui.summaryExtraBHint.textContent = 'Сколько релизов имеют найденную версию или событие в AppGallery.';
+      }else{
+        ui.summaryOnePercentLabel.textContent = 'AS старт';
+        ui.summaryOnePercentHint.textContent = 'Сколько iOS релизов имеют первое процентное событие раскатки.';
+        ui.summaryHundredPercentLabel.textContent = 'AS финал';
+        ui.summaryHundredPercentHint.textContent = 'Сколько iOS релизов имеют финальное сообщение о завершении раскатки.';
+        ui.summaryExtraALabel.textContent = 'AS события';
+        ui.summaryExtraAHint.textContent = 'Сколько release-family имеют хотя бы одно событие в AppStore.';
+        ui.summaryExtraBLabel.textContent = 'Финал сообщения';
+        ui.summaryExtraBHint.textContent = 'Сколько финальных сообщений вида «Раскатка в AppStore завершена» найдено.';
+      }
+    }
+
+    function setActivePlatform(nextPlatform){
+      const next = nextPlatform === 'ios' ? 'ios' : 'android';
+      if(state.activePlatform === next) return;
+      if(state.abortController){
+        state.abortController.abort();
+        state.abortController = null;
+      }
+      state.activePlatform = next;
+      try{
+        localStorage.setItem(LS_ACTIVE_PLATFORM, state.activePlatform);
+      }catch(_){}
+      ui.logBox.innerHTML = '';
+      resetComputedData();
+      renderPlatformMeta();
+      setStatus(ui.bandStatus, ui.bandCookiesInput.value.trim() ? 'Band cookies сохранены локально' : 'Band cookies не заданы', ui.bandCookiesInput.value.trim() ? 'status-ok' : 'status-idle');
+      setStatus(ui.dataStatus, 'Данные не загружены', 'status-idle');
+    }
+
+    function readSettings(){
+      return {
+        proxyBase: String(ui.proxyBaseInput.value || '').trim(),
+        bandCookies: String(ui.bandCookiesInput.value || '').trim(),
+        lookbackDays: Math.max(1, Number(ui.lookbackDaysInput.value) || DEFAULT_LOOKBACK_DAYS),
+        releaseFrom: String(ui.releaseFromInput.value || '').trim(),
+        releaseTo: String(ui.releaseToInput.value || '').trim()
+      };
+    }
+
+    function persistSettings(){
+      const settings = readSettings();
+      try{
+        localStorage.setItem(LS_PROXY_BASE, settings.proxyBase);
+        localStorage.setItem(LS_BAND_COOKIES, settings.bandCookies);
+        localStorage.setItem(LS_LOOKBACK_DAYS, String(settings.lookbackDays));
+        localStorage.setItem(LS_RELEASE_FROM, settings.releaseFrom);
+        localStorage.setItem(LS_RELEASE_TO, settings.releaseTo);
+      }catch(_){}
+    }
+
+    function restoreSettings(){
+      const storedPlatform = localStorage.getItem(LS_ACTIVE_PLATFORM);
+      state.activePlatform = storedPlatform === 'ios' ? 'ios' : 'android';
+      ui.proxyBaseInput.value = localStorage.getItem(LS_PROXY_BASE) || DEFAULT_PROXY_BASE;
+      ui.bandCookiesInput.value = localStorage.getItem(LS_BAND_COOKIES) || '';
+      ui.lookbackDaysInput.value = localStorage.getItem(LS_LOOKBACK_DAYS) || String(DEFAULT_LOOKBACK_DAYS);
+      ui.releaseFromInput.value = localStorage.getItem(LS_RELEASE_FROM) || localStorage.getItem(LS_RELEASE_FILTER) || '';
+      ui.releaseToInput.value = localStorage.getItem(LS_RELEASE_TO) || '';
+    }
+
+    function buildProxyUrl(proxyBase, targetUrl){
+      const base = String(proxyBase || '').trim().replace(/\/+$/, '');
+      if(!base){
+        throw new Error('Укажи proxy base.');
+      }
+      const proxyUrl = new URL(base + '/proxy');
+      proxyUrl.searchParams.set('url', targetUrl);
+      return proxyUrl.toString();
+    }
+
+    async function proxyRequestJson(method, targetUrl, headers, body, signal){
+      const settings = readSettings();
+      const url = buildProxyUrl(settings.proxyBase, targetUrl);
+      const response = await fetch(url, {
+        method,
+        headers: headers || {},
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal
+      });
+      if(!response.ok){
+        const raw = await response.text().catch(() => '');
+        const parsed = safeJson(raw);
+        const detail = parsed && typeof parsed === 'object'
+          ? [parsed.message, parsed.error, parsed.details].filter(Boolean).join(' | ')
+          : String(raw || '').trim();
+        throw new Error(detail ? `Proxy HTTP ${response.status}: ${detail}` : `Proxy HTTP ${response.status}`);
+      }
+      const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+      if(contentType.includes('application/json')){
+        return response.json();
+      }
+      const text = await response.text();
+      return safeJson(text) || { raw: text };
+    }
+
+    async function checkProxyHealth(){
+      const settings = readSettings();
+      const base = String(settings.proxyBase || '').trim().replace(/\/+$/, '');
+      if(!base){
+        throw new Error('Укажи proxy base.');
+      }
+      const response = await fetch(base + '/health', { cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if(!response.ok || !payload || payload.ok !== true){
+        throw new Error(`Proxy health error (${response.status})`);
+      }
+      return payload;
+    }
+
+    function unwrapBandPostsPayload(raw){
+      let node = raw;
+      for(let i = 0; i < 5; i += 1){
+        if(node && typeof node === 'object' && node.posts && typeof node.posts === 'object'){
+          return node;
+        }
+        if(node && typeof node === 'object' && node.body !== undefined){
+          if(typeof node.body === 'string'){
+            const parsed = safeJson(node.body);
+            if(parsed && typeof parsed === 'object'){
+              node = parsed;
+              continue;
+            }
+          }else if(node.body && typeof node.body === 'object'){
+            node = node.body;
+            continue;
+          }
+        }
+        if(node && typeof node === 'object' && node.data && typeof node.data === 'object'){
+          node = node.data;
+          continue;
+        }
+        break;
+      }
+      return raw && typeof raw === 'object' ? raw : {};
+    }
+
+    function collectBandPosts(payload){
+      const postsMap = payload && payload.posts && typeof payload.posts === 'object' ? payload.posts : {};
+      const order = Array.isArray(payload && payload.order) ? payload.order : Object.keys(postsMap);
+      const seen = new Set();
+      const posts = [];
+      for(const id of order){
+        const post = postsMap[id];
+        if(post && typeof post === 'object'){
+          posts.push(post);
+          seen.add(String(id));
+        }
+      }
+      for(const [id, post] of Object.entries(postsMap)){
+        if(seen.has(String(id))) continue;
+        if(post && typeof post === 'object') posts.push(post);
+      }
+      return posts;
+    }
+
+    function buildBandHeaders(cookies){
+      const value = String(cookies || '').trim();
+      if(!value){
+        throw new Error('Вставь Band cookies (чтение).');
+      }
+      return {
+        'Accept': 'application/json',
+        'Accept-Language': 'ru',
+        'X-Requested-With': 'XMLHttpRequest',
+        [PROXY_COOKIE_HEADER]: value
+      };
+    }
+
+    async function fetchBandChannelPostsSince(channelId, sinceMs, signal){
+      const headers = buildBandHeaders(readSettings().bandCookies);
+      const postsById = new Map();
+      let beforeId = '';
+
+      for(let page = 0; page < PAGE_LIMIT; page += 1){
+        if(signal?.aborted) break;
+
+        const url = new URL(`https://band.wb.ru/api/v4/channels/${encodeURIComponent(channelId)}/posts`);
+        url.searchParams.set('page', '0');
+        url.searchParams.set('per_page', String(PAGE_SIZE));
+        if(beforeId) url.searchParams.set('before', beforeId);
+        url.searchParams.set('skipFetchThreads', 'false');
+        url.searchParams.set('collapsedThreads', 'true');
+        url.searchParams.set('collapsedThreadsExtended', 'false');
+
+        const payload = unwrapBandPostsPayload(await proxyRequestJson('GET', url.toString(), headers, undefined, signal));
+        const postsMap = payload && payload.posts && typeof payload.posts === 'object' ? payload.posts : {};
+        const order = Array.isArray(payload && payload.order) ? payload.order : Object.keys(postsMap);
+        if(!order.length && !Object.keys(postsMap).length) break;
+
+        const batch = [];
+        for(const id of order){
+          const post = postsMap[id];
+          if(post && typeof post === 'object'){
+            batch.push(post);
+            if(!postsById.has(String(id))) postsById.set(String(id), post);
+          }
+        }
+        for(const [id, post] of Object.entries(postsMap)){
+          if(post && typeof post === 'object' && !postsById.has(String(id))){
+            postsById.set(String(id), post);
+          }
+        }
+
+        batch.sort((a, b) => (Number(b && b.create_at) || 0) - (Number(a && a.create_at) || 0));
+        const oldest = batch[batch.length - 1] || null;
+        const oldestId = String(oldest && oldest.id || '').trim();
+        const oldestCreateAt = Number(oldest && oldest.create_at || 0);
+        log(`Band page ${page + 1}: +${batch.length} постов, oldest=${oldestId || 'n/a'}`);
+
+        if(!oldestId || oldestId === beforeId) break;
+        beforeId = oldestId;
+        if(order.length < PAGE_SIZE) break;
+        if(Number.isFinite(sinceMs) && Number.isFinite(oldestCreateAt) && oldestCreateAt < sinceMs) break;
+      }
+
+      return Array.from(postsById.values())
+        .filter((post) => {
+          const deletedAt = Number(post && post.delete_at);
+          if(Number.isFinite(deletedAt) && deletedAt > 0) return false;
+          if(String(post && post.root_id || '').trim()) return false;
+          const createdAt = Number(post && post.create_at);
+          if(Number.isFinite(sinceMs) && Number.isFinite(createdAt) && createdAt < sinceMs) return false;
+          return Number.isFinite(createdAt) && createdAt > 0;
+        })
+        .sort((a, b) => (Number(a && a.create_at) || 0) - (Number(b && b.create_at) || 0));
+    }
+
+    function extractBandPostText(post){
+      const chunks = [];
+      const push = (value) => {
+        const text = normalizeText(
+          String(value || '')
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2')
+            .replace(/\\([\\`*_{}\[\]()#+\-.!])/g, '$1')
+            .replace(/\*\*([^*]+)\*\*/g, '$1')
+            .replace(/\*([^*\n]+)\*/g, '$1')
+            .replace(/`([^`]+)`/g, '$1')
+        );
+        if(text) chunks.push(text);
+      };
+
+      push(post && post.message || '');
+
+      const attachments = Array.isArray(post && post.props && post.props.attachments) ? post.props.attachments : [];
+      for(const attachment of attachments){
+        push(attachment && attachment.pretext);
+        push(attachment && attachment.title);
+        push(attachment && attachment.text);
+        push(attachment && attachment.fallback);
+        const fields = Array.isArray(attachment && attachment.fields) ? attachment.fields : [];
+        for(const field of fields){
+          const title = normalizeText(field && field.title || '');
+          const value = normalizeText(field && field.value || '');
+          if(title && value) push(`${title}: ${value}`);
+          else{
+            push(title);
+            push(value);
+          }
+        }
+      }
+
+      return normalizeText(chunks.join('\n'));
+    }
+
+    function parseReleaseVersion(raw){
+      const match = String(raw || '').trim().match(/^(\d+)\.(\d+)\.(\d{1,4})$/);
+      if(!match) return null;
+      const major = Number(match[1]);
+      const minor = Number(match[2]);
+      const build = Number(match[3]);
+      if(!Number.isFinite(major) || !Number.isFinite(minor) || !Number.isFinite(build)) return null;
+      return {
+        major,
+        minor,
+        build,
+        buildPadded: String(build).padStart(4, '0')
+      };
+    }
+
+    function buildReleaseFamily(version){
+      const parsed = parseReleaseVersion(version);
+      if(!parsed) return String(version || '').trim();
+      const familyBuild = Math.floor(parsed.build / 10) * 10;
+      return `${parsed.major}.${parsed.minor}.${String(familyBuild).padStart(4, '0')}`;
+    }
+
+    function compareVersions(a, b){
+      const pa = parseReleaseVersion(a);
+      const pb = parseReleaseVersion(b);
+      if(!pa || !pb){
+        return String(a || '').localeCompare(String(b || ''), 'ru');
+      }
+      if(pa.major !== pb.major) return pa.major - pb.major;
+      if(pa.minor !== pb.minor) return pa.minor - pb.minor;
+      return pa.build - pb.build;
+    }
+
+    function compareVersionsDesc(a, b){
+      return compareVersions(b, a);
+    }
+
+    function parseRangeBoundary(value, edge){
+      const raw = String(value || '').trim();
+      if(!raw) return '';
+
+      const full = parseReleaseVersion(raw);
+      if(full){
+        return buildReleaseFamily(raw);
+      }
+
+      const short = raw.match(/^(\d+)\.(\d+)$/);
+      if(short){
+        const major = Number(short[1]);
+        const minor = Number(short[2]);
+        return `${major}.${minor}.${edge === 'to' ? '9999' : '0000'}`;
+      }
+
+      return null;
+    }
+
+    function filterGroupsByRange(groups, fromRaw, toRaw){
+      const from = parseRangeBoundary(fromRaw, 'from');
+      const to = parseRangeBoundary(toRaw, 'to');
+
+      if(fromRaw && from === null){
+        throw new Error('Поле "С релиза" должно быть в формате 7.5 или 7.5.6000');
+      }
+      if(toRaw && to === null){
+        throw new Error('Поле "По релиз" должно быть в формате 7.5 или 7.5.6000');
+      }
+
+      let lower = from || '';
+      let upper = to || '';
+      if(lower && upper && compareVersions(lower, upper) > 0){
+        const tmp = lower;
+        lower = upper;
+        upper = tmp;
+      }
+
+      if(!lower && !upper) return groups;
+
+      return groups.filter((group) => {
+        const family = String(group.family || '').trim();
+        if(lower && compareVersions(family, lower) < 0) return false;
+        if(upper && compareVersions(family, upper) > 0) return false;
+        return true;
+      });
+    }
+
+    function inferStageLabel(text){
+      const source = String(text || '').toLowerCase();
+      if(source.includes('раскат')) return 'раскатка';
+      if(source.includes('модерац')) return 'модерация';
+      if(source.includes('публик')) return 'публикация';
+      if(source.includes('отправ')) return 'отправка';
+      if(source.includes('review')) return 'review';
+      return 'этап не определён';
+    }
+
+    function detectAndroidStore(text){
+      const source = String(text || '').toLowerCase();
+      if(/google play|play market|gplay/.test(source)) return 'google_play';
+      if(/rustore/.test(source)) return 'ru_store';
+      if(/appgallery|app gallery|huawei appgallery|huawei gallery/.test(source)) return 'app_gallery';
+      return '';
+    }
+
+    function isIosAppStoreMessage(text){
+      return /app\s*store|appstore/i.test(String(text || '').toLowerCase());
+    }
+
+    function isIosFinalRollout(text){
+      const source = String(text || '');
+      return /раскатка\s+в\s+app\s*store\s+завершен[ао]/i.test(source)
+        || /в\s+app\s*store\s+завершен[ао]/i.test(source)
+        || /завершение\s+раскатки\s+в\s+app\s*store\s*\((успех|success)/i.test(source)
+        || /завершение\s+раскатки\s+в\s+app\s*store[\s\S]*?✅/i.test(source);
+    }
+
+    function extractReleaseVersion(text, platformId){
+      const source = String(text || '');
+      const platform = platformId === 'ios' ? 'ios' : 'android';
+      const directMatch = source.match(/версия\s+(\d+\.\d+\.\d{1,4})/i);
+      if(directMatch){
+        return String(directMatch[1] || '').trim();
+      }
+
+      if(platform === 'ios'){
+        const iosTagged = [...source.matchAll(/\b(\d+\.\d+\.\d{1,4})\b\s+ios\b/ig)];
+        if(iosTagged.length){
+          return String(iosTagged[iosTagged.length - 1][1] || '').trim();
+        }
+      }
+
+      const generic = [...source.matchAll(/\b(\d+\.\d+\.\d{1,4})\b/g)];
+      if(generic.length){
+        return String(generic[generic.length - 1][1] || '').trim();
+      }
+      return '';
+    }
+
+    function deriveStageText(text, version, percent, platformId, finalCompleted){
+      const source = normalizeText(text);
+      const platform = platformId === 'ios' ? 'ios' : 'android';
+      if(platform === 'ios'){
+        if(finalCompleted) return 'Раскатка в AppStore завершена';
+        if(percent !== null && /опубликован[аоы]?\s+в\s+app\s*store/i.test(source)) return 'опубликована';
+        if(/завершение\s+раскатки/i.test(source)) return 'завершение раскатки';
+      }
+
+      let stageText = '';
+      if(percent !== null){
+        const stageMatch = source.match(new RegExp(`версия\\s+${version.replace(/\./g, '\\.')}\\s+([\\s\\S]*?)\\s+${percent}\\s*%`, 'i'));
+        stageText = normalizeText(stageMatch && stageMatch[1] || '');
+      }
+      if(!stageText){
+        const anchorPattern = platform === 'ios'
+          ? new RegExp(`${version.replace(/\./g, '\\.')}\\s+ios`, 'i')
+          : new RegExp(`версия\\s+${version.replace(/\./g, '\\.')}`, 'i');
+        const split = source.split(anchorPattern);
+        const afterVersion = split[1] || '';
+        stageText = normalizeText(afterVersion.replace(/\s+/g, ' ').slice(0, 160));
+      }
+      return stageText
+        .replace(/\s+на$/i, '')
+        .replace(/\s+пользовател[ея][йь]?\.?$/i, '')
+        .replace(/\s+в\s+app\s*store$/i, '')
+        .replace(/\s+в\s+(google play|rustore|appgallery)$/i, '')
+        .replace(/\s+для\s+app\s*store$/i, '')
+        .replace(/\s+для\s+(google play|rustore|appgallery)$/i, '')
+        .trim();
+    }
+
+    function getStoreLabel(store){
+      if(store === 'google_play') return 'Google Play';
+      if(store === 'ru_store') return 'RuStore';
+      if(store === 'app_gallery') return 'AppGallery';
+      if(store === 'app_store') return 'AppStore';
+      return 'Unknown';
+    }
+
+    function parseStoreEvent(post, platformId){
+      const text = extractBandPostText(post);
+      if(!text) return null;
+      if(/снят[ао] с раскатки/i.test(text)) return null;
+
+      const platform = platformId === 'ios' ? 'ios' : 'android';
+      const store = platform === 'ios'
+        ? (isIosAppStoreMessage(text) ? 'app_store' : '')
+        : detectAndroidStore(text);
+      if(!store) return null;
+
+      const version = extractReleaseVersion(text, platform);
+      const percentMatches = [...text.matchAll(/(\d{1,3})\s*%/g)];
+      if(!version) return null;
+      const percent = percentMatches.length ? Number(percentMatches[percentMatches.length - 1][1]) : null;
+      if(percent !== null && !Number.isFinite(percent)) return null;
+      const finalCompleted = platform === 'ios' && isIosFinalRollout(text);
+
+      const stageText = deriveStageText(text, version, percent, platform, finalCompleted);
+      const createdAt = Number(post && post.create_at || 0);
+      if(!Number.isFinite(createdAt) || createdAt <= 0) return null;
+
+      return {
+        id: String(post && post.id || '').trim(),
+        createdAt,
+        text,
+        store,
+        storeLabel: getStoreLabel(store),
+        version,
+        family: buildReleaseFamily(version),
+        percent,
+        stageText,
+        finalCompleted,
+        stageLabel: finalCompleted ? 'раскатка завершена' : inferStageLabel(stageText)
+      };
+    }
+
+    function formatMskDate(ms){
+      if(!Number.isFinite(ms)) return '—';
+      return new Intl.DateTimeFormat('ru-RU', {
+        timeZone: MSK_TIMEZONE,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }).format(new Date(ms));
+    }
+
+    function formatMskDateTime(ms){
+      if(!Number.isFinite(ms)) return '—';
+      return new Intl.DateTimeFormat('ru-RU', {
+        timeZone: MSK_TIMEZONE,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(new Date(ms)).replace(',', '');
+    }
+
+    function groupEvents(events, platformId){
+      const platform = platformId === 'ios' ? 'ios' : 'android';
+      const map = new Map();
+      for(const event of events){
+        if(!map.has(event.family)){
+          map.set(event.family, platform === 'ios'
+            ? {
+                family: event.family,
+                appStoreFirstRollout: null,
+                appStoreFinal: null,
+                events: []
+              }
+            : {
+                family: event.family,
+                googleOnePercent: null,
+                googleHundredPercent: null,
+                ruStoreLatest: null,
+                appGalleryLatest: null,
+                events: []
+              });
+        }
+        const group = map.get(event.family);
+        group.events.push(event);
+        if(platform === 'ios'){
+          if(event.store === 'app_store' && event.percent !== null && !group.appStoreFirstRollout){
+            group.appStoreFirstRollout = event;
+          }
+          if(event.store === 'app_store' && (event.finalCompleted || event.percent === 100)){
+            group.appStoreFinal = event;
+          }
+        }else{
+          if(event.store === 'google_play' && event.percent !== null && !group.googleOnePercent){
+            group.googleOnePercent = event;
+          }
+          if(event.store === 'google_play' && event.percent === 100){
+            group.googleHundredPercent = event;
+          }
+          if(event.store === 'ru_store'){
+            group.ruStoreLatest = event;
+          }
+          if(event.store === 'app_gallery'){
+            group.appGalleryLatest = event;
+          }
+        }
+      }
+
+      const groups = Array.from(map.values())
+        .map((group) => {
+          group.events.sort((a, b) => a.createdAt - b.createdAt);
+          if(platform === 'ios'){
+            if(!group.appStoreFirstRollout){
+              group.appStoreFirstRollout = group.events.find((event) => event.store === 'app_store' && event.percent !== null) || null;
+            }
+            const finalEvents = group.events.filter((event) => event.store === 'app_store' && (event.finalCompleted || event.percent === 100));
+            group.appStoreFinal = finalEvents.length ? finalEvents[finalEvents.length - 1] : null;
+          }else{
+            if(!group.googleOnePercent){
+              group.googleOnePercent = group.events.find((event) => event.store === 'google_play' && event.percent !== null) || null;
+            }
+            const allGoogleHundred = group.events.filter((event) => event.store === 'google_play' && event.percent === 100);
+            group.googleHundredPercent = allGoogleHundred.length ? allGoogleHundred[allGoogleHundred.length - 1] : null;
+            const ruStoreEvents = group.events.filter((event) => event.store === 'ru_store');
+            group.ruStoreLatest = ruStoreEvents.length ? ruStoreEvents[ruStoreEvents.length - 1] : null;
+            const appGalleryEvents = group.events.filter((event) => event.store === 'app_gallery');
+            group.appGalleryLatest = appGalleryEvents.length ? appGalleryEvents[appGalleryEvents.length - 1] : null;
+          }
+          return group;
+        })
+        .sort((a, b) => compareVersionsDesc(a.family, b.family));
+
+      return groups;
+    }
+
+    function renderPointCell(event, options){
+      const cfg = options && typeof options === 'object' ? options : {};
+      const emphasizeVersion = !!cfg.emphasizeVersion;
+      const showStoreTag = !!cfg.showStoreTag;
+      if(!event){
+        return `
+          <span class="table-empty">Не найдено</span>
+          <span class="table-muted">В диапазоне нет подходящего сообщения.</span>
+        `;
+      }
+
+      const value = emphasizeVersion
+        ? `${escHtml(event.version)} · ${escHtml(formatMskDate(event.createdAt))}`
+        : escHtml(formatMskDate(event.createdAt));
+
+      return `
+        ${showStoreTag ? `<span class="store-tag">${escHtml(event.storeLabel)}</span>` : ''}
+        <div class="table-point">${value}</div>
+        <span class="table-muted">${escHtml(formatMskDateTime(event.createdAt))} (МСК)</span>
+        ${event.percent !== null && Number.isFinite(event.percent) ? `<span class="table-muted">${escHtml(event.percent)}%</span>` : ''}
+        <span class="table-muted">${escHtml(event.stageLabel)}${event.stageText ? ` · ${escHtml(event.stageText)}` : ''}</span>
+      `;
+    }
+
+    function renderGroups(groups, platformId){
+      const platform = platformId === 'ios' ? 'ios' : 'android';
+      ui.resultsCount.textContent = String(groups.length);
+      if(!groups.length){
+        ui.results.innerHTML = '<div class="empty-state">Ничего не найдено. Проверь Band cookies, proxy и диапазон поиска.</div>';
+        return;
+      }
+
+      if(platform === 'ios'){
+        ui.results.innerHTML = `
+          <div class="table-wrap">
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th>Релиз</th>
+                  <th>Сообщения</th>
+                  <th>Версии</th>
+                  <th>AS старт</th>
+                  <th>AS финал</th>
+                  <th>Matched</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${groups.map((group) => {
+                  const matchedVersions = Array.from(new Set(group.events.map((event) => event.version))).sort(compareVersionsDesc);
+                  return `
+                    <tr>
+                      <td><div class="table-release">${escHtml(group.family)}</div></td>
+                      <td><span class="mini-chip">${group.events.length} сообщений</span></td>
+                      <td><div class="table-versions">${escHtml(matchedVersions.join(', '))}</div></td>
+                      <td>${renderPointCell(group.appStoreFirstRollout, { emphasizeVersion: false, showStoreTag: true })}</td>
+                      <td>${renderPointCell(group.appStoreFinal, { emphasizeVersion: true, showStoreTag: true })}</td>
+                      <td>
+                        <details class="table-inline-details">
+                          <summary>Показать ${group.events.length}</summary>
+                          <div class="table-match-list">
+                            ${group.events.map((event) => `
+                              <div class="table-match-item">
+                                <div class="table-match-head">
+                                  <span>${escHtml(event.storeLabel)} · ${escHtml(event.version)}${event.percent !== null && Number.isFinite(event.percent) ? ` · ${escHtml(event.percent)}%` : ''}${event.finalCompleted ? ' · финал' : ''}</span>
+                                  <span>${escHtml(formatMskDateTime(event.createdAt))} (МСК)</span>
+                                </div>
+                                <div class="table-match-text">${escHtml(event.text)}</div>
+                              </div>
+                            `).join('')}
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+        return;
+      }
+
+      ui.results.innerHTML = `
+        <div class="table-wrap">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Релиз</th>
+                <th>Сообщения</th>
+                <th>Версии</th>
+                <th>ПР старт</th>
+                <th>ПР 100%</th>
+                <th>RuStore</th>
+                <th>AppGallery</th>
+                <th>Matched</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${groups.map((group) => {
+                const matchedVersions = Array.from(new Set(group.events.map((event) => event.version))).sort(compareVersionsDesc);
+                return `
+                  <tr>
+                    <td>
+                      <div class="table-release">${escHtml(group.family)}</div>
+                    </td>
+                    <td>
+                      <span class="mini-chip">${group.events.length} сообщений</span>
+                    </td>
+                    <td>
+                      <div class="table-versions">${escHtml(matchedVersions.join(', '))}</div>
+                    </td>
+                    <td>
+                      ${renderPointCell(group.googleOnePercent, { emphasizeVersion: false })}
+                    </td>
+                    <td>
+                      ${renderPointCell(group.googleHundredPercent, { emphasizeVersion: true })}
+                    </td>
+                    <td>
+                      ${renderPointCell(group.ruStoreLatest, { emphasizeVersion: true, showStoreTag: true })}
+                    </td>
+                    <td>
+                      ${renderPointCell(group.appGalleryLatest, { emphasizeVersion: true, showStoreTag: true })}
+                    </td>
+                    <td>
+                      <details class="table-inline-details">
+                        <summary>Показать ${group.events.length}</summary>
+                        <div class="table-match-list">
+                          ${group.events.map((event) => `
+                            <div class="table-match-item">
+                              <div class="table-match-head">
+                                <span>${escHtml(event.storeLabel)} · ${escHtml(event.version)}${event.percent !== null && Number.isFinite(event.percent) ? ` · ${escHtml(event.percent)}%` : ''}</span>
+                                <span>${escHtml(formatMskDateTime(event.createdAt))} (МСК)</span>
+                              </div>
+                              <div class="table-match-text">${escHtml(event.text)}</div>
+                            </div>
+                          `).join('')}
+                        </div>
+                      </details>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderSummary(groups, events, platformId){
+      const platform = platformId === 'ios' ? 'ios' : 'android';
+      ui.summaryReleases.textContent = String(groups.length);
+      ui.summaryEvents.textContent = String(events.length);
+      if(platform === 'ios'){
+        const groupsWithOne = groups.filter((group) => !!group.appStoreFirstRollout).length;
+        const groupsWithFinal = groups.filter((group) => !!group.appStoreFinal).length;
+        const groupsWithAnyAppStore = groups.filter((group) => (group.events || []).some((event) => event.store === 'app_store')).length;
+        const finalMessages = events.filter((event) => event.store === 'app_store' && event.finalCompleted).length;
+        ui.summaryOnePercent.textContent = String(groupsWithOne);
+        ui.summaryHundredPercent.textContent = String(groupsWithFinal);
+        ui.summaryRuStore.textContent = String(groupsWithAnyAppStore);
+        ui.summaryAppGallery.textContent = String(finalMessages);
+        return;
+      }
+      const groupsWithOne = groups.filter((group) => !!group.googleOnePercent).length;
+      const groupsWithHundred = groups.filter((group) => !!group.googleHundredPercent).length;
+      const groupsWithRuStore = groups.filter((group) => !!group.ruStoreLatest).length;
+      const groupsWithAppGallery = groups.filter((group) => !!group.appGalleryLatest).length;
+      ui.summaryOnePercent.textContent = String(groupsWithOne);
+      ui.summaryHundredPercent.textContent = String(groupsWithHundred);
+      ui.summaryRuStore.textContent = String(groupsWithRuStore);
+      ui.summaryAppGallery.textContent = String(groupsWithAppGallery);
+    }
+
+    function updateExportButtons(){
+      const disabled = state.loading || !Array.isArray(state.groups) || !state.groups.length;
+      if(ui.exportCsvBtn) ui.exportCsvBtn.disabled = disabled;
+      if(ui.exportExcelBtn) ui.exportExcelBtn.disabled = disabled;
+      if(ui.exportPdfBtn) ui.exportPdfBtn.disabled = disabled;
+    }
+
+    function buildExportRows(groups, platformId){
+      const platform = platformId === 'ios' ? 'ios' : 'android';
+      return (Array.isArray(groups) ? groups : []).map((group) => {
+        if(platform === 'ios'){
+          const one = group.appStoreFirstRollout;
+          const final = group.appStoreFinal;
+          const versions = Array.from(new Set((group.events || []).map((event) => event.version))).sort(compareVersionsDesc);
+          return {
+            platform: 'ios',
+            release_family: group.family,
+            versions: versions.join(', '),
+            events_count: Number((group.events || []).length || 0),
+            appstore_start_date: one ? formatMskDate(one.createdAt) : '',
+            appstore_start_datetime_msk: one ? formatMskDateTime(one.createdAt) : '',
+            appstore_start_version: one ? one.version : '',
+            appstore_start_percent: one && one.percent !== null ? String(one.percent) : '',
+            appstore_start_stage: one ? one.stageLabel : '',
+            appstore_start_stage_text: one ? one.stageText : '',
+            appstore_start_message: one ? one.text : '',
+            appstore_final_date: final ? formatMskDate(final.createdAt) : '',
+            appstore_final_datetime_msk: final ? formatMskDateTime(final.createdAt) : '',
+            appstore_final_version: final ? final.version : '',
+            appstore_final_stage: final ? final.stageLabel : '',
+            appstore_final_stage_text: final ? final.stageText : '',
+            appstore_final_message: final ? final.text : ''
+          };
+        }
+        const one = group.googleOnePercent;
+        const hundred = group.googleHundredPercent;
+        const ruStore = group.ruStoreLatest;
+        const appGallery = group.appGalleryLatest;
+        const versions = Array.from(new Set((group.events || []).map((event) => event.version))).sort(compareVersionsDesc);
+        return {
+          platform: 'android',
+          release_family: group.family,
+          versions: versions.join(', '),
+          events_count: Number((group.events || []).length || 0),
+          one_percent_date: one ? formatMskDate(one.createdAt) : '',
+          one_percent_datetime_msk: one ? formatMskDateTime(one.createdAt) : '',
+          one_percent_version: one ? one.version : '',
+          one_percent_stage: one ? one.stageLabel : '',
+          one_percent_stage_text: one ? one.stageText : '',
+          one_percent_message: one ? one.text : '',
+          hundred_percent_date: hundred ? formatMskDate(hundred.createdAt) : '',
+          hundred_percent_datetime_msk: hundred ? formatMskDateTime(hundred.createdAt) : '',
+          hundred_percent_version: hundred ? hundred.version : '',
+          hundred_percent_stage: hundred ? hundred.stageLabel : '',
+          hundred_percent_stage_text: hundred ? hundred.stageText : '',
+          hundred_percent_message: hundred ? hundred.text : '',
+          rustore_date: ruStore ? formatMskDate(ruStore.createdAt) : '',
+          rustore_datetime_msk: ruStore ? formatMskDateTime(ruStore.createdAt) : '',
+          rustore_version: ruStore ? ruStore.version : '',
+          rustore_stage: ruStore ? ruStore.stageLabel : '',
+          rustore_stage_text: ruStore ? ruStore.stageText : '',
+          rustore_message: ruStore ? ruStore.text : '',
+          appgallery_date: appGallery ? formatMskDate(appGallery.createdAt) : '',
+          appgallery_datetime_msk: appGallery ? formatMskDateTime(appGallery.createdAt) : '',
+          appgallery_version: appGallery ? appGallery.version : '',
+          appgallery_stage: appGallery ? appGallery.stageLabel : '',
+          appgallery_stage_text: appGallery ? appGallery.stageText : '',
+          appgallery_message: appGallery ? appGallery.text : ''
+        };
+      });
+    }
+
+    function buildExportFilename(ext){
+      const settings = readSettings();
+      const platform = getActivePlatformConfig();
+      const parts = ['band-store-rollout', platform.id];
+      if(settings.releaseFrom) parts.push(`from-${settings.releaseFrom.replace(/[^\d.]+/g, '-')}`);
+      if(settings.releaseTo) parts.push(`to-${settings.releaseTo.replace(/[^\d.]+/g, '-')}`);
+      const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16);
+      parts.push(stamp);
+      return `${parts.join('_')}.${ext}`;
+    }
+
+    function downloadBlob(filename, blob){
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function escapeCsvCell(value){
+      const text = String(value ?? '');
+      if(/[",;\n]/.test(text)){
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
+    }
+
+    function exportCsv(){
+      const rows = buildExportRows(state.groups, state.activePlatform);
+      if(!rows.length){
+        log('CSV export пропущен: нет данных.');
+        return;
+      }
+      const columns = Object.keys(rows[0]);
+      const lines = [
+        columns.join(';'),
+        ...rows.map((row) => columns.map((column) => escapeCsvCell(row[column])).join(';'))
+      ];
+      const blob = new Blob(["\uFEFF" + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const filename = buildExportFilename('csv');
+      downloadBlob(filename, blob);
+      log(`Экспортирован CSV: ${filename}`);
+    }
+
+    function exportExcel(){
+      const rows = buildExportRows(state.groups, state.activePlatform);
+      if(!rows.length){
+        log('Excel export пропущен: нет данных.');
+        return;
+      }
+      const columns = Object.keys(rows[0]);
+      const headerHtml = columns.map((column) => `<th>${escHtml(column)}</th>`).join('');
+      const bodyHtml = rows.map((row) => `
+        <tr>${columns.map((column) => `<td>${escHtml(row[column])}</td>`).join('')}</tr>
+      `).join('');
+      const closeBodyTag = '</' + 'body>';
+      const closeHtmlTag = '</' + 'html>';
+      const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body{font-family:Arial,sans-serif}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #d9d9d9;padding:8px;vertical-align:top;text-align:left}
+    th{background:#f3ecff;font-weight:700}
+  </style>
+</head>
+<body>
+  <table>
+    <thead><tr>${headerHtml}</tr></thead>
+    <tbody>${bodyHtml}</tbody>
+  </table>
+${closeBodyTag}
+${closeHtmlTag}`;
+      const blob = new Blob(["\uFEFF" + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const filename = buildExportFilename('xls');
+      downloadBlob(filename, blob);
+      log(`Экспортирован Excel: ${filename}`);
+    }
+
+    function buildPrintableResultsTable(groups, platformId){
+      const platform = platformId === 'ios' ? 'ios' : 'android';
+      if(platform === 'ios'){
+        return `
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Релиз</th>
+                <th>Сообщения</th>
+                <th>Версии</th>
+                <th>AS старт</th>
+                <th>AS финал</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(Array.isArray(groups) ? groups : []).map((group) => {
+                const matchedVersions = Array.from(new Set((group.events || []).map((event) => event.version))).sort(compareVersionsDesc);
+                return `
+                  <tr>
+                    <td><div class="table-release">${escHtml(group.family)}</div></td>
+                    <td><span class="mini-chip">${group.events.length} сообщений</span></td>
+                    <td><div class="table-versions">${escHtml(matchedVersions.join(', '))}</div></td>
+                    <td>${renderPointCell(group.appStoreFirstRollout, { emphasizeVersion: false, showStoreTag: true })}</td>
+                    <td>${renderPointCell(group.appStoreFinal, { emphasizeVersion: true, showStoreTag: true })}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+      return `
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Релиз</th>
+              <th>Сообщения</th>
+              <th>Версии</th>
+                <th>ПР старт</th>
+                <th>ПР 100%</th>
+                <th>RuStore</th>
+                <th>AppGallery</th>
+              </tr>
+            </thead>
+            <tbody>
+            ${(Array.isArray(groups) ? groups : []).map((group) => {
+              const matchedVersions = Array.from(new Set((group.events || []).map((event) => event.version))).sort(compareVersionsDesc);
+              return `
+                <tr>
+                  <td><div class="table-release">${escHtml(group.family)}</div></td>
+                  <td><span class="mini-chip">${group.events.length} сообщений</span></td>
+                  <td><div class="table-versions">${escHtml(matchedVersions.join(', '))}</div></td>
+                  <td>${renderPointCell(group.googleOnePercent, { emphasizeVersion: false })}</td>
+                  <td>${renderPointCell(group.googleHundredPercent, { emphasizeVersion: true })}</td>
+                  <td>${renderPointCell(group.ruStoreLatest, { emphasizeVersion: true, showStoreTag: true })}</td>
+                  <td>${renderPointCell(group.appGalleryLatest, { emphasizeVersion: true, showStoreTag: true })}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function buildPrintableHtml(groups, platformId){
+      const platform = getActivePlatformConfig();
+      const settings = readSettings();
+      const closeScriptTag = '</' + 'script>';
+      const closeBodyTag = '</' + 'body>';
+      const closeHtmlTag = '</' + 'html>';
+      const rangeLabel = [
+        settings.releaseFrom ? `с ${settings.releaseFrom}` : '',
+        settings.releaseTo ? `по ${settings.releaseTo}` : ''
+      ].filter(Boolean).join(' ');
+      return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escHtml(buildExportFilename('pdf'))}</title>
+  <style>
+    @page{ size: landscape; margin: 12mm; }
+    body{ font-family: Arial, sans-serif; color:#1f1a2d; margin:0; }
+    h1{ margin:0 0 6px; font-size:22px; }
+    p{ margin:0 0 12px; color:#5c5470; font-size:12px; line-height:1.45; }
+    .results-table{ width:100%; border-collapse:collapse; font-size:10px; }
+    .results-table th,.results-table td{ border:1px solid #d8ddea; padding:6px 7px; vertical-align:top; text-align:left; }
+    .results-table th{ background:#f2f5fb; font-weight:700; text-transform:uppercase; letter-spacing:.08em; font-size:9px; }
+    .results-table tr:nth-child(even) td{ background:#fafcff; }
+    .table-release{ font-size:14px; font-weight:800; line-height:1; white-space:nowrap; }
+    .mini-chip{ display:inline-block; padding:3px 7px; border:1px solid #d8ddea; border-radius:999px; background:#f8faff; color:#5e5378; font-size:9px; font-weight:700; white-space:nowrap; }
+    .table-versions{ color:#5e5378; font-size:10px; line-height:1.45; word-break:break-word; }
+    .table-point{ font-size:12px; line-height:1.15; font-weight:800; color:#2c2740; margin-bottom:4px; white-space:nowrap; }
+    .table-muted{ display:block; color:#6f6784; font-size:9px; line-height:1.4; margin-top:2px; word-break:break-word; }
+    .table-empty{ display:inline-block; color:#9a90b1; font-size:10px; font-weight:700; }
+    .store-tag{ display:inline-block; padding:2px 6px; margin-bottom:5px; border-radius:999px; background:#eef4ff; border:1px solid #d5e2ff; color:#4b5f8a; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+    .print-match-list{ display:flex; flex-direction:column; gap:5px; min-width:240px; }
+    .print-match-item{ border:1px solid #e7ebf5; border-radius:8px; background:#fff; padding:5px 6px; break-inside:avoid; }
+    .print-match-head{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size:8px; color:#6a5f82; margin-bottom:4px; }
+    .print-match-text{ white-space:pre-wrap; word-break:break-word; color:#312945; font-size:9px; line-height:1.35; }
+  </style>
+</head>
+<body>
+  <h1>${escHtml(platform.label)} rollout report</h1>
+  ${buildPrintableResultsTable(groups, platformId)}
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => window.print(), 120);
+    });
+    window.addEventListener('afterprint', () => {
+      setTimeout(() => window.close(), 120);
+    });
+  ${closeScriptTag}
+${closeBodyTag}
+${closeHtmlTag}`;
+    }
+
+    function exportPdf(){
+      const groups = Array.isArray(state.groups) ? state.groups : [];
+      if(!groups.length){
+        log('PDF export пропущен: нет данных.');
+        return;
+      }
+      const filename = buildExportFilename('pdf');
+      const popup = window.open('', '_blank');
+      if(!popup){
+        log('PDF export не открыт: браузер заблокировал новое окно.');
+        return;
+      }
+      popup.document.open();
+      popup.document.write(buildPrintableHtml(groups, state.activePlatform));
+      popup.document.close();
+      log(`Открыт PDF preview: ${filename}. В диалоге печати выбери Save as PDF.`);
+    }
+
+    function setLoading(next){
+      state.loading = !!next;
+      ui.loadBtn.disabled = state.loading;
+      ui.proxyCheckBtn.disabled = state.loading;
+      ui.loadBtn.textContent = state.loading ? 'Загружаю…' : 'Загрузить релизы';
+      updateExportButtons();
+    }
+
+    async function loadTimeline(){
+      const settings = readSettings();
+      const platform = getActivePlatformConfig();
+      persistSettings();
+
+      const sinceMs = Date.now() - settings.lookbackDays * 24 * 60 * 60 * 1000;
+      const rangeNote = [
+        settings.releaseFrom ? `from=${settings.releaseFrom}` : '',
+        settings.releaseTo ? `to=${settings.releaseTo}` : ''
+      ].filter(Boolean).join(', ');
+      log(`Старт загрузки: platform=${platform.label}, channel=${platform.channelId}, since=${formatMskDateTime(sinceMs)} МСК${rangeNote ? `, ${rangeNote}` : ''}`);
+
+      const posts = await fetchBandChannelPostsSince(platform.channelId, sinceMs, state.abortController.signal);
+      log(`Из Band получено ${posts.length} root-постов.`);
+
+      const events = posts
+        .map((post) => parseStoreEvent(post, platform.id))
+        .filter(Boolean);
+
+      if(platform.id === 'ios'){
+        const appStoreEvents = events.filter((event) => event.store === 'app_store').length;
+        const finalEvents = events.filter((event) => event.store === 'app_store' && event.finalCompleted).length;
+        log(`Распознано ${events.length} iOS store-событий: AppStore=${appStoreEvents}, финал=${finalEvents}.`);
+      }else{
+        const googlePlayEvents = events.filter((event) => event.store === 'google_play').length;
+        const ruStoreEvents = events.filter((event) => event.store === 'ru_store').length;
+        const appGalleryEvents = events.filter((event) => event.store === 'app_gallery').length;
+        log(`Распознано ${events.length} store-событий: Google Play=${googlePlayEvents}, RuStore=${ruStoreEvents}, AppGallery=${appGalleryEvents}.`);
+      }
+
+      const allGroups = groupEvents(events, platform.id);
+      const groups = filterGroupsByRange(allGroups, settings.releaseFrom, settings.releaseTo);
+      log(`После группировки и диапазона осталось ${groups.length} release-строк.`);
+
+      state.events = events;
+      state.groups = groups;
+      renderSummary(groups, events, platform.id);
+      renderGroups(groups, platform.id);
+
+      setStatus(ui.bandStatus, `${platform.label} messages прочитаны`, 'status-ok');
+      setStatus(ui.dataStatus, groups.length ? `Готово: ${groups.length} релизов` : 'Готово, но совпадений нет', groups.length ? 'status-ok' : 'status-warn');
+    }
+
+    async function handleLoad(){
+      if(state.abortController){
+        state.abortController.abort();
+      }
+      state.abortController = new AbortController();
+      setLoading(true);
+      setStatus(ui.dataStatus, 'Идёт загрузка и парсинг', 'status-warn');
+      try{
+        await loadTimeline();
+      }catch(error){
+        const message = error && error.message ? error.message : String(error);
+        log(`Ошибка: ${message}`);
+        setStatus(ui.bandStatus, 'Ошибка чтения Band', 'status-error');
+        setStatus(ui.dataStatus, message, 'status-error');
+      }finally{
+        setLoading(false);
+      }
+    }
+
+    async function handleProxyCheck(){
+      persistSettings();
+      try{
+        const payload = await checkProxyHealth();
+        log(`Proxy OK: ${payload.host}:${payload.port}`);
+        setStatus(ui.proxyStatus, `Proxy OK · ${payload.host}:${payload.port}`, 'status-ok');
+      }catch(error){
+        const message = error && error.message ? error.message : String(error);
+        log(`Proxy error: ${message}`);
+        setStatus(ui.proxyStatus, message, 'status-error');
+      }
+    }
+
+    function bindEvents(){
+      ui.androidTabBtn.addEventListener('click', () => setActivePlatform('android'));
+      ui.iosTabBtn.addEventListener('click', () => setActivePlatform('ios'));
+      ui.loadBtn.addEventListener('click', handleLoad);
+      ui.settingsBtn.addEventListener('click', () => setSettingsModalOpen(true));
+      ui.settingsCloseBtn.addEventListener('click', () => setSettingsModalOpen(false));
+      ui.settingsBackdrop.addEventListener('click', () => setSettingsModalOpen(false));
+      ui.proxyCheckBtn.addEventListener('click', handleProxyCheck);
+      ui.exportCsvBtn.addEventListener('click', exportCsv);
+      ui.exportExcelBtn.addEventListener('click', exportExcel);
+      ui.exportPdfBtn.addEventListener('click', exportPdf);
+      [
+        ui.proxyBaseInput,
+        ui.bandCookiesInput,
+        ui.lookbackDaysInput,
+        ui.releaseFromInput,
+        ui.releaseToInput
+      ].forEach((node) => {
+        node.addEventListener('input', persistSettings);
+        node.addEventListener('change', persistSettings);
+      });
+      document.addEventListener('keydown', (event) => {
+        if(event.key === 'Escape' && !ui.settingsModal.classList.contains('is-hidden')){
+          setSettingsModalOpen(false);
+        }
+      });
+    }
+
+    function init(){
+      restoreSettings();
+      bindEvents();
+      renderPlatformMeta();
+      resetComputedData();
+      setStatus(ui.proxyStatus, 'Proxy не проверен', 'status-idle');
+      setStatus(ui.bandStatus, ui.bandCookiesInput.value.trim() ? 'Band cookies сохранены локально' : 'Band cookies не заданы', ui.bandCookiesInput.value.trim() ? 'status-ok' : 'status-idle');
+      setStatus(ui.dataStatus, 'Данные не загружены', 'status-idle');
+      setSettingsModalOpen(false);
+      updateExportButtons();
+    }
+
+    init();
+  </script>
+</body>
+</html>

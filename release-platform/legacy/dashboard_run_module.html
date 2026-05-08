@@ -1,0 +1,3208 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Regress Dashboard — Дашборд</title>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- ExcelJS (не используется напрямую, оставляю как было) -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<!-- SheetJS (Excel) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- XlsxPopulate (стили Excel в браузере) -->
+<script src="https://unpkg.com/xlsx-populate/browser/xlsx-populate.min.js"></script>
+
+
+<!-- INLINE FILTERS OVERRIDE: keep controls on one line -->
+
+  <link rel="stylesheet" href="dashboard_run.css">
+</head>
+
+<body class="authed">
+
+
+<div class="wrap">
+  <h1>Остаток кейсов на регресс v.3.11</h1>
+
+ <div class="tabs">
+  <button id="tabDashBtn" class="active">Дашборд</button>
+</div>
+
+  <!-- ======= ПАНЕЛЬ ПАРАМЕТРОВ ======= -->
+  <div class="panel card" style="grid-template-columns:repeat(12,minmax(0,1fr));">
+    <div class="field" style="grid-column:span 3"><label>Base URL</label><input id="baseUrl" placeholder="https://allure-testops.wb.ru"></div>
+    <div class="field" style="grid-column:span 2"><label>Project ID</label><input id="projectId" placeholder="7"></div>
+    <div class="field" style="grid-column:span 2"><label>Версия (пример: 7.2.6)</label><input id="version" placeholder="7.2.6"></div>
+    <div class="field" style="grid-column:span 3"><label>API токен</label><input id="token" placeholder="вставьте токен"></div>
+    <div style="grid-column:span 4;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+      <button id="runBtn" class="btn primary">Запустить</button>
+      <button id="saveSettingsBtn" class="btn">Сохранить настройки</button>
+    </div>
+
+    <div style="grid-column:span 12;display:flex;flex-wrap:wrap;gap:8px;align-items:end">
+      <button id="dataPick" class="btn">Подключить файл данных</button>
+      <button id="dataCreate" class="btn">Создать файл данных</button>
+      <button id="dataSave" class="btn success" disabled>Сохранить в файл</button>
+
+      <input id="dataImport" type="file" accept="application/json" style="display:none">
+      <button id="dataImportBtn" class="btn">Импорт JSON</button>
+      <button id="dataExportBtn" class="btn">Экспорт JSON</button>
+      <button id="dataExportCsv" class="btn">Экспорт CSV (срезы)</button>
+
+      <div class="auto" style="margin-left:auto;display:grid;grid-auto-flow:column;gap:10px;align-items:center">
+        <div class="nums" id="autoState">Автозапуск: выключен</div>
+        <div class="field" style="display:grid;grid-template-columns:auto"><label>Интервал (мин)</label><input id="autoMins" value="20"></div>
+        <button id="autoStart" class="btn success">Старт</button>
+        <button id="autoStop" class="btn danger" disabled>Стоп</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== ДАШБОРД ====================== -->
+  <div id="tabDash" class="tab-section">
+    <!-- Готовность к релизу (Android + iOS) -->
+    <div class="card" id="releaseWrap" style="margin-bottom:16px">
+      <div class="head">
+        <div>Готовность к релизу</div>
+        <div class="nums" id="releaseHeadVer">Версия: —</div>
+      </div>
+      <div class="release-row" id="releaseRow"></div>
+    </div>
+
+    <!-- Мини-диаграммы по лаунчам -->
+    <div class="card" id="miniLaunchCard" style="margin-bottom:16px">
+      <div class="head">
+        <div>Мини-диаграммы по лаунчам</div>
+
+        <div class="export" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button id="miniToggleBtn" class="mini">Показать</button>
+
+          <label class="nums">Показать</label>
+          <input id="miniCount" class="mini" type="number" value="150" min="1" max="300" style="width:70px">
+
+          <label class="nums">Сорт</label>
+          <select id="miniSortKey" class="mini">
+            <option value="pct" selected>% пройдено</option>
+            <option value="finished">Пройдено (шт)</option>
+            <option value="total">Всего (шт)</option>
+            <option value="created">Свежесть</option>
+          </select>
+          <select id="miniSortDir" class="mini">
+            <option value="desc" selected>DESC</option>
+            <option value="asc">ASC</option>
+          </select>
+
+          <label class="nums">Отдел</label>
+          <select id="miniDept" class="mini">
+            <option value="all" selected>Все</option>
+            <option value="Корзина">Корзина</option>
+            <option value="Финтех">Финтех</option>
+            <option value="Чаты">Чаты</option>
+            <option value="ВХ">ВХ</option>
+            <option value="Остальные">Остальные</option>
+          </select>
+
+          <!-- фильтр по платформе -->
+          <label class="nums">Платформа</label>
+          <select id="miniPlatform" class="mini">
+            <option value="all" selected>Все</option>
+            <option value="android">Android</option>
+            <option value="ios">iOS</option>
+          </select>
+        </div>
+      </div>
+      <div id="miniWrap" style="display:none">
+        <div class="nums" id="miniInfo">—</div>
+        <div class="mini-grid" id="miniGrid"></div>
+      </div>
+    </div>
+
+    <!-- Сводный барчарт -->
+    <div class="card">
+      <div class="head">
+        <div>Сводный барчарт</div>
+        <div class="export">
+          <button id="expBarPng" class="mini">PNG</button>
+          <button id="expBarSvg" class="mini">SVG</button>
+          <button id="expAggCsv" class="mini">CSV</button>
+          <button id="expAggJson" class="mini">JSON</button>
+        </div>
+      </div>
+      <div id="chartFiltersWrap" style="margin:8px 0 -4px; padding:6px 10px; background:rgba(255,255,255,.6); border:1px solid #eee; border-radius:10px; display:flex; flex-wrap:wrap; gap:14px; align-items:center;">
+        <div>
+          <span style="font-weight:600;color:#444;margin-right:6px;">Платформа:</span>
+          <label style="display:inline-flex;align-items:center;gap:6px;margin-right:10px;"><input type="checkbox" id="fltPlatIOS" checked> iOS</label>
+          <label style="display:inline-flex;align-items:center;gap:6px;margin-right:10px;"><input type="checkbox" id="fltPlatAndroid" checked> Android</label>
+        </div>
+        <div>
+          <span style="font-weight:600;color:#444;margin:0 6px 0 2px;">Тип:</span>
+          <label style="display:inline-flex;align-items:center;gap:6px;margin-right:10px;"><input type="checkbox" id="fltTypeSmoke" checked> Smoke</label>
+          <label style="display:inline-flex;align-items:center;gap:6px;margin-right:10px;"><input type="checkbox" id="fltTypeSelective" checked> Selective</label>
+          <label style="display:inline-flex;align-items:center;gap:6px;margin-right:10px;"><input type="checkbox" id="fltTypeHB" checked> High/Blocker</label>
+        </div>
+        <div style="margin-left:auto; display:flex; gap:8px;">
+          <button type="button" id="fltAll"  class="mini" style="padding:6px 12px;">Все</button>
+          <button type="button" id="fltNone" class="mini" style="padding:6px 12px;">Сброс</button>
+        </div>
+      </div>
+    
+      <div class="nums" id="summaryInfo">—</div>
+      <div class="chart-wrap"><canvas id="barAll" class="chart"></canvas></div>
+    </div>
+
+    <div class="grid" id="cards"></div>
+
+    <div class="split">
+      <div class="card">
+        <div class="head">
+          <div>Лог</div>
+          <div class="nums" id="logInfo">—</div>
+        </div>
+
+        <div id="logProgressWrap" style="margin:4px 0 8px 0">
+          <div class="nums" id="logProgressCaption"></div>
+          <div class="progress"><div id="logProgressBar"></div></div>
+        </div>
+
+        <div class="log" id="log"></div>
+      </div>
+
+      <div class="card">
+        <div class="head">
+          <div>Аллерт по лаунчам</div>
+          <div class="export">
+            <label class="nums">Фильтр:</label>
+            <select id="alertFilter" class="mini">
+              <option value="all" selected>Все</option>
+              <option value="passed">Есть пройденные</option>
+              <option value="none">Нет пройденных</option>
+              <option value="empty">Без кейсов</option>
+            </select>
+          </div>
+        </div>
+        <div class="log" id="alertLog">Пока аллертов нет.</div>
+      </div>
+    </div>
+
+    <!-- ====== Срезы: Общие и По стриму ====== -->
+    <div class="card" style="margin-top:16px">
+      <div class="head">
+        <div>Сохранённые срезы</div>
+        <div class="subtabs">
+          <button id="subtabGeneral" class="mini active">Общие</button>
+          <button id="subtabStream" class="mini">По стриму</button>
+        </div>
+      </div>
+
+      <!-- === Общие === -->
+      <div id="snapGeneralSection">
+        <div class="export" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <label class="nums">Метрика</label>
+          <select id="dashMetric" class="mini">
+            <option value="finished" selected>Пройдено</option>
+            <option value="total">Всего</option>
+            <option value="remaining_total">Осталось</option>
+            <option value="remaining">Назначено</option>
+            <option value="in_progress">В процессе</option>
+          </select>
+          <label class="nums">Тип</label>
+          <select id="dashKind" class="mini">
+            <option value="all" selected>Все типы</option>
+            <option value="sm_sel">Smoke + Selective</option>
+            <option value="hb_only">High/Blocker</option>
+          </select>
+          <button id="dashSnapSave" class="mini">Сохранить срез</button>
+          <button id="dashSnapBuild" class="mini">Построить сравнение</button>
+          <button id="dashSnapClear" class="mini">Очистить всё</button>
+        </div>
+        <div id="snapListDash" class="snap-list"></div>
+        <div class="kpis" id="dashDelta" style="margin-top:8px"></div>
+        <div class="chart-wrap" style="height:320px"><canvas id="dashPrevCurr" class="chart"></canvas></div>
+        <div class="chart-wrap" style="height:320px"><canvas id="dashMultiBar" class="chart"></canvas></div>
+      </div>
+
+      <!-- === По стриму (Smoke / Selective) === -->
+      <div id="snapStreamSection" style="display:none">
+        <div class="export" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <label class="nums">Стрим</label>
+          <select id="streamKind" class="mini">
+            <option value="Smoke" selected>Smoke</option>
+            <option value="Selective">Selective</option>
+            <option value="High/Blocker">High/Blocker</option>
+          </select>
+          <label class="nums">Название стрима</label>
+<select id="streamName" class="mini">
+  <option value="__all__" selected>— выберите стрим —</option>
+</select>
+          <label class="nums">Метрика</label>
+          <select id="dashMetricStream" class="mini">
+            <option value="finished" selected>Пройдено</option>
+            <option value="total">Всего</option>
+            <option value="remaining_total">Осталось</option>
+            <option value="remaining">Назначено</option>
+            <option value="in_progress">В процессе</option>
+          </select>
+          <button id="dashStreamSnapSave" class="mini">Сохранить срез (стрим)</button>
+          <button id="dashStreamSnapBuild" class="mini">Построить сравнение</button>
+          <button id="dashStreamSnapClear" class="mini">Очистить всё</button>
+        </div>
+        <div id="snapListDashStream" class="snap-list"></div>
+        <div class="kpis" id="dashDeltaStream" style="margin-top:8px"></div>
+        <div class="chart-wrap" style="height:320px"><canvas id="dashPrevCurrStream" class="chart"></canvas></div>
+        <div class="chart-wrap" style="height:320px"><canvas id="dashMultiBarStream" class="chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="title">Regress Dashboard by Iliasov D.S n Rusakov A.G</div>
+
+  </div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(function(){
+  /* ===== утилиты DOM/стиля ===== */
+  function $(s){ return document.querySelector(s); }
+  function $all(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
+  function toast(msg){ var t=$('#toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(function(){ t.classList.remove('show'); },1600); }
+  function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function hexA(hex, a){ var c=hex.replace('#',''); var n=parseInt(c,16); var r=(n>>16)&255,g=(n>>8)&255,b=n&255; return 'rgba('+r+','+g+','+b+','+a+')'; }
+  function fitHiDPICanvas(canvas){ var dpr=Math.max(1,window.devicePixelRatio||1); var rect=canvas.getBoundingClientRect(); var w=Math.round(rect.width*dpr), h=Math.round(rect.height*dpr); if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; } }
+  function makeCtx(canvas){ fitHiDPICanvas(canvas); return canvas.getContext('2d'); }
+  function escapeHtml(str){
+    return String(str||'').replace(/[&<>"']/g, s=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[s]));
+  }
+
+  /* ===== глобальные ===== */
+  window.__charts={}; window.addEventListener('resize', function(){ for(var k in window.__charts){ if(window.__charts[k].maker) window.__charts[k].maker(); } });
+
+  Chart.defaults.devicePixelRatio=Math.max(1,window.devicePixelRatio||1);
+  Chart.defaults.font.family="Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  Chart.defaults.font.size=13;
+  Chart.defaults.color=getComputedStyle(document.documentElement).getPropertyValue('--text').trim()||'#2a1446';
+  Chart.defaults.plugins.legend.labels.usePointStyle=true;
+
+  // Мини-диаграммы: текущие данные + опции
+  window.__mini_last = null;
+  const MINI_DEFAULTS = { count: 24, sortKey: 'pct', sortDir: 'desc', dept: 'all', platform: 'all' };
+
+  function readMiniOpts(){
+    const count = Math.max(1, Math.min(120, parseInt($('#miniCount')?.value||MINI_DEFAULTS.count,10)||MINI_DEFAULTS.count));
+    const sortKey = ($('#miniSortKey')?.value)||MINI_DEFAULTS.sortKey;
+    const sortDir = ($('#miniSortDir')?.value)||MINI_DEFAULTS.sortDir;
+    const dept = ($('#miniDept')?.value)||MINI_DEFAULTS.dept;
+    const platform = ($('#miniPlatform')?.value)||MINI_DEFAULTS.platform;
+    return {count, sortKey, sortDir, dept, platform};
+  }
+
+  function rebuildMini(){
+    if(!window.__mini_last) return;
+    const {launches, perLaunchFinished, perLaunchTotal} = window.__mini_last;
+    buildMiniLaunchCharts(launches, perLaunchFinished, perLaunchTotal, readMiniOpts());
+  }
+
+  /* Центровой текст для doughnut */
+  const DoughnutCenterText = {
+    id: 'doughnutCenterText',
+    afterDraw(chart){
+      const ds = chart.data.datasets?.[0];
+      if(!ds || typeof ds.__pct !== 'number') return;
+      const {ctx, chartArea} = chart;
+      const x = (chartArea.left + chartArea.right)/2;
+      const y = (chartArea.top + chartArea.bottom)/2;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = getCSS('--text');
+      ctx.font = '700 16px ' + Chart.defaults.font.family;
+      ctx.fillText(ds.__pct + '%', x, y);
+      ctx.restore();
+    }
+  };
+
+  var COLORS={ total:getCSS('--c1'), finished:getCSS('--c2'), remaining_total:getCSS('--c3'), remaining:getCSS('--c3'), in_progress:getCSS('--c4') };
+  var ORDER = ["[iOS][High/Blocker]","[Android][High/Blocker]","[iOS][Selective]","[Android][Selective]"];
+
+  // --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ для фильтра по типу (dashKind) ---
+  function allowByKind(label){
+    label = String(label||'');
+    var sel = document.getElementById('dashKind');
+    var v = sel ? sel.value : 'all';
+
+    var isHB = label.indexOf('[High/Blocker]') !== -1;
+
+    if (v === 'hb_only') return isHB;
+    if (v === 'sm_sel')  return !isHB;
+    return true; // 'all' или что-то неизвестное
+  }
+  var CURRENT_BASE_URL = '';
+  var barAllChartRef = null;
+
+  /* ===== микро-оптимизации ===== */
+  const now = ()=> performance.now();
+
+  // Пакетное логирование
+  const logBuf=[]; let logTimer=null;
+  function flushLog(){
+    if(!logBuf.length) return;
+    const el=$('#log'); if(!el) { logBuf.length=0; return; }
+    el.textContent += (el.textContent ? '\n' : '') + logBuf.join('\n');
+    el.scrollTop = el.scrollHeight;
+    logBuf.length=0; logTimer=null;
+  }
+  function appendLogLine(line){
+    logBuf.push(line);
+    if(!logTimer) logTimer=setTimeout(flushLog, 80);
+  }
+  function logDash(msg){ appendLogLine(msg); }
+
+  // Кеш GET-запросов
+  const GET_CACHE = new Map();
+  const UWU_CACHE = new Map();
+  function cacheKey(url, params, headers){
+    const qs=params?new URLSearchParams(params).toString():'';
+    return url + (qs?('?'+qs):'') + '|' + (headers?.Authorization||'');
+  }
+
+  // Пул промисов
+  async function pMap(arr, mapper, {concurrency=8, onProgress}={}){
+    return new Promise((resolve,reject)=>{
+      if(!arr || arr.length===0){ resolve([]); return; }
+      let i=0, done=0, out=new Array(arr.length), active=0, stopped=false;
+      const next=()=>{
+        if(stopped) return;
+        while(active<concurrency && i<arr.length){
+          const idx=i++, val=arr[idx]; active++;
+          Promise.resolve().then(()=>mapper(val, idx)).then(res=>{
+            out[idx]=res; active--; done++; if(onProgress) onProgress(done, arr.length); (done===arr.length)?resolve(out):next();
+          }).catch(e=>{ stopped=true; reject(e); });
+        }
+      };
+      next();
+    });
+  }
+
+  async function safeJson(resp){ try{ return await resp.json(); }catch(_){ return null; } }
+
+/* ===== рендер графиков ===== */
+function makeBarChart(canvasId, labels, datasets){
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  var maker = function(){
+    fitHiDPICanvas(canvas);
+    var ctx = makeCtx(canvas);
+
+    if (window.__charts[canvasId] && window.__charts[canvasId].chart){
+      try { window.__charts[canvasId].chart.destroy(); } catch(e){}
+    }
+
+    function colorFor(key){
+      return key==='total' ? COLORS.total
+           : key==='finished' ? COLORS.finished
+           : key==='remaining_total' ? COLORS.remaining_total
+           : key==='remaining' ? COLORS.remaining
+           : key==='in_progress' ? COLORS.in_progress
+           : COLORS.finished;
+    }
+
+    // 1) Лейблы-значения поверх столбцов (читабельно и фиксировано)
+    const valueLabelsPlugin = {
+      id: 'valueLabels',
+      afterDatasetsDraw(chart){
+        const {ctx, chartArea} = chart;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.font = Chart.helpers.toFont(Chart.defaults.font).string;
+
+        chart.data.datasets.forEach((ds, di)=>{
+          const meta = chart.getDatasetMeta(di);
+          if (!meta || !meta.data) return;
+
+          meta.data.forEach((bar, i)=>{
+            if (!bar) return;
+            const val = Number(ds.data?.[i] || 0);
+            if (val === 0) return;
+
+            const {x, y} = bar.getProps(['x','y'], true);
+            // держим подпись внутри области графика
+            const yy = Math.min(Math.max(y - 6, chartArea.top + 6), chartArea.bottom - 6);
+
+            ctx.fillStyle = getCSS('--ink');
+            ctx.fillText(val.toLocaleString('ru-RU'), x, yy);
+          });
+        });
+        ctx.restore();
+      }
+    };
+
+    // 2) Дельта над «Текущим» в prev/curr
+    const deltaPlugin = {
+      id: 'deltaInside',
+      afterDatasetsDraw(chart) {
+        if (chart.canvas.id !== 'dashPrevCurr' && chart.canvas.id !== 'dashPrevCurrStream') return;
+
+        const dsCurr = chart.data.datasets[1];
+        const deltas = (dsCurr && dsCurr.__delta) || [];
+        const meta = chart.getDatasetMeta(1);
+        if (!meta || !meta.data) return;
+
+        const { ctx, chartArea } = chart;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '700 12px ' + Chart.defaults.font.family;
+
+        // helper: скруглённый прямоугольник
+        function rrect(x, y, w, h, r){
+          const rr = Math.min(r, h/2, w/2);
+          ctx.beginPath();
+          ctx.moveTo(x+rr, y);
+          ctx.arcTo(x+w, y,   x+w, y+h, rr);
+          ctx.arcTo(x+w, y+h, x,   y+h, rr);
+          ctx.arcTo(x,   y+h, x,   y,   rr);
+          ctx.arcTo(x,   y,   x+w, y,   rr);
+          ctx.closePath();
+        }
+
+        meta.data.forEach((elem, i) => {
+          if (!elem) return;
+          const d = Number(deltas[i] || 0);
+if (d === 0) return;  // 🔴 пропускаем нулевые дельты
+const txt = (d > 0 ? '+' : '') + d.toLocaleString('ru-RU');
+
+          const { x, y, base } = elem.getProps(['x','y','base'], true);
+          let cy = y + (base - y) / 2;               // центр столбца
+          const pad = 12;
+          cy = Math.max(chartArea.top + pad, Math.min(chartArea.bottom - pad, cy));
+
+          const w = ctx.measureText(txt).width + 10;
+          const h = 18;
+          ctx.fillStyle = 'rgba(255,255,255,.85)';
+          rrect(x - w/2, cy - h/2, w, h, 8);
+          ctx.fill();
+
+          ctx.fillStyle = getCSS('--ink') || getCSS('--text') || '#2a1446';
+          ctx.fillText(txt, x, cy);
+        });
+
+        ctx.restore();
+      }
+    };
+
+    const isPrevCurr = (canvasId==='dashPrevCurr' || canvasId==='dashPrevCurrStream');
+
+    var cfg = {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: datasets.map(function(ds){
+          return {
+            label: ds.label,
+            data: ds.data,
+            backgroundColor: ds.backgroundColor || hexA(colorFor(ds.key), ds.key==='total' ? .45 : .85),
+            borderColor: ds.borderColor || colorFor(ds.key),
+            borderWidth: 1.5,
+            borderRadius: 6,
+            borderSkipped: false,
+            barThickness: 'flex',
+            maxBarThickness: 46,
+            categoryPercentage: 0.7,
+            barPercentage: 0.9
+          };
+        })
+      },
+      options: {
+        maintainAspectRatio: false,
+        animation: false,
+        layout: { padding: { top: 8, bottom: 8 } },
+        plugins: {
+          legend: { position: 'bottom' },
+          // На всякий случай гасим chartjs-plugin-datalabels, если подключен глобально
+          datalabels: false
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(148,163,184,.2)' },
+            ticks: { stepSize: 500 }
+          }
+        }
+      },
+      // Подключаем плагины условно
+      plugins: isPrevCurr ? [valueLabelsPlugin, deltaPlugin] : [valueLabelsPlugin]
+    };
+
+    var chart = new Chart(ctx, cfg);
+    window.__charts[canvasId] = { chart: chart, maker: maker };
+    if (canvasId === 'barAll') barAllChartRef = chart;
+  };
+
+  maker();
+}
+
+  function makeDonut(canvas, values){
+  // values ожидает: [finished, remaining_total]
+  var maker=function(){
+    fitHiDPICanvas(canvas);
+    var ctx=makeCtx(canvas);
+
+    if(window.__charts[canvas.id] && window.__charts[canvas.id].chart){
+      try{ window.__charts[canvas.id].chart.destroy(); }catch(e){}
+    }
+
+    const percentCenter = {
+      id: 'percentCenter',
+      afterDraw(chart){
+        const data = (chart.data.datasets?.[0]?.data || []).map(Number);
+        const finished = data[0] || 0;
+        const rest     = data[1] || 0;
+        const total    = Math.max(1, finished + rest);
+
+        const donePct  = (finished / total) * 100;
+        const leftPct  = (rest     / total) * 100;
+
+        const {ctx} = chart;
+        const {left, right, top, bottom} = chart.chartArea;
+        const x = (left + right) / 2;
+        const y = (top  + bottom) / 2;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const baseSize = Math.max(14, Math.min(chart.width, chart.height) * 0.18);
+        ctx.fillStyle = getCSS('--ink') || getCSS('--text') || '#2a1446';
+        ctx.font = `700 ${Math.round(baseSize)}px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+        ctx.fillText(`${donePct.toFixed(1)}%`, x, y - baseSize*0.03);
+
+        ctx.fillStyle = COLORS.remaining_total || getCSS('--muted') || '#8d77a6';
+        ctx.font = `600 ${Math.round(baseSize*0.37)}px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+        ctx.fillText(`осталось ${leftPct.toFixed(1)}%`, x, y + baseSize*0.75);
+        ctx.restore();
+      }
+    };
+
+    var chart=new Chart(ctx,{
+      type:'doughnut',
+      data:{
+        labels:['Пройдено','Осталось'],
+        datasets:[{
+          data:values,
+          backgroundColor:[COLORS.finished, COLORS.remaining_total],
+          borderColor:'#ffffff',
+          borderWidth:2,
+          spacing:3,
+          hoverOffset:4
+        }]
+      },
+      options:{
+        maintainAspectRatio:false,
+        animation:false,
+        plugins:{
+          legend:{ position:'bottom', labels:{ padding:10, boxWidth:10, boxHeight:10 } },
+          tooltip:{
+            callbacks:{
+              label: (ct)=>{
+                const ds = (ct.dataset.data||[]).map(Number);
+                const total = ds.reduce((s,v)=>s+v,0) || 1;
+                const val = Number(ct.raw||0);
+                const pct = (val/total*100).toFixed(1);
+                return `${ct.label}: ${val.toLocaleString('ru-RU')} (${pct}%)`;
+              }
+            }
+          }
+        },
+        cutout:'68%'
+      },
+      plugins:[percentCenter]
+    });
+
+    window.__charts[canvas.id]={chart:chart, maker:maker};
+  };
+  return maker;
+}
+  /* ===== сеть/вызовы API ===== */
+  function b64Utf8(str){ return btoa(unescape(encodeURIComponent(str))); }
+  function makeSearchValue(kind, version){
+    try{
+      const arr = [
+        { id:'name', type:'string', value:`[${kind}]` },
+        { id:'name', type:'string', value:String(version) }
+      ];
+      return b64Utf8(JSON.stringify(arr));
+    }catch(_){ 
+      return b64Utf8(JSON.stringify([{id:'name', type:'string', value:`[${kind}] Регресс ${version}`} ]));
+    }
+  }  function searchB64NameContains(str){
+    return btoa(unescape(encodeURIComponent(JSON.stringify([{id:'name', type:'string', value:String(str)}]))));
+  }
+  function getSmokeKey(){
+    const val = (document.querySelector('#smokeKey')?.value || '').trim();
+    return val || 'Smoke';
+  }
+  function getSelectiveKey(){
+    const val = (document.querySelector('#selectiveKey')?.value || '').trim();
+    return val || 'Selective';
+  }
+  async function fetchJson(url, params, headers){
+    const qs=params?new URLSearchParams(params).toString():'';
+    const full=qs?(url+'?'+qs):url;
+    const key = cacheKey(url, params, headers);
+    if(GET_CACHE.has(key)) return GET_CACHE.get(key);
+
+    const fetchOnce = async (hdrs)=> {
+      const r = await fetch(full,{headers:hdrs});
+      if(!r.ok) return {status:r.status, data:await safeJson(r)};
+      return {status:r.status, data:await r.json()};
+    };
+
+    let res = await fetchOnce(headers);
+    if(res.status===401 && headers?.Authorization?.startsWith('Api-Token ')){
+      const h2={...headers, Authorization: headers.Authorization.replace('Api-Token ','Bearer ')};
+      res = await fetchOnce(h2);
+    }
+    if(!res || (res.status<200 || res.status>=300)) throw new Error('HTTP '+(res?.status||''));
+    GET_CACHE.set(key, res.data);
+    return res.data;
+  }
+
+  async function fetchPaginated(baseUrl, paramsBase, headers, {size=100, maxPages=8, window=4, logger}={}){
+    const out = [];
+    let active = 0, stopped = false, i = 0;
+
+    return await new Promise((resolve, reject)=>{
+      const run = ()=>{
+        if (stopped) return;
+        while (active < window && i < maxPages) {
+          const page = i++;
+          active++;
+          const params = { ...paramsBase, page, size };
+          fetchJson(baseUrl + '/api/launch', params, headers).then(data=>{
+            const items = (data && data.content) || [];
+            if (logger) logger('[launch] page=' + page + ' items=' + items.length);
+            for (let k = 0; k < items.length; k++) out.push(items[k]);
+            if (items.length < size) stopped = true;
+          }).catch(reject).finally(()=>{
+            active--;
+            if ((stopped || i >= maxPages) && active === 0) resolve(out);
+            else run();
+          });
+        }
+      };
+      run();
+    });
+  }
+
+  async function fetchLaunches(baseUrl, projectId, version, includeSmoke, includeSelective, headers, pages, size, logger){
+    const maxPages = pages==null?8:pages;
+    const pageSize = size==null?100:size;
+
+    const kinds=[];
+    if(includeSmoke) kinds.push(getSmokeKey());
+    if(includeSelective) kinds.push(getSelectiveKey());
+
+    // Всегда дополнительно подхватываем High/Blocker, чтобы постримовые срезы
+    // работали и для HB. Для Smoke/Selective остаётся старая логика через
+    // getSmokeKey()/getSelectiveKey().
+    const kindsAll = kinds.concat(['High/Blocker']);
+
+    const tasks = kindsAll.map(kind=>{
+      const search = version ? makeSearchValue(kind,version) : undefined;
+      const paramsBase = { projectId, preview:'true', sort:'createdDate,desc' };
+      if (search) paramsBase.search = search;
+      return fetchPaginated(baseUrl, paramsBase, headers, {size:pageSize, maxPages, window:4, logger});
+    });
+
+    const result = (await Promise.all(tasks)).flat();
+
+    const seen=new Set(); const uniq=[];
+    for(const it of result){
+      if(!it || seen.has(it.id)) continue;
+      seen.add(it.id); uniq.push(it);
+    }
+    return uniq;
+  }
+
+  function fetchStat(baseUrl, id, headers, elog){
+    return fetchJson(baseUrl+'/api/launch/'+id+'/statistic', null, headers).then(function(stat){ return Array.isArray(stat)?stat:[]; })
+      .catch(function(e){ if(elog) elog('[stat '+id+'] '+e.message); return []; });
+  }
+
+  async function fetchMemberStats(baseUrl, id, headers){
+    return fetchJson(baseUrl+'/api/launch/'+id+'/memberstats', {size:1000,page:0}, headers).then(function(d){
+      if(Array.isArray(d)) return d;
+      return (d&&d.content)||[];
+    }).catch(()=>[]);
+  }
+
+  async function fetchLeafCount(baseUrl, id, headers, searchFilter){
+    const urlLeaf = baseUrl + '/api/testresulttree/leaf';
+    const size = 2000;
+    let page = 0;
+    const uniq = new Set();
+    while (true){
+      const params = { launchId:id, treeId:14, sort:'duration,asc', size, page };
+      if (searchFilter) params.search = searchFilter;
+      const data = await fetchJson(urlLeaf, params, headers).catch(()=>null);
+      const content = (data && data.content) || [];
+      if (!content.length) break;
+      for (const leaf of content){
+        const uid = leaf?.uid ?? leaf?.id ?? leaf?.testCaseId ?? leaf?.entityId;
+        if (uid != null) uniq.add(String(uid));
+        else uniq.add('p'+page+'_'+uniq.size);
+      }
+      if (content.length < size) break;
+      if (uniq.size > 250000) break;
+      page += 1;
+    }
+    return uniq.size;
+  }
+
+  async function fetchLeafItems(baseUrl, id, headers){
+    const urlLeaf = baseUrl + '/api/testresulttree/leaf';
+    const size = 1000;
+    let page = 0;
+    let out = [];
+    while (true){
+      const params = { launchId:id, sort:'name,asc', size, page };
+      const data = await fetchJson(urlLeaf, params, headers).catch(()=>null);
+      const content = (data && data.content) || [];
+      if (!content.length) break;
+      out = out.concat(content);
+      if (content.length < size) break;
+      page += 1;
+    }
+    return out;
+  }
+
+  function parseUwUNumber(raw){
+    if (raw == null) return 0;
+    const s = String(raw).trim();
+    if (!s || s === '0') return 0;
+    const num = parseFloat(s.replace(',', '.'));
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  async function getUwUInfo(baseUrl, tcid, headers){
+    if (UWU_CACHE.has(tcid)) return UWU_CACHE.get(tcid);
+    let uwuNum = 0;
+    let platformVal = null;
+    try{
+      const data = await fetchJson(baseUrl + '/api/testcase/' + tcid + '/overview', null, headers);
+      const fields = (data && data.customFields) || [];
+      for (let i = 0; i < fields.length; i++){
+        const cf = fields[i] || {};
+        const cfInfo = cf.customField || {};
+        const cfName = String(cfInfo.name || '').trim();
+
+        if (cfName === 'UwU') {
+          let v = cf.name;
+          if (!v) {
+            const vals = cf.values || [];
+            if (vals.length && vals[0]) v = vals[0].name;
+          }
+          uwuNum = parseUwUNumber(v);
+        } else if (cfName === 'Platform') {
+          let p = cf.name;
+          if (!p) {
+            const vals = cf.values || [];
+            if (vals.length && vals[0]) p = vals[0].name;
+          }
+          if (p) platformVal = String(p);
+        }
+      }
+    }catch(e){
+      uwuNum = 0;
+      platformVal = null;
+    }
+    const result = { uwuNum, platform: platformVal };
+    UWU_CACHE.set(tcid, result);
+    return result;
+  }
+
+  function getUwuStatsFromAgg(uwuAgg, label){
+    const a = (uwuAgg && uwuAgg[label]) || {};
+    let sumDone = null;
+    let sumLeft = null;
+    let sumTotal = null;
+
+    if (a.uwu && typeof a.uwu === 'object'){
+      sumDone = a.uwu.sumDone ?? a.uwu.done ?? a.uwu.sum_done;
+      sumLeft = a.uwu.sumLeft ?? a.uwu.left ?? a.uwu.sum_left;
+      sumTotal = a.uwu.sum ?? a.uwu.uwuSum ?? a.uwu.totalUwu;
+    } else {
+      sumDone = a.sum_done ?? a.sumDone ?? a.done;
+      sumLeft = a.sum_left ?? a.sumLeft ?? a.left;
+      sumTotal = a.sum ?? a.uwu_sum ?? a.uwuSum;
+    }
+
+    if (sumDone == null && sumLeft == null && sumTotal == null) return null;
+    const done = Number(sumDone) || 0;
+    const left = Number(sumLeft) || 0;
+    const total = sumTotal == null ? (done + left) : Number(sumTotal) || (done + left);
+    return { done, left, total };
+  }
+
+  function makeUwuDonut(canvasId, doneSum, leftSum){
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const maker = function(){
+      fitHiDPICanvas(canvas);
+      const ctx = makeCtx(canvas);
+      if (window.__charts[canvasId]?.chart){
+        try{ window.__charts[canvasId].chart.destroy(); }catch(e){}
+      }
+
+      const done = Math.max(0, Number(doneSum) || 0);
+      const left = Math.max(0, Number(leftSum) || 0);
+      const totalRaw = Math.max(0, done + left);
+      const pctBase = totalRaw > 0 ? totalRaw : 1;
+      const data = totalRaw > 0 ? [done, left] : [1, 0];
+      const donePct = totalRaw > 0 ? (done / pctBase * 100) : 0;
+      const leftPct = totalRaw > 0 ? (left / pctBase * 100) : 0;
+
+      const centerPlugin = {
+        id: 'uwuCenterPct',
+        afterDraw(ch){
+          const {ctx, chartArea:{left,right,top,bottom}} = ch;
+          const x = (left + right) / 2;
+          const y = (top + bottom) / 2;
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const fontFamily = Chart.defaults.font.family || 'Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+          const maxW = (right - left) * 0.9;
+          const baseMax = Math.min(ch.width, ch.height);
+
+          const countLines = [
+            done.toLocaleString('ru-RU'),
+            'из',
+            totalRaw.toLocaleString('ru-RU')
+          ];
+
+          const fitTextSizeMulti = (lines, maxWidth, maxSize, minSize, weight) => {
+            let size = Math.max(minSize, Math.round(maxSize));
+            for(; size >= minSize; size--){
+              ctx.font = `${weight} ${size}px ${fontFamily}`;
+              let ok = true;
+              for(const t of lines){
+                if(ctx.measureText(t).width > maxWidth){ ok = false; break; }
+              }
+              if(ok) return size;
+            }
+            return minSize;
+          };
+
+          const baseSize = Math.max(14, Math.min(ch.width, ch.height) * 0.18);
+          const countSize = fitTextSizeMulti(countLines, maxW, baseSize * 0.264, 9, 800);
+          const pctSize = Math.round(baseSize);
+          const pctSubSize = Math.round(baseSize * 0.37);
+
+          const countLineH = Math.round(countSize * 1.1);
+          const countBlockH = countLineH * countLines.length;
+          const topLimit = top + countLineH * 0.6;
+          let countStartY = (y - baseSize * 1.25) - countBlockH / 2 + 5;
+          if(countStartY < topLimit) countStartY = topLimit;
+
+          const drawLine = (text, size, weight, color, yy) => {
+            ctx.fillStyle = color;
+            ctx.font = `${weight} ${size}px ${fontFamily}`;
+            ctx.fillText(text, x, yy);
+          };
+
+          // count block (3 строки) выше процентов
+          const countColor = getCSS('--ink') || getCSS('--text') || '#2a1446';
+          const mutedColor = getCSS('--muted') || '#8d77a6';
+          for(let i=0;i<countLines.length;i++){
+            const yy = countStartY + countLineH * (i + 0.5);
+            const weight = (i === 1) ? 700 : 800;
+            const color = (i === 1) ? mutedColor : countColor;
+            drawLine(countLines[i], countSize, weight, color, yy);
+          }
+
+          // проценты на уровне обычных тест-кейсов
+          const pctY = y - baseSize * 0.03;
+          const leftY = y + baseSize * 0.75;
+          drawLine(`${donePct.toFixed(1)}%`, pctSize, 700, countColor, pctY);
+          drawLine(`осталось ${leftPct.toFixed(1)}%`, pctSubSize, 600, COLORS.remaining_total || mutedColor, leftY);
+          ctx.restore();
+        }
+      };
+
+      const chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Пройдено','Осталось'],
+        datasets: [{
+          data,
+          backgroundColor: [
+            getCSS('--wb-deep') || getCSS('--c1') || COLORS.total || '#7a3af9',
+            COLORS.remaining_total
+          ],
+          borderColor:'#fff',
+          borderWidth:2,
+          spacing:3
+        }]
+        },
+        options: {
+          maintainAspectRatio:false,
+          animation:false,
+          cutout:'70%',
+          plugins:{
+            legend:{ position:'bottom', labels:{ padding:10, boxWidth:10, boxHeight:10 } },
+            tooltip:{
+              callbacks:{
+                label: (ct)=>{
+                  const ds = (ct.dataset.data||[]).map(Number);
+                  const total = ds.reduce((s,v)=>s+v,0) || 1;
+                  const val = Number(ct.raw||0);
+                  const pct = (val/total*100).toFixed(1);
+                  return `${ct.label}: ${val.toLocaleString('ru-RU')} (${pct}%)`;
+                }
+              }
+            }
+          }
+        },
+        plugins:[centerPlugin]
+      });
+      window.__charts[canvasId] = { chart, maker };
+    };
+    maker();
+  }
+
+  /* ===== агрегирование/подсчёты ===== */
+  function normalizeStatus(raw){
+    if (raw == null) return 'in_progress';
+    const s = String(raw).toLowerCase();
+    if (s === 'passed' || s === 'failed' || s === 'broken' || s === 'skipped') return s;
+    return 'in_progress';
+  }
+  const COMPLETED = new Set(['passed','failed','broken','skipped']);
+  const NON_COMPLETED = new Set(['in_progress']);
+
+  function sumByStatuses(list, allowedSet){
+    let sum = 0;
+    (list || []).forEach(s => {
+      const st = normalizeStatus(s && s.status);
+      if (allowedSet.has(st)) sum += Number(s.count || 0);
+    });
+    return sum;
+  }
+
+  function computeCountsExact(statList){
+    const finished   = sumByStatuses(statList, COMPLETED);
+    const unfinished = sumByStatuses(statList, NON_COMPLETED);
+    const total      = finished + unfinished;
+    const remaining_total = unfinished;
+    return {
+      total,
+      finished,
+      remaining_total,
+      in_progress: unfinished,
+      remaining: 0
+    };
+  }
+
+  function assignedUnfinishedFromMemberStats(mstats){
+    let assigned=0;
+    (mstats||[]).forEach(m=>{
+      assigned += sumByStatuses(m.statistic, NON_COMPLETED);
+    });
+    return assigned;
+  }
+
+  function setLogProgress(state){
+    var cap = $('#logProgressCaption');
+    var bar = $('#logProgressBar');
+    var loaded = Number(state.loaded||0), total = Number(state.total||0);
+    var step = Number(state.step||0), steps = Number(state.steps||0);
+    if(cap) cap.textContent = 'Запусков: '+loaded+' из '+(total||loaded)+' • Шаги: '+step+' / '+(steps||step);
+    if(bar){
+      var p = total>0 ? Math.min(100, Math.round(loaded/Math.max(1,total)*100)) : (steps>0? Math.min(100, Math.round(step/Math.max(1,steps)*100)) : 0);
+      bar.style.width = p + '%';
+    }
+  }
+
+  async function aggregateByGroups(launches, baseUrl, headers, logger, elog){
+    var agg={};
+    for(var oi=0;oi<ORDER.length;oi++){
+      agg[ORDER[oi]]={total:0,finished:0,remaining_total:0,remaining:0,in_progress:0};
+    }
+
+    var perLaunchFinished = {}, perLaunchTotal = {};
+    const totalSteps = launches.length;
+    let doneSteps = 0;
+
+    await pMap(launches, async (it)=>{
+      try{
+        const [stat, mstats] = await Promise.all([
+          fetchStat(baseUrl, it.id, headers, elog),
+          fetchMemberStats(baseUrl, it.id, headers)
+        ]);
+        const c = computeCountsExact(stat);
+
+        const assignedUnf = assignedUnfinishedFromMemberStats(mstats);
+        const unfinishedAll = Math.max(0, c.remaining_total);
+        const unassigned = Math.max(0, unfinishedAll - assignedUnf);
+
+        perLaunchFinished[it.id]=c.finished||0;
+        perLaunchTotal[it.id]=c.total||0;
+
+        for(var gi=0;gi<ORDER.length;gi++){
+          var key=ORDER[gi]; var first=key.split(']')[0]+']'; var second=key.split('][')[1];
+          var nm = it.name||'';
+          if(nm.indexOf(first)!==-1 && nm.indexOf(second)!==-1){
+            agg[key].total           += c.total;
+            agg[key].finished        += c.finished;
+            agg[key].remaining_total += unfinishedAll;
+            agg[key].remaining       += assignedUnf;
+            agg[key].in_progress     += unassigned;
+            break;
+          }
+        }
+      }catch(e){ if(elog) elog('[aggregate '+it.id+'] '+(e.message||e)); }
+      doneSteps++;
+      if(doneSteps%2===0) setLogProgress({ step: doneSteps, steps: totalSteps, loaded: doneSteps, total: totalSteps });
+    }, {concurrency: 10});
+
+    setLogProgress({ step: totalSteps, steps: totalSteps, loaded: totalSteps, total: totalSteps });
+    return {agg, perLaunchFinished, perLaunchTotal};
+  }
+
+  function normalizePlatformName(p){
+    const s = String(p || '').toLowerCase();
+    if (!s) return null;
+    if (s.includes('android')) return 'Android';
+    if (s.includes('ios')) return 'iOS';
+    return null;
+  }
+
+  function extractKindFromLaunchName(name){
+    const s = String(name || '');
+    if (/\[Smoke\]/i.test(s)) return 'Smoke';
+    if (/\[Selective\]/i.test(s)) return 'Selective';
+    if (/\[High\/Blocker\]/i.test(s)) return 'High/Blocker';
+    return null;
+  }
+
+  const STREAM_CONCURRENCY = 20;
+  async function buildUwUAgg(launches, baseUrl, headers, logger, elog){
+    var uwuAgg = {};
+    for(var oi=0;oi<ORDER.length;oi++){
+      uwuAgg[ORDER[oi]] = { sum:0, sum_done:0, sum_left:0 };
+    }
+
+    const totalSteps = launches.length;
+    let doneSteps = 0;
+
+    await pMap(launches, async (it)=>{
+      try{
+        const kind = extractKindFromLaunchName(it.name || '');
+        const launchPlatform = normalizePlatformName(it.name || '');
+        if (!kind || kind === 'Selective') return;
+        if (!launchPlatform) return;
+        const leafItems = await fetchLeafItems(baseUrl, it.id, headers);
+
+        await pMap(leafItems, async (leaf)=>{
+          const tcid = Number(leaf?.testCaseId);
+          if (!Number.isFinite(tcid)) return;
+          const info = await getUwUInfo(baseUrl, tcid, headers);
+          const platform = launchPlatform;
+          const key = `[${platform}][${kind}]`;
+          if (!uwuAgg[key]) return;
+          const uwuNum = Number(info.uwuNum || 0);
+          const st = normalizeStatus(leaf && leaf.status);
+          uwuAgg[key].sum += uwuNum;
+          if (COMPLETED.has(st)) uwuAgg[key].sum_done += uwuNum;
+          else uwuAgg[key].sum_left += uwuNum;
+        }, {concurrency: STREAM_CONCURRENCY});
+      }catch(e){ if(elog) elog('[uwu '+it.id+'] '+(e.message||e)); }
+
+      doneSteps++;
+      if(logger && doneSteps%2===0) logger('[uwu] launches '+doneSteps+' / '+totalSteps);
+    }, {concurrency: 4});
+
+    return uwuAgg;
+  }
+
+  function renderAgg(agg, cardsId, barId, summaryEl, uwuAgg){
+    var container=document.getElementById(cardsId);
+    container.innerHTML='';
+
+    var labelOrder = ORDER.filter(function(l){ return l.indexOf('[Smoke]') === -1; });
+    var idxByLabel = {};
+    for(var i=0;i<labelOrder.length;i++){
+      idxByLabel[labelOrder[i]] = ORDER.indexOf(labelOrder[i]);
+    }
+
+    var hbLabels = labelOrder.filter(function(l){ return l.indexOf('[High/Blocker]') !== -1; });
+    var selLabels = labelOrder.filter(function(l){ return l.indexOf('[Selective]') !== -1; });
+    var otherLabels = labelOrder.filter(function(l){ return hbLabels.indexOf(l) === -1 && selLabels.indexOf(l) === -1; });
+
+    var grand=0;
+    for(var gi=0;gi<labelOrder.length;gi++){
+      var aG = agg[labelOrder[gi]] || {total:0,finished:0,remaining_total:0,remaining:0,in_progress:0};
+      grand += aG.total;
+    }
+
+    function getUwuTotal(label){
+      var uwuStats = getUwuStatsFromAgg(uwuAgg, label);
+      return Number(uwuStats && uwuStats.total || 0);
+    }
+
+    function appendRegCard(label){
+      var a=agg[label]||{total:0,finished:0,remaining_total:0,remaining:0,in_progress:0};
+      var oi = idxByLabel[label];
+      var canId='dn_'+cardsId+'_'+oi;
+      var rightHtml = 'Всего: <b>' + (a.total||0).toLocaleString('ru-RU') + '</b>';
+
+      var regCard=document.createElement('div');
+      regCard.className='card';
+      regCard.innerHTML=
+        '<div class="head"><div>'+label+'</div><div class="export"><div class="nums">'+rightHtml+'</div></div></div>'+
+        '<div class="chart-wrap"><canvas id="'+canId+'" class="chart"></canvas></div>'+
+        '<div class="kpis">'+
+          '<div class="kpi"><span class="label">Пройдено</span><span class="val">'+(a.finished||0).toLocaleString('ru-RU')+'</span></div>'+
+          '<div class="kpi"><span class="label">Осталось</span><span class="val">'+(a.remaining_total||0).toLocaleString('ru-RU')+'</span></div>'+
+        '</div>';
+      container.appendChild(regCard);
+
+      // передаём только 2 числа: пройдено и осталось
+      var maker=makeDonut(document.getElementById(canId), [a.finished, a.remaining_total]);
+      requestAnimationFrame(function(){ maker(); });
+    }
+
+    function appendUwuCard(label){
+      var oi = idxByLabel[label];
+      var uwuCanId='uwu_'+cardsId+'_'+oi;
+      var uwuMetaId='uwu_meta_'+cardsId+'_'+oi;
+      var uwuTotalId='uwu_total_'+cardsId+'_'+oi;
+      var uwuDoneId='uwu_done_'+cardsId+'_'+oi;
+      var uwuLeftId='uwu_left_'+cardsId+'_'+oi;
+
+      var uwuCard=document.createElement('div');
+      uwuCard.className='card';
+      uwuCard.innerHTML=
+        '<div class="head"><div id="'+uwuMetaId+'">'+label+' UwU</div><div class="export"><div class="nums" id="'+uwuTotalId+'">Всего: —</div></div></div>'+
+        '<div class="chart-wrap"><canvas id="'+uwuCanId+'" class="chart"></canvas></div>'+
+        '<div class="kpis">'+
+          '<div class="kpi"><span class="label">Пройдено</span><span class="val" id="'+uwuDoneId+'">—</span></div>'+
+          '<div class="kpi"><span class="label">Осталось</span><span class="val" id="'+uwuLeftId+'">—</span></div>'+
+        '</div>';
+      container.appendChild(uwuCard);
+
+      var metaEl = document.getElementById(uwuMetaId);
+      var totalEl = document.getElementById(uwuTotalId);
+      var doneEl = document.getElementById(uwuDoneId);
+      var leftEl = document.getElementById(uwuLeftId);
+      var uwuStats = getUwuStatsFromAgg(uwuAgg, label);
+      var sum = Number(uwuStats && uwuStats.total || 0);
+      var done = Number(uwuStats && uwuStats.done || 0);
+      var left = Number(uwuStats && uwuStats.left || 0);
+      if (metaEl) metaEl.textContent = label + ' UwU';
+      if (totalEl) totalEl.innerHTML = 'Всего: <b>' + (sum ? sum.toLocaleString('ru-RU') : '0') + '</b>';
+      if (doneEl) doneEl.textContent = done.toLocaleString('ru-RU');
+      if (leftEl) leftEl.textContent = left.toLocaleString('ru-RU');
+      makeUwuDonut(uwuCanId, done, left);
+    }
+
+    // 1) High/Blocker (обычные)
+    for(var h=0;h<hbLabels.length;h++){ appendRegCard(hbLabels[h]); }
+    // 2) High/Blocker UwU (отдельный ряд)
+    for(var hu=0;hu<hbLabels.length;hu++){ appendUwuCard(hbLabels[hu]); }
+    // 3) Selective (обычные + UwU в правом углу)
+    for(var s=0;s<selLabels.length;s++){ appendRegCard(selLabels[s]); }
+    // 4) Остальные (если появятся)
+    for(var o=0;o<otherLabels.length;o++){ appendRegCard(otherLabels[o]); }
+
+    if(summaryEl) summaryEl.textContent='Всего групп: '+ORDER.length+', всего кейсов: '+grand.toLocaleString('ru-RU');
+
+
+// === build datasets with FILTERS applied ===
+  // Inline checker independent from later helpers
+  function __allowLabel(label){
+    label = String(label||'');
+    var isIOS     = label.indexOf('[iOS]')===0;
+    var isAndroid = label.indexOf('[Android]')===0;
+    var isSmoke   = label.indexOf('[Smoke]')!==-1;
+    var isSel     = label.indexOf('[Selective]')!==-1;
+    var isHB      = label.indexOf('[High/Blocker]')!==-1;
+
+    var on = function(id){ var el=document.getElementById(id); return !el || !!el.checked; };
+    if (isIOS && !on('fltPlatIOS')) return false;
+    if (isAndroid && !on('fltPlatAndroid')) return false;
+    if (isSmoke && !on('fltTypeSmoke')) return false;
+    if (isSel   && !on('fltTypeSelective')) return false;
+    if (isHB    && !on('fltTypeHB')) return false;
+
+    // Дополнительный фильтр по типу срезов (Smoke/Selective/High/Blocker)
+    if (!allowByKind(label)) return false;
+
+    // если лейбл не попадает ни под один фильтр, оставляем
+    return true;
+  }
+  var __ORDER_USED = ORDER.filter(__allowLabel);
+
+  var ds = ['total','finished','remaining_total'].map(function(k){
+    return {
+      key: k,
+      label: ({ total:'Всего', finished:'Пройдено', remaining_total:'Осталось' })[k],
+      data: __ORDER_USED.map(function(l){ return (agg[l] && agg[l][k]) || 0; })
+    };
+  });
+
+  // Update summary (visible only)
+  try{
+    var totalCasesVisible = 0;
+    for (var i=0;i<__ORDER_USED.length;i++){
+      var a = agg[__ORDER_USED[i]] || {};
+      totalCasesVisible += Number(a.total||0) || 0;
+    }
+    var sumEl = document.getElementById('summaryInfo');
+    if (sumEl) sumEl.textContent = 'Всего групп: ' + __ORDER_USED.length + ', всего кейсов: ' + (totalCasesVisible.toLocaleString ? totalCasesVisible.toLocaleString('ru-RU') : totalCasesVisible);
+  }catch(e){}
+  if(barId) makeBarChart(barId, __ORDER_USED, ds);
+
+  }
+
+  /* ===== Хранилище ===== */
+  var STORE_DEFAULT={ snaps:[], streamSnaps:[], lastPerLaunch:{} };
+  function getStore(){ try{ return JSON.parse(localStorage.getItem('allure-regress-store-v1')) || JSON.parse(JSON.stringify(STORE_DEFAULT)); }catch(e){ return JSON.parse(JSON.stringify(STORE_DEFAULT)); } }
+  function setLocalStore(s){ localStorage.setItem('allure-regress-store-v1', JSON.stringify(s)); }
+  let storeFromFile=null, dataFileHandle=null;
+  function setStore(newStore){
+    storeFromFile = JSON.parse(JSON.stringify({ ...STORE_DEFAULT, ...(newStore||{}) }));
+    setLocalStore(storeFromFile);
+    var saveBtn = $('#dataSave'); if(saveBtn) saveBtn.disabled = !dataFileHandle;
+  }
+  async function saveStoreMaybe(){
+    if(!dataFileHandle || !storeFromFile) return;
+    try{
+      const writable = await dataFileHandle.createWritable();
+      await writable.write(JSON.stringify(storeFromFile, null, 2));
+      await writable.close();
+      toast('Данные сохранены в файл');
+    }catch(e){ toast('Не удалось сохранить: '+(e.message||e)); }
+  }
+  async function pickDataFile(){
+    if(!window.showOpenFilePicker){ toast('Браузер не поддерживает подключение файла. Используйте Импорт JSON.'); return; }
+    try{
+      const [handle] = await window.showOpenFilePicker({ multiple:false, types:[{ description:'JSON', accept:{'application/json':['.json']} }] });
+      dataFileHandle = handle;
+      const file = await handle.getFile();
+      const text = await file.text(); const obj = JSON.parse(text||'{}');
+      setStore({ ...STORE_DEFAULT, ...obj }); renderSnapList(); renderStreamSnapList(); toast('Файл данных подключён');
+    }catch(e){ if(e?.name!=='AbortError') toast('Ошибка чтения файла: '+(e.message||e)); }
+  }
+  async function createDataFile(){
+    if(!window.showSaveFilePicker){ toast('Браузер не поддерживает создание файла. Используйте Экспорт JSON.'); return; }
+    try{
+      const handle = await window.showSaveFilePicker({ suggestedName:'regress-data.json', types:[{ description:'JSON', accept:{'application/json':['.json']} }] });
+      dataFileHandle = handle;
+      setStore(getStore()); await saveStoreMaybe();
+      toast('Файл данных создан и подключён');
+    }catch(e){ if(e?.name!=='AbortError') toast('Не удалось создать файл: '+(e.message||e)); }
+  }
+
+  function exportSnapsCSV(){
+    var st=getStore(); var snaps=st.snaps||[];
+    var rows=[['snap_id','ts_iso','title','group','total','finished','remaining_total','remaining','in_progress']];
+    snaps.forEach(function(s){
+      ORDER.forEach(function(g){
+        var o=(s.data||{})[g]||{total:0,finished:0,remaining_total:0,remaining:0,in_progress:0};
+        rows.push([s.id, new Date(s.ts).toISOString(), s.title, g, o.total, o.finished, o.remaining_total, o.remaining, o.in_progress]);
+      });
+    });
+    var csv = rows.map(r => r.map(v=>{
+      var x=(v==null?'':String(v));
+      if(/[",\n]/.test(x)) x='"'+x.replace(/"/g,'""')+'"';
+      return x;
+    }).join(',')).join('\n');
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='regress-data.csv'; a.click(); URL.revokeObjectURL(url);
+  }
+
+  /* ===== Дашборд: кнопки/рендер (Общие) ===== */
+  function renderSnapList(){
+    var box=$('#snapListDash'); if(!box) return; box.innerHTML='';
+    var store=getStore(); var list=store.snaps||[];
+    for(var i=list.length-1;i>=0;i--){
+      var s=list[i];
+      var totalFinished = ORDER.reduce(function(sum,k){ return sum + (((s.data||{})[k]||{}).finished||0);}, 0);
+      var row=document.createElement('div');
+      row.className='snap';
+      row.innerHTML='<input type="checkbox" data-id="'+s.id+'" />'+
+        '<label style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">'+
+        '<span class="title">'+s.title+'</span>'+
+        '<span class="meta">'+(new Date(s.ts)).toLocaleString()+' • всего пройдено: '+totalFinished.toLocaleString('ru-RU')+'</span></label>'+
+        '<button class="del" data-id="'+s.id+'">Удалить</button>';
+      box.appendChild(row);
+    }
+    var dels=box.querySelectorAll('.del');
+    for(var d=0;d<dels.length;d++){
+      dels[d].addEventListener('click', function(){
+        var id=this.getAttribute('data-id'); var st=getStore();
+        st.snaps=(st.snaps||[]).filter(function(x){return x.id!==id});
+        setStore(st); renderSnapList();
+      });
+    }
+    $('#dashSnapSave')?.addEventListener('click', function(){
+      if(!window.lastAgg){ toast('Сначала соберите дашборд'); return; }
+      takeSnapshot({ version:($('#version')?.value.trim())||'', timeISO:(new Date()).toISOString(), data: window.lastAgg });
+    });
+    $('#dashSnapClear')?.addEventListener('click', function(){
+      var st=getStore(); st.snaps=[]; setStore(st); renderSnapList(); toast('Срезы удалены');
+    });
+    $('#dashSnapBuild')?.addEventListener('click', ()=>buildDashMultiCompare({silent:false}));
+  }
+
+  // === ВСПОМОГАТЕЛЬНОЕ: красивые подписи для легенды/срезов ===
+function prettySnapTitle(raw){
+  // Было: "[Smoke] Корзина... v=7.2.9 2025-09-02T12:44:33Z"
+  // Станет: "[Smoke] Корзина... v=7.2.9 2025-09-02 12:44"
+  const s = String(raw||'');
+  const m = s.match(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  const neat = m ? s.replace(/T\d{2}:\d{2}:\d{2}.*Z?/,' '+m[2]) : s;
+  return neat.replace('Z','').trim();
+}
+
+function makeSnapTitle(o){
+  var ver = o.version || 'all';
+
+  // смотрим, какой тип выбран в фильтре "Тип" в блоке "Сохранённые срезы"
+  var sel = document.getElementById('dashKind');
+  var v   = sel ? sel.value : 'all';
+
+  var kindLabel;
+  if (v === 'hb_only') {
+    // срез только по High/Blocker
+    kindLabel = 'High/Blocker';
+  } else if (v === 'sm_sel') {
+    // классический Smoke + Selective
+    kindLabel = 'Smoke+Selective';
+  } else {
+    // все типы сразу (Smoke, Selective, High/Blocker)
+    kindLabel = 'Smoke+Selective+HB';
+  }
+
+  return `[${kindLabel}] v=${ver} ${o.timeISO}`;
+}
+  function takeSnapshot(ctx){
+    var st=getStore();
+    var id=String(Date.now())+Math.random().toString(16).slice(2);
+    var snap={ id:id, ts:Date.now(), title:makeSnapTitle(ctx), data:ctx.data };
+    st.snaps=(st.snaps||[]); st.snaps.push(snap);
+    setStore(st); renderSnapList(); saveStoreMaybe(); toast('Срез сохранён');
+  }
+
+  function buildDashMultiCompare(opts){
+    const silent = !!(opts && opts.silent);
+
+    var metric=$('#dashMetric')?.value || 'finished';
+    var labels = ORDER.filter(function(label){ return allowByKind(label); });
+    if (!labels.length) labels = ORDER.slice();
+    var chosen=[].slice.call(document.querySelectorAll('#snapListDash input[type=checkbox]:checked'))
+                 .map(cb=>cb.getAttribute('data-id'));
+
+    var snaps=(getStore().snaps||[]).filter(s=> chosen.indexOf(s.id)!==-1);
+
+    if(!snaps.length){
+      if(!silent) toast('Выберите срезы');
+      return;
+    }
+
+    // собрать наборы
+    const palette = [
+      '#7a3af9','#00c48c','#ffb020','#ff5aad','#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#14b8a6'
+    ];
+    const datasets = snaps.map((s, i)=>{
+      const col = palette[i % palette.length];
+      return {
+        key: metric,
+        label: prettySnapTitle(s.title || ('Срез '+(i+1))),
+        data: labels.map(k => ((s.data||{})[k]||{})[metric] || 0),
+        backgroundColor: hexA(col,.85),
+        borderColor: col
+      };
+    });
+
+    var wrap = document.getElementById('dashMultiBar')?.parentElement;
+    if(wrap){
+      var extra = Math.max(0, datasets.length - 6);
+      wrap.style.height = Math.min(900, 320 + extra*24) + 'px';
+    }
+
+    makeBarChart('dashMultiBar', labels, datasets);
+  }
+
+  function renderDashPrevCurrent(currentAgg, metric){
+    metric=metric||'finished'; var color=COLORS[metric]||COLORS.finished;
+    var labels = ORDER.filter(function(label){ return allowByKind(label); });
+    if (!labels.length) labels = ORDER.slice();
+    var list=(getStore().snaps||[]); var prev=list.length>0?list[list.length-1]:null;
+    var currData=labels.map(function(k){ return (currentAgg[k]&&currentAgg[k][metric])||0; });
+    var prevData=labels.map(function(k){ return (prev&&prev.data&&prev.data[k]&&prev.data[k][metric])?prev.data[k][metric]:0; });
+    var deltas = currData.map(function(v,i){ return v - (prevData[i]||0); });
+
+    var box=$('#dashDelta');
+    if(box){
+      box.innerHTML='';
+      for(var i=0;i<labels.length;i++){
+        var d=deltas[i]; var sign=d>0?'+':'';
+        var item=document.createElement('div'); item.className='kpi';
+        item.innerHTML='<span class="label">'+labels[i]+' — Δ</span><span class="val">'+sign+d.toLocaleString('ru-RU')+'</span>';
+        box.appendChild(item);
+      }
+    }
+
+    var dsPrev = {key:metric, label:'Предыдущий', data:prevData, backgroundColor:hexA(color,.35), borderColor:color};
+    var dsCurr = {key:metric, label:'Текущий',   data:currData, backgroundColor:hexA(color,.85), borderColor:color};
+    dsCurr.__delta = deltas;
+
+    makeBarChart('dashPrevCurr', labels, [dsPrev, dsCurr]);
+  }
+
+  /* ===== Readiness (Android + iOS) ===== */
+  async function fetchReadinessLaunch(baseUrl, projectId, headers, platform, version){
+    const nameCore = `[ALL][${platform}] Готовность к релизу`;
+    const tryWith  = searchB64NameContains(`${nameCore} ${version}`);
+    const tryPlain = searchB64NameContains(nameCore);
+
+    async function findOne(searchB64){
+      const list = await fetchPaginated(
+        baseUrl,
+        { projectId, preview:'true', sort:'createdDate,desc', search: searchB64 },
+        headers,
+        { size:100, maxPages:6, window:3 }
+      );
+      return (list && list[0]) || null;
+    }
+
+    let launch = version ? (await findOne(tryWith)) : null;
+    if(!launch) launch = await findOne(tryPlain);
+    return launch;
+  }
+
+  async function buildReleaseSection(baseUrl, projectId, version, headers){
+    const headVer = document.getElementById('releaseHeadVer');
+    if(headVer) headVer.textContent = 'Версия: ' + (version || '—');
+
+    const row = document.getElementById('releaseRow');
+    if(!row) return;
+    row.innerHTML = '<div class="nums">Загрузка…</div>';
+
+    const [andL, iosL] = await Promise.all([
+      fetchReadinessLaunch(baseUrl, projectId, headers, 'Android', version),
+      fetchReadinessLaunch(baseUrl, projectId, headers, 'iOS',      version)
+    ]);
+
+    async function oneCard(L){
+      if(!L) return {
+        html: '<div class="release-card"><div class="release-title"><span>—</span><span class="nums">нет лаунча</span></div></div>'
+      };
+      const stat = await fetchStat(baseUrl, L.id, headers);
+      const c = computeCountsExact(stat);
+      const total = Number(c.total||0);
+      const finished = Number(c.finished||0);
+      const pct = total>0 ? Math.round(finished*100/total) : 0;
+
+      const link = `${baseUrl}/launch/${L.id}`;
+      const safeName = escapeHtml(L.name||'[launch]');
+
+      const html =
+        `<div class="release-card">
+          <div class="release-title">
+            <span>${safeName}</span>
+            <span class="nums">#${L.id}</span>
+          </div>
+          <div class="release-sub">
+            <div class="release-chip">Готовность (пройдено)</div>
+            <div class="release-chip"><strong>${pct}%</strong></div>
+            <div class="release-chip">Всего / Пройдено&nbsp;<strong>${total.toLocaleString('ru-RU')} / ${finished.toLocaleString('ru-RU')}</strong></div>
+          </div>
+          <div class="release-bar"><div style="width:${pct}%"></div></div>
+          <a class="release-link" href="${link}" target="_blank">Открыть launch</a>
+        </div>`;
+      return {html};
+    }
+
+    const [andCard, iosCard] = await Promise.all([oneCard(andL), oneCard(iosL)]);
+    row.innerHTML = (andCard.html || '') + (iosCard.html || '');
+  }
+
+  /* ===== Вспомогатели для мини-диаграмм ===== */
+  function deptOf(name){
+    var low=(name||'').toLowerCase();
+    if(low.indexOf('корзин')!==-1) return 'Корзина';
+    if(low.indexOf('финтех')!==-1 || low.indexOf('wbpay')!==-1 || low.indexOf('кошелек')!==-1 || low.indexOf('кошелька')!==-1) return 'Финтех';
+    if(low.indexOf('чат')!==-1) return 'Чаты';
+    if(low.indexOf('bx')!==-1 || low.indexOf('вх')!==-1) return 'ВХ';
+    return 'Остальные';
+  }
+  function platformOf(name){
+    var s=(name||'').toLowerCase();
+    if(s.includes('[android]')) return 'android';
+    if(s.includes('[ios]')) return 'ios';
+    return 'other';
+  }
+
+  /* ===== мини-диаграммы по лаунчам (с фильтром платформы) ===== */
+  function buildMiniLaunchCharts(launches, perLaunchFinished, perLaunchTotal, opts){
+    const grid = $('#miniGrid');
+    const info = $('#miniInfo');
+    if(!grid || !info){ return; }
+
+    const MAX_HARD = 120;
+    const {count, sortKey, sortDir, dept, platform} = opts || MINI_DEFAULTS;
+
+    grid.innerHTML = '';
+    if(!Array.isArray(launches) || !launches.length){
+      info.textContent = 'Лаунчей не найдено';
+      return;
+    }
+
+    const items = launches.map(L=>{
+      const total    = Number(perLaunchTotal[L.id]   ?? 0);
+      const finished = Number(perLaunchFinished[L.id]?? 0);
+      const pct      = total>0 ? (finished*100/total) : 0;
+      const depName  = deptOf(L.name||'');
+      const plt      = platformOf(L.name||'');
+      const created  = Number(L.createdDate || L.startTime || 0);
+      return { L, total, finished, pct, dept: depName, platform: plt, created };
+    });
+
+    let filtered = items;
+    if(dept && dept!=='all') filtered = filtered.filter(x=>x.dept===dept);
+    if(platform && platform!=='all') filtered = filtered.filter(x=>x.platform===platform);
+
+    const dir = (sortDir==='asc') ? 1 : -1;
+    filtered.sort((a,b)=>{
+      if(sortKey==='total')    return dir*(a.total - b.total);
+      if(sortKey==='finished') return dir*(a.finished - b.finished);
+      if(sortKey==='created')  return dir*(a.created - b.created);
+      return dir*(a.pct - b.pct);
+    });
+
+    const slice = filtered.slice(0, Math.min(MAX_HARD, count));
+
+    slice.forEach((it, idx)=>{
+      const {L, total, finished, pct} = it;
+      const card = document.createElement('div');
+      card.className = 'mini-card';
+      const canId = 'mini_can_' + L.id + '_' + idx;
+
+      card.innerHTML =
+        `<div class="mini-title" title="${escapeHtml(L.name||'')}">
+            <a href="${CURRENT_BASE_URL}/launch/${L.id}" target="_blank" rel="noopener">
+              ${escapeHtml(L.name||'')}
+            </a>
+         </div>
+         <div class="mini-fig"><canvas id="${canId}"></canvas></div>
+         <div class="mini-remaining">Пройдено: ${finished.toLocaleString('ru-RU')} / ${total.toLocaleString('ru-RU')}</div>`;
+
+      grid.appendChild(card);
+
+      const canvas = document.getElementById(canId);
+      const maker = () => {
+        fitHiDPICanvas(canvas);
+        if(window.__charts[canId]?.chart){ try{ window.__charts[canId].chart.destroy(); }catch(e){} }
+        const ctx = makeCtx(canvas);
+        const chart = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Пройдено','Осталось'],
+            datasets: [{
+              data: [finished, Math.max(0, total - finished)],
+              backgroundColor: [COLORS.finished, COLORS.remaining_total],
+              borderColor:'#fff', borderWidth:2, spacing:2
+            }]
+          },
+          options: {
+            maintainAspectRatio:false,
+            animation:false,
+            cutout:'70%',
+            plugins:{
+              legend:{
+                display:true,
+                position:'bottom',
+                labels:{ padding:6, boxWidth:8, boxHeight:8, font:{size:10} }
+              }
+            }
+          },
+          plugins:[{
+            id:'centerPct2',
+            afterDraw(ch){
+              const {ctx, chartArea:{left,right,top,bottom}} = ch;
+              const x=(left+right)/2, y=(top+bottom)/2;
+              ctx.save();
+              ctx.textAlign='center'; ctx.textBaseline='middle';
+              ctx.fillStyle=getCSS('--ink');
+              ctx.font='700 14px ' + Chart.defaults.font.family;
+              ctx.fillText(Math.round(pct) + '%', x, y);
+              ctx.restore();
+            }
+          }]
+        });
+        window.__charts[canId] = { chart, maker };
+      };
+      maker();
+    });
+
+    info.textContent =
+      `Показано: ${slice.length} из ${filtered.length} (всего ${launches.length}) • `
+      + `сорт: ${({'pct':'% пройдено','finished':'пройдено','total':'всего','created':'свежесть'})[sortKey]} ${sortDir.toUpperCase()}`
+      + (dept && dept!=='all' ? ` • отдел: ${dept}` : '')
+      + (platform && platform!=='all' ? ` • платформа: ${platform.toUpperCase()}` : '');
+  }
+
+  /* ===== алерты ===== */
+  var ALERT_ENTRIES = [];
+  function renderAlerts(){
+    var box = $('#alertLog'); if(!box) return;
+
+    if(!ALERT_ENTRIES.length){
+      box.textContent = 'Пока аллертов нет.';
+      return;
+    }
+
+    var filter = ($('#alertFilter')?.value) || 'all';
+    box.innerHTML = '';
+
+    ALERT_ENTRIES.forEach(function(e){
+      var finished = Number(e.finished || 0);
+      var total    = Number(e.total || 0);
+
+      var hasPassed = finished > 0;
+      var isEmpty   = total === 0;
+
+      if(filter === 'passed' && !hasPassed) return;
+      if(filter === 'none'   && (hasPassed || isEmpty)) return;
+      if(filter === 'empty'  && !isEmpty) return;
+
+      var colorCls = isEmpty ? 'warn' : (hasPassed ? 'ok' : 'bad');
+
+      var href = (CURRENT_BASE_URL ? (CURRENT_BASE_URL + '/api/launch/' + e.id + '/statistic') : '#');
+
+      var row = document.createElement('div');
+      row.className = 'alert-row ' + colorCls;
+      row.innerHTML =
+        '<a href="'+href+'" target="_blank">#'+e.id+'</a> — '
+        + (e.name || '(no name)') + ' = '
+        + '<span>'+finished+'</span>' + (isEmpty?' (без кейсов)':'');
+      box.appendChild(row);
+    });
+
+    box.scrollTop = box.scrollHeight;
+  }
+  $('#alertFilter')?.addEventListener('change', renderAlerts);
+
+  /* ===== авто ===== */
+  var autoTimer=null;
+  function setAutoState(running){
+    $('#autoState').textContent = 'Автозапуск: '+(running?'включён':'выключен');
+    $('#autoStart').disabled = running;
+    $('#autoStop').disabled = !running;
+  }
+
+  /* ===== основной запуск дашборда ===== */
+  async function runDashboard(){
+    try{ GET_CACHE.clear(); }catch(_){}
+    try{ UWU_CACHE.clear(); }catch(_){}
+    var logEl=$('#log'); if(logEl) logEl.textContent='';
+    $('#logInfo') && ($('#logInfo').textContent='—');
+    $('#summaryInfo') && ($('#summaryInfo').textContent='—');
+    $('#alertLog') && ($('#alertLog').textContent='Пока аллертов нет.');
+    ALERT_ENTRIES = [];
+
+    var baseUrl=($('#baseUrl')&&$('#baseUrl').value.trim().replace(/\/$/,''))||'';
+    var projectId=($('#projectId')&&$('#projectId').value.trim())||'';
+    var version=($('#version')&&$('#version').value.trim())||'';
+    var token=($('#token')&&$('#token').value.trim())||'';
+    if(!baseUrl||!projectId||!token){ toast('Заполните Base URL, Project ID и токен'); return; }
+    CURRENT_BASE_URL = baseUrl;
+
+    var headers={Accept:'application/json', Authorization:'Api-Token '+token, 'User-Agent':'allure-summary-html/stable'};
+
+    try{
+      const t0=now();
+      const launches = await fetchLaunches(baseUrl, projectId, version, true, true, headers, 8, 100, logDash);
+
+      if($('#logInfo')) $('#logInfo').textContent='Запусков: '+launches.length;
+
+      launches.forEach(it => appendLogLine('[LAUNCH] #'+it.id+' | '+(it.name||'')));
+
+      setLogProgress({loaded: 0, total: launches.length, step: 0, steps: launches.length});
+
+      const res = await aggregateByGroups(launches, baseUrl, headers, logDash, function(e){ appendLogLine('[error] '+e); });
+
+      var agg=res.agg, perLaunchFinished=res.perLaunchFinished, perLaunchTotal=res.perLaunchTotal;
+
+      // Мини-пончики по лаунчам (учтём настройки)
+      window.__mini_last = { launches, perLaunchFinished, perLaunchTotal };
+      updateStreamNamesUI();
+      buildMiniLaunchCharts(launches, perLaunchFinished, perLaunchTotal, readMiniOpts());
+
+      window.lastAgg=agg;
+      window.lastUwuAgg=null;
+
+      // NEW: авто-сохранение постримовых снепшотов на основе текущей выборки лаунчей
+autoSaveAllStreamSnaps();
+
+// NEW: если открыт подтаб «По стриму» — сразу обновим prev/curr бар и сравнение
+if(document.getElementById('snapStreamSection')?.style.display !== 'none'){
+  renderStreamSnapList();
+  renderDashPrevCurrentStream(window.lastAgg, $('#dashMetricStream')?.value||'finished');
+  buildDashMultiCompareStream({silent:true});
+}
+
+      // алерты
+      var st=getStore();
+      var last = st.lastPerLaunch || {};
+      const launchNames = {};
+      launches.forEach(it => { launchNames[String(it.id)] = it.name || ''; });
+
+      ALERT_ENTRIES = [];
+      for(var id in perLaunchFinished){
+        var curr = Number(perLaunchFinished[id]||0);
+        last[id] = curr;
+        ALERT_ENTRIES.push({ id:id, name:launchNames[id]||'', finished:curr, total:Number(perLaunchTotal[id]||0) });
+      }
+      st.lastPerLaunch = last;
+      setStore(st); saveStoreMaybe();
+
+      renderAlerts();
+
+      renderAgg(agg, 'cards', 'barAll', $('#summaryInfo'), null);
+      var mtr=($('#dashMetric')?.value)||'finished';
+      renderDashPrevCurrent(agg, mtr);
+
+      
+      // Автосохранение общего среза (как в Визуализации)
+      try{ takeSnapshot({ version:($('#version')?.value.trim())||'', timeISO:(new Date()).toISOString(), data: agg }); }catch(_){}
+buildDashMultiCompare({ silent: true });
+
+      await buildReleaseSection(baseUrl, projectId, version, headers);
+
+      appendLogLine('Считаю UwU по платформам…');
+      buildUwUAgg(launches, baseUrl, headers, logDash, function(e){ appendLogLine('[uwu] '+e); })
+        .then(function(uwuAgg){
+          window.lastUwuAgg = uwuAgg;
+          renderAgg(window.lastAgg, 'cards', 'barAll', $('#summaryInfo'), window.lastUwuAgg);
+        })
+        .catch(function(e){
+          appendLogLine('[uwu] ошибка: ' + (e.message||e));
+        });
+
+      const t1=now();
+      appendLogLine('Готово за '+Math.round(t1-t0)+' мс');
+    }catch(e){
+      toast(e.message||String(e));
+    } finally {
+      flushLog();
+    }
+  }
+
+  /* ===== Экспорт (общий) ===== */
+  function exportAggCSV(){
+    if(!window.lastAgg){ toast('Сначала соберите дашборд'); return; }
+    var rows=[['group','total','finished','remaining_total','remaining','in_progress']];
+    ORDER.forEach(function(g){
+      var o=window.lastAgg[g]||{total:0,finished:0,remaining_total:0,remaining:0,in_progress:0};
+      rows.push([g,o.total,o.finished,o.remaining_total,o.remaining,o.in_progress]);
+    });
+    var csv = rows.map(r => r.map(v=>{
+      var x=(v==null?'':String(v));
+      if(/[",\n]/.test(x)) x='"'+x.replace(/"/g,'""')+'"';
+      return x;
+    }).join(',')).join('\n');
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='agg.csv'; a.click(); URL.revokeObjectURL(url);
+  }
+  function exportAggJSON(){
+    if(!window.lastAgg){ toast('Сначала соберите дашборд'); return; }
+    var blob=new Blob([JSON.stringify(window.lastAgg,null,2)],{type:'application/json'});
+        var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='agg.json'; a.click(); URL.revokeObjectURL(url);
+  }
+// Разбор имени лаунча: ищем токены в квадратных скобках и выделяем stream / platform / kind
+function parseStreamTriple(name){
+  const tokens = [];
+  String(name || '').replace(/\[([^\]]+)\]/g, (_, t) => {
+    tokens.push(t);
+    return '';
+  });
+  if (!tokens.length) return null;
+
+  let stream = null;
+  let platform = null;
+  let kind = null;
+
+  tokens.forEach(t => {
+    const low = t.toLowerCase();
+    if (low === 'android' || low === 'ios') {
+      platform = t;
+      return;
+    }
+    if (low === 'smoke' || low === 'selective' || low === 'high/blocker' || low === 'high-blocker') {
+      // нормализуем High-Blocker -> High/Blocker
+      kind = (low === 'high-blocker') ? 'High/Blocker' : t;
+      return;
+    }
+    if (!stream) {
+      stream = t;
+    }
+  });
+
+  if (!stream || !platform || !kind) return null;
+  return { stream, platform, kind };
+}
+
+// Собрать уникальные названия стримов для выбранного kind (Smoke/Selective)
+function collectStreamNames(kind){
+  const L = (window.__mini_last && window.__mini_last.launches) || [];
+  const set = new Set();
+  L.forEach(x=>{
+    const p = parseStreamTriple(x.name||'');
+    if(p && p.kind.toLowerCase() === String(kind).toLowerCase()){
+      set.add(p.stream);
+    }
+  });
+  return Array.from(set).sort((a,b)=>a.localeCompare(b,'ru'));
+}
+
+// Обновить UI селект со стримами
+function updateStreamNamesUI(){
+  const kind = $('#streamKind')?.value || 'Smoke';
+  const sel  = $('#streamName');
+  if(!sel) return;
+  const valPrev = sel.value;
+  const names = collectStreamNames(kind);
+  sel.innerHTML = '<option value="__all__">— выберите стрим —</option>' +
+                  names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  // если ранее выбранный есть — вернём
+  if(names.includes(valPrev)) sel.value = valPrev;
+}
+
+// Посчитать агрегат для конкретного стрима (по двум платформам) на основе текущих лаунчей
+function aggForStream(kind, streamName){
+  const labels = orderForKind(kind);
+  const agg = {};
+  labels.forEach(l=>{ agg[l] = { total:0, finished:0, remaining_total:0, remaining:0, in_progress:0 }; });
+
+  const L = (window.__mini_last && window.__mini_last.launches) || [];
+  const FIN = (window.__mini_last && window.__mini_last.perLaunchFinished) || {};
+  const TOT = (window.__mini_last && window.__mini_last.perLaunchTotal) || {};
+
+  L.forEach(x=>{
+    const p = parseStreamTriple(x.name||'');
+    if(!p) return;
+    if(p.kind.toLowerCase() !== String(kind).toLowerCase()) return;
+    if(streamName && streamName !== '__all__' && p.stream !== streamName) return;
+
+    const key = `[${p.platform}][${p.kind}]`;   // совпадает с формой из ORDER
+    if(!(key in agg)) return;
+
+    const finished = Number(FIN[x.id] || 0);
+    const total    = Number(TOT[x.id] || 0);
+    const remaining_total = Math.max(0, total - finished);
+
+    agg[key].total           += total;
+    agg[key].finished        += finished;
+    agg[key].remaining_total += remaining_total;
+    // детального деления на assigned/unassigned здесь нет — считаем всё как in_progress
+    agg[key].in_progress     += remaining_total;
+  });
+
+  return agg;
+}
+
+  /* ====== Срезы по стриму (Smoke / Selective) ====== */
+
+  function orderForKind(kind){
+    const k = String(kind).toLowerCase();
+    if (k === 'smoke')         return ["[iOS][Smoke]","[Android][Smoke]"];
+    if (k === 'selective')     return ["[Android][Selective]","[iOS][Selective]"];
+    if (k === 'high/blocker')  return ["[iOS][High/Blocker]","[Android][High/Blocker]"];
+    // по умолчанию вернём все три группы, если вдруг что-то странное прилетело
+    return ["[iOS][Smoke]","[Android][Smoke]","[Android][Selective]","[iOS][Selective]","[iOS][High/Blocker]","[Android][High/Blocker]"];
+  }
+
+  function makeStreamSnapTitle(o){
+    var ver=o.version||'all';
+    return `[${o.kind}] v=${ver} ${o.timeISO}`;
+  }
+
+function takeStreamSnapshot(ctx){
+  // ctx: { kind:'Smoke'|'Selective', version, timeISO }
+  const kind = ctx.kind;
+  const streamName = ($('#streamName')?.value) || '__all__';
+  if(!streamName || streamName === '__all__'){
+    toast('Выберите конкретный стрим в списке');
+    return;
+  }
+
+  // строим агрегат ровно для выбранного стрима (две платформы для kind)
+  const data = aggForStream(kind, streamName);
+
+  var st=getStore();
+  var id=String(Date.now())+Math.random().toString(16).slice(2);
+  var snap={
+    id,
+    ts: Date.now(),
+    kind,
+    stream: streamName,
+    title: `[${kind}] ${streamName} v=${ctx.version||'all'} ${ctx.timeISO}`,
+    data
+  };
+  st.streamSnaps=(st.streamSnaps||[]);
+  st.streamSnaps.push(snap);
+  setStore(st);
+  renderStreamSnapList();
+  saveStoreMaybe();
+  toast('Срез по стриму сохранён');
+}
+
+function renderStreamSnapList(){
+  var box=$('#snapListDashStream'); if(!box) return; box.innerHTML='';
+  var kind = $('#streamKind')?.value || 'Smoke';
+  var streamName = $('#streamName')?.value || '__all__';
+
+  var store=getStore();
+  var list=(store.streamSnaps||[]).filter(s=>
+    String(s.kind||'').toLowerCase()===String(kind).toLowerCase()
+    && (streamName==='__all__' || s.stream===streamName)
+  );
+
+  const labels = orderForKind(kind);
+
+  for(var i=list.length-1;i>=0;i--){
+    var s=list[i];
+    var totalFinished = labels.reduce(function(sum,k){
+      return sum + (((s.data||{})[k]||{}).finished||0);
+    }, 0);
+
+    var row=document.createElement('div');
+    row.className='snap';
+    row.innerHTML='<input type="checkbox" data-id="'+s.id+'" />'+
+      '<label style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">'+
+      '<span class="title">'+escapeHtml(s.title)+'</span>'+
+      '<span class="meta">'+(new Date(s.ts)).toLocaleString()
+      +' • стрим: '+escapeHtml(s.stream||'—')
+      +' • всего пройдено: '+totalFinished.toLocaleString('ru-RU')+'</span></label>'+
+      '<button class="del" data-id="'+s.id+'">Удалить</button>';
+    box.appendChild(row);
+  }
+  var dels=box.querySelectorAll('.del');
+  for(var d=0;d<dels.length;d++){
+    dels[d].addEventListener('click', function(){
+      var id=this.getAttribute('data-id'); var st=getStore();
+      st.streamSnaps=(st.streamSnaps||[]).filter(function(x){return x.id!==id});
+      setStore(st); renderStreamSnapList();
+    });
+  }
+
+  // Кнопки управления срезами "По стриму"
+  var btnSave  = document.getElementById('dashStreamSnapSave');
+  var btnBuild = document.getElementById('dashStreamSnapBuild');
+  var btnClear = document.getElementById('dashStreamSnapClear');
+
+  if (btnSave) {
+    btnSave.onclick = function(){
+      // Нужны актуальные данные дашборда
+      if (!window.__mini_last || !Array.isArray(window.__mini_last.launches) || !window.__mini_last.launches.length) {
+        toast('Сначала соберите дашборд');
+        return;
+      }
+      var ctx = {
+        kind:  (document.getElementById('streamKind')?.value) || 'Smoke',
+        version: (document.getElementById('version')?.value.trim()) || '',
+        timeISO: (new Date()).toISOString()
+      };
+      takeStreamSnapshot(ctx);
+    };
+  }
+
+  if (btnBuild) {
+    btnBuild.onclick = function(){
+      buildDashMultiCompareStream({ silent:false });
+    };
+  }
+
+  if (btnClear) {
+    btnClear.onclick = function(){
+      var kind  = (document.getElementById('streamKind')?.value) || 'Smoke';
+      var streamName = (document.getElementById('streamName')?.value) || '__all__';
+      var st = getStore();
+      st.streamSnaps = (st.streamSnaps||[]).filter(function(s){
+        var sameKind = String(s.kind||'').toLowerCase() === String(kind).toLowerCase();
+        var sameStream = (streamName === '__all__') || (s.stream === streamName);
+        return !(sameKind && sameStream);
+      });
+      setStore(st);
+      renderStreamSnapList();
+      toast('Срезы по стриму удалены');
+    };
+  }
+}
+
+  function buildDashMultiCompareStream(opts){
+  const silent = !!(opts && opts.silent);
+
+  var metric=$('#dashMetricStream')?.value || 'finished';
+  var kind = $('#streamKind')?.value || 'Smoke';
+  var streamName = $('#streamName')?.value || '__all__';
+  const labels=orderForKind(kind);
+
+  var chosen=[].slice.call(document.querySelectorAll('#snapListDashStream input[type=checkbox]:checked'))
+               .map(cb=>cb.getAttribute('data-id'));
+
+  var snaps=(getStore().streamSnaps||[]).filter(s=>
+    chosen.indexOf(s.id)!==-1
+    && String(s.kind||'').toLowerCase()===String(kind).toLowerCase()
+    && (streamName==='__all__' || s.stream===streamName)
+  );
+
+  if(!snaps.length){
+    if(!silent) toast('Выберите срезы (стрим)');
+    return;
+  }
+
+  const palette = ['#7a3af9','#00c48c','#ffb020','#ff5aad','#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#14b8a6'];
+  const datasets = snaps.map((s, i)=>{
+    const col = palette[i % palette.length];
+    return {
+      key: metric,
+      label: prettySnapTitle(s.title || ('Срез '+(i+1))),
+      data: labels.map(k => ((s.data||{})[k]||{})[metric] || 0),
+      backgroundColor: hexA(col,.85),
+      borderColor: col
+    };
+  });
+
+  var wrap = document.getElementById('dashMultiBarStream')?.parentElement;
+  if(wrap){
+    var extra = Math.max(0, datasets.length - 6);
+    wrap.style.height = Math.min(900, 320 + extra*24) + 'px';
+  }
+
+  makeBarChart('dashMultiBarStream', labels, datasets);
+}
+
+// NEW: автосбор всех постримовых срезов (для Smoke и Selective)
+function autoSaveAllStreamSnaps(){
+  // Нужны актуальные лаунчи/пер-метрики (заполняются в runDashboard)
+  const launchesOk = window.__mini_last && Array.isArray(window.__mini_last.launches) && window.__mini_last.launches.length;
+  if(!launchesOk) return;
+
+  const version = ($('#version')?.value.trim())||'';
+  const timeISO = (new Date()).toISOString();
+
+  const kinds = ['Smoke','Selective','High/Blocker'];
+  const newSnaps = [];
+
+  kinds.forEach(kind=>{
+    const names = collectStreamNames(kind); // соберём список названий стримов по текущим лаунчам
+    names.forEach(streamName=>{
+      // агрегат В СЕКЦИИ «По стриму» всегда «две платформы для одного kind» — из текущих лаунчей
+      const data = aggForStream(kind, streamName);
+
+      // сформируем снепшот
+      newSnaps.push({
+        id: String(Date.now())+Math.random().toString(16).slice(2),
+        ts: Date.now(),
+        kind,
+        stream: streamName,
+        title: `[${kind}] ${streamName} v=${version} ${timeISO}`,
+        data
+      });
+    });
+  });
+
+  if(!newSnaps.length) return;
+
+  // единоразово положим в store и перерисуем список «По стриму»
+  const st = getStore();
+  st.streamSnaps = (st.streamSnaps||[]).concat(newSnaps);
+  setStore(st);
+  renderStreamSnapList();
+  saveStoreMaybe();
+  // без навязчивого тоста — сохраняем «тихо», но можно включить при желании:
+  // toast('Автосрезы по стримам сохранены');
+}
+
+function renderDashPrevCurrentStream(currentAggAll, metric){
+  var kind = $('#streamKind')?.value || 'Smoke';
+  var streamName = $('#streamName')?.value || '__all__';
+  const labels=orderForKind(kind);
+
+  // Текущая “онлайн” картина — по данным лаунчей, но только выбранного стрима
+  const currentAgg = aggForStream(kind, streamName);
+
+  metric=metric||'finished'; var color=COLORS[metric]||COLORS.finished;
+
+  // предыдущий — из сохранённых постримовых срезов по выбранному стриму
+  var list=(getStore().streamSnaps||[]).filter(s=>
+    String(s.kind||'').toLowerCase()===String(kind).toLowerCase()
+    && (streamName==='__all__' || s.stream===streamName)
+  );
+  var prev=list.length>0?list[list.length-1]:null;
+
+  var currData=labels.map(function(k){ return (currentAgg[k]&&currentAgg[k][metric])||0; });
+  var prevData=labels.map(function(k){ return (prev&&prev.data&&prev.data[k]&&prev.data[k][metric])?prev.data[k][metric]:0; });
+  var deltas = currData.map(function(v,i){ return v - (prevData[i]||0); });
+
+  var box=$('#dashDeltaStream');
+  if(box){
+    box.innerHTML='';
+    for(var i=0;i<labels.length;i++){
+      var d=deltas[i]; var sign=d>0?'+':'';
+      var item=document.createElement('div'); item.className='kpi';
+      item.innerHTML='<span class="label">'+labels[i]+' — Δ</span><span class="val">'+sign+d.toLocaleString('ru-RU')+'</span>';
+      box.appendChild(item);
+    }
+  }
+
+  var dsPrev = {key:metric, label:'Предыдущий', data:prevData, backgroundColor:hexA(color,.35), borderColor:color};
+  var dsCurr = {key:metric, label:'Текущий',   data:currData, backgroundColor:hexA(color,.85), borderColor:color};
+  dsCurr.__delta = deltas;
+
+  makeBarChart('dashPrevCurrStream', labels, [dsPrev, dsCurr]);
+}
+
+
+  /* ====== Обработчики/инициализация ====== */
+
+  // Универсальный переключатель табов
+  function showTab(tab) {
+    var all = ['Dash','Swat','Vang','Create','Chp','Calc'];
+    var key = String(tab || 'dash').toLowerCase();
+    all.forEach(function (suffix) {
+      var btn = document.getElementById('tab' + suffix + 'Btn');
+      var sec = document.getElementById('tab' + suffix);
+      var active = (suffix.toLowerCase() === key);
+      if (btn) btn.classList.toggle('active', active);
+      if (sec) sec.style.display = active ? 'block' : 'none';
+    });
+    var panel = document.querySelector('.panel.card');
+    if (panel) {
+      panel.style.display = (key === 'dash') ? '' : 'none';
+    }
+  }
+
+  // Основные табы
+  $('#tabDashBtn')?.addEventListener('click', () => showTab('dash'));
+
+  // Подтабы срезов
+  function setSubtab(which){
+    const g = (which==='general');
+    $('#subtabGeneral').classList.toggle('active', g);
+    $('#subtabStream').classList.toggle('active', !g);
+    $('#snapGeneralSection').style.display = g ? 'block' : 'none';
+    $('#snapStreamSection').style.display  = g ? 'none' : 'block';
+  }
+  $('#subtabGeneral')?.addEventListener('click', ()=> setSubtab('general'));
+  $('#subtabStream')?.addEventListener('click', ()=> { setSubtab('stream'); renderStreamSnapList(); buildDashMultiCompareStream({silent:true}); if(window.lastAgg){ renderDashPrevCurrentStream(window.lastAgg, $('#dashMetricStream')?.value||'finished'); } });
+
+  // Мини-диаграммы
+  $('#miniToggleBtn')?.addEventListener('click', ()=>{
+    const wrap = $('#miniWrap');
+    const shown = wrap.style.display!=='none';
+    wrap.style.display = shown ? 'none' : 'block';
+    $('#miniToggleBtn').textContent = shown ? 'Показать' : 'Скрыть';
+    if(!shown) rebuildMini();
+  });
+  $('#miniCount')?.addEventListener('change', rebuildMini);
+  $('#miniSortKey')?.addEventListener('change', rebuildMini);
+  $('#miniSortDir')?.addEventListener('change', rebuildMini);
+  $('#miniDept')?.addEventListener('change', rebuildMini);
+  $('#miniPlatform')?.addEventListener('change', rebuildMini);
+
+  // Автостарт
+  $('#autoStart')?.addEventListener('click', ()=>{
+    const mins = Math.max(1, parseInt($('#autoMins')?.value||'20',10)||20);
+    if(window.__autoTimer){ clearInterval(window.__autoTimer); }
+    runDashboard();
+    window.__autoTimer = setInterval(runDashboard, mins*60*1000);
+    setAutoState(true);
+  });
+  $('#autoStop')?.addEventListener('click', ()=>{
+    if(window.__autoTimer) clearInterval(window.__autoTimer);
+    window.__autoTimer = null; setAutoState(false);
+  });
+
+  // Кнопки данных
+  $('#dataPick')?.addEventListener('click', pickDataFile);
+  $('#dataCreate')?.addEventListener('click', createDataFile);
+  $('#dataSave')?.addEventListener('click', saveStoreMaybe);
+  $('#dataImportBtn')?.addEventListener('click', ()=>$('#dataImport')?.click());
+  $('#dataImport')?.addEventListener('change', async (e)=>{
+    const file = e.target.files && e.target.files[0]; if(!file) return;
+    try{
+      const text = await file.text();
+      const obj  = JSON.parse(text||'{}');
+      setStore({ ...STORE_DEFAULT, ...obj });
+      renderSnapList(); renderStreamSnapList();
+      toast('Импортировано');
+    }catch(err){ toast('Ошибка импорта: '+(err.message||err)); }
+  });
+  $('#dataExportBtn')?.addEventListener('click', ()=>{
+    const blob=new Blob([JSON.stringify(getStore(),null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='regress-data.json'; a.click(); URL.revokeObjectURL(url);
+  });
+  $('#dataExportCsv')?.addEventListener('click', exportSnapsCSV);
+
+  // Экспорт графиков/аггрегаций
+  $('#expAggCsv')?.addEventListener('click', exportAggCSV);
+  $('#expAggJson')?.addEventListener('click', exportAggJSON);
+
+  // Срезы (общие)
+  renderSnapList();
+  $('#dashMetric')?.addEventListener('change', ()=>{ if(window.lastAgg) renderDashPrevCurrent(window.lastAgg, $('#dashMetric')?.value||'finished'); });
+  $('#dashKind')?.addEventListener('change', ()=>{
+    if (window.lastAgg){
+      renderAgg(window.lastAgg, 'cards', 'barAll', document.getElementById('summaryInfo'), window.lastUwuAgg || null);
+      var mtr = (document.getElementById('dashMetric')?.value) || 'finished';
+      renderDashPrevCurrent(window.lastAgg, mtr);
+      buildDashMultiCompare({silent:true});
+    }
+  });
+  // Срезы (стрим)
+  renderStreamSnapList();
+  $('#dashMetricStream')?.addEventListener('change', ()=>{ if(window.lastAgg) renderDashPrevCurrentStream(window.lastAgg, $('#dashMetricStream')?.value||'finished'); });
+// При смене вида стрима — обновляем список названий и перерисовываем
+$('#streamKind')?.addEventListener('change', ()=>{
+  updateStreamNamesUI();
+  renderStreamSnapList();
+  buildDashMultiCompareStream({silent:true});
+  if(window.lastAgg) renderDashPrevCurrentStream(window.lastAgg, $('#dashMetricStream')?.value||'finished');
+});
+
+// При выборе конкретного стрима — фильтруем и перерисовываем
+$('#streamName')?.addEventListener('change', ()=>{
+  renderStreamSnapList();
+  buildDashMultiCompareStream({silent:true});
+  if(window.lastAgg) renderDashPrevCurrentStream(window.lastAgg, $('#dashMetricStream')?.value||'finished');
+});
+
+// При сборке дашборда — когда есть список лаунчей — наполним селект стримов
+// (добавь в конце runDashboard(), сразу после window.__mini_last = {...};)
+
+  // Кнопки срезов
+  $('#dashSnapBuild')?.addEventListener('click', ()=>buildDashMultiCompare({silent:false}));
+  $('#dashStreamSnapBuild')?.addEventListener('click', ()=>buildDashMultiCompareStream({silent:false}));
+  $('#dashStreamSnapSave')?.addEventListener('click', ()=>{
+    if(!window.lastAgg){ toast('Сначала соберите дашборд'); return; }
+    const kind = $('#streamKind')?.value || 'Smoke';
+    takeStreamSnapshot({ kind, version:($('#version')?.value.trim())||'', timeISO:(new Date()).toISOString(), data: window.lastAgg });
+  });
+  $('#dashStreamSnapClear')?.addEventListener('click', ()=>{
+    var st=getStore(); var kind=$('#streamKind')?.value||'Smoke';
+    st.streamSnaps=(st.streamSnaps||[]).filter(s=> String(s.kind||'').toLowerCase()!==String(kind).toLowerCase());
+    setStore(st); renderStreamSnapList(); toast('Срезы стрима очищены');
+  });
+
+// Кнопка запуска дашборда
+$('#runBtn')?.addEventListener('click', runDashboard);
+
+// Инициализация состояния
+showTab('dash');
+setSubtab('general');
+setAutoState(false);
+})();
+ </script>
+
+<!-- ==== SWAT TAB (injected, non-invasive) ==== -->
+
+
+<!-- ==== Additive SWAT API controls + logic (non-invasive) ==== -->
+
+
+<script>
+// === SWAT: fast mode (parallel leaves + higher concurrency, throttled logs) ===
+(function(){
+  function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+  ready(function(){
+    if(typeof sw_buildFromApi !== 'function') return;
+    const original = sw_buildFromApi;
+
+    function now(){ return (typeof performance!=='undefined' && performance.now) ? performance.now() : Date.now(); }
+
+    // Override with fast version
+    sw_buildFromApi = async function sw_buildFromApi_fast(){
+      const baseUrl = (document.getElementById('swatBaseUrl').value||'').trim().replace(/\/+$/,'');
+      const token   = (document.getElementById('swatApiToken').value||'').trim();
+      const projectId = (document.getElementById('swatProjectId').value||'').trim();
+      const release = (document.getElementById('swatRelease').value||'').trim();
+      const kinds = []; if(document.getElementById('kindSmoke')?.checked) kinds.push('Smoke'); if(document.getElementById('kindSelective')?.checked) kinds.push('Selective'); if(document.getElementById('kindHB')?.checked) kinds.push('High/Blocker');
+      if(!baseUrl || !token || !projectId || !release || kinds.length===0){ alert('Укажите Base URL, Project ID, Token, Релиз и выберите Kind'); return; }
+
+      // helpers
+      async function safe(promiseFactory, ctx){
+        try{ return await promiseFactory(); }
+        catch(e){ log('API error'+(ctx?(' @ '+ctx):'')+': '+(e.message||e),'ERROR'); return null; }
+      }
+      const limit8  = (typeof sw_pLimit==='function') ? sw_pLimit(8)  : (fn=>fn());
+      const limit32 = (typeof sw_pLimit==='function') ? sw_pLimit(32) : (fn=>fn());
+
+      log(`(FAST) Ищу лаунчи для релиза ${release} по видам: ${kinds.join(', ')}`);
+      setProgress(2);
+      const launches = await safe(()=>sw_findLaunchesByRelease(baseUrl, projectId, token, release, kinds), 'findLaunchesByRelease') || [];
+      log(`Найдено лаунчей: ${launches.length}`);
+      if(!launches.length){ setProgress(100); sw_renderSummary([]); sw_renderDetailed([]); return; }
+
+      // Collect leaves in parallel per launch
+      let allLeafIds = [];
+      const leavesArr = await Promise.all(launches.map(ln => limit8(()=> safe(()=>sw_listLeafResultsForLaunch(baseUrl, token, ln.id), 'listLeafResultsForLaunch('+ln.id+')') )));
+      leavesArr.forEach(ids => { if(Array.isArray(ids)) allLeafIds.push(...ids); });
+      log('(FAST) Всего листовых результатов: '+allLeafIds.length);
+      if(!allLeafIds.length){ setProgress(100); sw_renderSummary([]); sw_renderDetailed([]); return; }
+
+      // Analyze leaves with higher concurrency + throttled UI updates
+      const swatSet = (typeof sw_parseSwatList==='function') ? sw_parseSwatList() : new Set();
+      const records=[];
+      let done=0, t0=now(), lastUi=0;
+      await Promise.all(allLeafIds.map(id => limit32(async ()=>{
+        const rec = await safe(()=>sw_analyzeLeaf(baseUrl, token, id, swatSet), 'analyzeLeaf('+id+')');
+        if(rec) records.push(rec);
+        done++;
+        const t=now();
+        if(t - lastUi > 500 || done===allLeafIds.length){
+          const pct = Math.round( (done*100)/allLeafIds.length );
+          setProgress(2 + 96*done/allLeafIds.length);
+          // компактный лог прогресса
+          log(`(FAST) ${done}/${allLeafIds.length} • ${pct}%`, 'DEBUG');
+          lastUi = t;
+        }
+      })));
+
+      window.__swat_records_all = records.slice();
+      sw_populateStreams(); sw_populateRuns(); sw_applyFiltersAndRender();
+      setProgress(100);
+      log('(FAST) Готово из API');
+    };
+
+    // И на всякий случай: если что-то пойдёт не так — вернём оригинал по Shift+клику
+    const btn = document.getElementById('swatBuildApi');
+    if(btn){
+      btn.title = (btn.title?btn.title+'\n':'') + 'Shift+Click — запустить медленный режим';
+      btn.addEventListener('click', function(e){
+        if(e.shiftKey){
+          sw_buildFromApi = original;
+          setTimeout(()=>{ sw_buildFromApi = arguments.callee.fastApplied ? sw_buildFromApi : sw_buildFromApi; }, 0);
+        }
+      }, { once:true });
+    }
+  });
+})();
+</script>
+
+<!-- Safe swap for Release and API Token fields -->
+<script>
+(function(){
+  function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+  ready(function(){
+    try{
+      // ищем блок SWAT и поля
+      var api = document.getElementById('swatApiPanel') || document; // fallback
+      var fldTokenEl   = document.getElementById('swatApiToken');
+      var fldReleaseEl = document.getElementById('swatRelease');
+      if(!fldTokenEl || !fldReleaseEl) return;
+
+      // берём .field контейнеры
+      var fldToken   = fldTokenEl.closest('.field') || fldTokenEl;
+      var fldRelease = fldReleaseEl.closest('.field') || fldReleaseEl;
+      if(!fldToken.parentNode || !fldRelease.parentNode) return;
+
+      // если уже стоит в нужном порядке (Release до Token) — выходим
+      var sibl = fldRelease.nextElementSibling;
+      if(sibl === fldToken) return;
+
+      // безопасная перестановка узлов
+      var placeholder = document.createElement('div');
+      fldToken.parentNode.insertBefore(placeholder, fldToken);
+      fldRelease.replaceWith(fldToken);
+      placeholder.replaceWith(fldRelease);
+      // ГОТОВО: поля поменялись местами без insertBefore на чужой контейнер
+    }catch(e){
+      console.warn('SWAT swap fields failed:', e);
+    }
+  });
+})();
+</script>
+
+ 
+
+<!-- === PATCH: show/hide toggles + initial stream hide + footer tail cleanup + SWAT safe visibility === -->
+
+<script>
+(function(){
+  const $ = (s, r=document)=>r.querySelector(s);
+  const $$= (s, r=document)=>Array.from(r.querySelectorAll(s));
+
+  // 1) Initial: on Dashboard show only "Общие" (hide "По стриму")
+  function hideStreamOnStart(){
+    const gen = $('#snapListDash, #snapGeneralSection');
+    const str = $('#snapListDashStream, #snapStreamSection');
+    if(str){ str.style.display='none'; }
+    if(gen){ gen.style.display=''; }
+  }
+
+  // 2) Re-bind subtabs "Общие / По стриму" if present (UI only)
+  function bindSubtabs(){
+    const btnG = $('#subtabGeneral');
+    const btnS = $('#subtabStream');
+    const gen  = $('#snapGeneralSection, #snapListDash');
+    const str  = $('#snapStreamSection, #snapListDashStream');
+    if(!btnG || !btnS || !gen || !str) return;
+    const showG = ()=>{ gen.style.display=''; str.style.display='none'; btnG.classList.add('active'); btnS.classList.remove('active'); };
+    const showS = ()=>{ gen.style.display='none'; str.style.display=''; btnS.classList.add('active'); btnG.classList.remove('active'); };
+    btnG.addEventListener('click', (e)=>{ e.preventDefault(); showG(); });
+    btnS.addEventListener('click', (e)=>{ e.preventDefault(); showS(); });
+    // default
+    showG();
+  }
+
+  // 3) Add toggle buttons "Показать/Скрыть" for known sections by heading text
+  function makeBtn(){ const b=document.createElement('button'); b.className='pill toggle-btn'; b.type='button'; b.textContent='Скрыть'; return b; }
+  function attachToggleByTitle(title){
+    // find heading node that matches title
+    const heads = $$('h2,h3,.head,.card .head,.card .title,.section-title');
+    const hdr = heads.find(h=> (h.textContent||'').trim() === title);
+    if(!hdr) return;
+    const panel = hdr.closest('.card, section, .panel, .box, .wrap, .container, div');
+    if(!panel || panel.__toggleBound) return;
+    panel.__toggleBound = true;
+    const btn = makeBtn();
+    // place at header end
+    hdr.appendChild(btn);
+    const content = hdr.nextElementSibling || panel.children[1];
+    if(!content) return;
+    btn.addEventListener('click', ()=>{
+      const vis = content.style.display !== 'none';
+      content.style.display = vis ? 'none' : '';
+      btn.textContent = vis ? 'Показать' : 'Скрыть';
+      if(!vis && typeof window.rebuildMini==='function'){ try{ rebuildMini(); }catch(_){} }
+    });
+  }
+  function attachToggles(){
+    [
+      'Сохранённые срезы',
+      'Лог',
+      'Аллерт по лаунчам',
+      '[iOS][Smoke]',
+      '[Android][Smoke]',
+      '[Android][Selective]',
+      '[iOS][Selective]',
+      'Сводный барчарт'
+    ].forEach(attachToggleByTitle);
+  }
+
+  // 4) Footer "tail" cleanup: hide accidental printed JS
+  function cleanFooterTail(){
+    const body = document.body;
+    const nodes = Array.from(body.childNodes).slice(-30);
+    nodes.forEach(n=>{
+      if(n.nodeType===3){
+        const t = (n.textContent||'').trim();
+        if(t.length>120 && /(return\s+new\s+Blob|function\s+downloadBlob|btnExportXls|sw_exportXls)/i.test(t)){
+          const d=document.createElement('div'); d.className='__code-dump'; d.textContent=t; body.replaceChild(d,n);
+        }
+      } else if(n.nodeType===1){
+        const txt = (n.textContent||'').trim();
+        if(txt.length>300 && /(return\s+new\s+Blob|function\s+downloadBlob|btnExportXls|sw_exportXls)/i.test(txt)){
+          n.classList.add('__code-dump');
+        }
+      }
+    });
+  }
+
+  // 5) SWAT safe visibility: show only on its tab (if tabs exist)
+  function bindTopTabs(){
+    const bar = $('nav .tabs, .tabs, [data-tabs="main"]') || document;
+    bar.addEventListener('click', (e)=>{
+      const el = e.target.closest('button, a, [data-tab]');
+      if(!el) return;
+      const label = (el.textContent||'').trim();
+      const dash = $('#tabDash, #dashboardWrap, [data-block="dashboard"]');
+      const isDa = /дашборд/i.test(label);
+      if(dash){
+        if(dash) dash.style.display = isDa ? '' : 'none';
+      }
+      // unstick active state if buttons have it
+      const btns = $$('.tabs [data-tab], .tabs button, nav .tabs button');
+      btns.forEach(b=> b.classList.remove('active','active-btn'));
+      el.classList.add('active');
+      setTimeout(cleanFooterTail, 50);
+    }, {passive:true});
+  }
+
+  function init(){
+    hideStreamOnStart();
+    bindSubtabs();
+    attachToggles();
+    cleanFooterTail();
+    bindTopTabs();
+    setTimeout(cleanFooterTail, 400);
+    setTimeout(cleanFooterTail, 1500);
+  }
+  if(document.readyState!=='loading') init();
+  else document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+
+<!-- PATCH: add STOP button next to 'Запустить' on dashboard -->
+<script>
+(function(){
+  var runBtn = document.getElementById('runBtn');
+  if(!runBtn) return;
+  // create Stop button if not exists
+  var stopBtn = document.getElementById('stopBtn');
+  if(!stopBtn){
+    stopBtn = document.createElement('button');
+    stopBtn.id = 'stopBtn';
+    stopBtn.className = runBtn.className;
+    stopBtn.textContent = 'Стоп';
+    stopBtn.style.marginLeft = '8px';
+    runBtn.parentNode.insertBefore(stopBtn, runBtn.nextSibling);
+  }
+  // global abort controller (opt-in for your fetches using window.__dashAbort.signal)
+  if(!window.__dashAbort) window.__dashAbort = new AbortController();
+
+  function setBusy(b){
+    runBtn.disabled = !!b;
+    stopBtn.disabled = !b;
+    if(b){ runBtn.classList.add('busy'); } else { runBtn.classList.remove('busy'); }
+  }
+  setBusy(false); // initial
+
+  runBtn.addEventListener('click', function(){
+    // new controller for a new run
+    try { window.__dashAbort.abort(); } catch(_){}
+    window.__dashAbort = new AbortController();
+    window.__shouldStop = false;
+    setBusy(true);
+  });
+
+  stopBtn.addEventListener('click', function(){
+    window.__shouldStop = true;
+    try { window.__dashAbort.abort(); } catch(_){}
+    setBusy(false);
+  });
+})();
+</script>
+
+<!-- STOP/ABORT shim injected -->
+<script id="stop-abort-shim">
+(function(){
+  // prevent double inject
+  if (window.__stopShimInstalled__) return;
+  window.__stopShimInstalled__ = true;
+
+  // Global abort session
+  const abortState = (window.__abortState__ = {
+    controller: null,
+    active: false,
+    stopRequested: false,
+  });
+
+  function beginAbortSession(){
+    abortState.controller = new AbortController();
+    abortState.active = true;
+    abortState.stopRequested = false;
+  }
+  function requestStop(){
+    abortState.stopRequested = true;
+    try{ abortState.controller && abortState.controller.abort(); }catch(_){}
+    abortState.active = false;
+  }
+  window.__beginAbortSession__ = beginAbortSession;
+  window.__requestStop__ = requestStop;
+
+  // Fetch shim: add signal automatically
+  if (!window.__fetchPatchedForAbort__) {
+    const _fetch = window.fetch;
+    window.fetch = function(input, init){
+      init = init || {};
+      if (abortState.controller && !init.signal){
+        init = Object.assign({}, init, { signal: abortState.controller.signal });
+      }
+      return _fetch(input, init);
+    };
+    window.__fetchPatchedForAbort__ = true;
+  }
+
+  // Global abort-aware promise helper
+  window.abortable = function(promise){
+    if (!abortState.controller) return promise;
+    const s = abortState.controller.signal;
+    if (!s) return promise;
+    return new Promise((resolve,reject)=>{
+      const onAbort = ()=>reject(Object.assign(new Error('ABORT'),{name:'AbortError'}));
+      if (s.aborted) return onAbort();
+      s.addEventListener('abort', onAbort, {once:true});
+      promise.then(v=>{ s.removeEventListener('abort', onAbort); resolve(v); },
+                   e=>{ s.removeEventListener('abort', onAbort); reject(e); });
+    });
+  };
+
+  // UI: find buttons by id or text
+  function byText(btns, txt){
+    txt = String(txt).trim().toLowerCase();
+    return Array.from(btns).find(b => (b.textContent||'').trim().toLowerCase() === txt);
+  }
+
+  function pickButtons(){
+    const allBtns = document.querySelectorAll('button, .btn');
+    let run = document.querySelector('#dashRunBtn') || byText(allBtns, 'запустить');
+    let stop = document.querySelector('#dashStopBtn') || byText(allBtns, 'стоп');
+    return {run, stop};
+  }
+
+  function ensureHandlers(){
+    const {run, stop} = pickButtons();
+    if (!run || !stop || run.__stopShimBound__) return;
+    run.__stopShimBound__ = true;
+
+    // RUN
+    run.addEventListener('click', function(){
+      // start session; UI lock (defer to avoid blocking other handlers)
+      try{ beginAbortSession(); }catch(_){}
+      setTimeout(()=>{
+        run.disabled = true;
+        run.classList.add('is-busy');
+        // the page code should re-enable itself; as a fallback re-enable after 30s
+        setTimeout(()=>{ run.disabled=false; run.classList.remove('is-busy'); }, 30000);
+      }, 0);
+    }, {capture:true});
+
+    // STOP
+    stop.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      requestStop();
+      // re-enable run button immediately
+      setTimeout(()=>{
+        const {run} = pickButtons();
+        if (run){ run.disabled = false; run.classList.remove('is-busy'); }
+      }, 0);
+    });
+  }
+
+  // try now and on dom changes
+  ensureHandlers();
+  const mo = new MutationObserver(ensureHandlers);
+  mo.observe(document.documentElement, {subtree:true, childList:true});
+  
+  // silence AbortError red screens
+  window.addEventListener('unhandledrejection', (ev)=>{
+    const r = ev.reason;
+    if (r && (r.name === 'AbortError' || String(r).includes('AbortError') || String(r).includes('ABORT'))) {
+      ev.preventDefault();
+    }
+  });
+})();
+</script>
+
+
+  <!-- ====================== ВАНГОВАТОР (4-я вкладка, iframe-изоляция) ====================== -->
+  
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+// === Platform/Type Filters (robust, DOM-level, with summary) ===
+(function(){
+  function normKey(s){ return String(s||'').replace(/\]\s*\[/g, '][').trim(); }
+  function parseLabel(label){
+    label = normKey(label);
+    var plat = (label.indexOf('[iOS]')===0) ? 'iOS' : (label.indexOf('[Android]')===0 ? 'Android' : null);
+    var type = label.includes('[High/Blocker]') ? 'High/Blocker' :
+               (label.includes('[Selective]') ? 'Selective' :
+               (label.includes('[Smoke]') ? 'Smoke' : null));
+    return { platform: plat, type: type };
+  }
+  function isPlatformEnabled(p){
+    if(p==='iOS') return document.getElementById('fltPlatIOS')?.checked === true;
+    if(p==='Android') return document.getElementById('fltPlatAndroid')?.checked === true;
+    return true; // unknown -> don't hide
+  }
+  function isTypeEnabled(t){
+    if(t==='Smoke') return document.getElementById('fltTypeSmoke')?.checked === true;
+    if(t==='Selective') return document.getElementById('fltTypeSelective')?.checked === true;
+    if(t==='High/Blocker') return document.getElementById('fltTypeHB')?.checked === true;
+    return true;
+  }
+  function isVisibleLabel(label){
+    var p = parseLabel(label);
+    return isPlatformEnabled(p.platform) && isTypeEnabled(p.type);
+  }
+
+  // For bars: filter labels/datasets by visibility
+  if (typeof window.makeBarChart === 'function' && !window.__makeBarChartOrig){
+    window.__makeBarChartOrig = window.makeBarChart;
+    window.makeBarChart = function(barId, labels, datasets){
+      try{
+        var idx = labels.map(function(l,i){ return isVisibleLabel(l) ? i : -1; }).filter(function(x){return x!==-1;});
+        var labels2 = idx.map(function(i){ return labels[i]; });
+        var datasets2 = (datasets||[]).map(function(ds){
+          var d = ds.data || [];
+          return Object.assign({}, ds, { data: idx.map(function(i){ return d[i]; }) });
+        });
+        return window.__makeBarChartOrig(barId, labels2, datasets2);
+      }catch(e){ console.warn('bar filter error', e); return window.__makeBarChartOrig(barId, labels, datasets); }
+    };
+  }
+
+  // Donuts: show/hide by visibility
+  function applyVisibilityFilter(){
+    try{
+      var cards = document.querySelectorAll('#cards .card');
+      cards.forEach(function(card){
+        var title = card.querySelector('.head > div:first-child');
+        var label = title ? title.textContent : '';
+        card.style.display = isVisibleLabel(label) ? '' : 'none';
+      });
+    }catch(e){ console.warn('applyVisibilityFilter error', e); }
+  }
+  window.__applyVisibilityFilter = applyVisibilityFilter;
+
+  // Recompute summary ("Всего групп / всего кейсов") based on visible labels
+  function updateSummaryFromFilters(){
+    try{
+      var sumEl = document.getElementById('summaryInfo');
+      if(!sumEl || !window.__lastAgg) return;
+      var labels = Object.keys(window.__lastAgg || {});
+      var visible = labels.filter(isVisibleLabel);
+      var totalCases = visible.reduce(function(acc, k){
+        var a = window.__lastAgg[k] || {};
+        var t = Number(a.total || 0);
+        return acc + (isFinite(t) ? t : 0);
+      }, 0);
+      sumEl.textContent = 'Всего групп: ' + visible.length + ', всего кейсов: ' + (totalCases.toLocaleString ? totalCases.toLocaleString('ru-RU') : totalCases);
+    }catch(e){ console.warn('updateSummaryFromFilters error', e); }
+  }
+  window.__updateSummaryFromFilters = updateSummaryFromFilters;
+
+  // Hook renderAgg to capture agg and apply filters after draw
+  (function hookRender(){
+    if (typeof window.renderAgg !== 'function' || window.__renderAggHooked) return;
+    window.__renderAggHooked = true;
+    var orig = window.renderAgg;
+    window.renderAgg = function(a,b,c,d){
+      window.__lastAgg = a; // remember
+      var r = orig(a,b,c,d);
+      try{ applyVisibilityFilter(); updateSummaryFromFilters(); }catch(_e){}
+      return r;
+    };
+  })();
+
+  function bindUI(){
+    var ids = ['fltPlatIOS','fltPlatAndroid','fltTypeSmoke','fltTypeSelective','fltTypeHB'];
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      if(el && !el.__bind){
+        el.__bind = true;
+        el.addEventListener('change', function(){
+          try{
+            if (typeof window.renderAgg === 'function' && window.__lastAgg){
+              window.renderAgg(window.__lastAgg, 'cards', 'barAll', document.getElementById('summaryInfo'), window.lastUwuAgg || null);
+            } else {
+              applyVisibilityFilter();
+              updateSummaryFromFilters();
+              window.dispatchEvent(new Event('resize'));
+            }
+          }catch(e){ console.warn('repaint failed', e); }
+        });
+      }
+    });
+    document.getElementById('fltAll')?.addEventListener('click', function(){
+      ['fltPlatIOS','fltPlatAndroid','fltTypeSmoke','fltTypeSelective','fltTypeHB'].forEach(function(id){ var el=document.getElementById(id); if(el) el.checked=true; });
+      document.getElementById('fltPlatIOS')?.dispatchEvent(new Event('change'));
+    });
+    document.getElementById('fltNone')?.addEventListener('click', function(){
+      ['fltPlatIOS','fltPlatAndroid','fltTypeSmoke','fltTypeSelective','fltTypeHB'].forEach(function(id){ var el=document.getElementById(id); if(el) el.checked=false; });
+      document.getElementById('fltPlatIOS')?.dispatchEvent(new Event('change'));
+    });
+  }
+  document.addEventListener('DOMContentLoaded', bindUI);
+})();
+</script>
+
+
+
+
+
+<script>
+// ========= Settings persistence + instant filters (patch v3: debounced + calls updateSummaryFromFilters) =========
+(function(){
+  const LS_KEYS = {
+    version: 'rb__version',
+    token: 'rb__token',
+    baseUrl: 'rb__baseUrl',
+    projectId: 'rb__projectId'
+  };
+  const $ = sel => document.querySelector(sel);
+
+  const versionInput   = $('#version');
+  const tokenInput     = $('#token');
+  const baseUrlInput   = $('#baseUrl');
+  const projectIdInput = $('#projectId');
+  const saveBtn        = $('#saveSettingsBtn');
+  const toast          = $('#toast');
+
+  function showToast(msg){
+    if(!toast) return;
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(()=> toast.classList.remove('show'), 1500);
+  }
+  function setIfEmpty(el, val){
+    if(el && (el.value === '' || el.value == null)) el.value = val;
+  }
+
+  // Load saved values
+  try {
+    const v   = localStorage.getItem(LS_KEYS.version);
+    const t   = localStorage.getItem(LS_KEYS.token);
+    const bu  = localStorage.getItem(LS_KEYS.baseUrl);
+    const pid = localStorage.getItem(LS_KEYS.projectId);
+    if(v)   setIfEmpty(versionInput, v);
+    if(t)   setIfEmpty(tokenInput, t);
+    if(bu)  setIfEmpty(baseUrlInput, bu);
+    if(pid) setIfEmpty(projectIdInput, pid);
+  } catch(e){}
+  // Defaults if nothing saved
+  setIfEmpty(baseUrlInput, 'https://allure-testops.wb.ru');
+  setIfEmpty(projectIdInput, '7');
+
+  function saveSettings(){
+    try{
+      if(versionInput)   localStorage.setItem(LS_KEYS.version,   (versionInput.value||'').trim());
+      if(tokenInput)     localStorage.setItem(LS_KEYS.token,     (tokenInput.value||'').trim());
+      if(baseUrlInput)   localStorage.setItem(LS_KEYS.baseUrl,   (baseUrlInput.value||'').trim());
+      if(projectIdInput) localStorage.setItem(LS_KEYS.projectId, (projectIdInput.value||'').trim());
+      showToast('Настройки сохранены');
+    }catch(e){
+      console.error(e);
+      showToast('Не удалось сохранить');
+    }
+  }
+  if(saveBtn) saveBtn.addEventListener('click', saveSettings);
+  [versionInput, tokenInput].forEach(el => { if(el) el.addEventListener('blur', saveSettings); });
+
+  // ========== Instant filters ==========
+  const fltSmoke    = $('#fltTypeSmoke');
+  const fltSel      = $('#fltTypeSelective');
+  const fltHB       = $('#fltTypeHB');
+  const fltIOS      = $('#fltPlatIOS');
+  const fltAndroid  = $('#fltPlatAndroid');
+  const btnAll      = $('#fltAll');
+  const btnNone     = $('#fltNone');
+
+  let rafId = 0;
+  function scheduleApply(){
+    if(rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(()=>{
+      if (typeof window.updateSummaryFromFilters === 'function') {
+        try { window.updateSummaryFromFilters(); } catch(e){ console.debug(e); }
+      }
+      const fns = [
+        'buildSummaryBar','rebuildSummaryBar','renderSummaryBar','updateSummaryBar',
+        'buildMiniDonuts','renderMiniDonuts','updateMiniDonuts',
+        'sw_renderSummary','renderAgg','renderDashPrevCurrent','renderDashPrevCurrentStream',
+        'renderStreamSnapList','renderSnapList'
+      ];
+      fns.forEach(name => { if (typeof window[name] === 'function') { try{ window[name](); }catch(e){ console.debug(name, e); } } });
+    });
+  }
+
+  [fltSmoke, fltSel, fltHB, fltIOS, fltAndroid].forEach(el => {
+    if(!el) return;
+    el.addEventListener('change', scheduleApply);
+    el.addEventListener('input',  scheduleApply);
+    el.addEventListener('click',  scheduleApply);
+  });
+
+  if(btnAll){
+    btnAll.addEventListener('click', () => {
+      [fltSmoke, fltSel, fltHB, fltIOS, fltAndroid].forEach(el => { if(el) el.checked = true; });
+      scheduleApply();
+    });
+  }
+  if(btnNone){
+    btnNone.addEventListener('click', () => {
+      [fltSmoke, fltSel, fltHB, fltIOS, fltAndroid].forEach(el => { if(el) el.checked = false; });
+      scheduleApply();
+    });
+  }
+
+  scheduleApply();
+})();
+</script>
+
+<!-- START: Safe standalone "Стримы" multiselect (injected by assistant) -->
+
+
+<script>
+(function(){
+  // Safe wrapper: errors inside will not break the page
+  try{
+    const LOCAL_KEY = 'mini_streams_selection_v1';
+    const DROPDOWN_ID = 'rrStreamDD_safe_v1';
+    const RETRY_INTERVAL_MS = 800;
+    const MAX_RETRIES = 40;
+
+    function safe$(sel, root=document){ try{ return root.querySelector(sel); }catch(_){ return null; } }
+    function safe$all(sel, root=document){ try{ return Array.from(root.querySelectorAll(sel)); }catch(_){ return []; } }
+
+    function findContext(){
+      const root = document.getElementById('miniLaunchCard') || document;
+      const toolbar = (root.querySelector('.head .export') || root.querySelector('.head') || root.querySelector('.mini-toolbar')) || null;
+      const grid = (root.querySelector('#miniGrid') || root.querySelector('.mini-grid') || root.querySelector('[data-mini-grid]') || root.querySelector('.cards') || root.querySelector('.grid')) || null;
+      return {root, toolbar, grid};
+    }
+
+    function collectCards(grid){
+      if(!grid) return [];
+      const candidates = safe$all('[data-mini-card], .mini-card, .miniCard, .card', grid);
+      return candidates.filter(el=>{
+        try{
+          if(el.querySelector('svg, canvas')) return true;
+          const txt = (el.textContent||'').trim();
+          if(/%|Пройдено|Пройшло|Прошло/i.test(txt)) return true;
+          return false;
+        }catch(_){ return false; }
+      });
+    }
+
+    function detectStreamFromCard(el){
+      try{
+        if(!el) return 'Прочее';
+        if(el.dataset && el.dataset.stream) return el.dataset.stream.trim();
+        const titleNode = el.querySelector('[data-title], .title, h4, h5, .card-title') || el.querySelector('div') || el;
+        const txt = (titleNode.textContent || el.textContent || '').replace(/\s+/g,' ').trim();
+        const m = txt.match(/\[\s*Stream\s+([^\]|]+?)]/i) || txt.match(/Stream\s+([A-Za-zА-Яа-я0-9 _()\-\/]+?)(?:\s|,|$)/i);
+        if(m && m[1]) return m[1].trim();
+        return txt.split('\n')[0].slice(0,60).trim() || 'Прочее';
+      }catch(_){ return 'Прочее'; }
+    }
+
+    function mountDropdown(toolbar, grid){
+      if(!toolbar) return null;
+      if(safe$('#'+DROPDOWN_ID, toolbar)) return safe$('#'+DROPDOWN_ID, toolbar);
+
+      const dd = document.createElement('div');
+      dd.id = DROPDOWN_ID;
+      dd.className = 'rr-stream-dd';
+      dd.innerHTML = ''
+        + '<button class="rr-dd-trigger" aria-expanded="false">'
+        + '  <span>Стримы</span>'
+        + '  <span class="rr-badge" id="rrCount_safe">0</span>'
+        + '</button>'
+        + '<div class="rr-dd-menu" role="menu" aria-label="Стримы">'
+        + '  <div class="rr-dd-actions"><button class="rr-small-btn" data-act="all">Все</button><button class="rr-small-btn" data-act="none">Сброс</button></div>'
+        + '  <div class="rr-dd-list"></div>'
+        + '</div>';
+
+      try{
+        const plat = toolbar.querySelector('#miniPlatform');
+        if(plat && plat.parentElement) plat.parentElement.insertAdjacentElement('afterend', dd);
+        else toolbar.appendChild(dd);
+      }catch(_){
+        toolbar.appendChild(dd);
+      }
+
+      attachHandlers(dd, grid);
+      refreshOptions(dd, grid);
+      return dd;
+    }
+
+    function refreshOptions(dd, grid){
+      if(!dd) return;
+      try{
+        const list = dd.querySelector('.rr-dd-list');
+        const cards = collectCards(grid || (document.getElementById('miniGrid') || document.querySelector('.mini-grid') || document.querySelector('[data-mini-grid]')));
+        const set = new Set();
+        cards.forEach(c=>{
+          try{
+            const name = detectStreamFromCard(c);
+            if(name) set.add(name);
+            if(!c.dataset.stream) c.dataset.stream = name;
+          }catch(_){}
+        });
+        const streams = Array.from(set).sort((a,b)=> a.localeCompare(b,'ru'));
+        const saved = (localStorage.getItem(LOCAL_KEY)||'').split('|').filter(Boolean);
+
+        if(streams.length === 0){
+          list.innerHTML = '<div style="padding:8px;color:#777">Нет стримов</div>';
+          const cnt = dd.querySelector('#rrCount_safe'); if(cnt) cnt.textContent = '0';
+          return;
+        }
+
+        const html = streams.map((s,i)=> {
+          const safeId = 'rr_safe_cb_' + i;
+          const checkedAttr = saved.length ? (saved.indexOf(s) !== -1 ? 'checked' : '') : 'checked';
+          return '<div class="rr-dd-item" data-stream="'+escapeHtml(s)+'" style="display:flex;align-items:center">'
+            + '<input type="checkbox" id="'+safeId+'" value="'+escapeHtml(s)+'" '+checkedAttr+'>'
+            + '<label for="'+safeId+'">'+escapeHtml(s)+'</label>'
+            + '</div>';
+        }).join('');
+        list.innerHTML = html;
+        const cnt = dd.querySelector('#rrCount_safe'); if(cnt) cnt.textContent = String(streams.length);
+      }catch(e){
+        console.warn('rr-safe: refreshOptions error', e && e.message);
+      }
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    function attachHandlers(dd, grid){
+      try{
+        const btn = dd.querySelector('.rr-dd-trigger');
+        const menu = dd.querySelector('.rr-dd-menu');
+        const list = dd.querySelector('.rr-dd-list');
+        if(!btn || !menu || !list) return;
+
+        btn.addEventListener('click', function(e){
+          try{
+            const open = menu.classList.toggle('open');
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            e.stopPropagation();
+          }catch(_){}
+        });
+
+        document.addEventListener('click', function(e){
+          try{
+            if(!dd.contains(e.target)){
+              menu.classList.remove('open');
+              btn.setAttribute('aria-expanded','false');
+            }
+          }catch(_){}
+        });
+
+        dd.querySelectorAll('.rr-small-btn').forEach(function(b){
+          b.addEventListener('click', function(e){
+            try{
+              const act = b.getAttribute('data-act');
+              const cbs = Array.from(list.querySelectorAll('input[type=checkbox]'));
+              if(act === 'all') cbs.forEach(cb=>cb.checked = true);
+              else if(act === 'none') cbs.forEach(cb=>cb.checked = false);
+              applyFilter(dd, grid);
+              e.stopPropagation();
+            }catch(_){}
+          });
+        });
+
+        list.addEventListener('click', function(e){
+          try{
+            const t = e.target;
+            if(t && t.matches && t.matches('input[type=checkbox]')){
+              applyFilter(dd, grid);
+            }
+          }catch(_){}
+        });
+
+      }catch(e){
+        console.warn('rr-safe: attachHandlers error', e && e.message);
+      }
+    }
+
+    function applyFilter(dd, grid){
+      try{
+        const list = dd.querySelector('.rr-dd-list');
+        if(!list) return;
+        const cbs = Array.from(list.querySelectorAll('input[type=checkbox]'));
+        const selected = cbs.filter(cb=>cb.checked).map(cb=>cb.value);
+        const all = (selected.length === 0) || (selected.length === cbs.length);
+        try{ localStorage.setItem(LOCAL_KEY, all ? '' : selected.join('|')); }catch(_){}
+        const cards = collectCards(grid || (document.getElementById('miniGrid') || document.querySelector('.mini-grid') || document.querySelector('[data-mini-grid]')));
+        cards.forEach(c=>{
+          try{
+            const s = c.dataset.stream || detectStreamFromCard(c);
+            const ok = all || selected.indexOf(s) !== -1;
+            c.classList.toggle('hide', !ok);
+          }catch(_){}
+        });
+        const cnt = dd.querySelector('#rrCount_safe');
+        if(cnt) cnt.textContent = all ? String(cbs.length) : String(selected.length);
+      }catch(e){
+        console.warn('rr-safe: applyFilter error', e && e.message);
+      }
+    }
+
+    (function startMount(){
+      let retries = 0;
+      const root = document.getElementById('miniLaunchCard') || document;
+      function tryOnce(){
+        try{
+          const {toolbar, grid} = findContext();
+          if(toolbar){
+            const dd = mountDropdown(toolbar, grid);
+            const gridNode = grid || document.getElementById('miniGrid') || document.querySelector('.mini-grid') || document.querySelector('[data-mini-grid]');
+            if(gridNode && !gridNode._rr_safe_observed){
+              try{
+                const mo = new MutationObserver(function(){ try{ refreshOptions(dd, gridNode); applyFilter(dd, gridNode); }catch(_){ } });
+                mo.observe(gridNode, {childList:true, subtree:true});
+                gridNode._rr_safe_observed = true;
+              }catch(_){}
+            }
+            try{ applyFilter(dd, grid); }catch(_){}
+            return true;
+          }
+        }catch(_){}
+        return false;
+      }
+
+      if(tryOnce()) return;
+      const iv = setInterval(function(){
+        retries++;
+        if(tryOnce() || retries > MAX_RETRIES){ clearInterval(iv); }
+      }, RETRY_INTERVAL_MS);
+
+      try{
+        const container = document.getElementById('miniLaunchCard') || document.body;
+        const mo2 = new MutationObserver(function(mutations){
+          try{
+            const {toolbar} = findContext();
+            if(!toolbar) return;
+            if(!safe$('#'+DROPDOWN_ID, toolbar)) {
+              mountDropdown(toolbar, findContext().grid);
+            } else {
+              refreshOptions(safe$('#'+DROPDOWN_ID, toolbar), findContext().grid);
+            }
+          }catch(_){}
+        });
+        mo2.observe(container, {childList:true, subtree:true});
+      }catch(_){}
+    })();
+
+  }catch(e){
+    try{ console.warn('rr-safe: fatal initialization error', e && e.message); }catch(_){}
+  }
+})(); 
+</script>
+<!-- END: Safe standalone "Стримы" multiselect (injected by assistant) -->
+
+
+</body>
+</html>

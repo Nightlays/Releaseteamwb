@@ -1,8 +1,0 @@
-.git
-.gitignore
-.DS_Store
-.env
-.env.local
-.claude
-*.log
-*.pid
