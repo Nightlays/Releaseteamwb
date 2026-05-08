@@ -39,6 +39,10 @@ import {
   type UwuReport,
   type UwuStreamRow,
 } from '../../services/uvu';
+import {
+  loadUwuReleaseReportFromSupabase,
+  saveUwuReleaseReportToSupabase,
+} from '../../services/releaseStatsSupabase';
 
 Chart.register(LineController, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -689,6 +693,7 @@ export function Uvu() {
   const [includeSelective, setIncludeSelective] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('people');
   const [running, setRunning] = useState(false);
+  const [dbBusy, setDbBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('—');
   const [error, setError] = useState('');
@@ -718,9 +723,10 @@ export function Uvu() {
 
   const normalizedRelease = normalizeUwuReleaseVersion(releaseVersion);
   const tokenReady = Boolean(String(settings.allureToken || '').trim());
-  const canRun = tokenReady && Boolean(normalizedRelease) && (includeHighBlocker || includeSelective);
+  const canRun = tokenReady && Boolean(normalizedRelease) && (includeHighBlocker || includeSelective) && !dbBusy;
+  const canLoadFromDb = Boolean(normalizedRelease) && !running && !dbBusy;
   const exportLabel = activeTab === 'days' ? 'Выгрузить PDF' : 'Выгрузить Excel';
-  const showRunStatus = running || progress > 0 || Boolean(error) || status !== '—' || !tokenReady;
+  const showRunStatus = running || dbBusy || progress > 0 || Boolean(error) || status !== '—' || !tokenReady;
   const runStatusText = error || (!tokenReady ? 'Allure token не настроен.' : status);
 
   useEffect(() => {
@@ -900,6 +906,19 @@ export function Uvu() {
     setDetail({ type: 'stream', stream });
   }, []);
 
+  const applyReport = useCallback((nextReport: UwuReport) => {
+    setReport(nextReport);
+    const nextDayLogins = nextReport.swatMembers.map(member => member.login);
+    setSelectedDayLogins(prev => {
+      if (!daysFilterInitializedRef.current) {
+        if (nextDayLogins.length > 0) daysFilterInitializedRef.current = true;
+        return nextDayLogins;
+      }
+      const allowed = new Set(nextDayLogins);
+      return prev.filter(login => allowed.has(login));
+    });
+  }, []);
+
   const run = useCallback(async () => {
     if (!canRun || running) return;
     const controller = new AbortController();
@@ -935,17 +954,18 @@ export function Uvu() {
       );
 
       if (runId !== runIdRef.current) return;
-      setReport(nextReport);
-      const nextDayLogins = nextReport.swatMembers.map(member => member.login);
-      setSelectedDayLogins(prev => {
-        if (!daysFilterInitializedRef.current) {
-          if (nextDayLogins.length > 0) daysFilterInitializedRef.current = true;
-          return nextDayLogins;
+      applyReport(nextReport);
+      setStatus('Расчёт готов. Записываю уникальный срез релиза в БД…');
+      try {
+        await saveUwuReleaseReportToSupabase(settings.projectId, nextReport);
+        if (runId === runIdRef.current) {
+          setStatus('Готово. Срез релиза записан в БД.');
         }
-        const allowed = new Set(nextDayLogins);
-        return prev.filter(login => allowed.has(login));
-      });
-      setStatus('Готово. Можно смотреть отчёт и выгружать результат.');
+      } catch (storageError) {
+        if (runId === runIdRef.current) {
+          setStatus(`Готово, но БД не записалась: ${(storageError as Error).message || 'ошибка Supabase'}`);
+        }
+      }
       setProgress(100);
     } catch (rawError) {
       if (runId !== runIdRef.current) return;
@@ -964,6 +984,7 @@ export function Uvu() {
       }
     }
   }, [
+    applyReport,
     canRun,
     includeHighBlocker,
     includeSelective,
@@ -976,6 +997,31 @@ export function Uvu() {
     settings.proxyMode,
     settings.useProxy,
   ]);
+
+  const loadFromDb = useCallback(async () => {
+    if (!canLoadFromDb) return;
+    setDbBusy(true);
+    setError('');
+    setProgress(0);
+    setStatus('Читаю сохранённый uWu-срез из БД…');
+    try {
+      const cachedReport = await loadUwuReleaseReportFromSupabase(settings.projectId, normalizedRelease);
+      if (!cachedReport) {
+        setStatus('В БД нет сохранённого uWu-среза для этого релиза.');
+        return;
+      }
+      applyReport(cachedReport);
+      setProgress(100);
+      setStatus('БД: uWu-срез релиза загружен.');
+    } catch (rawError) {
+      const message = (rawError as Error).message || 'Не удалось загрузить uWu-срез из БД.';
+      setError(message);
+      setStatus('Ошибка чтения БД.');
+      setProgress(0);
+    } finally {
+      setDbBusy(false);
+    }
+  }, [applyReport, canLoadFromDb, normalizedRelease, settings.projectId]);
 
   const stop = useCallback(() => {
     runIdRef.current += 1;
@@ -1578,7 +1624,12 @@ export function Uvu() {
         actions={running ? (
           <Button variant="danger" onClick={stop}>Остановить</Button>
         ) : (
-          <Button variant="primary" onClick={run} disabled={!canRun}>Собрать</Button>
+          <>
+            <Button variant="secondary" onClick={() => void loadFromDb()} disabled={!canLoadFromDb}>
+              {dbBusy ? 'БД...' : 'БД загрузить'}
+            </Button>
+            <Button variant="primary" onClick={run} disabled={!canRun}>Собрать</Button>
+          </>
         )}
         showStatus={showRunStatus}
         status={runStatusText}

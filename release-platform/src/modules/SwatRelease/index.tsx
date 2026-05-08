@@ -42,6 +42,10 @@ import {
   type SwatPlatformModel,
   type SwatReleaseReport,
 } from '../../services/swat';
+import {
+  loadSwatReleaseReportFromSupabase,
+  saveSwatReleaseReportToSupabase,
+} from '../../services/releaseStatsSupabase';
 
 Chart.register(LineController, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -983,6 +987,7 @@ export function SwatRelease() {
   const [statusTone, setStatusTone] = useState<StatusTone>('neutral');
   const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(false);
+  const [dbBusy, setDbBusy] = useState(false);
   const [report, setReport] = useState<SwatReleaseReport | null>(null);
   const [logs, setLogs] = useState<Array<{ text: string; level: LogLevel }>>([]);
   const [sortKey, setSortKey] = useState<EmployeeSortKey>('name');
@@ -1031,6 +1036,8 @@ export function SwatRelease() {
   }, []);
 
   const tokenReady = Boolean(String(settings.allureToken || '').trim());
+  const cleanRelease = String(release || '').trim();
+  const canLoadFromDb = Boolean(cleanRelease) && !running && !dbBusy;
   const themeColors = useMemo(() => getChartThemeColors(), [theme]);
 
   const sortedEmployees = useMemo(() => {
@@ -1086,8 +1093,12 @@ export function SwatRelease() {
     }
   }, [settings.proxyBase, settings.useProxy]);
 
+  const applyReport = useCallback((nextReport: SwatReleaseReport) => {
+    setReport(nextReport);
+    setSelectedLogins(nextReport.users.map(user => user.login));
+  }, []);
+
   const run = useCallback(async () => {
-    const cleanRelease = String(release || '').trim();
     if (!cleanRelease) {
       setStatus('Укажи версию релиза.');
       setStatusTone('error');
@@ -1138,10 +1149,23 @@ export function SwatRelease() {
       );
 
       if (runId !== runIdRef.current) return;
-      setReport(nextReport);
-      setSelectedLogins(nextReport.users.map(user => user.login));
-      setStatus(`Готово: SWAT ${nextReport.swatCount}, запусков ${nextReport.launchesCount}.`);
+      applyReport(nextReport);
+      setStatus(`Расчёт готов: SWAT ${nextReport.swatCount}, запусков ${nextReport.launchesCount}. Записываю в БД…`);
       setStatusTone('ok');
+      try {
+        await saveSwatReleaseReportToSupabase(settings.projectId, nextReport);
+        if (runId === runIdRef.current) {
+          setStatus(`Готово: SWAT ${nextReport.swatCount}, запусков ${nextReport.launchesCount}. Срез записан в БД.`);
+          addLog('Supabase: SWAT-срез релиза записан', 'ok');
+        }
+      } catch (storageError) {
+        if (runId === runIdRef.current) {
+          const message = (storageError as Error).message || 'ошибка Supabase';
+          setStatus(`Готово, но БД не записалась: ${message}`);
+          setStatusTone('warn');
+          addLog(`Supabase: ${message}`, 'warn');
+        }
+      }
       setProgress(100);
     } catch (rawError) {
       if (runId !== runIdRef.current) return;
@@ -1160,7 +1184,8 @@ export function SwatRelease() {
     }
   }, [
     addLog,
-    release,
+    applyReport,
+    cleanRelease,
     settings.allureBase,
     settings.allureToken,
     settings.projectId,
@@ -1169,6 +1194,35 @@ export function SwatRelease() {
     settings.useProxy,
     tokenReady,
   ]);
+
+  const loadFromDb = useCallback(async () => {
+    if (!canLoadFromDb) return;
+    setDbBusy(true);
+    setStatus('Читаю сохранённый SWAT-срез из БД…');
+    setStatusTone('neutral');
+    setProgress(0);
+    try {
+      const cachedReport = await loadSwatReleaseReportFromSupabase(settings.projectId, cleanRelease);
+      if (!cachedReport) {
+        setStatus('В БД нет сохранённого SWAT-среза для этого релиза.');
+        setStatusTone('warn');
+        return;
+      }
+      applyReport(cachedReport);
+      setProgress(100);
+      setStatus(`БД: SWAT-срез ${cachedReport.release} загружен.`);
+      setStatusTone('ok');
+      addLog(`Supabase: загружен SWAT-срез ${cachedReport.release}`, 'ok');
+    } catch (rawError) {
+      const message = (rawError as Error).message || 'Не удалось загрузить SWAT-срез из БД.';
+      setStatus(message);
+      setStatusTone('error');
+      setProgress(0);
+      addLog(`Supabase: ${message}`, 'error');
+    } finally {
+      setDbBusy(false);
+    }
+  }, [addLog, applyReport, canLoadFromDb, cleanRelease, settings.projectId]);
 
   const stop = useCallback(() => {
     if (!abortRef.current) return;
@@ -1319,8 +1373,11 @@ export function SwatRelease() {
               />
             </div>
 
-            <Button variant="primary" onClick={() => void run()} disabled={running}>
+            <Button variant="primary" onClick={() => void run()} disabled={running || dbBusy}>
               {running ? 'Сбор...' : 'Запустить сбор'}
+            </Button>
+            <Button variant="secondary" onClick={() => void loadFromDb()} disabled={!canLoadFromDb}>
+              {dbBusy ? 'БД...' : 'БД загрузить'}
             </Button>
             <Button variant="danger" onClick={stop} disabled={!running}>
               Остановить
