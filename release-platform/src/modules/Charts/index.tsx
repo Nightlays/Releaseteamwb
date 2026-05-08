@@ -45,6 +45,8 @@ import {
   getChartsMlFeatureLabel,
   labelChartsMlExport,
   refreshChartsMlStateForReport,
+  rebuildChartsReportForReleases,
+  rebuildChartsReportFromReleaseSnapshots,
   requestChartsAiSummary,
   rebuildChartsSummaryState,
   retrainChartsMlViaHelper,
@@ -52,11 +54,19 @@ import {
   type ChartsDowntimeRow,
   type ChartsAiTypeSnapshot,
   type ChartsMetricRow,
+  type ChartsReleaseSnapshotPayload,
   type ChartsReport,
   type ChartsStreamDeltaRow,
   type ChartsStreamInsightSummary,
   type ChartsTaskTypeRow,
 } from '../../services/charts';
+import {
+  loadAvailableChartsReleaseSnapshotsFromSupabase,
+  loadChartsReleaseSnapshotsFromSupabase,
+  loadLatestChartsReportFromSupabase,
+  saveChartsMlDatasetToSupabase,
+  saveChartsReportToSupabase,
+} from '../../services/chartsSupabase';
 
 Chart.register(LineController, BarController, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler);
 
@@ -230,97 +240,16 @@ function buildReleaseFilterCaption(total: number, selectedCount: number) {
   return `${selectedCount} из ${total}`;
 }
 
-function filterReportByReleases(source: ChartsReport | null, selected: Set<string> | null) {
-  if (!source || !selected || !selected.size) return source;
-  const includesRelease = (release: string) => selected.has(release);
-  const filteredChpRows = source.chpRows.filter(item => includesRelease(item.release));
-  return {
-    ...source,
-    releases: source.releases.filter(includesRelease),
-    metrics: source.metrics.filter(item => includesRelease(item.release)),
-    tcRows: source.tcRows.filter(item => includesRelease(item.release)),
-    coverageRows: source.coverageRows.filter(item => includesRelease(item.release)),
-    selectiveRows: source.selectiveRows.filter(item => includesRelease(item.release)),
-    avgRows: source.avgRows.filter(item => includesRelease(item.release)),
-    chpRows: filteredChpRows,
-    devDowntime: {
-      iosRows: source.devDowntime.iosRows.filter(item => includesRelease(item.release)),
-      androidRows: source.devDowntime.androidRows.filter(item => includesRelease(item.release)),
-      iosByRelease: source.devDowntime.iosByRelease.filter(item => includesRelease(item.release)),
-      androidByRelease: source.devDowntime.androidByRelease.filter(item => includesRelease(item.release)),
-    },
-    timings: source.timings.filter(item => includesRelease(item.release)),
-    taskTypes: {
-      ...source.taskTypes,
-      iosRows: source.taskTypes.iosRows.filter(item => includesRelease(item.release)),
-      androidRows: source.taskTypes.androidRows.filter(item => includesRelease(item.release)),
-    },
-    chpTypes: {
-      ...source.chpTypes,
-      rows: source.chpTypes.rows.filter(item => includesRelease(item.release)),
-      iosRows: source.chpTypes.iosRows.filter(item => includesRelease(item.release)),
-      androidRows: source.chpTypes.androidRows.filter(item => includesRelease(item.release)),
-    },
-    chpQuarterStats: rebuildFilteredChpQuarterStats(
-      filteredChpRows,
-      source.chpQuarterStats?.issues.filter(issue => includesRelease(issue.release)) || []
-    ),
-    streamDeltaRows: source.streamDeltaRows.filter(item => includesRelease(item.release)),
-  };
-}
-
-function rebuildFilteredChpQuarterStats(
-  chpRows: ChartsReport['chpRows'],
-  issues: NonNullable<ChartsReport['chpQuarterStats']>['issues']
-): ChartsReport['chpQuarterStats'] {
-  if (!chpRows.length && !issues.length) return null;
-  const byQuarter = new Map<string, { total: number; streams: Map<string, { name: string; count: number; external: boolean; substreams: Map<string, number> }> }>();
-  issues.forEach(issue => {
-    const quarter = issue.quarter || 'Без квартала';
-    if (!byQuarter.has(quarter)) {
-      byQuarter.set(quarter, { total: 0, streams: new Map() });
-    }
-    const bucket = byQuarter.get(quarter)!;
-    bucket.total += 1;
-    const streamName = issue.stream || 'Без стрима';
-    if (!bucket.streams.has(streamName)) {
-      bucket.streams.set(streamName, { name: streamName, count: 0, external: issue.external, substreams: new Map() });
-    }
-    const stream = bucket.streams.get(streamName)!;
-    stream.count += 1;
-    const substream = issue.substream || 'Без сабстрима';
-    stream.substreams.set(substream, (stream.substreams.get(substream) || 0) + 1);
-  });
-
-  const quarterSortValue = (label: string) => {
-    const match = String(label || '').match(/^Q(\d)\s+(\d{4})$/i);
-    if (!match) return Number.POSITIVE_INFINITY;
-    return Number(match[2]) * 10 + Number(match[1]);
-  };
-
-  return {
-    average: chpRows.length ? chpRows.reduce((sum, row) => sum + (Number(row.total || 0) || 0), 0) / chpRows.length : 0,
-    releases: chpRows.length,
-    issues,
-    quarters: Array.from(byQuarter.entries())
-      .sort((left, right) => quarterSortValue(left[0]) - quarterSortValue(right[0]) || left[0].localeCompare(right[0]))
-      .map(([quarter, data]) => ({
-        quarter,
-        total: data.total,
-        streams: Array.from(data.streams.values())
-          .map(stream => {
-            const topSubstream = Array.from(stream.substreams.entries())
-              .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0] || null;
-            return {
-              name: stream.name,
-              count: stream.count,
-              external: stream.external,
-              topSubstream: topSubstream ? { name: topSubstream[0], count: topSubstream[1] } : null,
-            };
-          })
-          .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
-      })),
-  };
+function compareReleaseLabels(left: string, right: string) {
+  const leftParts = String(left || '').split('.').map(part => Number(part));
+  const rightParts = String(right || '').split('.').map(part => Number(part));
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const a = Number.isFinite(leftParts[index]) ? leftParts[index] : 0;
+    const b = Number.isFinite(rightParts[index]) ? rightParts[index] : 0;
+    if (a !== b) return a - b;
+  }
+  return String(left || '').localeCompare(String(right || ''));
 }
 
 function formatDowntimeLabel(totalMinutes: number, days: number) {
@@ -2185,6 +2114,9 @@ export function Charts() {
   const [compareMode, setCompareMode] = useState<CompareMode>('mean');
   const [valueMode, setValueMode] = useState<ChartsDesignValueMode>('absolute');
   const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
+  const [availableDbReleases, setAvailableDbReleases] = useState<string[]>([]);
+  const [dbFilteredReport, setDbFilteredReport] = useState<ChartsReport | null>(null);
+  const [releaseFilterBusy, setReleaseFilterBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [error, setError] = useState('');
@@ -2217,41 +2149,33 @@ export function Charts() {
 
   const status = useStatusBools(settings, proxyOnline, helperOnline);
   const releaseRangePreview = useMemo(() => buildMajorReleaseRange(releaseFrom, releaseTo), [releaseFrom, releaseTo]);
-  const selectedReleaseSet = useMemo(() => (selectedReleases.length ? new Set(selectedReleases) : null), [selectedReleases]);
-  const filteredReport = useMemo(() => filterReportByReleases(report, selectedReleaseSet), [report, selectedReleaseSet]);
+  const availableReleaseOptions = useMemo(() => {
+    const values = new Set<string>();
+    (report?.releases || []).forEach(release => values.add(release));
+    availableDbReleases.forEach(release => values.add(release));
+    return Array.from(values).sort(compareReleaseLabels);
+  }, [availableDbReleases, report]);
+  const selectedReleaseKey = selectedReleases.join('|');
+  const selectedNeedsDb = useMemo(() => (
+    Boolean(selectedReleases.length)
+    && selectedReleases.some(release => !report?.releases?.includes(release))
+  ), [report, selectedReleases]);
+  const filteredReport = useMemo(() => {
+    if (selectedNeedsDb) return dbFilteredReport;
+    return rebuildChartsReportForReleases(report, selectedReleases, compareMode);
+  }, [compareMode, dbFilteredReport, report, selectedNeedsDb, selectedReleases]);
   const displayedReport = useMemo(() => {
     if (!filteredReport) return null;
-    const originalCurrentRelease = report?.releases[report.releases.length - 1] || '';
-    const filteredCurrentRelease = filteredReport.releases[filteredReport.releases.length - 1] || '';
-    const mlPredictionLocked = Boolean(originalCurrentRelease && filteredCurrentRelease && originalCurrentRelease !== filteredCurrentRelease);
-    const prepared = mlPredictionLocked ? {
-      ...filteredReport,
-      ml: {
-        ...filteredReport.ml,
-        prediction: {
-          ...filteredReport.ml.prediction,
-          engine: 'none' as const,
-          activeProbability: null,
-          linearProbability: null,
-          catboostProbability: null,
-          trained: false,
-          reason: 'ML риск пересчитывается только для последнего собранного релиза. Выбранный фильтр показывает другой срез.',
-          modelAgreementPct: null,
-          agreementText: 'Согласованность недоступна',
-          featureDrivers: [],
-        },
-      },
-    } : filteredReport;
-    const summaryState = rebuildChartsSummaryState(prepared, compareMode);
+    const summaryState = rebuildChartsSummaryState(filteredReport, compareMode);
     return {
-      ...prepared,
+      ...filteredReport,
       aiContext: summaryState.aiContext,
       ml: {
-        ...prepared.ml,
+        ...filteredReport.ml,
         summary: summaryState.mlSummary,
       },
     } as ChartsReport;
-  }, [compareMode, filteredReport, report]);
+  }, [compareMode, filteredReport]);
   const labels = useMemo(() => (displayedReport?.releases || []).map(formatReleaseShort), [displayedReport]);
   const currentMetric = displayedReport?.metrics[displayedReport.metrics.length - 1] || null;
   const displayedMlRiskPct = displayedReport?.ml.prediction.activeProbability == null
@@ -2449,12 +2373,73 @@ export function Charts() {
   }, [aiAutoSummary]);
 
   useEffect(() => {
-    if (!report?.releases?.length) {
-      setSelectedReleases([]);
+    let cancelled = false;
+    loadAvailableChartsReleaseSnapshotsFromSupabase(settings.projectId)
+      .then(releases => {
+        if (!cancelled) setAvailableDbReleases(releases);
+      })
+      .catch(error => {
+        if (!cancelled) pushLog(`Supabase cache: ${(error as Error)?.message || String(error)}`, 'warn');
+      });
+    return () => { cancelled = true; };
+  }, [pushLog, settings.projectId]);
+
+  useEffect(() => {
+    if (!availableReleaseOptions.length) {
+      if (!report?.releases?.length) setSelectedReleases([]);
       return;
     }
-    setSelectedReleases(prev => prev.filter(item => report.releases.includes(item)));
-  }, [report]);
+    const allowed = new Set(availableReleaseOptions);
+    setSelectedReleases(prev => prev.filter(item => allowed.has(item)));
+  }, [availableReleaseOptions, report]);
+
+  useEffect(() => {
+    if (!selectedNeedsDb || !selectedReleases.length) {
+      setDbFilteredReport(null);
+      setReleaseFilterBusy(false);
+      return;
+    }
+
+    let cancelled = false;
+    setReleaseFilterBusy(true);
+    setDbFilteredReport(null);
+    loadChartsReleaseSnapshotsFromSupabase(settings.projectId, selectedReleases)
+      .then(async snapshots => {
+        if (cancelled) return;
+        const byRelease = new Map(snapshots.map(snapshot => [snapshot.release, snapshot]));
+        const ordered = selectedReleases
+          .map(release => byRelease.get(release))
+          .filter((snapshot): snapshot is ChartsReleaseSnapshotPayload => Boolean(snapshot));
+        const missing = selectedReleases.filter(release => !byRelease.has(release));
+        if (missing.length) {
+          pushLog(`Supabase cache: нет срезов для ${missing.map(formatReleaseShort).join(', ')}.`, 'warn');
+        }
+        if (!ordered.length) {
+          setDbFilteredReport(null);
+          return;
+        }
+        const built = rebuildChartsReportFromReleaseSnapshots(ordered, { sourceReport: report, compareMode });
+        const helperBase = String(built.ml.helperHealth.base || settings.mlHelperBase || '').trim();
+        const refreshed = await refreshChartsMlStateForReport(built, buildMlIoConfig(helperBase), compareMode).catch(() => built);
+        if (!cancelled) {
+          setDbFilteredReport(refreshed);
+          setHelperOnline(refreshed.ml.helperHealth.online);
+          pushLog(`Supabase cache: статистика пересобрана по ${refreshed.releases.length} релизам.`, 'ok');
+        }
+      })
+      .catch(error => {
+        if (!cancelled) {
+          const message = (error as Error)?.message || String(error);
+          setError(message);
+          pushLog(`Supabase cache: ${message}`, 'error');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setReleaseFilterBusy(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [buildMlIoConfig, compareMode, pushLog, report, selectedNeedsDb, selectedReleaseKey, selectedReleases, settings.mlHelperBase, settings.projectId]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -2474,6 +2459,23 @@ export function Charts() {
     pushLog(`Старт сбора графиков по диапазону ${releaseFrom} → ${releaseTo}.`);
 
     try {
+      const cachedReport = await loadLatestChartsReportFromSupabase({
+        projectId: settings.projectId,
+        releaseFrom,
+        releaseTo,
+        compareMode,
+      }).catch(loadError => {
+        pushLog(`Supabase: ${(loadError as Error)?.message || String(loadError)}`, 'warn');
+        return null;
+      });
+      if (cachedReport?.report && !controller.signal.aborted) {
+        setReport(cachedReport.report);
+        setSelectedReleases([]);
+        setHelperOnline(cachedReport.report.ml.helperHealth.online);
+        pushLog(`Supabase: найден готовый отчёт (${cachedReport.report.releases.length} релизов), внешние запросы не запускались.`, 'ok');
+        return;
+      }
+
       const result = await collectChartsReport({
         allureBase: settings.allureBase,
         allureToken: settings.allureToken,
@@ -2504,6 +2506,18 @@ export function Charts() {
       setSelectedReleases([]);
       setHelperOnline(result.ml.helperHealth.online);
       pushLog(`Сбор завершён: ${result.releases.length} релизов, аномалий ${result.anomalies.score}, ML ${result.ml.prediction.activeProbability == null ? '—' : `${Math.round(result.ml.prediction.activeProbability * 100)}%`}.`, 'ok');
+      try {
+        const saved = await saveChartsReportToSupabase({
+          report: result,
+          projectId: settings.projectId,
+          releaseFrom,
+          releaseTo,
+          compareMode,
+        });
+        pushLog(`Supabase: отчёт сохранён (${saved.metrics} метрик, ${saved.ml} ML-записей).`, 'ok');
+      } catch (dbError) {
+        pushLog(`Supabase: ${(dbError as Error)?.message || String(dbError)}`, 'warn');
+      }
       if (aiAutoSummary && settings.glmBase) {
         setAiLoading(true);
         try {
@@ -2549,6 +2563,53 @@ export function Charts() {
     }
   }, [aiAutoSummary, compareMode, pushLog, releaseFrom, releaseRangePreview.length, releaseTo, settings.allureBase, settings.allureToken, settings.bandCookies, settings.deployLabToken, settings.gitlabCookie, settings.gitlabToken, settings.glmBase, settings.glmKey, settings.glmModel, settings.mlHelperBase, settings.projectId, settings.proxyBase, settings.proxyMode, settings.useProxy, settings.wikiToken, settings.ytBase, settings.ytToken]);
 
+  const loadFromDb = useCallback(async () => {
+    setActionBusy('db-load');
+    setError('');
+    try {
+      pushLog(`Supabase: загрузка последнего отчёта ${releaseFrom} → ${releaseTo}.`);
+      const loaded = await loadLatestChartsReportFromSupabase({
+        projectId: settings.projectId,
+        releaseFrom,
+        releaseTo,
+        compareMode,
+      });
+      if (!loaded) {
+        pushLog('Supabase: отчёт для выбранного диапазона не найден.', 'warn');
+        return;
+      }
+      setReport(loaded.report);
+      setSelectedReleases([]);
+      setHelperOnline(loaded.report.ml.helperHealth.online);
+      pushLog(`Supabase: отчёт загружен (${loaded.report.releases.length} релизов).`, 'ok');
+    } catch (error) {
+      const message = (error as Error)?.message || String(error);
+      setError(message);
+      pushLog(`Supabase: ${message}`, 'error');
+    } finally {
+      setActionBusy('');
+    }
+  }, [compareMode, pushLog, releaseFrom, releaseTo, settings.projectId]);
+
+  const saveReportToDb = useCallback(async () => {
+    if (!report) return;
+    setActionBusy('db-save');
+    try {
+      const saved = await saveChartsReportToSupabase({
+        report,
+        projectId: settings.projectId,
+        releaseFrom,
+        releaseTo,
+        compareMode,
+      });
+      pushLog(`Supabase: отчёт сохранён вручную (${saved.metrics} метрик, ${saved.ml} ML-записей).`, 'ok');
+    } catch (error) {
+      pushLog(`Supabase: ${(error as Error)?.message || String(error)}`, 'error');
+    } finally {
+      setActionBusy('');
+    }
+  }, [compareMode, pushLog, releaseFrom, releaseTo, report, settings.projectId]);
+
   const exportJson = useCallback(() => {
     if (!report) return;
     exportBlob(`charts-${report.releases[0] || 'from'}-${report.releases[report.releases.length - 1] || 'to'}.json`, JSON.stringify(report, null, 2), 'application/json;charset=utf-8');
@@ -2577,6 +2638,12 @@ export function Charts() {
       } catch (syncError) {
         pushLog(`ML-выгрузка сохранена локально: ${(syncError as Error)?.message || String(syncError)}`, 'warn');
       }
+      try {
+        await saveChartsMlDatasetToSupabase(result.dataset, settings.projectId);
+        pushLog('ML-выгрузка синхронизирована с Supabase.', 'ok');
+      } catch (dbError) {
+        pushLog(`Supabase ML: ${(dbError as Error)?.message || String(dbError)}`, 'warn');
+      }
       const refreshed = await refreshChartsMlStateForReport(
         {
           ...report,
@@ -2600,7 +2667,7 @@ export function Charts() {
     } finally {
       setActionBusy('');
     }
-  }, [buildMlIoConfig, compareMode, pushLog, report, settings.mlHelperBase]);
+  }, [buildMlIoConfig, compareMode, pushLog, report, settings.mlHelperBase, settings.projectId]);
 
   const labelAndRetrain = useCallback(async (label: 'ok' | 'fail') => {
     if (!report?.ml.features) return;
@@ -2621,6 +2688,12 @@ export function Charts() {
         pushLog(`ML-разметка "${labelTitle}" синхронизирована с Drive.`, 'ok');
       } catch (syncError) {
         pushLog(`ML-разметка сохранена локально: ${(syncError as Error)?.message || String(syncError)}`, 'warn');
+      }
+      try {
+        await saveChartsMlDatasetToSupabase(dataset, settings.projectId);
+        pushLog(`ML-разметка "${labelTitle}" синхронизирована с Supabase.`, 'ok');
+      } catch (dbError) {
+        pushLog(`Supabase ML: ${(dbError as Error)?.message || String(dbError)}`, 'warn');
       }
       let helperState = report.ml.helperHealth;
       try {
@@ -2680,7 +2753,7 @@ export function Charts() {
     } finally {
       setActionBusy('');
     }
-  }, [buildMlIoConfig, compareMode, pushLog, report, settings.mlHelperBase]);
+  }, [buildMlIoConfig, compareMode, pushLog, report, settings.mlHelperBase, settings.projectId]);
 
   const retrainOnly = useCallback(async () => {
     setActionBusy('retrain');
@@ -2705,18 +2778,16 @@ export function Charts() {
 
   const toggleRelease = useCallback((release: string) => {
     setSelectedReleases(prev => {
-      if (!report?.releases?.length) return prev;
-      if (!prev.length) {
-        return report.releases.filter(item => item !== release);
-      }
+      if (!availableReleaseOptions.length) return prev;
+      if (!prev.length) return [release];
       if (prev.includes(release)) {
         const next = prev.filter(item => item !== release);
-        return next.length === report.releases.length ? [] : next;
+        return next.length ? next : [];
       }
-      const next = [...prev, release].sort((left, right) => report.releases.indexOf(left) - report.releases.indexOf(right));
-      return next.length === report.releases.length ? [] : next;
+      const next = [...prev, release].sort(compareReleaseLabels);
+      return next.length === availableReleaseOptions.length ? [] : next;
     });
-  }, [report]);
+  }, [availableReleaseOptions]);
 
   const resetReleaseFilter = useCallback(() => setSelectedReleases([]), []);
 
@@ -3983,6 +4054,12 @@ export function Charts() {
           <Button variant={designPreviewOpen ? 'primary' : 'ghost'} size="sm" onClick={() => setDesignPreviewOpen(value => !value)}>
             {designPreviewOpen ? 'Закрыть макеты' : 'Макеты дизайна'}
           </Button>
+          <Button variant="ghost" size="sm" onClick={loadFromDb} disabled={loading || Boolean(actionBusy)}>
+            {actionBusy === 'db-load' ? 'БД...' : 'БД загрузить'}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={saveReportToDb} disabled={!report || loading || Boolean(actionBusy)}>
+            {actionBusy === 'db-save' ? 'БД...' : 'БД сохранить'}
+          </Button>
           <Button variant="ghost" size="sm" onClick={exportJson} disabled={!report}>Экспорт JSON</Button>
           <Button variant="ghost" size="sm" onClick={exportCsv} disabled={!report}>Экспорт CSV</Button>
           <Button variant="ghost" size="sm" onClick={() => exportPdf()} disabled={!report || exportingPdf}>{exportingPdf ? 'PDF...' : 'PDF всё'}</Button>
@@ -4056,6 +4133,57 @@ export function Charts() {
         <Card><EmptyState text="Собери данные по диапазону релизов, чтобы построить графики и AI/ML анализ." /></Card>
       ) : (
         <>
+          <div data-export-kind="data">
+            <Card>
+              <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Глобальный фильтр релизов</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      Применяется ко всем графикам, таблицам, ML-сводке и статистике; релизы вне текущего диапазона подтягиваются из БД cache.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {releaseFilterBusy && <Badge color="yellow">БД...</Badge>}
+                    {selectedNeedsDb && !releaseFilterBusy && <Badge color="green">из БД cache</Badge>}
+                    <Badge color="gray">{buildReleaseFilterCaption(availableReleaseOptions.length, selectedReleases.length || availableReleaseOptions.length)}</Badge>
+                    <Button variant="ghost" size="sm" onClick={resetReleaseFilter} disabled={!selectedReleases.length}>Сбросить</Button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {availableReleaseOptions.map(release => {
+                    const active = !selectedReleases.length || selectedReleases.includes(release);
+                    const fromDbOnly = !report.releases.includes(release);
+                    return (
+                      <button
+                        key={`release-pill-${release}`}
+                        type="button"
+                        onClick={() => toggleRelease(release)}
+                        style={{
+                          borderRadius: 999,
+                          border: `1px solid ${active ? 'rgba(155,92,255,.28)' : 'var(--border)'}`,
+                          background: active ? 'rgba(155,92,255,.10)' : 'transparent',
+                          color: active ? 'var(--text)' : 'var(--text-3)',
+                          padding: '6px 10px',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                        title={fromDbOnly ? 'Релиз доступен из БД cache' : 'Релиз из текущего отчёта'}
+                      >
+                        {formatReleaseShort(release)}{fromDbOnly ? ' · БД' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+
+          {!displayedReport && selectedNeedsDb && (
+            <Card><EmptyState text={releaseFilterBusy ? 'Собираю статистику по выбранным релизам из БД cache...' : 'Не удалось собрать статистику по выбранным релизам из БД cache.'} /></Card>
+          )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {renderAiMlLegacySummary()}
             {renderLlmSummaryCard()}
@@ -4127,47 +4255,6 @@ export function Charts() {
               tone={downtimeTone}
               hint="Подтвердить владельцев окружений при ненулевом простое"
             />
-          </div>
-
-          <div data-export-kind="data">
-            <Card>
-              <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Глобальный фильтр релизов</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Применяется ко всем графикам, таблицам и дельтам по стримам на этом экране.</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <Badge color="gray">{buildReleaseFilterCaption(report.releases.length, selectedReleases.length || report.releases.length)}</Badge>
-                  <Button variant="ghost" size="sm" onClick={resetReleaseFilter} disabled={!selectedReleases.length}>Сбросить</Button>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {report.releases.map(release => {
-                  const active = !selectedReleases.length || selectedReleases.includes(release);
-                  return (
-                    <button
-                      key={`release-pill-${release}`}
-                      type="button"
-                      onClick={() => toggleRelease(release)}
-                      style={{
-                        borderRadius: 999,
-                        border: `1px solid ${active ? 'rgba(155,92,255,.28)' : 'var(--border)'}`,
-                        background: active ? 'rgba(155,92,255,.10)' : 'transparent',
-                        color: active ? 'var(--text)' : 'var(--text-3)',
-                        padding: '6px 10px',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {formatReleaseShort(release)}
-                    </button>
-                  );
-                })}
-              </div>
-              </CardBody>
-            </Card>
           </div>
 
           <div className="charts-tab-content">

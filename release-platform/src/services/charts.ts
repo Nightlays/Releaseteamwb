@@ -1,4 +1,8 @@
 import { proxyFetch, type ProxyMode } from './proxy';
+import {
+  loadChartsReleaseSnapshotsFromSupabase,
+  saveChartsReleaseSnapshotToSupabase,
+} from './chartsSupabase';
 import { normalizeGlmBase, type ReleaseMetrics } from '../types';
 
 export interface ChartsConfig {
@@ -519,6 +523,29 @@ export interface CollectChartsOptions {
   compareMode?: 'prev' | 'mean';
   onLog?: (text: string, level?: 'info' | 'ok' | 'warn' | 'error') => void;
   onProgress?: (done: number, total: number) => void;
+}
+
+export interface ChartsReleaseSnapshotPayload {
+  schemaVersion: 1;
+  release: string;
+  collectedAt: string;
+  tcRow: ChartsTcRow;
+  coverageRow: ChartsCoverageRow;
+  selectiveRow: ChartsCoverageRow;
+  avgRow: ChartsAvgRow;
+  chpRow: ChartsChpRow;
+  timing: ChartsTimingRow;
+  taskTypesIosRow: ChartsTaskTypeRow;
+  taskTypesAndroidRow: ChartsTaskTypeRow;
+  chpTypesRow: ChartsChpTypeRow;
+  chpTypesIosRow: ChartsChpTypeRow;
+  chpTypesAndroidRow: ChartsChpTypeRow;
+  chpQuarterIssues: ChartsChpQuarterIssue[];
+  releaseMarkers: Array<{ msLocal: number; source: 'allure' | 'deploy' | 'regression' }>;
+  tcStreamCounts: Array<[string, { manual: number; auto: number; uwuManual: number; uwuAuto: number }]>;
+  hbStreamCounts: Array<[string, number]>;
+  selectiveStreamCounts: Array<[string, number]>;
+  uwuStreamCounts: Array<[string, number]>;
 }
 
 const PAGE_SIZE = 200;
@@ -1787,24 +1814,18 @@ async function fetchDeployDates(cfg: ChartsConfig, prefix: 'IOS' | 'ANDROID', re
   const baseUrl = DEPLOY_BASE_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
   const deployUrl = DEPLOY_DEPLOY_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
 
-  let cutoffIso: string | null = null;
-  let storeMsLocal: number | null = null;
-
-  try {
-    const base = await fetchJson<Record<string, unknown>>(cfg, baseUrl, { headers: buildDeployHeaders(token) });
-    cutoffIso = String(base?.cutoff_date || '') || null;
-  } catch {
-    cutoffIso = null;
-  }
-
-  try {
-    const deploy = await fetchJson<Record<string, unknown>>(cfg, deployUrl, { headers: buildDeployHeaders(token) });
-    storeMsLocal = prefix === 'ANDROID'
-      ? extractEarliestNoteDate(deploy, 'Google Play')
-      : extractEarliestNoteDate(deploy, 'AppStore');
-  } catch {
-    storeMsLocal = null;
-  }
+  const [cutoffIso, storeMsLocal] = await Promise.all([
+    fetchJson<Record<string, unknown>>(cfg, baseUrl, { headers: buildDeployHeaders(token) })
+      .then(base => String(base?.cutoff_date || '') || null)
+      .catch(() => null),
+    fetchJson<Record<string, unknown>>(cfg, deployUrl, { headers: buildDeployHeaders(token) })
+      .then(deploy => (
+        prefix === 'ANDROID'
+          ? extractEarliestNoteDate(deploy, 'Google Play')
+          : extractEarliestNoteDate(deploy, 'AppStore')
+      ))
+      .catch(() => null),
+  ]);
 
   return { cutoff: cutoffIso, storeMsLocal };
 }
@@ -3301,6 +3322,352 @@ export async function refreshChartsMlStateForReport(
   } as ChartsReport;
 }
 
+function emptyChartsMlSummary(compareMode: 'prev' | 'mean'): ChartsMlSummary {
+  return {
+    statusText: 'Нет данных',
+    statusTone: 'neutral',
+    engineLabel: 'Нет модели',
+    helperText: 'ML-хелпер не проверялся',
+    helperTone: 'neutral',
+    trainingText: '',
+    compareText: compareMode === 'prev' ? 'к предыдущему релизу' : 'к средней истории',
+    overview: [],
+    risks: [],
+    changes: [],
+    recommendations: [],
+    manualChecks: [],
+    highlights: [],
+    sections: {
+      overview: { id: 'overview', title: 'Общая сводка', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },
+      regress: { id: 'regress', title: 'Регресс', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },
+      release: { id: 'release', title: 'Релиз', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },
+      types: { id: 'types', title: 'Типы и ЧП', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },
+      streams: { id: 'streams', title: 'Стримы', subtitle: '', tone: 'neutral', overview: [], risks: [], changes: [], recommendations: [], highlights: [] },
+    },
+  };
+}
+
+function rowMapByRelease<T extends { release: string }>(rows: T[] | undefined) {
+  const map = new Map<string, T>();
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const release = String(row?.release || '').trim();
+    if (release) map.set(release, row);
+  });
+  return map;
+}
+
+function rowsForReleases<T extends { release: string }>(rows: T[] | undefined, releases: string[]) {
+  const map = rowMapByRelease(rows);
+  return releases.map(release => map.get(release)).filter((row): row is T => Boolean(row));
+}
+
+function rebuildMetricsAndMl(report: Omit<ChartsReport, 'metrics' | 'anomalies' | 'aiContext' | 'ml'> & Pick<ChartsReport, 'ml'>, compareMode: 'prev' | 'mean'): ChartsReport {
+  const buildPrefixAnomalies = (size: number) => computeAnomalies({
+    tcRows: report.tcRows.slice(0, size),
+    coverageRows: report.coverageRows.slice(0, size),
+    selectiveRows: report.selectiveRows.slice(0, size),
+    avgRows: report.avgRows.slice(0, size),
+    chpRows: report.chpRows.slice(0, size),
+    timings: report.timings.slice(0, size),
+    taskTypes: {
+      iosTypes: report.taskTypes.iosTypes,
+      androidTypes: report.taskTypes.androidTypes,
+      iosRows: report.taskTypes.iosRows.slice(0, size),
+      androidRows: report.taskTypes.androidRows.slice(0, size),
+    },
+    chpTypes: {
+      rows: report.chpTypes.rows.slice(0, size),
+      iosRows: report.chpTypes.iosRows.slice(0, size),
+      androidRows: report.chpTypes.androidRows.slice(0, size),
+    },
+  });
+
+  const perRowFeatures: Array<{ features: ChartsMlFeatures; anomalies: ChartsAnomalies }> = report.tcRows.map((_row, index) => {
+    const size = index + 1;
+    const prefixAnomalies = buildPrefixAnomalies(size);
+    const tcStats = seriesStats(report.tcRows.slice(0, size).map(row => row.total));
+    const covSwatStats = seriesStats(report.coverageRows.slice(0, size).map(row => row.swatCount));
+    const covStreamStats = seriesStats(report.coverageRows.slice(0, size).map(row => row.streamCount));
+    const selSwatStats = seriesStats(report.selectiveRows.slice(0, size).map(row => row.swatCount));
+    const selStreamStats = seriesStats(report.selectiveRows.slice(0, size).map(row => row.streamCount));
+    const avgTotalStats = seriesStats(report.avgRows.slice(0, size).map(row => row.totalMs / 60000));
+    const chpTotalStats = seriesStats(report.chpRows.slice(0, size).map(row => row.total));
+    const chpIosStats = seriesStats(report.chpRows.slice(0, size).map(row => row.ios));
+    const chpAndroidStats = seriesStats(report.chpRows.slice(0, size).map(row => row.android));
+    return {
+      anomalies: prefixAnomalies,
+      features: {
+        tc_total: round(tcStats.last, 2),
+        tc_total_delta: round(tcStats.delta, 2),
+        tc_total_delta_pct: round(tcStats.deltaPct, 2),
+        tc_volatility: round(tcStats.vol, 2),
+        tc_slope_pct: round(tcStats.slopePct, 2),
+        cov_swat_delta_pct: round(covSwatStats.deltaPct, 2),
+        cov_stream_delta_pct: round(covStreamStats.deltaPct, 2),
+        sel_swat_delta_pct: round(selSwatStats.deltaPct, 2),
+        sel_stream_delta_pct: round(selStreamStats.deltaPct, 2),
+        avg_total_delta: round(avgTotalStats.delta, 2),
+        chp_total_delta_pct: round(chpTotalStats.deltaPct, 2),
+        chp_ios_delta_pct: round(chpIosStats.deltaPct, 2),
+        chp_android_delta_pct: round(chpAndroidStats.deltaPct, 2),
+        release_anoms: prefixAnomalies.release.count,
+        type_anoms: prefixAnomalies.type.count,
+        platform_anoms: prefixAnomalies.platform.count,
+        anom_score: prefixAnomalies.score,
+      },
+    };
+  });
+
+  const dataset = report.ml.dataset || [];
+  const linearModel = trainMlModel(dataset);
+  const linearProbabilities = perRowFeatures.map(item => predictLinearMl(item.features, linearModel));
+  const mlFeatures = perRowFeatures.length ? perRowFeatures[perRowFeatures.length - 1].features : null;
+  const linearProbability = linearProbabilities.length ? linearProbabilities[linearProbabilities.length - 1] : null;
+  const labeledSamples = dataset.filter(item => item.label === 'ok' || item.label === 'fail').length;
+  const datasetQuality = getMlDatasetQuality(labeledSamples);
+  const featureDrivers = buildFeatureDrivers(mlFeatures, linearModel);
+  const prediction: ChartsMlPrediction = {
+    engine: linearProbability != null ? 'linear' : 'none',
+    activeProbability: linearProbability,
+    linearProbability,
+    catboostProbability: null,
+    labeledSamples,
+    trained: !!linearModel.trained,
+    reason: linearModel.trained ? '' : linearModel.reason,
+    datasetQuality: datasetQuality.level,
+    datasetQualityText: datasetQuality.text,
+    datasetQualityHint: datasetQuality.hint,
+    modelAgreementPct: null,
+    agreementText: 'Согласованность недоступна',
+    featureDrivers,
+  };
+
+  const metrics: ChartsMetricRow[] = report.tcRows.map((row, index) => {
+    const avg = report.avgRows[index] || { totalMs: 0, totalWeighted: 0 };
+    const chp = report.chpRows[index] || { total: 0, ios: 0, android: 0 };
+    const coverage = report.coverageRows[index] || { swatCount: 0, streamCount: 0 };
+    const selective = report.selectiveRows[index] || { swatCount: 0, streamCount: 0 };
+    const prev = index > 0 ? report.tcRows[index - 1] : null;
+    const prevChp = index > 0 ? report.chpRows[index - 1] : null;
+    const featureRow = perRowFeatures[index]?.features;
+    const anomalyRow = perRowFeatures[index]?.anomalies;
+    const riskProbability = linearProbabilities[index] ?? null;
+    return {
+      release: row.release,
+      tc_total: row.total,
+      tc_manual: row.manual,
+      tc_auto: row.auto,
+      tc_total_delta: prev ? row.total - prev.total : 0,
+      tc_total_delta_pct: featureRow?.tc_total_delta_pct ?? 0,
+      tc_volatility: featureRow?.tc_volatility ?? 0,
+      tc_slope_pct: featureRow?.tc_slope_pct ?? 0,
+      cov_swat: coverage.swatCount,
+      cov_stream: coverage.streamCount,
+      cov_swat_delta_pct: featureRow?.cov_swat_delta_pct ?? 0,
+      cov_stream_delta_pct: featureRow?.cov_stream_delta_pct ?? 0,
+      sel_swat: selective.swatCount,
+      sel_stream: selective.streamCount,
+      sel_swat_delta_pct: featureRow?.sel_swat_delta_pct ?? 0,
+      sel_stream_delta_pct: featureRow?.sel_stream_delta_pct ?? 0,
+      avg_total: round(Number(avg.totalMs || 0) / 60000, 2),
+      avg_weighted: round(Number(avg.totalWeighted || 0) / 60000, 2),
+      avg_total_delta: index > 0 ? round((Number(avg.totalMs || 0) - Number(report.avgRows[index - 1]?.totalMs || 0)) / 60000, 2) : 0,
+      chp_total: chp.total,
+      chp_ios: chp.ios,
+      chp_android: chp.android,
+      chp_prod: report.chpTypes.rows[index]?.product || 0,
+      chp_bug: report.chpTypes.rows[index]?.bug || 0,
+      chp_crash: report.chpTypes.rows[index]?.crash || 0,
+      chp_vlet: report.chpTypes.rows[index]?.vlet || 0,
+      chp_total_delta: prevChp ? chp.total - prevChp.total : 0,
+      chp_total_delta_pct: featureRow?.chp_total_delta_pct ?? 0,
+      chp_ios_delta_pct: featureRow?.chp_ios_delta_pct ?? 0,
+      chp_android_delta_pct: featureRow?.chp_android_delta_pct ?? 0,
+      anom_score: anomalyRow?.score ?? 0,
+      release_anoms: anomalyRow?.release.count ?? 0,
+      type_anoms: anomalyRow?.type.count ?? 0,
+      platform_anoms: anomalyRow?.platform.count ?? 0,
+      mlRiskPct: riskProbability == null ? null : round(riskProbability * 100, 1),
+    };
+  });
+
+  const anomalies = perRowFeatures.length ? perRowFeatures[perRowFeatures.length - 1].anomalies : buildPrefixAnomalies(0);
+  const rebuilt = {
+    ...report,
+    metrics,
+    anomalies,
+    ml: {
+      ...report.ml,
+      features: mlFeatures,
+      prediction,
+      summary: emptyChartsMlSummary(compareMode),
+    },
+    aiContext: {} as ChartsAiContext,
+  } satisfies ChartsReport;
+  const summaryState = rebuildChartsSummaryState(rebuilt, compareMode);
+  return {
+    ...rebuilt,
+    aiContext: summaryState.aiContext,
+    ml: {
+      ...rebuilt.ml,
+      summary: summaryState.mlSummary,
+    },
+  };
+}
+
+export function rebuildChartsReportForReleases(source: ChartsReport | null, selectedReleases: string[], compareMode: 'prev' | 'mean' = 'mean') {
+  if (!source) return null;
+  const selectedSet = new Set((selectedReleases || []).map(item => String(item || '').trim()).filter(Boolean));
+  if (!selectedSet.size) return source;
+  const releases = source.releases.filter(release => selectedSet.has(release));
+  if (!releases.length) return null;
+  const iosRows = rowsForReleases(source.taskTypes.iosRows, releases);
+  const androidRows = rowsForReleases(source.taskTypes.androidRows, releases);
+  return rebuildMetricsAndMl({
+    ...source,
+    releases,
+    tcRows: rowsForReleases(source.tcRows, releases),
+    coverageRows: rowsForReleases(source.coverageRows, releases),
+    selectiveRows: rowsForReleases(source.selectiveRows, releases),
+    avgRows: rowsForReleases(source.avgRows, releases),
+    chpRows: rowsForReleases(source.chpRows, releases),
+    devDowntime: {
+      iosRows: (source.devDowntime.iosRows || []).filter(item => selectedSet.has(item.release)),
+      androidRows: (source.devDowntime.androidRows || []).filter(item => selectedSet.has(item.release)),
+      iosByRelease: rowsForReleases(source.devDowntime.iosByRelease, releases),
+      androidByRelease: rowsForReleases(source.devDowntime.androidByRelease, releases),
+    },
+    timings: rowsForReleases(source.timings, releases),
+    taskTypes: {
+      iosTypes: sortTypesByCanon(new Set(iosRows.flatMap(row => Object.keys(row.counts || {})))),
+      androidTypes: sortTypesByCanon(new Set(androidRows.flatMap(row => Object.keys(row.counts || {})))),
+      iosRows,
+      androidRows,
+    },
+    chpTypes: {
+      rows: rowsForReleases(source.chpTypes.rows, releases),
+      iosRows: rowsForReleases(source.chpTypes.iosRows, releases),
+      androidRows: rowsForReleases(source.chpTypes.androidRows, releases),
+    },
+    chpQuarterStats: buildChpQuarterStats(
+      rowsForReleases(source.chpRows, releases),
+      (source.chpQuarterStats?.issues || []).filter(issue => selectedSet.has(issue.release))
+    ),
+    streamDeltaRows: (source.streamDeltaRows || []).filter(item => selectedSet.has(item.release)),
+  }, compareMode);
+}
+
+export function rebuildChartsReportFromReleaseSnapshots(
+  snapshots: ChartsReleaseSnapshotPayload[],
+  options?: { sourceReport?: ChartsReport | null; compareMode?: 'prev' | 'mean' }
+) {
+  const compareMode = options?.compareMode || 'mean';
+  const ordered = (Array.isArray(snapshots) ? snapshots : [])
+    .filter(isChartsReleaseSnapshotPayload)
+    .slice()
+    .sort((left, right) => compareReleaseAsc(left.release, right.release));
+  const releases = ordered.map(snapshot => snapshot.release);
+  const releaseSet = new Set(releases);
+  const sourceReport = options?.sourceReport || null;
+  const sourceIosDowntime = rowMapByRelease(sourceReport?.devDowntime?.iosByRelease);
+  const sourceAndroidDowntime = rowMapByRelease(sourceReport?.devDowntime?.androidByRelease);
+  const tcStreamByRelease = ordered.map(snapshot => ({ release: snapshot.release, counts: tcStreamMapFromEntries(snapshot.tcStreamCounts) }));
+  const hbStreamByRelease = ordered.map(snapshot => ({ release: snapshot.release, counts: numberMapFromEntries(snapshot.hbStreamCounts) }));
+  const selStreamByRelease = ordered.map(snapshot => ({ release: snapshot.release, counts: numberMapFromEntries(snapshot.selectiveStreamCounts) }));
+  const uwuStreamByRelease = ordered.map(snapshot => ({ release: snapshot.release, counts: numberMapFromEntries(snapshot.uwuStreamCounts) }));
+  const latestStreamCounts = tcStreamByRelease.length ? tcStreamByRelease[tcStreamByRelease.length - 1].counts : new Map();
+  const latestStreamNames = Array.from(latestStreamCounts.keys()).map(normalizeStreamLabel).filter(Boolean).sort((left, right) => left.localeCompare(right));
+  const streamDeltaRows: ChartsStreamDeltaRow[] = [];
+
+  for (let index = 1; index < tcStreamByRelease.length; index += 1) {
+    const previous = tcStreamByRelease[index - 1];
+    const current = tcStreamByRelease[index];
+    const streams = new Set<string>([...previous.counts.keys(), ...current.counts.keys()]);
+    streams.forEach(stream => {
+      const prev = previous.counts.get(stream) || { manual: 0, auto: 0, uwuManual: 0, uwuAuto: 0 };
+      const next = current.counts.get(stream) || { manual: 0, auto: 0, uwuManual: 0, uwuAuto: 0 };
+      const manualBefore = Number(prev.manual || 0);
+      const manualAfter = Number(next.manual || 0);
+      const autoBefore = Number(prev.auto || 0);
+      const autoAfter = Number(next.auto || 0);
+      const uwuManualBefore = Number(prev.uwuManual || 0);
+      const uwuManualAfter = Number(next.uwuManual || 0);
+      const uwuAutoBefore = Number(prev.uwuAuto || 0);
+      const uwuAutoAfter = Number(next.uwuAuto || 0);
+      const manualDelta = manualAfter - manualBefore;
+      const autoDelta = autoAfter - autoBefore;
+      const uwuManualDelta = uwuManualAfter - uwuManualBefore;
+      const uwuAutoDelta = uwuAutoAfter - uwuAutoBefore;
+      if (!manualDelta && !autoDelta && !uwuManualDelta && !uwuAutoDelta) return;
+      streamDeltaRows.push({
+        release: current.release,
+        stream: normalizeStreamLabel(stream),
+        manualBefore, manualAfter, manualDelta,
+        autoBefore, autoAfter, autoDelta,
+        uwuManualBefore, uwuManualAfter, uwuManualDelta,
+        uwuAutoBefore, uwuAutoAfter, uwuAutoDelta,
+      });
+    });
+  }
+
+  return rebuildMetricsAndMl({
+    releases,
+    tcRows: ordered.map(snapshot => snapshot.tcRow),
+    coverageRows: ordered.map(snapshot => snapshot.coverageRow),
+    selectiveRows: ordered.map(snapshot => snapshot.selectiveRow),
+    avgRows: ordered.map(snapshot => snapshot.avgRow),
+    chpRows: ordered.map(snapshot => snapshot.chpRow),
+    devDowntime: {
+      iosRows: (sourceReport?.devDowntime?.iosRows || []).filter(item => releaseSet.has(item.release)),
+      androidRows: (sourceReport?.devDowntime?.androidRows || []).filter(item => releaseSet.has(item.release)),
+      iosByRelease: releases.map(release => sourceIosDowntime.get(release) || { release, totalMinutes: 0, days: 0, entries: 0 }),
+      androidByRelease: releases.map(release => sourceAndroidDowntime.get(release) || { release, totalMinutes: 0, days: 0, entries: 0 }),
+    },
+    timings: ordered.map(snapshot => snapshot.timing),
+    taskTypes: {
+      iosTypes: sortTypesByCanon(new Set(ordered.flatMap(snapshot => Object.keys(snapshot.taskTypesIosRow.counts || {})))),
+      androidTypes: sortTypesByCanon(new Set(ordered.flatMap(snapshot => Object.keys(snapshot.taskTypesAndroidRow.counts || {})))),
+      iosRows: ordered.map(snapshot => snapshot.taskTypesIosRow),
+      androidRows: ordered.map(snapshot => snapshot.taskTypesAndroidRow),
+    },
+    chpTypes: {
+      rows: ordered.map(snapshot => snapshot.chpTypesRow),
+      iosRows: ordered.map(snapshot => snapshot.chpTypesIosRow),
+      androidRows: ordered.map(snapshot => snapshot.chpTypesAndroidRow),
+    },
+    chpQuarterStats: buildChpQuarterStats(ordered.map(snapshot => snapshot.chpRow), ordered.flatMap(snapshot => snapshot.chpQuarterIssues || [])),
+    streamInsights: {
+      hb: buildLatestStreamDeltaSummary(hbStreamByRelease, 'тест-кейсов'),
+      selective: buildLatestStreamDeltaSummary(selStreamByRelease, 'тест-кейсов'),
+      uwu: buildLatestStreamDeltaSummary(uwuStreamByRelease, 'ед. УВУ'),
+      internalStreams: latestStreamNames.filter(name => !isExternalStreamLabel(name)),
+      externalStreams: latestStreamNames.filter(name => isExternalStreamLabel(name)),
+    },
+    streamDeltaRows,
+    ml: {
+      features: null,
+      dataset: sourceReport?.ml.dataset || readChartsMlDataset(),
+      prediction: {
+        engine: 'none',
+        activeProbability: null,
+        linearProbability: null,
+        catboostProbability: null,
+        labeledSamples: sourceReport?.ml.prediction.labeledSamples || 0,
+        trained: false,
+        reason: '',
+        datasetQuality: sourceReport?.ml.prediction.datasetQuality || 'low',
+        datasetQualityText: sourceReport?.ml.prediction.datasetQualityText || 'Недостаточно данных',
+        datasetQualityHint: sourceReport?.ml.prediction.datasetQualityHint || '',
+        modelAgreementPct: null,
+        agreementText: 'Согласованность недоступна',
+        featureDrivers: [],
+      },
+      helperHealth: sourceReport?.ml.helperHealth || { online: false, busy: false, base: '', error: '', checkedAt: Date.now() },
+      summary: emptyChartsMlSummary(compareMode),
+    },
+  }, compareMode);
+}
+
 function normalizeChartsMlHelperBase(value: unknown) {
   return String(value || '').trim().replace(/\/+$/, '');
 }
@@ -4261,6 +4628,67 @@ function compressChartsAiContextForPrompt(context: ChartsAiContext) {
   };
 }
 
+function mapNumberEntries(source: Map<string, number>) {
+  return Array.from(source.entries()).map(([key, value]) => [key, Number(value || 0)] as [string, number]);
+}
+
+function mapTcStreamEntries(source: Map<string, { manual: number; auto: number; uwuManual: number; uwuAuto: number }>) {
+  return Array.from(source.entries()).map(([key, value]) => [key, {
+    manual: Number(value?.manual || 0),
+    auto: Number(value?.auto || 0),
+    uwuManual: Number(value?.uwuManual || 0),
+    uwuAuto: Number(value?.uwuAuto || 0),
+  }] as [string, { manual: number; auto: number; uwuManual: number; uwuAuto: number }]);
+}
+
+function numberMapFromEntries(value: unknown) {
+  const out = new Map<string, number>();
+  if (!Array.isArray(value)) return out;
+  value.forEach(item => {
+    if (!Array.isArray(item) || item.length < 2) return;
+    const key = String(item[0] || '').trim();
+    const count = Number(item[1]);
+    if (key && Number.isFinite(count)) out.set(key, count);
+  });
+  return out;
+}
+
+function tcStreamMapFromEntries(value: unknown) {
+  const out = new Map<string, { manual: number; auto: number; uwuManual: number; uwuAuto: number }>();
+  if (!Array.isArray(value)) return out;
+  value.forEach(item => {
+    if (!Array.isArray(item) || item.length < 2) return;
+    const key = String(item[0] || '').trim();
+    const record = item[1] && typeof item[1] === 'object' ? item[1] as Record<string, unknown> : {};
+    if (!key) return;
+    out.set(key, {
+      manual: Number(record.manual || 0) || 0,
+      auto: Number(record.auto || 0) || 0,
+      uwuManual: Number(record.uwuManual || 0) || 0,
+      uwuAuto: Number(record.uwuAuto || 0) || 0,
+    });
+  });
+  return out;
+}
+
+function isChartsReleaseSnapshotPayload(value: unknown): value is ChartsReleaseSnapshotPayload {
+  if (!value || typeof value !== 'object') return false;
+  const payload = value as Partial<ChartsReleaseSnapshotPayload>;
+  return payload.schemaVersion === 1
+    && typeof payload.release === 'string'
+    && Boolean(payload.tcRow)
+    && Boolean(payload.coverageRow)
+    && Boolean(payload.selectiveRow)
+    && Boolean(payload.avgRow)
+    && Boolean(payload.chpRow)
+    && Boolean(payload.timing)
+    && Boolean(payload.taskTypesIosRow)
+    && Boolean(payload.taskTypesAndroidRow)
+    && Boolean(payload.chpTypesRow)
+    && Boolean(payload.chpTypesIosRow)
+    && Boolean(payload.chpTypesAndroidRow);
+}
+
 export function buildChartsAiSummaryContext(report: ChartsReport, compareMode: 'prev' | 'mean' = 'mean'): ChartsAiContext {
   const releases = report.releases.slice();
   const currentRelease = releases[releases.length - 1] || '';
@@ -4704,26 +5132,144 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
   const hbStreamByRelease: Array<{ release: string; counts: Map<string, number> }> = [];
   const selStreamByRelease: Array<{ release: string; counts: Map<string, number> }> = [];
   const uwuStreamByRelease: Array<{ release: string; counts: Map<string, number> }> = [];
+  const launchStatisticCache = new Map<number, Promise<number>>();
+  const automatedTotalCache = new Map<number, Promise<number>>();
+  const memberStatsCache = new Map<number, Promise<AllureMemberStatItem[]>>();
+  const streamCountsCache = new Map<string, Promise<{
+    localAll: Map<string, number>;
+    localAuto: Map<string, number>;
+    localAllUwu: Map<string, number>;
+    localAutoUwu: Map<string, number>;
+  }>>();
+
+  const cachedLaunchStatistic = (launchId: number) => {
+    if (!launchStatisticCache.has(launchId)) {
+      launchStatisticCache.set(launchId, fetchLaunchStatistic(cfg, launchId));
+    }
+    return launchStatisticCache.get(launchId)!;
+  };
+  const cachedAutomatedTotalCases = (launchId: number) => {
+    if (!automatedTotalCache.has(launchId)) {
+      automatedTotalCache.set(launchId, fetchAutomatedTotalCases(cfg, launchId));
+    }
+    return automatedTotalCache.get(launchId)!;
+  };
+  const cachedMemberStats = (launchId: number) => {
+    if (!memberStatsCache.has(launchId)) {
+      memberStatsCache.set(launchId, fetchMemberStats(cfg, launchId));
+    }
+    return memberStatsCache.get(launchId)!;
+  };
+  const cachedStreamCountsByLaunch = (
+    launchId: number,
+    optionsOverride?: { includeAuto?: boolean; includeUwu?: boolean }
+  ) => {
+    const includeAuto = optionsOverride?.includeAuto !== false;
+    const includeUwu = optionsOverride?.includeUwu !== false;
+    const key = `${launchId}:${includeAuto ? 'auto' : 'manual'}:${includeUwu ? 'uwu' : 'plain'}`;
+    if (!streamCountsCache.has(key)) {
+      streamCountsCache.set(key, (async () => {
+        const localAll = new Map<string, number>();
+        const localAuto = new Map<string, number>();
+        const localAllUwu = new Map<string, number>();
+        const localAutoUwu = new Map<string, number>();
+        await collectStreamCountsByLaunch(cfg, launchId, localAll, localAuto, localAllUwu, localAutoUwu, optionsOverride);
+        return { localAll, localAuto, localAllUwu, localAutoUwu };
+      })());
+    }
+    return streamCountsCache.get(key)!;
+  };
+  const projectId = String(cfg.projectId || '').trim() || '7';
+  const releaseSnapshotMap = new Map<string, ChartsReleaseSnapshotPayload>();
+  let releaseSnapshotCacheAvailable = true;
+  try {
+    const cachedSnapshots = await loadChartsReleaseSnapshotsFromSupabase(projectId, releases);
+    cachedSnapshots.forEach(snapshot => {
+      if (isChartsReleaseSnapshotPayload(snapshot)) releaseSnapshotMap.set(snapshot.release, snapshot);
+    });
+    if (releaseSnapshotMap.size) {
+      log(options, `БД: найдено ${releaseSnapshotMap.size} релизных срезов, внешние запросы по ним будут пропущены.`, 'ok');
+    }
+  } catch (cacheError) {
+    releaseSnapshotCacheAvailable = false;
+    log(options, `БД cache: ${(cacheError as Error)?.message || String(cacheError)}`, 'warn');
+  }
+
+  const applyCachedReleaseSnapshot = (snapshot: ChartsReleaseSnapshotPayload) => {
+    tcRows.push(snapshot.tcRow);
+    coverageRows.push(snapshot.coverageRow);
+    selectiveRows.push(snapshot.selectiveRow);
+    avgRows.push(snapshot.avgRow);
+    chpRows.push(snapshot.chpRow);
+    timings.push(snapshot.timing);
+    taskTypesIosRows.push(snapshot.taskTypesIosRow);
+    taskTypesAndroidRows.push(snapshot.taskTypesAndroidRow);
+    Object.keys(snapshot.taskTypesIosRow.counts || {}).forEach(type => taskTypesIosSet.add(type));
+    Object.keys(snapshot.taskTypesAndroidRow.counts || {}).forEach(type => taskTypesAndroidSet.add(type));
+    chpTypesRows.push(snapshot.chpTypesRow);
+    chpTypesIosRows.push(snapshot.chpTypesIosRow);
+    chpTypesAndroidRows.push(snapshot.chpTypesAndroidRow);
+    chpQuarterIssues.push(...(Array.isArray(snapshot.chpQuarterIssues) ? snapshot.chpQuarterIssues : []));
+    (Array.isArray(snapshot.releaseMarkers) ? snapshot.releaseMarkers : []).forEach(marker => {
+      const msLocal = Number(marker?.msLocal || 0);
+      if (Number.isFinite(msLocal) && msLocal > 0) {
+        const source = marker?.source === 'deploy' || marker?.source === 'regression' ? marker.source : 'allure';
+        collectReleaseMarker(releaseMarkersMap, snapshot.release, msLocal, source);
+      }
+    });
+    tcStreamByRelease.push({ release: snapshot.release, counts: tcStreamMapFromEntries(snapshot.tcStreamCounts) });
+    hbStreamByRelease.push({ release: snapshot.release, counts: numberMapFromEntries(snapshot.hbStreamCounts) });
+    selStreamByRelease.push({ release: snapshot.release, counts: numberMapFromEntries(snapshot.selectiveStreamCounts) });
+    uwuStreamByRelease.push({ release: snapshot.release, counts: numberMapFromEntries(snapshot.uwuStreamCounts) });
+  };
 
   for (let index = 0; index < releases.length; index += 1) {
     const release = releases[index];
     options?.onProgress?.(index, releases.length);
+    const cachedReleaseSnapshot = releaseSnapshotMap.get(release);
+    if (cachedReleaseSnapshot) {
+      applyCachedReleaseSnapshot(cachedReleaseSnapshot);
+      log(options, `БД: ${release} загружен из cache, внешние запросы пропущены.`, 'ok');
+      options?.onProgress?.(index + 1, releases.length);
+      continue;
+    }
     log(options, `Сбор релиза ${release}...`);
+    const releaseMarkersForSnapshot: ChartsReleaseSnapshotPayload['releaseMarkers'] = [];
+    const markRelease = (msLocal: number | null | undefined, source: 'allure' | 'deploy' | 'regression') => {
+      const value = Number(msLocal || 0);
+      if (!Number.isFinite(value) || value <= 0) return;
+      releaseMarkersForSnapshot.push({ msLocal: value, source });
+      collectReleaseMarker(releaseMarkersMap, release, value, source);
+    };
 
-    const swatInfo = await fetchSwatLogins(release, cfg.signal);
+    const swatInfoPromise = fetchSwatLogins(release, cfg.signal);
+    const smokeLaunchesPromise = fetchChartLaunchesByKind(cfg, release, 'Smoke');
+    const selectiveLaunchesPromise = fetchChartLaunchesByKind(cfg, release, 'Selective');
+    const hbAvgLaunchesPromise = fetchHBLaunchesSwatRelease(cfg, release);
+    const hbLaunchesPromise = fetchHBLaunches(cfg, release);
+    const iosIssuesPromise = fetchDeployIssuesList(cfg, 'IOS', release).catch(() => []);
+    const androidIssuesPromise = fetchDeployIssuesList(cfg, 'ANDROID', release).catch(() => []);
+    const iosTimingPromise = fetchDeployDates(cfg, 'IOS', release).catch(() => ({ cutoff: null, storeMsLocal: null }));
+    const androidTimingPromise = fetchDeployDates(cfg, 'ANDROID', release).catch(() => ({ cutoff: null, storeMsLocal: null }));
+    const iosRegressionPromise = fetchRegressionStartPoint(cfg, 'IOS', release).catch(() => null);
+    const androidRegressionPromise = fetchRegressionStartPoint(cfg, 'ANDROID', release).catch(() => null);
+
+    const [swatInfo, smokeLaunches, selectiveLaunches] = await Promise.all([
+      swatInfoPromise,
+      smokeLaunchesPromise,
+      selectiveLaunchesPromise,
+    ]);
     const swatSet = swatInfo.set;
     const swatPeopleDeclared = Number(swatInfo.total || 0) || 0;
 
     const launchMap = new Map<number, AllureLaunchLite>();
-    const smokeLaunches = await fetchChartLaunchesByKind(cfg, release, 'Smoke');
-    const selectiveLaunchesForTotal = await fetchChartLaunchesByKind(cfg, release, 'Selective');
-    [...smokeLaunches, ...selectiveLaunchesForTotal].forEach(launch => {
+    [...smokeLaunches, ...selectiveLaunches].forEach(launch => {
       const id = Number(launch?.id || 0);
       if (id) {
         launchMap.set(id, launch);
         const createdDate = Number(launch?.createdDate || 0);
         if (Number.isFinite(createdDate) && createdDate > 0) {
-          collectReleaseMarker(releaseMarkersMap, release, createdDate, 'allure');
+          markRelease(createdDate, 'allure');
         }
       }
     });
@@ -4734,8 +5280,8 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
     if (allLaunchIds.length) {
       const totals = await mapLimit(allLaunchIds, 12, async launchId => {
         const [launchTotal, automatedTotal] = await Promise.all([
-          fetchLaunchStatistic(cfg, launchId).catch(() => 0),
-          fetchAutomatedTotalCases(cfg, launchId).catch(() => 0),
+          cachedLaunchStatistic(launchId).catch(() => 0),
+          cachedAutomatedTotalCases(launchId).catch(() => 0),
         ]);
         return { launchTotal, automatedTotal };
       }, cfg.signal);
@@ -4747,10 +5293,10 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
     const manual = Math.max(0, total - auto);
     tcRows.push({ release, manual, auto, total });
 
-    const hbAvgLaunches = await fetchHBLaunchesSwatRelease(cfg, release);
+    const hbAvgLaunches = await hbAvgLaunchesPromise;
     const hbAvgIds = hbAvgLaunches.map(launch => Number(launch?.id || 0)).filter(Boolean);
     const perAvg = await mapLimit(hbAvgIds, 12, async launchId => {
-      const memberStats = await fetchMemberStats(cfg, launchId).catch(() => []);
+      const memberStats = await cachedMemberStats(launchId).catch(() => []);
       const byLogin = new Map<string, { cases: number; duration: number }>();
       for (const member of memberStats) {
         const assignee = normalizeLogin(member?.assignee);
@@ -4823,13 +5369,13 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
       totalWeighted: totalCasesAll ? totalDurationAll / totalCasesAll : 0,
     });
 
-    const hbLaunches = await fetchHBLaunches(cfg, release);
+    const hbLaunches = await hbLaunchesPromise;
     const hbIds = hbLaunches.map(launch => Number(launch?.id || 0)).filter(Boolean);
     let hbSwat = 0;
     let hbStream = 0;
     if (hbIds.length) {
       const perHb = await mapLimit(hbIds, 12, async launchId => {
-        const memberStats = await fetchMemberStats(cfg, launchId).catch(() => []);
+        const memberStats = await cachedMemberStats(launchId).catch(() => []);
         return {
           agg: swatStreamAgg(memberStats, swatSet),
           people: Array.from(extractSwatAssignees(memberStats, swatSet)),
@@ -4845,12 +5391,11 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
 
       const hbStreamCounts = new Map<string, number>();
       const hbPerStream = await mapLimit(hbIds, 6, async launchId => {
-        const allMap = new Map<string, number>();
-        await collectStreamCountsByLaunch(cfg, launchId, allMap, new Map(), new Map(), new Map(), {
+        const item = await cachedStreamCountsByLaunch(launchId, {
           includeAuto: false,
           includeUwu: false,
         });
-        return allMap;
+        return item.localAll;
       }, cfg.signal);
       hbPerStream.forEach(map => mergeMapCounts(hbStreamCounts, map));
       hbStreamByRelease.push({ release, counts: hbStreamCounts });
@@ -4867,13 +5412,12 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
       coverageRows.push({ release, swatCount: 0, swatPeople: swatPeopleDeclared, streamCount: 0, total: 0 });
     }
 
-    const selectiveLaunches = await fetchChartLaunchesByKind(cfg, release, 'Selective');
     const selectiveIds = selectiveLaunches.map(launch => Number(launch?.id || 0)).filter(Boolean);
     let selectiveSwat = 0;
     let selectiveStream = 0;
     if (selectiveIds.length) {
       const perSelective = await mapLimit(selectiveIds, 12, async launchId => {
-        const memberStats = await fetchMemberStats(cfg, launchId).catch(() => []);
+        const memberStats = await cachedMemberStats(launchId).catch(() => []);
         return {
           agg: swatStreamAgg(memberStats, swatSet),
           people: Array.from(extractSwatAssignees(memberStats, swatSet)),
@@ -4895,12 +5439,11 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
 
       const selectiveStreamCounts = new Map<string, number>();
       const selPerStream = await mapLimit(selectiveIds, 6, async launchId => {
-        const allMap = new Map<string, number>();
-        await collectStreamCountsByLaunch(cfg, launchId, allMap, new Map(), new Map(), new Map(), {
+        const item = await cachedStreamCountsByLaunch(launchId, {
           includeAuto: false,
           includeUwu: false,
         });
-        return allMap;
+        return item.localAll;
       }, cfg.signal);
       selPerStream.forEach(map => mergeMapCounts(selectiveStreamCounts, map));
       selStreamByRelease.push({ release, counts: selectiveStreamCounts });
@@ -4915,12 +5458,7 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
       const allUwuMap = new Map<string, number>();
       const autoUwuMap = new Map<string, number>();
       const perStream = await mapLimit(allLaunchIds, 6, async launchId => {
-        const localAll = new Map<string, number>();
-        const localAuto = new Map<string, number>();
-        const localAllUwu = new Map<string, number>();
-        const localAutoUwu = new Map<string, number>();
-        await collectStreamCountsByLaunch(cfg, launchId, localAll, localAuto, localAllUwu, localAutoUwu);
-        return { localAll, localAuto, localAllUwu, localAutoUwu };
+        return cachedStreamCountsByLaunch(launchId);
       }, cfg.signal);
 
       perStream.forEach(item => {
@@ -4937,10 +5475,12 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
       uwuStreamByRelease.push({ release, counts: new Map() });
     }
 
-    const [iosChp, androidChp] = await Promise.all([
-      fetchDeployIssueCount(cfg, 'IOS', release).catch(() => 0),
-      fetchDeployIssueCount(cfg, 'ANDROID', release).catch(() => 0),
+    const [iosIssues, androidIssues] = await Promise.all([
+      iosIssuesPromise,
+      androidIssuesPromise,
     ]);
+    const iosChp = iosIssues.filter(item => item?.merged_after_cutoff === true).length;
+    const androidChp = androidIssues.filter(item => item?.merged_after_cutoff === true).length;
     chpRows.push({
       release,
       ios: iosChp,
@@ -4949,10 +5489,10 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
     });
 
     const [iosTiming, androidTiming, iosRegression, androidRegression] = await Promise.all([
-      fetchDeployDates(cfg, 'IOS', release).catch(() => ({ cutoff: null, storeMsLocal: null })),
-      fetchDeployDates(cfg, 'ANDROID', release).catch(() => ({ cutoff: null, storeMsLocal: null })),
-      fetchRegressionStartPoint(cfg, 'IOS', release).catch(() => null),
-      fetchRegressionStartPoint(cfg, 'ANDROID', release).catch(() => null),
+      iosTimingPromise,
+      androidTimingPromise,
+      iosRegressionPromise,
+      androidRegressionPromise,
     ]);
 
     const iosCut = yValueFromIsoCut(iosTiming.cutoff);
@@ -4960,14 +5500,14 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
     const iosStore = yValueFromMsLocalCut(iosTiming.storeMsLocal);
     const androidStore = yValueFromMsLocalCut(androidTiming.storeMsLocal);
     const releaseTimelineMs = Number(iosCut?.msLocal || androidCut?.msLocal || iosStore?.msLocal || androidStore?.msLocal || 0) || null;
-    if (iosCut?.msLocal) collectReleaseMarker(releaseMarkersMap, release, iosCut.msLocal, 'deploy');
-    if (androidCut?.msLocal) collectReleaseMarker(releaseMarkersMap, release, androidCut.msLocal, 'deploy');
-    if (iosStore?.msLocal) collectReleaseMarker(releaseMarkersMap, release, iosStore.msLocal, 'deploy');
-    if (androidStore?.msLocal) collectReleaseMarker(releaseMarkersMap, release, androidStore.msLocal, 'deploy');
-    if (iosRegression?.msLocal) collectReleaseMarker(releaseMarkersMap, release, iosRegression.msLocal, 'regression');
-    if (androidRegression?.msLocal) collectReleaseMarker(releaseMarkersMap, release, androidRegression.msLocal, 'regression');
+    markRelease(iosCut?.msLocal, 'deploy');
+    markRelease(androidCut?.msLocal, 'deploy');
+    markRelease(iosStore?.msLocal, 'deploy');
+    markRelease(androidStore?.msLocal, 'deploy');
+    markRelease(iosRegression?.msLocal, 'regression');
+    markRelease(androidRegression?.msLocal, 'regression');
 
-    timings.push({
+    const timingRow: ChartsTimingRow = {
       release,
       iosCutLabel: iosCut?.label || '',
       androidCutLabel: androidCut?.label || '',
@@ -4983,28 +5523,25 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
       androidRegressionMinutes: androidRegression?.y ?? null,
       iosLagMinutes: iosCut?.y != null && iosStore?.y != null ? iosStore.y - iosCut.y : null,
       androidLagMinutes: androidCut?.y != null && androidStore?.y != null ? androidStore.y - androidCut.y : null,
-    });
-
-    const [iosIssues, androidIssues] = await Promise.all([
-      fetchDeployIssuesList(cfg, 'IOS', release).catch(() => []),
-      fetchDeployIssuesList(cfg, 'ANDROID', release).catch(() => []),
-    ]);
+    };
+    timings.push(timingRow);
 
     const iosTypesAgg = aggregateIssuesByType(iosIssues);
     const androidTypesAgg = aggregateIssuesByType(androidIssues);
     iosTypesAgg.typeSet.forEach(type => taskTypesIosSet.add(type));
     androidTypesAgg.typeSet.forEach(type => taskTypesAndroidSet.add(type));
-    taskTypesIosRows.push({ release, counts: iosTypesAgg.counts, details: iosTypesAgg.details });
-    taskTypesAndroidRows.push({ release, counts: androidTypesAgg.counts, details: androidTypesAgg.details });
+    const taskTypesIosRow: ChartsTaskTypeRow = { release, counts: iosTypesAgg.counts, details: iosTypesAgg.details };
+    const taskTypesAndroidRow: ChartsTaskTypeRow = { release, counts: androidTypesAgg.counts, details: androidTypesAgg.details };
+    taskTypesIosRows.push(taskTypesIosRow);
+    taskTypesAndroidRows.push(taskTypesAndroidRow);
 
     const iosChpIssues = uniqueIssuesByKey(iosIssues.filter(item => item?.merged_after_cutoff === true));
     const androidChpIssues = uniqueIssuesByKey(androidIssues.filter(item => item?.merged_after_cutoff === true));
     const allIssues = uniqueIssuesByKey([...iosIssues, ...androidIssues]);
     const metaByKey = await fetchYtIssueMetaBatch(cfg, allIssues, options);
     const releaseQuarter = quarterLabelFromMsLocal(releaseTimelineMs);
-    uniqueIssuesByKey([...iosChpIssues, ...androidChpIssues]).forEach(issue => {
-      chpQuarterIssues.push(buildChpQuarterIssue(release, releaseQuarter, issue));
-    });
+    const releaseChpQuarterIssues = uniqueIssuesByKey([...iosChpIssues, ...androidChpIssues]).map(issue => buildChpQuarterIssue(release, releaseQuarter, issue));
+    chpQuarterIssues.push(...releaseChpQuarterIssues);
 
     const releaseChpCounts = computeChpTypesCounts(uniqueIssuesByKey([...iosChpIssues, ...androidChpIssues]), metaByKey);
     const iosReleaseChpCounts = computeChpTypesCounts(iosChpIssues, metaByKey);
@@ -5013,9 +5550,44 @@ export async function collectChartsReport(cfg: ChartsConfig, fromRelease: string
     iosReleaseChpCounts.vlet = computeVletCount(iosIssues, metaByKey);
     androidReleaseChpCounts.vlet = computeVletCount(androidIssues, metaByKey);
 
-    chpTypesRows.push({ release, ...releaseChpCounts });
-    chpTypesIosRows.push({ release, ...iosReleaseChpCounts });
-    chpTypesAndroidRows.push({ release, ...androidReleaseChpCounts });
+    const chpTypesRow: ChartsChpTypeRow = { release, ...releaseChpCounts };
+    const chpTypesIosRow: ChartsChpTypeRow = { release, ...iosReleaseChpCounts };
+    const chpTypesAndroidRow: ChartsChpTypeRow = { release, ...androidReleaseChpCounts };
+    chpTypesRows.push(chpTypesRow);
+    chpTypesIosRows.push(chpTypesIosRow);
+    chpTypesAndroidRows.push(chpTypesAndroidRow);
+
+    const releaseSnapshot: ChartsReleaseSnapshotPayload = {
+      schemaVersion: 1,
+      release,
+      collectedAt: new Date().toISOString(),
+      tcRow: tcRows[tcRows.length - 1],
+      coverageRow: coverageRows[coverageRows.length - 1],
+      selectiveRow: selectiveRows[selectiveRows.length - 1],
+      avgRow: avgRows[avgRows.length - 1],
+      chpRow: chpRows[chpRows.length - 1],
+      timing: timingRow,
+      taskTypesIosRow,
+      taskTypesAndroidRow,
+      chpTypesRow,
+      chpTypesIosRow,
+      chpTypesAndroidRow,
+      chpQuarterIssues: releaseChpQuarterIssues,
+      releaseMarkers: releaseMarkersForSnapshot,
+      tcStreamCounts: mapTcStreamEntries(tcStreamByRelease[tcStreamByRelease.length - 1]?.counts || new Map()),
+      hbStreamCounts: mapNumberEntries(hbStreamByRelease[hbStreamByRelease.length - 1]?.counts || new Map()),
+      selectiveStreamCounts: mapNumberEntries(selStreamByRelease[selStreamByRelease.length - 1]?.counts || new Map()),
+      uwuStreamCounts: mapNumberEntries(uwuStreamByRelease[uwuStreamByRelease.length - 1]?.counts || new Map()),
+    };
+    if (releaseSnapshotCacheAvailable) {
+      try {
+        await saveChartsReleaseSnapshotToSupabase(projectId, releaseSnapshot);
+        log(options, `БД: ${release} сохранен в release cache.`, 'ok');
+      } catch (cacheSaveError) {
+        releaseSnapshotCacheAvailable = false;
+        log(options, `БД cache ${release}: ${(cacheSaveError as Error)?.message || String(cacheSaveError)}`, 'warn');
+      }
+    }
 
     log(options, `✓ ${release}: TC ${total.toLocaleString('ru-RU')}, HB ${hbSwat + hbStream}, ЧП ${iosChp + androidChp}`, 'ok');
     options?.onProgress?.(index + 1, releases.length);
