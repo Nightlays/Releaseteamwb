@@ -1001,12 +1001,13 @@ const EXCLUDED_STREAMS = [
 const FINTECH_PREFIX_RE = /^\[Финтех\]\s*/i;
 const PLATFORM_SEP = '(?:\\s*[-—:–.]+\\s*|\\s+)*';
 const DUTY_WORD = 'Дежурн[\\p{L}\\p{N}_]*';
+const DUTY_PERSON_CAPTURE = '(?:[^@\\n\\r,;]*?)@([^\\n\\r,;]+?)(?=\\s*(?:[\\n\\r,;]|$))';
 const RE_BLOCK_QUOTED = new RegExp(`${DUTY_WORD}\\s*"([^"]+)"([\\s\\S]*?)(?=${DUTY_WORD}\\s*"|$)`, 'giu');
 const RE_BLOCK_OT = new RegExp(`${DUTY_WORD}\\s+от\\s+([^\\n\\r"]+)\\s*([\\s\\S]*?)(?=${DUTY_WORD}|$)`, 'giu');
 const RE_BLOCK_HEADER = new RegExp(`${DUTY_WORD}\\s+(?!от\\b)([^\\n\\r"@]+?)\\s*[\\r\\n]+([\\s\\S]*?)(?=${DUTY_WORD}|$)`, 'giu');
-const RE_INLINE_FREE = new RegExp(`${DUTY_WORD}\\s+([^\\n\\r"@]+?)` + PLATFORM_SEP + '@([^\\n\\r,; ]+)', 'giu');
-const RE_ANDROID = new RegExp('\\b(?:Android|andr)\\b' + PLATFORM_SEP + '@([^\\n\\r,; ]+)', 'iu');
-const RE_IOS = new RegExp('\\bios\\b' + PLATFORM_SEP + '@([^\\n\\r,; ]+)', 'iu');
+const RE_INLINE_FREE = new RegExp(`${DUTY_WORD}\\s+([^\\n\\r"@]+?)` + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'giu');
+const RE_ANDROID = new RegExp('\\b(?:Android|andr)\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
+const RE_IOS = new RegExp('\\bios\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
 
 // ─── COLLECTION TYPES ──────────────────────────────────────────
 
