@@ -1133,7 +1133,15 @@ function normLooseStr(s: string): string {
 }
 
 function toHandle(value: string): string {
-  const v = String(value || '').trim().replace(/^@+/, '');
+  let v = String(value || '').trim().replace(/^@+/, '').trim();
+  if (!v) return '';
+  const nextMentionIdx = v.indexOf('@');
+  if (nextMentionIdx >= 0) v = v.slice(0, nextMentionIdx).trim();
+  v = v
+    .replace(/\s*[\(\[][^\)\]]*$/u, '')
+    .replace(/\s+(?:на\s+выходн(?:ые|ых)?|с\s+\d|до\s+\d|временно|замена|резерв|backup)(?:\s|$).*$/iu, '')
+    .replace(/[\s/\\|,;:–—-]+$/u, '')
+    .trim();
   return v ? '@' + v : '';
 }
 
