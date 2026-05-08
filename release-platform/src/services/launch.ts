@@ -1009,6 +1009,18 @@ const RE_INLINE_FREE = new RegExp(`${DUTY_WORD}\\s+([^\\n\\r"@]+?)` + PLATFORM_S
 const RE_ANDROID = new RegExp('\\b(?:Android|andr)\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
 const RE_IOS = new RegExp('\\bios\\b' + PLATFORM_SEP + DUTY_PERSON_CAPTURE, 'iu');
 
+export function hasCollectionPingMessage(messages: string[]): boolean {
+  const list = Array.isArray(messages) ? messages : [];
+  return list.some(message => {
+    const text = normStr(String(message || ''));
+    return Boolean(
+      text
+        && text.includes('привет, просьба указать дежурных на ближайший релиз')
+        && text.includes('дежурный "название_стрима"'),
+    );
+  });
+}
+
 // ─── COLLECTION TYPES ──────────────────────────────────────────
 
 export interface CollectionRow {
@@ -1961,7 +1973,8 @@ async function collectDutyRowsSince(
   const rows = buildCollectionRows(streams, duties, leadIndex, excludeSet);
   const pingText = buildPingRequestMessageForMissing(rows);
   const pingFound = pingText
-    ? messages.some(message => normBandText(message).toLowerCase() === normBandText(pingText).toLowerCase())
+    ? hasCollectionPingMessage(messages)
+      || messages.some(message => normBandText(message).toLowerCase() === normBandText(pingText).toLowerCase())
     : true;
 
   const missing = rows.filter(r => r.missing).length;

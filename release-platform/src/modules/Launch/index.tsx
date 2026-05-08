@@ -26,6 +26,7 @@ import {
   buildSinceWindow,
   publishCollectionPing,
   publishMissingDutyPosts,
+  hasCollectionPingMessage,
   findCollectionUserIds,
   clearBandDutyGroups,
   addBandDutyGroups,
@@ -489,6 +490,21 @@ function buildCollectionWorkflowStatuses(
     'pending',
     'pending',
   ];
+}
+
+function waitForBandReadConsistency(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function parseStreamList(input: string): string[] {
@@ -2509,14 +2525,28 @@ export function Launch() {
     try {
       switch (step.action) {
         case 'publishPing': {
-          await publishCollectionPing(proxyBase, cookies, rows, ac.signal);
-          setCollectionPingFound(true);
-          collLog('Пинг опубликован в чат SWAT QA.', 'ok');
-          const nextStatuses = collectionWorkflowStatuses.map((status, currentIdx) =>
+          const statusesSeed = collectionWorkflowStatuses.map((status, currentIdx) =>
             currentIdx === idx ? 'done' : status,
           );
-          setCollectionWorkflowStatuses(nextStatuses);
-          setCollectionWorkflowCurrentIdx(firstPendingIndex(nextStatuses));
+          if (!String(pingText || '').trim()) {
+            collLog('[Шаг 1] Публикация запроса не требуется: все дежурные найдены.', 'ok');
+          } else if (collectionPingFound || hasCollectionPingMessage(collectionMessages)) {
+            setCollectionPingFound(true);
+            collLog('[Шаг 1] Запрос дежурных уже найден в чате, повторная публикация не нужна.', 'ok');
+          } else {
+            await publishCollectionPing(proxyBase, cookies, rows, ac.signal);
+            setCollectionPingFound(true);
+            collLog('Пинг опубликован в чат SWAT QA.', 'ok');
+            await waitForBandReadConsistency(350, ac.signal);
+          }
+
+          if (collectionSinceMs) {
+            const refreshed = await refreshCollectionSince(proxyBase, cookies, gasUrl, token, collectionSinceMs, collLog, ac.signal);
+            applyCollectionResult(refreshed, true, statusesSeed);
+          } else {
+            setCollectionWorkflowStatuses(statusesSeed);
+            setCollectionWorkflowCurrentIdx(firstPendingIndex(statusesSeed));
+          }
           break;
         }
         case 'publishMissing': {
@@ -2526,6 +2556,7 @@ export function Launch() {
             const statusesSeed = collectionWorkflowStatuses.map((status, currentIdx) =>
               currentIdx === idx ? 'done' : status,
             );
+            await waitForBandReadConsistency(350, ac.signal);
             const refreshed = await refreshCollectionSince(proxyBase, cookies, gasUrl, token, collectionSinceMs, collLog, ac.signal);
             applyCollectionResult(refreshed, true, statusesSeed);
           } else {
@@ -2593,6 +2624,9 @@ export function Launch() {
     cookies,
     collLog,
     collectionSinceMs,
+    pingText,
+    collectionPingFound,
+    collectionMessages,
     gasUrl,
     token,
     applyCollectionResult,
@@ -4131,6 +4165,8 @@ export function Launch() {
 
     let rows: CollectionRow[] = [];
     let sinceMs: number | null = null;
+    let currentPingText = '';
+    let currentMessages: string[] = [];
     let idMaps: CollectionIdMaps = { ios: {}, android: {} };
     let statuses: PushStatus[] = COLLECTION_WORKFLOW_STEPS.map(() => 'pending');
 
@@ -4145,6 +4181,8 @@ export function Launch() {
       const result = await runCollection(proxyBase, cookies, token, gasUrl, collLog, ac.signal);
       rows = Array.isArray(result.rows) ? result.rows : [];
       sinceMs = Number.isFinite(result.sinceMs) ? result.sinceMs : null;
+      currentPingText = result.pingText || '';
+      currentMessages = Array.isArray(result.messages) ? result.messages : [];
       applyCollectionResult(result);
       setLocalStatuses(buildCollectionWorkflowStatuses(rows, result.pingText || '', Boolean(result.pingFound)));
 
@@ -4169,9 +4207,36 @@ export function Launch() {
           let statusesAfterStep: PushStatus[] | null = null;
           switch (step.action) {
             case 'publishPing': {
-              await publishCollectionPing(proxyBase, cookies, rows, ac.signal);
-              setCollectionPingFound(true);
-              collLog('Пинг опубликован в чат SWAT QA.', 'ok');
+              const statusesSeed = statuses.map((status, currentIdx) =>
+                currentIdx === idx ? 'done' : status,
+              );
+              if (!String(currentPingText || '').trim()) {
+                collLog('[Шаг 1] Публикация запроса не требуется: все дежурные найдены.', 'ok');
+              } else if (hasCollectionPingMessage(currentMessages)) {
+                setCollectionPingFound(true);
+                collLog('[Шаг 1] Запрос дежурных уже найден в чате, повторная публикация не нужна.', 'ok');
+              } else {
+                await publishCollectionPing(proxyBase, cookies, rows, ac.signal);
+                setCollectionPingFound(true);
+                collLog('Пинг опубликован в чат SWAT QA.', 'ok');
+                await waitForBandReadConsistency(350, ac.signal);
+              }
+              if (sinceMs) {
+                const refreshed = await refreshCollectionSince(proxyBase, cookies, gasUrl, token, sinceMs, collLog, ac.signal);
+                rows = Array.isArray(refreshed.rows) ? refreshed.rows : [];
+                sinceMs = Number.isFinite(refreshed.sinceMs) ? refreshed.sinceMs : sinceMs;
+                currentPingText = refreshed.pingText || '';
+                currentMessages = Array.isArray(refreshed.messages) ? refreshed.messages : [];
+                idMaps = { ios: {}, android: {} };
+                setCollectionIdMaps(idMaps);
+                applyCollectionResult(refreshed, true, statusesSeed);
+                statusesAfterStep = buildCollectionWorkflowStatuses(rows, refreshed.pingText || '', Boolean(refreshed.pingFound))
+                  .map((status, statusIdx) => {
+                    if (statusIdx < 2 && (statusesSeed[statusIdx] === 'done' || statusesSeed[statusIdx] === 'skipped')) return statusesSeed[statusIdx];
+                    if (statusIdx >= 2) return 'pending';
+                    return status;
+                  });
+              }
               break;
             }
             case 'publishMissing': {
@@ -4181,9 +4246,12 @@ export function Launch() {
                 const statusesSeed = statuses.map((status, currentIdx) =>
                   currentIdx === idx ? 'done' : status,
                 );
+                await waitForBandReadConsistency(350, ac.signal);
                 const refreshed = await refreshCollectionSince(proxyBase, cookies, gasUrl, token, sinceMs, collLog, ac.signal);
                 rows = Array.isArray(refreshed.rows) ? refreshed.rows : [];
                 sinceMs = Number.isFinite(refreshed.sinceMs) ? refreshed.sinceMs : sinceMs;
+                currentPingText = refreshed.pingText || '';
+                currentMessages = Array.isArray(refreshed.messages) ? refreshed.messages : [];
                 idMaps = { ios: {}, android: {} };
                 setCollectionIdMaps(idMaps);
                 applyCollectionResult(refreshed, true, statusesSeed);
