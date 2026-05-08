@@ -2653,7 +2653,7 @@ export async function syncMajorWorkflowState(
     'done', // 1: Feed Post (root post found means step 1 done)
     dutyLines.length ? 'done' : 'pending', // 2: Fill Duty
     streamsSheetExists ? 'done' : 'pending', // 3: Streams Sheet
-    hasOwnThreadReply(threadPosts, rootId, userId, (_text, post) => isBandPollPost(post)) ? 'done' : 'pending', // 4: Poll
+    hasOwnThreadReply(threadPosts, rootId, '', (_text, post) => isBandPollPost(post)) ? 'done' : 'pending', // 4: Poll
     hasOwnThreadReply(threadPosts, rootId, userId, (text) => text.includes(reminderNeedle)) ? 'done' : 'pending', // 5: Reminder
     hasOwnThreadReply(threadPosts, rootId, userId, (text) => text.startsWith('Компоненты:')) ? 'done' : 'pending', // 6: Components
     (runsData.blockerHigh.length || runsData.selective.length) ? 'done' : 'pending', // 7: Fill Runs

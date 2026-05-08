@@ -1553,6 +1553,7 @@ const LS_STEP_SCHEDULES = 'wb_release_launch_step_schedules_v1';
 const LEGACY_REACT_STEP_SCHEDULE_KEYS = ['wb_rl_step_schedules_v1'];
 const LS_AUTOMATION_PLAN = 'wb_rl_automation_v1';
 const LS_MAJOR_RELEASE = 'wb_release_launch_major_release_v1';
+const LS_MAJOR_TAB = 'wb_release_launch_major_tab_v1';
 const LEGACY_MAJOR_RELEASE_KEYS = [
   'wb_release_launch_major_duty_ping_release_v1',
   'wb_release_launch_major_push_ios_release_v1',
@@ -1718,6 +1719,18 @@ function saveMajorReleaseStorage(value: string) {
     if (normalized) localStorage.setItem(LS_MAJOR_RELEASE, normalized);
     else localStorage.removeItem(LS_MAJOR_RELEASE);
     for (const key of LEGACY_MAJOR_RELEASE_KEYS) localStorage.removeItem(key);
+  } catch {}
+}
+function loadMajorTabStorage(): 'collection' | 'release' | 'ping' | 'editor' {
+  try {
+    const value = String(localStorage.getItem(LS_MAJOR_TAB) || '').trim();
+    if (value === 'release' || value === 'ping' || value === 'editor') return value;
+  } catch {}
+  return 'collection';
+}
+function saveMajorTabStorage(value: 'collection' | 'release' | 'ping' | 'editor') {
+  try {
+    localStorage.setItem(LS_MAJOR_TAB, value);
   } catch {}
 }
 
@@ -2044,7 +2057,7 @@ export function Launch() {
   const [andSyncing, setAndSyncing] = useState(false);
   const [iosComponents, setIosComponents] = useState('');
   const [andComponents, setAndComponents] = useState('');
-  const [majorTab, setMajorTab] = useState<'collection' | 'release' | 'ping' | 'editor'>('collection');
+  const [majorTab, setMajorTab] = useState<'collection' | 'release' | 'ping' | 'editor'>(loadMajorTabStorage);
 
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeText, setNoticeText] = useState('');
@@ -2160,6 +2173,11 @@ export function Launch() {
     setAndRelease(value);
     saveMajorReleaseStorage(value);
     setNoticeText('');
+  }, []);
+
+  const updateMajorTab = useCallback((value: 'collection' | 'release' | 'ping' | 'editor') => {
+    setMajorTab(value);
+    saveMajorTabStorage(value);
   }, []);
 
   const updateDutyPingState = useCallback((platform: MajorPlatform, patch: Partial<DutyPingUiState>) => {
@@ -2362,6 +2380,7 @@ export function Launch() {
         nextStatuses = nextStatuses.map((status, idx) => {
           const localStatus = currentStatuses[idx];
           if (status === 'done') return 'done';
+          if (localStatus === 'done') return 'done';
           if (localStatus === 'skipped') return 'skipped';
           if (localStatus === 'error') return 'error';
           return 'pending';
@@ -3148,7 +3167,7 @@ export function Launch() {
   }, [andRelease]);
 
   useEffect(() => {
-    if (mode !== 'major' || majorTab !== 'release') return;
+    if (mode !== 'major') return;
     const timers: number[] = [];
     if (String(iosRelease || '').trim()) {
       timers.push(window.setTimeout(() => {
@@ -3163,7 +3182,7 @@ export function Launch() {
     return () => {
       timers.forEach(timer => window.clearTimeout(timer));
     };
-  }, [mode, majorTab, iosRelease, andRelease, syncMajorPlatform]);
+  }, [mode, iosRelease, andRelease, syncMajorPlatform]);
 
   useEffect(() => {
     if (mode !== 'major' || majorTab !== 'release') return;
@@ -4157,7 +4176,7 @@ export function Launch() {
     if (collectionRunning) throw new Error('Сбор дежурных уже выполняется.');
     if (!cookies) throw new Error('Band cookies не заданы — укажи в Настройках.');
 
-    setMajorTab('collection');
+    updateMajorTab('collection');
     setCollectionLogs([]);
     setCollectionRunning(true);
     const ac = new AbortController();
@@ -4311,6 +4330,7 @@ export function Launch() {
     collLog,
     applyCollectionResult,
     adminCookies,
+    updateMajorTab,
   ]);
 
   const executeAutomation = useCallback(async (plan: AutomationPlan) => {
@@ -4986,7 +5006,7 @@ export function Launch() {
 	            ]).map(item => (
               <button
                 key={item.id}
-                onClick={() => setMajorTab(item.id)}
+                onClick={() => updateMajorTab(item.id)}
                 style={{
                   padding: '10px 14px',
                   fontSize: 12,
