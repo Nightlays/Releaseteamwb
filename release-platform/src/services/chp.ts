@@ -436,11 +436,10 @@ async function fetchText(
 }
 
 function buildDeployHeaders(token: string) {
-  const auth = withBearer(normalizeDeployLabToken(token));
   return {
     Accept: 'application/json, text/plain, */*',
     'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-    'authorization-deploy-lab': auth,
+    'X-Releaseboss-Readonly-Token': normalizeDeployLabToken(token),
     Origin: 'https://deploy-lab.wb.ru',
     Referer: 'https://deploy-lab.wb.ru/',
   };

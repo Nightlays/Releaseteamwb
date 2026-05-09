@@ -848,7 +848,7 @@ function buildDeployLabHeaders(token: string): Record<string, string> {
   return {
     accept: '*/*',
     'accept-language': 'ru-RU,ru;q=0.9',
-    'authorization-deploy-lab': `Bearer ${raw}`,
+    'X-Releaseboss-Readonly-Token': raw,
     origin: 'https://deploy-lab.wb.ru',
     referer: 'https://deploy-lab.wb.ru/',
     'X-Proxy-Cookie': '',

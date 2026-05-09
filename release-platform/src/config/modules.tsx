@@ -1,7 +1,6 @@
 import React from 'react';
 
 export type ModuleId =
-  | 'home'
   | 'dashboard'
   | 'goals'
   | 'vangovat'
@@ -192,15 +191,6 @@ const icAccess = (
 // ── Module registry ───────────────────────────────────────────────────────────
 
 export const MODULES: ModuleDefinition[] = [
-  {
-    id: 'home',
-    legacyId: 'service-home',
-    label: 'Сервисы',
-    sub: 'Dashboard · Learning Hub · Project',
-    section: 'Обзор',
-    icon: icHome,
-    showLegacyButton: false,
-  },
   {
     id: 'dashboard',
     legacyId: 'dashboard_run_module.html',

@@ -2385,6 +2385,24 @@ export function Charts() {
   }, [pushLog, settings.projectId]);
 
   useEffect(() => {
+    const from = releaseFrom.trim();
+    const to = releaseTo.trim();
+    if (!from || !to) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const loaded = await loadLatestChartsReportFromSupabase({ projectId: settings.projectId, releaseFrom: from, releaseTo: to, compareMode });
+        if (cancelled || !loaded?.report) return;
+        setReport(loaded.report);
+        setSelectedReleases([]);
+        setHelperOnline(loaded.report.ml.helperHealth.online);
+        pushLog(`Supabase: отчёт загружен автоматически (${loaded.report.releases.length} релизов).`, 'ok');
+      } catch { /* silent */ }
+    }, 700);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [releaseFrom, releaseTo, compareMode, settings.projectId]);  // intentionally excludes pushLog/setters (stable refs)
+
+  useEffect(() => {
     if (!availableReleaseOptions.length) {
       if (!report?.releases?.length) setSelectedReleases([]);
       return;
@@ -4053,12 +4071,6 @@ export function Charts() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Button variant={designPreviewOpen ? 'primary' : 'ghost'} size="sm" onClick={() => setDesignPreviewOpen(value => !value)}>
             {designPreviewOpen ? 'Закрыть макеты' : 'Макеты дизайна'}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={loadFromDb} disabled={loading || Boolean(actionBusy)}>
-            {actionBusy === 'db-load' ? 'БД...' : 'БД загрузить'}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={saveReportToDb} disabled={!report || loading || Boolean(actionBusy)}>
-            {actionBusy === 'db-save' ? 'БД...' : 'БД сохранить'}
           </Button>
           <Button variant="ghost" size="sm" onClick={exportJson} disabled={!report}>Экспорт JSON</Button>
           <Button variant="ghost" size="sm" onClick={exportCsv} disabled={!report}>Экспорт CSV</Button>

@@ -73,21 +73,6 @@ function ModuleContent({
   const key = `${moduleId}:${refreshKey}`;
 
   switch (moduleId) {
-    case 'home':
-      return (
-        <div key={key} style={{ height: '100%' }}>
-          <ServiceGateway
-            selectedServiceId={DEFAULT_SERVICE_GATEWAY_ID}
-            onSelect={item => {
-              if (item.authTarget.type === 'module') {
-                onActivateModule(item.authTarget.moduleId);
-                return;
-              }
-              window.location.assign(item.authTarget.href);
-            }}
-          />
-        </div>
-      );
     case 'dashboard':
       return <div key={key}><Dashboard /></div>;
     case 'goals':
@@ -507,14 +492,12 @@ function Layout() {
     return <AuthScreen error={authError} theme={theme} onToggleTheme={toggleTheme} onSubmit={handleLogin} />;
   }
 
-  const isWideModule = currentModule.id === 'home' || currentModule.id === 'dashboard' || currentModule.id === 'charts' || currentModule.id === 'goals' || currentModule.id === 'releaseAnalysis';
-  const mainPadding = currentModule.id === 'releaseAnalysis'
+  const isWideModule = true;
+  const mainPadding = currentModule.id === 'releaseAnalysis' || currentModule.id === 'swat'
     ? '10px 12px 18px 12px'
-    : currentModule.id === 'home'
-      ? '0'
-      : currentModule.id === 'dashboard'
+    : currentModule.id === 'dashboard'
       ? '12px 14px 18px'
-      : (currentModule.id === 'charts' || currentModule.id === 'goals') ? '0' : 16;
+      : (currentModule.id === 'charts' || currentModule.id === 'goals') ? '0' : '10px 12px 18px 12px';
 
   return (
     <div className="app-shell" style={{

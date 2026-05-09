@@ -24,6 +24,7 @@ import {
   Modal,
   Progress,
   SegmentControl,
+  Select,
   StatusPill,
   Td,
   Th,
@@ -43,6 +44,7 @@ import {
   type SwatReleaseReport,
 } from '../../services/swat';
 import {
+  loadAvailableSwatReleaseReportsFromSupabase,
   loadSwatReleaseReportFromSupabase,
   saveSwatReleaseReportToSupabase,
 } from '../../services/releaseStatsSupabase';
@@ -56,7 +58,7 @@ type TabValue = 'emp' | 'plat' | 'cases' | 'streams';
 type ProxyState = 'unknown' | 'ok' | 'error';
 type StatusTone = 'neutral' | 'ok' | 'warn' | 'error';
 type LogLevel = 'info' | 'ok' | 'warn' | 'error';
-type SortDirection = 1 | -1;
+type SortDirection = 1 | -1 | null;
 type EmployeeSortKey = 'name' | 'target' | 'uwu' | 'uwuph' | 'iosh' | 'andh' | 'iosc' | 'andc' | 'avg';
 
 interface ChartThemeColors {
@@ -209,11 +211,17 @@ function progressColor(tone: StatusTone) {
 }
 
 function sortIndicator(active: boolean, dir: SortDirection) {
-  if (!active) return '↕';
-  return dir === 1 ? '▲' : '▼';
+  const neutral = (
+    <span style={{ display: 'flex', flexDirection: 'column', gap: 1, opacity: 0.3, fontSize: 7, lineHeight: 1 }}>
+      <span>▲</span><span>▼</span>
+    </span>
+  );
+  if (!active || dir === null) return neutral;
+  return <span style={{ fontSize: 10 }}>{dir === 1 ? '▲' : '▼'}</span>;
 }
 
 function sortEmployees(rows: SwatEmployeeRow[], key: EmployeeSortKey, dir: SortDirection) {
+  if (dir === null) return rows;
   const sign = dir;
   return [...rows].sort((left, right) => {
     let a: number | string | null = null;
@@ -383,13 +391,15 @@ function SortableHeader({
 }) {
   const active = activeKey === sortKey;
   return (
-    <Th style={{ textAlign: align, ...style }}>
+    <Th style={{ whiteSpace: 'normal', textAlign: 'center', ...style }}>
       <button
         onClick={() => onToggle(sortKey)}
         style={{
-          display: 'inline-flex',
+          display: 'flex',
           alignItems: 'center',
-          gap: 6,
+          justifyContent: 'center',
+          gap: 5,
+          width: '100%',
           border: 'none',
           background: 'transparent',
           padding: 0,
@@ -401,8 +411,8 @@ function SortableHeader({
           letterSpacing: 'inherit',
         }}
       >
-        <span>{label}</span>
-        <span style={{ opacity: active ? 1 : 0.45 }}>{sortIndicator(active, direction)}</span>
+        <span style={{ textAlign: 'center' }}>{label}</span>
+        <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>{sortIndicator(active, direction)}</span>
       </button>
     </Th>
   );
@@ -432,16 +442,18 @@ function MetricCard({
         borderRadius: 16,
         border: '1px solid var(--border)',
         background: 'var(--card)',
+        minWidth: 0,
+        overflow: 'hidden',
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label}
       </div>
-      <div style={{ fontSize: 26, lineHeight: 1.1, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ fontSize: 26, lineHeight: 1.1, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {value}
       </div>
       {hint ? (
-        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {hint}
         </div>
       ) : null}
@@ -663,7 +675,7 @@ function EmployeeTable({
           <tr>
             <SortableHeader label="SWAT" sortKey="name" activeKey={sortKey} direction={sortDir} onToggle={onToggleSort} style={headerDivider()} />
             <SortableHeader label="Целевой стрим" sortKey="target" activeKey={sortKey} direction={sortDir} onToggle={onToggleSort} style={headerDivider()} />
-            <Th style={headerDivider('group')}>Проходил</Th>
+            <Th style={{ whiteSpace: 'normal', ...headerDivider('group') }}>Проходил</Th>
             <SortableHeader label="uWu" sortKey="uwu" activeKey={sortKey} direction={sortDir} onToggle={onToggleSort} align="right" style={headerDivider()} />
             <SortableHeader label="uWu/Ч" sortKey="uwuph" activeKey={sortKey} direction={sortDir} onToggle={onToggleSort} align="right" style={headerDivider()} />
             <SortableHeader label="iOS (ч/м)" sortKey="iosh" activeKey={sortKey} direction={sortDir} onToggle={onToggleSort} align="right" style={headerDivider()} />
@@ -859,7 +871,7 @@ function PlatformTable({ model }: { model: SwatPlatformModel }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
         <MetricCard label="Android за релиз" value={formatNumber(totalAndroidCases)} hint={`SWAT уникальных: ${formatNumber(model.uniqueWorkersA)}`} />
         <MetricCard label="iOS за релиз" value={formatNumber(totalIosCases)} hint={`SWAT уникальных: ${formatNumber(model.uniqueWorkersI)}`} />
         <MetricCard label="Среднее Android" value={Number(model.releaseAvgA || 0).toFixed(2)} hint="Кейсов на SWAT" tone="accent" />
@@ -988,6 +1000,7 @@ export function SwatRelease() {
   const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(false);
   const [dbBusy, setDbBusy] = useState(false);
+  const [dbReleases, setDbReleases] = useState<string[]>([]);
   const [report, setReport] = useState<SwatReleaseReport | null>(null);
   const [logs, setLogs] = useState<Array<{ text: string; level: LogLevel }>>([]);
   const [sortKey, setSortKey] = useState<EmployeeSortKey>('name');
@@ -1031,13 +1044,20 @@ export function SwatRelease() {
     };
   }, [settings.proxyBase, settings.useProxy]);
 
+  useEffect(() => {
+    let cancelled = false;
+    loadAvailableSwatReleaseReportsFromSupabase(settings.projectId)
+      .then(releases => { if (!cancelled) setDbReleases(releases); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [settings.projectId]);
+
   const addLog = useCallback((text: string, level: LogLevel = 'info') => {
     setLogs(prev => [...prev.slice(-299), { text: `[${formatTimeStamp()}] ${text}`, level }]);
   }, []);
 
   const tokenReady = Boolean(String(settings.allureToken || '').trim());
   const cleanRelease = String(release || '').trim();
-  const canLoadFromDb = Boolean(cleanRelease) && !running && !dbBusy;
   const themeColors = useMemo(() => getChartThemeColors(), [theme]);
 
   const sortedEmployees = useMemo(() => {
@@ -1195,14 +1215,15 @@ export function SwatRelease() {
     tokenReady,
   ]);
 
-  const loadFromDb = useCallback(async () => {
-    if (!canLoadFromDb) return;
+  const loadFromDb = useCallback(async (targetRelease: string) => {
+    const rel = targetRelease.trim();
+    if (!rel || running) return;
     setDbBusy(true);
     setStatus('Читаю сохранённый SWAT-срез из БД…');
     setStatusTone('neutral');
     setProgress(0);
     try {
-      const cachedReport = await loadSwatReleaseReportFromSupabase(settings.projectId, cleanRelease);
+      const cachedReport = await loadSwatReleaseReportFromSupabase(settings.projectId, rel);
       if (!cachedReport) {
         setStatus('В БД нет сохранённого SWAT-среза для этого релиза.');
         setStatusTone('warn');
@@ -1222,7 +1243,7 @@ export function SwatRelease() {
     } finally {
       setDbBusy(false);
     }
-  }, [addLog, applyReport, canLoadFromDb, cleanRelease, settings.projectId]);
+  }, [addLog, applyReport, running, settings.projectId]);
 
   const stop = useCallback(() => {
     if (!abortRef.current) return;
@@ -1237,15 +1258,13 @@ export function SwatRelease() {
   }, [addLog]);
 
   const toggleSort = useCallback((key: EmployeeSortKey) => {
-    setSortKey(prevKey => {
-      if (prevKey === key) {
-        setSortDir(prevDir => (prevDir === 1 ? -1 : 1));
-        return prevKey;
-      }
+    if (sortKey === key) {
+      setSortDir(prev => (prev === 1 ? -1 : prev === -1 ? null : 1));
+    } else {
+      setSortKey(key);
       setSortDir(1);
-      return key;
-    });
-  }, []);
+    }
+  }, [sortKey]);
 
   const toggleLogin = useCallback((login: string) => {
     setSelectedLogins(prev => prev.includes(login) ? prev.filter(item => item !== login) : [...prev, login]);
@@ -1334,7 +1353,7 @@ export function SwatRelease() {
         SWAT Релиз
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
         <MetricCard label="SWAT сотрудников" value={report ? formatNumber(report.swatCount) : '—'} />
         <MetricCard label="Запусков" value={report ? formatNumber(report.launchesCount) : '—'} />
         <MetricCard label="Кейсов всего" value={report ? formatNumber(report.totalCases) : '—'} hint={report ? `Android ${formatNumber(report.totalCasesAndroid)} · iOS ${formatNumber(report.totalCasesIos)}` : undefined} />
@@ -1373,11 +1392,30 @@ export function SwatRelease() {
               />
             </div>
 
+            {dbReleases.length > 0 && (
+              <div>
+                <FieldLabel>Из БД</FieldLabel>
+                <Select
+                  value=""
+                  style={{ width: 180 }}
+                  disabled={running || dbBusy}
+                  onChange={event => {
+                    const val = event.target.value;
+                    if (!val) return;
+                    setRelease(val);
+                    void loadFromDb(val);
+                  }}
+                >
+                  <option value="">— выбрать версию —</option>
+                  {[...dbReleases].reverse().map(rel => (
+                    <option key={rel} value={rel}>{rel}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
+
             <Button variant="primary" onClick={() => void run()} disabled={running || dbBusy}>
               {running ? 'Сбор...' : 'Запустить сбор'}
-            </Button>
-            <Button variant="secondary" onClick={() => void loadFromDb()} disabled={!canLoadFromDb}>
-              {dbBusy ? 'БД...' : 'БД загрузить'}
             </Button>
             <Button variant="danger" onClick={stop} disabled={!running}>
               Остановить
