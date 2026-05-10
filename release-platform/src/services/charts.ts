@@ -357,7 +357,7 @@ export interface ChartsAiContext {
     releases: string[];
     currentRelease: string;
     previousRelease: string;
-    compareMode: 'previous_release' | 'mean_history';
+    compareMode: 'previous_release' | 'mean_history' | 'specific_release';
     baseReleases: string[];
   };
   mlRisk: {
@@ -3361,7 +3361,7 @@ function rowsForReleases<T extends { release: string }>(rows: T[] | undefined, r
   return releases.map(release => map.get(release)).filter((row): row is T => Boolean(row));
 }
 
-function rebuildMetricsAndMl(report: Omit<ChartsReport, 'metrics' | 'anomalies' | 'aiContext' | 'ml'> & Pick<ChartsReport, 'ml'>, compareMode: 'prev' | 'mean'): ChartsReport {
+function rebuildMetricsAndMl(report: Omit<ChartsReport, 'metrics' | 'anomalies' | 'aiContext' | 'ml'> & Pick<ChartsReport, 'ml'>, compareMode: 'prev' | 'mean', compareRelease?: string): ChartsReport {
   const buildPrefixAnomalies = (size: number) => computeAnomalies({
     tcRows: report.tcRows.slice(0, size),
     coverageRows: report.coverageRows.slice(0, size),
@@ -3504,7 +3504,7 @@ function rebuildMetricsAndMl(report: Omit<ChartsReport, 'metrics' | 'anomalies' 
     },
     aiContext: {} as ChartsAiContext,
   } satisfies ChartsReport;
-  const summaryState = rebuildChartsSummaryState(rebuilt, compareMode);
+  const summaryState = rebuildChartsSummaryState(rebuilt, compareMode, compareRelease);
   return {
     ...rebuilt,
     aiContext: summaryState.aiContext,
@@ -3515,7 +3515,7 @@ function rebuildMetricsAndMl(report: Omit<ChartsReport, 'metrics' | 'anomalies' 
   };
 }
 
-export function rebuildChartsReportForReleases(source: ChartsReport | null, selectedReleases: string[], compareMode: 'prev' | 'mean' = 'mean') {
+export function rebuildChartsReportForReleases(source: ChartsReport | null, selectedReleases: string[], compareMode: 'prev' | 'mean' = 'mean', compareRelease?: string) {
   if (!source) return null;
   const selectedSet = new Set((selectedReleases || []).map(item => String(item || '').trim()).filter(Boolean));
   if (!selectedSet.size) return source;
@@ -3554,14 +3554,15 @@ export function rebuildChartsReportForReleases(source: ChartsReport | null, sele
       (source.chpQuarterStats?.issues || []).filter(issue => selectedSet.has(issue.release))
     ),
     streamDeltaRows: (source.streamDeltaRows || []).filter(item => selectedSet.has(item.release)),
-  }, compareMode);
+  }, compareMode, compareRelease);
 }
 
 export function rebuildChartsReportFromReleaseSnapshots(
   snapshots: ChartsReleaseSnapshotPayload[],
-  options?: { sourceReport?: ChartsReport | null; compareMode?: 'prev' | 'mean' }
+  options?: { sourceReport?: ChartsReport | null; compareMode?: 'prev' | 'mean'; compareRelease?: string }
 ) {
   const compareMode = options?.compareMode || 'mean';
+  const compareRelease = options?.compareRelease;
   const ordered = (Array.isArray(snapshots) ? snapshots : [])
     .filter(isChartsReleaseSnapshotPayload)
     .slice()
@@ -3665,7 +3666,7 @@ export function rebuildChartsReportFromReleaseSnapshots(
       helperHealth: sourceReport?.ml.helperHealth || { online: false, busy: false, base: '', error: '', checkedAt: Date.now() },
       summary: emptyChartsMlSummary(compareMode),
     },
-  }, compareMode);
+  }, compareMode, compareRelease);
 }
 
 function normalizeChartsMlHelperBase(value: unknown) {
@@ -4452,8 +4453,8 @@ function enrichChartsAiContext(context: ChartsAiContext, report: ChartsReport, s
   };
 }
 
-export function rebuildChartsSummaryState(report: ChartsReport, compareMode: 'prev' | 'mean' = 'mean') {
-  const aiContext = buildChartsAiSummaryContext(report, compareMode);
+export function rebuildChartsSummaryState(report: ChartsReport, compareMode: 'prev' | 'mean' = 'mean', compareRelease?: string) {
+  const aiContext = buildChartsAiSummaryContext(report, compareMode, compareRelease);
   const preparedReport = {
     ...report,
     aiContext,
@@ -4486,12 +4487,13 @@ function compareReleaseAsc(left: string, right: string) {
   return 0;
 }
 
-function baselineStats(series: number[], mode: 'prev' | 'mean') {
+function baselineStats(series: number[], mode: 'prev' | 'mean', baseIndex?: number) {
   const values = (Array.isArray(series) ? series : []).map(value => Number(value)).filter(Number.isFinite);
   if (values.length < 2) {
     return { last: values.length ? values[values.length - 1] : null, base: null };
   }
   const last = values[values.length - 1];
+  if (baseIndex != null && baseIndex >= 0 && baseIndex < values.length - 1) return { last, base: values[baseIndex] };
   if (mode === 'prev') return { last, base: values[values.length - 2] };
   const history = values.slice(0, -1);
   return {
@@ -4516,12 +4518,12 @@ function formatAiMetricValue(kind: 'count' | 'minutes' | 'clock' | 'percent', va
   return Math.round(num).toLocaleString('ru-RU');
 }
 
-function buildAiMetricSnapshot(label: string, series: number[], kind: 'count' | 'minutes' | 'clock' | 'percent', compareMode: 'prev' | 'mean', digits = 0, better = '', note = ''): ChartsAiMetricSnapshot {
+function buildAiMetricSnapshot(label: string, series: number[], kind: 'count' | 'minutes' | 'clock' | 'percent', compareMode: 'prev' | 'mean', digits = 0, better = '', note = '', baseIndex?: number): ChartsAiMetricSnapshot {
   const values = (Array.isArray(series) ? series : []).map(value => Number(value)).filter(Number.isFinite);
   if (!values.length) {
     return { label, current: '—', currentRaw: null, base: '—', baseRaw: null, delta: null, deltaPct: null, better, note };
   }
-  const stat = baselineStats(values, compareMode);
+  const stat = baselineStats(values, compareMode, baseIndex);
   const delta = stat.base == null ? null : stat.last! - stat.base;
   const deltaPct = stat.base == null || stat.base === 0 ? (stat.last ? 100 : 0) : ((stat.last! - stat.base) / stat.base) * 100;
   return {
@@ -4689,13 +4691,17 @@ function isChartsReleaseSnapshotPayload(value: unknown): value is ChartsReleaseS
     && Boolean(payload.chpTypesAndroidRow);
 }
 
-export function buildChartsAiSummaryContext(report: ChartsReport, compareMode: 'prev' | 'mean' = 'mean'): ChartsAiContext {
+export function buildChartsAiSummaryContext(report: ChartsReport, compareMode: 'prev' | 'mean' = 'mean', compareRelease?: string): ChartsAiContext {
   const releases = report.releases.slice();
   const currentRelease = releases[releases.length - 1] || '';
   const previousRelease = releases.length > 1 ? releases[releases.length - 2] : '';
-  const baseReleases = compareMode === 'prev'
-    ? (previousRelease ? [previousRelease] : [])
-    : releases.slice(0, -1);
+  const baseIndex = compareRelease ? report.releases.indexOf(compareRelease) : undefined;
+  const resolvedBaseIndex = baseIndex != null && baseIndex >= 0 ? baseIndex : undefined;
+  const baseReleases = compareRelease && resolvedBaseIndex != null
+    ? [compareRelease]
+    : compareMode === 'prev'
+      ? (previousRelease ? [previousRelease] : [])
+      : releases.slice(0, -1);
 
   const tcSeries = buildSeriesFromRows(report.tcRows, row => row.total);
   const autoSeries = buildSeriesFromRows(report.tcRows, row => row.auto);
@@ -4737,7 +4743,7 @@ export function buildChartsAiSummaryContext(report: ChartsReport, compareMode: '
       releases,
       currentRelease,
       previousRelease,
-      compareMode: compareMode === 'prev' ? 'previous_release' : 'mean_history',
+      compareMode: compareRelease && resolvedBaseIndex != null ? 'specific_release' : compareMode === 'prev' ? 'previous_release' : 'mean_history',
       baseReleases,
     },
     mlRisk: {
@@ -4750,27 +4756,27 @@ export function buildChartsAiSummaryContext(report: ChartsReport, compareMode: '
     },
     keyMetrics: {
       regress: [
-        buildAiMetricSnapshot('Объем регресса', tcSeries, 'count', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('АТ в регрессе', autoSeries, 'count', compareMode, 0, 'up'),
-        buildAiMetricSnapshot('Критичные проверки SWAT + Stream', covSeries, 'count', compareMode, 0, 'up'),
-        buildAiMetricSnapshot('Селективные проверки', selectiveSeries, 'count', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('Среднее время прохождения', avgSeries, 'minutes', compareMode, 2, 'down'),
-        buildAiMetricSnapshot('Среднее время на кейс', avgWeightedSeries, 'minutes', compareMode, 2, 'down'),
+        buildAiMetricSnapshot('Объем регресса', tcSeries, 'count', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('АТ в регрессе', autoSeries, 'count', compareMode, 0, 'up', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Критичные проверки SWAT + Stream', covSeries, 'count', compareMode, 0, 'up', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Селективные проверки', selectiveSeries, 'count', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Среднее время прохождения', avgSeries, 'minutes', compareMode, 2, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Среднее время на кейс', avgWeightedSeries, 'minutes', compareMode, 2, 'down', '', resolvedBaseIndex),
       ],
       release: [
-        buildAiMetricSnapshot('ЧП всего', chpSeries, 'count', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('ЧП iOS', chpIosSeries, 'count', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('ЧП Android', chpAndroidSeries, 'count', compareMode, 0, 'down'),
+        buildAiMetricSnapshot('ЧП всего', chpSeries, 'count', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('ЧП iOS', chpIosSeries, 'count', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('ЧП Android', chpAndroidSeries, 'count', compareMode, 0, 'down', '', resolvedBaseIndex),
       ],
       timings: [
-        buildAiMetricSnapshot('Cutoff iOS', cutIosSeries, 'clock', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('Cutoff Android', cutAndroidSeries, 'clock', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('Старт регресса iOS', regIosSeries, 'clock', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('Старт регресса Android', regAndroidSeries, 'clock', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('Store iOS', storeIosSeries, 'clock', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('Store Android', storeAndroidSeries, 'clock', compareMode, 0, 'down'),
-        buildAiMetricSnapshot('Lag iOS', lagIosSeries, 'minutes', compareMode, 1, 'down'),
-        buildAiMetricSnapshot('Lag Android', lagAndroidSeries, 'minutes', compareMode, 1, 'down'),
+        buildAiMetricSnapshot('Cutoff iOS', cutIosSeries, 'clock', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Cutoff Android', cutAndroidSeries, 'clock', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Старт регресса iOS', regIosSeries, 'clock', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Старт регресса Android', regAndroidSeries, 'clock', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Store iOS', storeIosSeries, 'clock', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Store Android', storeAndroidSeries, 'clock', compareMode, 0, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Lag iOS', lagIosSeries, 'minutes', compareMode, 1, 'down', '', resolvedBaseIndex),
+        buildAiMetricSnapshot('Lag Android', lagAndroidSeries, 'minutes', compareMode, 1, 'down', '', resolvedBaseIndex),
       ],
     },
     anomalies: report.anomalies,
@@ -4807,9 +4813,9 @@ export function buildChartsAiSummaryContext(report: ChartsReport, compareMode: '
       })),
     },
     devDowntime: {
-      ios: buildAiMetricSnapshot('DEV downtime iOS', iosDowntimeSeries, 'minutes', compareMode, 1, 'down'),
-      android: buildAiMetricSnapshot('DEV downtime Android', androidDowntimeSeries, 'minutes', compareMode, 1, 'down'),
-      total: buildAiMetricSnapshot('DEV downtime total', totalDowntimeSeries, 'minutes', compareMode, 1, 'down'),
+      ios: buildAiMetricSnapshot('DEV downtime iOS', iosDowntimeSeries, 'minutes', compareMode, 1, 'down', '', resolvedBaseIndex),
+      android: buildAiMetricSnapshot('DEV downtime Android', androidDowntimeSeries, 'minutes', compareMode, 1, 'down', '', resolvedBaseIndex),
+      total: buildAiMetricSnapshot('DEV downtime total', totalDowntimeSeries, 'minutes', compareMode, 1, 'down', '', resolvedBaseIndex),
       currentDays: {
         ios: currentDowntimeIos?.days || 0,
         android: currentDowntimeAndroid?.days || 0,

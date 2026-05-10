@@ -27,6 +27,7 @@ import {
   LogView,
   Progress,
   SegmentControl,
+  Select,
   StatusPill,
   Table,
   Td,
@@ -71,7 +72,7 @@ import {
 Chart.register(LineController, BarController, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler);
 
 type ChartMode = 'line' | 'bar';
-type CompareMode = 'mean' | 'prev';
+type CompareMode = 'mean' | 'prev' | 'specific';
 type LogLevel = 'info' | 'ok' | 'warn' | 'error';
 type ChartsDesignMockVariant = 'business' | 'compact' | 'legacy';
 type ChartsDesignValueMode = 'absolute' | 'prevDelta' | 'meanDelta';
@@ -2112,6 +2113,7 @@ export function Charts() {
   const [releaseTo, setReleaseTo] = useState('7.5.9000');
   const [chartMode] = useState<ChartMode>('line');
   const [compareMode, setCompareMode] = useState<CompareMode>('mean');
+  const [compareRelease, setCompareRelease] = useState('');
   const [valueMode, setValueMode] = useState<ChartsDesignValueMode>('absolute');
   const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
   const [availableDbReleases, setAvailableDbReleases] = useState<string[]>([]);
@@ -2160,13 +2162,15 @@ export function Charts() {
     Boolean(selectedReleases.length)
     && selectedReleases.some(release => !report?.releases?.includes(release))
   ), [report, selectedReleases]);
+  const resolvedCompareRelease = compareMode === 'specific' ? compareRelease || undefined : undefined;
+  const serviceCompareMode: 'mean' | 'prev' = compareMode === 'specific' ? 'mean' : compareMode;
   const filteredReport = useMemo(() => {
     if (selectedNeedsDb) return dbFilteredReport;
-    return rebuildChartsReportForReleases(report, selectedReleases, compareMode);
-  }, [compareMode, dbFilteredReport, report, selectedNeedsDb, selectedReleases]);
+    return rebuildChartsReportForReleases(report, selectedReleases, serviceCompareMode, resolvedCompareRelease);
+  }, [serviceCompareMode, resolvedCompareRelease, dbFilteredReport, report, selectedNeedsDb, selectedReleases]);
   const displayedReport = useMemo(() => {
     if (!filteredReport) return null;
-    const summaryState = rebuildChartsSummaryState(filteredReport, compareMode);
+    const summaryState = rebuildChartsSummaryState(filteredReport, serviceCompareMode, resolvedCompareRelease);
     return {
       ...filteredReport,
       aiContext: summaryState.aiContext,
@@ -2175,7 +2179,7 @@ export function Charts() {
         summary: summaryState.mlSummary,
       },
     } as ChartsReport;
-  }, [compareMode, filteredReport]);
+  }, [serviceCompareMode, resolvedCompareRelease, filteredReport]);
   const labels = useMemo(() => (displayedReport?.releases || []).map(formatReleaseShort), [displayedReport]);
   const currentMetric = displayedReport?.metrics[displayedReport.metrics.length - 1] || null;
   const displayedMlRiskPct = displayedReport?.ml.prediction.activeProbability == null
@@ -4098,11 +4102,26 @@ export function Charts() {
             <div>
               <FieldLabel>Сравнение базы</FieldLabel>
               <SegmentControl
-                items={[{ label: 'Среднее', value: 'mean' }, { label: 'Предыдущий', value: 'prev' }]}
+                items={[{ label: 'Среднее', value: 'mean' }, { label: 'Предыдущий', value: 'prev' }, { label: 'Релиз', value: 'specific' }]}
                 value={compareMode}
                 onChange={value => setCompareMode(value as CompareMode)}
               />
             </div>
+            {compareMode === 'specific' && (
+              <div>
+                <FieldLabel>Релиз для сравнения</FieldLabel>
+                <Select
+                  value={compareRelease}
+                  style={{ width: 160 }}
+                  onChange={event => setCompareRelease(event.target.value)}
+                >
+                  <option value="">— выбрать —</option>
+                  {availableReleaseOptions.map(release => (
+                    <option key={release} value={release}>{release}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22, fontSize: 13, color: 'var(--text-2)' }}>
               <input type="checkbox" checked={aiAutoSummary} onChange={event => setAiAutoSummary(event.target.checked)} />
               AI после сбора
