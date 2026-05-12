@@ -129,8 +129,9 @@ export function getRoleLabel(role: string, roles: RbacRole[]): string {
 }
 
 export function getLegacyAssetUrl(filePath: string): string {
-  const baseUrl = new URL(document.baseURI || window.location.origin);
-  return new URL(`legacy/${filePath}`, baseUrl).toString();
+  const pathname = window.location.pathname;
+  const basePath = pathname.endsWith('/') ? pathname : `${pathname}/`;
+  return `${window.location.origin}${basePath}legacy/${filePath}`;
 }
 
 export function buildLegacyModuleUrl(module: ModuleDefinition, settings: AppSettings): string {
