@@ -11,6 +11,7 @@ export type ModuleId =
   | 'biaudience'
   | 'biusers'
   | 'devices'
+  | 'deviceQueries'
   | 'charts'
   | 'releaseAnalysis'
   | 'chpRange'
@@ -275,6 +276,15 @@ export const MODULES: ModuleDefinition[] = [
     sub: 'Аудитория по моделям',
     section: 'Аналитика',
     icon: icDevices,
+  },
+  {
+    id: 'deviceQueries',
+    legacyId: 'BI устройства+.html',
+    label: 'BI устройства+',
+    sub: 'Производители · пользователь · tablets · iPad · FOLD',
+    section: 'Аналитика',
+    icon: icDevices,
+    showLegacyButton: false,
   },
   {
     id: 'charts',

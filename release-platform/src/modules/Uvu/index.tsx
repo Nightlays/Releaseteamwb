@@ -40,6 +40,7 @@ import {
   type UwuStreamRow,
 } from '../../services/uvu';
 import {
+  loadAvailableUwuReleaseReportsFromSupabase,
   loadUwuReleaseReportFromSupabase,
   saveUwuReleaseReportToSupabase,
 } from '../../services/releaseStatsSupabase';
@@ -694,6 +695,7 @@ export function Uvu() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('people');
   const [running, setRunning] = useState(false);
   const [dbBusy, setDbBusy] = useState(false);
+  const [dbReleases, setDbReleases] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('—');
   const [error, setError] = useState('');
@@ -720,6 +722,7 @@ export function Uvu() {
   const runIdRef = useRef(0);
   const daysExportRef = useRef<HTMLDivElement | null>(null);
   const daysFilterInitializedRef = useRef(false);
+  const defaultDbReleaseProjectRef = useRef('');
 
   const normalizedRelease = normalizeUwuReleaseVersion(releaseVersion);
   const tokenReady = Boolean(String(settings.allureToken || '').trim());
@@ -740,6 +743,22 @@ export function Uvu() {
   useEffect(() => {
     persistFilters(filters);
   }, [filters]);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadAvailableUwuReleaseReportsFromSupabase(settings.projectId)
+      .then(releases => {
+        if (!cancelled) setDbReleases(releases);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.projectId]);
+
+  const dbReleaseOptions = useMemo(() => (
+    [...dbReleases].sort((left, right) => right.localeCompare(left, 'ru', { numeric: true, sensitivity: 'base' }))
+  ), [dbReleases]);
 
   const dayUsers = useMemo(() => {
     if (!report) return [];
@@ -959,6 +978,7 @@ export function Uvu() {
       try {
         await saveUwuReleaseReportToSupabase(settings.projectId, nextReport);
         if (runId === runIdRef.current) {
+          setDbReleases(prev => Array.from(new Set([...prev, nextReport.releaseVersion])));
           setStatus('Готово. Срез релиза записан в БД.');
         }
       } catch (storageError) {
@@ -998,21 +1018,23 @@ export function Uvu() {
     settings.useProxy,
   ]);
 
-  const loadFromDb = useCallback(async () => {
-    if (!canLoadFromDb) return;
+  const loadFromDb = useCallback(async (targetRelease = normalizedRelease) => {
+    const cleanRelease = normalizeUwuReleaseVersion(targetRelease);
+    if (!cleanRelease || running || dbBusy) return;
     setDbBusy(true);
     setError('');
     setProgress(0);
     setStatus('Читаю сохранённый uWu-срез из БД…');
     try {
-      const cachedReport = await loadUwuReleaseReportFromSupabase(settings.projectId, normalizedRelease);
+      const cachedReport = await loadUwuReleaseReportFromSupabase(settings.projectId, cleanRelease);
       if (!cachedReport) {
         setStatus('В БД нет сохранённого uWu-среза для этого релиза.');
         return;
       }
+      setReleaseVersion(cachedReport.releaseVersion);
       applyReport(cachedReport);
       setProgress(100);
-      setStatus('БД: uWu-срез релиза загружен.');
+      setStatus(`БД: uWu-срез ${cachedReport.releaseVersion} загружен.`);
     } catch (rawError) {
       const message = (rawError as Error).message || 'Не удалось загрузить uWu-срез из БД.';
       setError(message);
@@ -1021,7 +1043,19 @@ export function Uvu() {
     } finally {
       setDbBusy(false);
     }
-  }, [applyReport, canLoadFromDb, normalizedRelease, settings.projectId]);
+  }, [applyReport, dbBusy, normalizedRelease, running, settings.projectId]);
+
+  useEffect(() => {
+    const latestRelease = dbReleaseOptions[0];
+    if (!latestRelease || running || dbBusy) return;
+
+    const projectKey = String(settings.projectId || '').trim() || '7';
+    if (defaultDbReleaseProjectRef.current === projectKey) return;
+    defaultDbReleaseProjectRef.current = projectKey;
+
+    setReleaseVersion(latestRelease);
+    void loadFromDb(latestRelease);
+  }, [dbBusy, dbReleaseOptions, loadFromDb, running, settings.projectId]);
 
   const stop = useCallback(() => {
     runIdRef.current += 1;
@@ -1567,6 +1601,26 @@ export function Uvu() {
               placeholder="7.5.0000"
               style={{ width: 118, height: 34, padding: '6px 10px', minWidth: 0 }}
             />
+            {dbReleaseOptions.length > 0 && (
+              <>
+                <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>Из БД:</span>
+                <CanonicalValueSelect
+                  value=""
+                  options={dbReleaseOptions}
+                  onChange={value => {
+                    if (!value) return;
+                    setReleaseVersion(value);
+                    void loadFromDb(value);
+                  }}
+                  placeholder={dbBusy ? 'Загрузка...' : 'Выбрать релиз'}
+                  searchPlaceholder="Поиск релиза"
+                  emptyText="Релизы не найдены"
+                  clearLabel="Не выбирать"
+                  disabled={running || dbBusy}
+                  style={{ width: 154, height: 34, padding: '6px 10px', minWidth: 0 }}
+                />
+              </>
+            )}
             <label
               title="Собирать High/Blocker"
               style={{

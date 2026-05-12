@@ -40,6 +40,91 @@ export interface BiDevicesPayload {
   totals: Record<'android' | 'ios', number>;
 }
 
+export type BiDeviceQueryKind =
+  | 'manufacturers'
+  | 'userDevices'
+  | 'platformShare'
+  | 'tablets'
+  | 'ipads'
+  | 'foldList'
+  | 'foldCount'
+  | 'androidManufacturers';
+
+export interface BiDeviceQueryDefinition {
+  kind: BiDeviceQueryKind;
+  queryId: number;
+  title: string;
+  description: string;
+  searchLabel?: string;
+  searchPlaceholder?: string;
+}
+
+export interface BiDeviceQueryRow {
+  values: Record<string, string | number | null>;
+  raw: unknown;
+  searchText: string;
+}
+
+export interface BiDeviceQueryPayload {
+  query: BiDeviceQueryDefinition;
+  rows: BiDeviceQueryRow[];
+  columns: string[];
+  fetchedAt: string;
+}
+
+export const BI_DEVICE_QUERY_DEFINITIONS: BiDeviceQueryDefinition[] = [
+  {
+    kind: 'manufacturers',
+    queryId: 94951,
+    title: 'Устройства по производителям',
+    description: 'Распределение моделей и пользователей по производителям устройств.',
+  },
+  {
+    kind: 'userDevices',
+    queryId: 94953,
+    title: 'Устройства пользователя',
+    description: 'Поиск устройств конкретного пользователя по user/login/id в BI-результате.',
+    searchLabel: 'Пользователь',
+    searchPlaceholder: 'login, user id или часть значения',
+  },
+  {
+    kind: 'platformShare',
+    queryId: 94954,
+    title: 'Процент пользователей по платформам',
+    description: 'Доля аудитории по платформам.',
+  },
+  {
+    kind: 'tablets',
+    queryId: 94955,
+    title: 'Планшеты по type=tablet',
+    description: 'Устройства, найденные BI-запросом по типу tablet.',
+  },
+  {
+    kind: 'ipads',
+    queryId: 94956,
+    title: 'iPad по имени',
+    description: 'Более точная выборка iPad по названию модели.',
+  },
+  {
+    kind: 'foldList',
+    queryId: 94957,
+    title: 'FOLD по списку',
+    description: 'FOLD-устройства по известному списку моделей.',
+  },
+  {
+    kind: 'foldCount',
+    queryId: 94958,
+    title: 'Подсчёт FOLD',
+    description: 'Агрегированный подсчёт FOLD-устройств.',
+  },
+  {
+    kind: 'androidManufacturers',
+    queryId: 94959,
+    title: 'Производители Android от 100%',
+    description: 'Android-производители с полным покрытием в запросе.',
+  },
+];
+
 export interface BiUserRecord {
   platform: 'iOS' | 'Android';
   release: string;
@@ -162,6 +247,7 @@ const BI_BASE = 'https://bi.wb.ru';
 const BI_API_QUEUE = `${BI_BASE}/bi/v2/queue`;
 const BI_API_QUEUE_V1 = `${BI_BASE}/bi/queue`;
 const BI_API_CACHE = `${BI_BASE}/cache-puller/api/v1/cache`;
+const BI_API_QUERY = `${BI_BASE}/bi/v5/datasource/query`;
 const BI_DATASOURCE_ID = 11386;
 const BI_DEVICE_DS_ID = 14517;
 const BI_DEVICE_OS_DS_ID = 16888;
@@ -180,6 +266,7 @@ const BI_V2_DATASOURCES = new Set([BI_DATASOURCE_ID, BI_DEVICE_DS_ID, BI_DEVICE_
 const BI_V2_DATASOURCE_MIN_ID = 10000;
 const BI_READY_STATUSES = new Set(['RESOLVED', 'DONE', 'SUCCESS', 'READY', 'CACHE_READY']);
 const BI_ERROR_STATUSES = new Set(['FAILED', 'ERROR']);
+type BiQueueKind = 'datasource' | 'savedDatasource';
 
 const DEPLOY_ISSUES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/issues';
 const BI_INTERVAL = 'last_2_days';
@@ -261,18 +348,22 @@ function isBiV2DataSource(dataSourceId: number) {
   return BI_V2_DATASOURCES.has(dataSourceId) || dataSourceId >= BI_V2_DATASOURCE_MIN_ID;
 }
 
+function isBiV2Queue(dataSourceId: number, queueKind: BiQueueKind) {
+  return queueKind === 'savedDatasource' || isBiV2DataSource(dataSourceId);
+}
+
 function getBiQueueUrl(dataSourceId: number) {
   return isBiV2DataSource(dataSourceId)
     ? `${BI_API_QUEUE}/datasource/${dataSourceId}`
     : `${BI_API_QUEUE_V1}/datasource/${dataSourceId}`;
 }
 
-function getBiStatusUrl(requestId: string) {
-  return `${BI_API_QUEUE_V1}/dbconn/${BI_DBCONN_ID}/request/${encodeURIComponent(requestId)}/status`;
+function getBiStatusUrl(requestId: string, dbConnId = BI_DBCONN_ID) {
+  return `${BI_API_QUEUE_V1}/dbconn/${dbConnId}/request/${encodeURIComponent(requestId)}/status`;
 }
 
-function getBiResultUrl(requestId: string, dataSourceId: number) {
-  return isBiV2DataSource(dataSourceId)
+function getBiResultUrl(requestId: string, dataSourceId: number, queueKind: BiQueueKind) {
+  return isBiV2Queue(dataSourceId, queueKind)
     ? `${BI_API_CACHE}/result/request/${encodeURIComponent(requestId)}?onlyCache=false`
     : `${BI_BASE}/bi/cache/result/request/${encodeURIComponent(requestId)}?onlyCache=false`;
 }
@@ -316,12 +407,19 @@ async function proxyResponseJson(
   };
 }
 
-async function runBiQuery(cfg: YtConfig, dataSourceId: number, body: Record<string, unknown>) {
+async function runBiQuery(
+  cfg: YtConfig,
+  dataSourceId: number,
+  body: Record<string, unknown>,
+  queueKind: BiQueueKind = 'datasource',
+  queueId?: number,
+) {
   const cookie = String(cfg.biCookie || '').trim();
   if (!cookie) {
     throw new Error('Добавь WB BI Cookie в настройки.');
   }
 
+  const targetLabel = queueKind === 'savedDatasource' ? 'query' : 'datasource';
   const queue = await proxyResponseJson(cfg, getBiQueueUrl(dataSourceId), {
     method: 'POST',
     headers: {
@@ -332,14 +430,14 @@ async function runBiQuery(cfg: YtConfig, dataSourceId: number, body: Record<stri
   });
 
   if (!queue.ok) {
-    throw new Error(`WB BI очередь вернула HTTP ${queue.status} для datasource ${dataSourceId}.`);
+    throw new Error(`WB BI очередь вернула HTTP ${queue.status} для ${targetLabel} ${dataSourceId}.`);
   }
 
   const requestId = findStringDeep(queue.json, 'requestId');
   const key = findStringDeep(queue.json, 'key');
 
   if (!requestId || !key) {
-    throw new Error(`WB BI не вернул requestId/key для datasource ${dataSourceId}.`);
+    throw new Error(`WB BI не вернул requestId/key для ${targetLabel} ${dataSourceId}.`);
   }
 
   try {
@@ -353,9 +451,40 @@ async function runBiQuery(cfg: YtConfig, dataSourceId: number, body: Record<stri
   const pollMs = 1500;
   const timeoutMs = 180000;
 
-  if (isBiV2DataSource(dataSourceId)) {
+  if (queueKind === 'savedDatasource') {
     while (Date.now() - startedAt < timeoutMs) {
-      const result = await proxyResponseJson(cfg, getBiResultUrl(requestId, dataSourceId), {
+      const status = await proxyResponseJson(cfg, getBiStatusUrl(requestId, queueId), {
+        headers: authHeaders,
+      });
+      const statusData = (status.json?.data as { status?: string } | undefined) || undefined;
+      const rawStatus = String(statusData?.status || status.json?.status || '').toUpperCase();
+
+      if (status.ok && BI_READY_STATUSES.has(rawStatus)) {
+        break;
+      }
+
+      if (BI_ERROR_STATUSES.has(rawStatus)) {
+        throw new Error(`WB BI статус ${rawStatus} для ${targetLabel} ${dataSourceId}.`);
+      }
+
+      await sleep(pollMs);
+    }
+
+    const result = await proxyResponseJson(cfg, getBiResultUrl(requestId, dataSourceId, queueKind), {
+      headers: authHeaders,
+    });
+
+    if (!result.ok) {
+      throw new Error(`WB BI result вернул HTTP ${result.status} для ${targetLabel} ${dataSourceId}.`);
+    }
+
+    const resultData = (result.json?.data as { rows?: unknown[] } | undefined) || undefined;
+    return Array.isArray(resultData?.rows) ? resultData.rows : [];
+  }
+
+  if (isBiV2Queue(dataSourceId, queueKind)) {
+    while (Date.now() - startedAt < timeoutMs) {
+      const result = await proxyResponseJson(cfg, getBiResultUrl(requestId, dataSourceId, queueKind), {
         headers: authHeaders,
       });
       const resultData = (result.json?.data as { rows?: unknown[] } | undefined) || undefined;
@@ -368,17 +497,17 @@ async function runBiQuery(cfg: YtConfig, dataSourceId: number, body: Record<stri
       }
 
       if (BI_ERROR_STATUSES.has(rawStatus)) {
-        throw new Error(`WB BI статус ${rawStatus} для datasource ${dataSourceId}.`);
+        throw new Error(`WB BI статус ${rawStatus} для ${targetLabel} ${dataSourceId}.`);
       }
 
       await sleep(pollMs);
     }
 
-    throw new Error(`WB BI timeout для datasource ${dataSourceId}.`);
+    throw new Error(`WB BI timeout для ${targetLabel} ${dataSourceId}.`);
   }
 
   while (Date.now() - startedAt < timeoutMs) {
-    const status = await proxyResponseJson(cfg, getBiStatusUrl(requestId), {
+    const status = await proxyResponseJson(cfg, getBiStatusUrl(requestId, queueId), {
       headers: authHeaders,
     });
     const statusData = (status.json?.data as { status?: string } | undefined) || undefined;
@@ -389,18 +518,18 @@ async function runBiQuery(cfg: YtConfig, dataSourceId: number, body: Record<stri
     }
 
     if (BI_ERROR_STATUSES.has(rawStatus)) {
-      throw new Error(`WB BI статус ${rawStatus} для datasource ${dataSourceId}.`);
+      throw new Error(`WB BI статус ${rawStatus} для ${targetLabel} ${dataSourceId}.`);
     }
 
     await sleep(pollMs);
   }
 
-  const result = await proxyResponseJson(cfg, getBiResultUrl(requestId, dataSourceId), {
+  const result = await proxyResponseJson(cfg, getBiResultUrl(requestId, dataSourceId, queueKind), {
     headers: authHeaders,
   });
 
   if (!result.ok) {
-    throw new Error(`WB BI result вернул HTTP ${result.status} для datasource ${dataSourceId}.`);
+    throw new Error(`WB BI result вернул HTTP ${result.status} для ${targetLabel} ${dataSourceId}.`);
   }
 
   const resultData = (result.json?.data as { rows?: unknown[] } | undefined) || undefined;
@@ -1424,6 +1553,186 @@ function createAudienceCrossBody(options: {
     widgetId: 0,
     withLimitation: false,
     queryParams,
+  };
+}
+
+interface SavedBiQueryRuntime {
+  connectorId: number;
+  body: Record<string, unknown>;
+}
+
+function createSavedBiQueryBody(queryId: number, query?: Record<string, unknown>, meta?: Record<string, unknown>) {
+  return {
+    dashboardId: 0,
+    dataSourceId: Number(meta?.id || query?.dataSourceId || queryId),
+    metaOnly: false,
+    onlyCache: false,
+    widgetId: 0,
+    withLimitation: Boolean(query?.withLimitation),
+    queryParams: Array.isArray(query?.queryParams) ? cloneJsonRecord({ queryParams: query.queryParams }).queryParams : [],
+  };
+}
+
+function asJsonRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function cloneJsonRecord(record: Record<string, unknown>) {
+  return JSON.parse(JSON.stringify(record)) as Record<string, unknown>;
+}
+
+function findRecordDeep(input: unknown, key: string): Record<string, unknown> | null {
+  const record = asJsonRecord(input);
+  if (!record) return null;
+
+  const direct = asJsonRecord(record[key]);
+  if (direct) return direct;
+
+  for (const value of Object.values(record)) {
+    const nested = findRecordDeep(value, key);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function extractSavedBiQueryRuntime(payload: unknown, queryId: number): SavedBiQueryRuntime | null {
+  const root = asJsonRecord(payload);
+  if (!root) return null;
+
+  const data = asJsonRecord(root.data);
+  const query = asJsonRecord(root.query)
+    || asJsonRecord(data?.query)
+    || asJsonRecord(root.datasourceQuery)
+    || asJsonRecord(root.dataSourceQuery)
+    || asJsonRecord(data?.datasourceQuery)
+    || asJsonRecord(data?.dataSourceQuery)
+    || findRecordDeep(root, 'query');
+  const meta = asJsonRecord(root.meta) || asJsonRecord(data?.meta) || findRecordDeep(root, 'meta') || undefined;
+  const connector = asJsonRecord(query?.connector) || asJsonRecord(root.connector) || asJsonRecord(data?.connector);
+  const connectorId = Number(connector?.id || query?.connectorId || query?.dbconnId || meta?.connectorId || 0);
+
+  if (!query || !connectorId) return null;
+
+  return {
+    connectorId,
+    body: createSavedBiQueryBody(queryId, query, meta),
+  };
+}
+
+function isSavedBiSearchParam(param: Record<string, unknown>) {
+  const marker = String(param.key || param.name || param.label || param.title || '').toLowerCase();
+  return ['user', 'login', 'uid', 'search', 'польз', 'логин'].some(part => marker.includes(part));
+}
+
+function applySavedBiSearchParams(body: Record<string, unknown>, searchValue?: string) {
+  const cleanSearch = String(searchValue || '').trim();
+  if (!cleanSearch) return body;
+
+  const params = Array.isArray(body.queryParams) ? body.queryParams : [];
+  let matched = false;
+  const nextParams = params.map(param => {
+    const record = asJsonRecord(param);
+    if (!record) return param;
+
+    if (!isSavedBiSearchParam(record) && params.length !== 1) {
+      return param;
+    }
+
+    matched = true;
+    return {
+      ...record,
+      value: cleanSearch,
+    };
+  });
+
+  if (matched) {
+    body.queryParams = nextParams;
+  }
+
+  return body;
+}
+
+async function fetchSavedBiQueryRuntime(cfg: YtConfig, queryId: number, searchValue?: string) {
+  const cookie = String(cfg.biCookie || '').trim();
+  if (!cookie) {
+    throw new Error('Добавь WB BI Cookie в настройки.');
+  }
+
+  const response = await proxyResponseJson(cfg, `${BI_API_QUERY}/${queryId}`, {
+    headers: buildBiHeaders(cookie, queryId),
+    signal: cfg.signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`WB BI не загрузил описание query ${queryId}: HTTP ${response.status}.`);
+  }
+
+  const runtime = extractSavedBiQueryRuntime(response.json, queryId);
+  if (!runtime) {
+    throw new Error(`WB BI не вернул connector/queryParams для query ${queryId}.`);
+  }
+
+  runtime.body = applySavedBiSearchParams(runtime.body, searchValue);
+  return runtime;
+}
+
+function normalizeBiDeviceQueryRow(row: unknown): BiDeviceQueryRow {
+  const values: Record<string, string | number | null> = {};
+
+  if (Array.isArray(row)) {
+    row.forEach((value, index) => {
+      values[`col_${index + 1}`] = normalizeTableCell(value);
+    });
+  } else if (row && typeof row === 'object') {
+    Object.entries(row as Record<string, unknown>).forEach(([key, value]) => {
+      values[key] = normalizeTableCell(value);
+    });
+  } else {
+    values.value = normalizeTableCell(row);
+  }
+
+  return {
+    values,
+    raw: row,
+    searchText: Object.values(values).map(value => String(value ?? '')).join(' ').toLowerCase(),
+  };
+}
+
+function normalizeTableCell(value: unknown): string | number | null {
+  if (value == null) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object') {
+    const record = value as { name?: unknown; label?: unknown; value?: unknown; title?: unknown };
+    const nested = record.name ?? record.label ?? record.value ?? record.title;
+    if (nested != null && nested !== value) return normalizeTableCell(nested);
+  }
+  return String(value);
+}
+
+function collectBiDeviceQueryColumns(rows: BiDeviceQueryRow[]) {
+  const seen = new Set<string>();
+  rows.forEach(row => {
+    Object.keys(row.values).forEach(key => seen.add(key));
+  });
+  return Array.from(seen);
+}
+
+export async function fetchBiDeviceQuery(
+  cfg: YtConfig,
+  query: BiDeviceQueryDefinition,
+  options?: { searchValue?: string },
+): Promise<BiDeviceQueryPayload> {
+  const runtime = await fetchSavedBiQueryRuntime(cfg, query.queryId, options?.searchValue);
+  const rawRows = await runBiQuery(cfg, query.queryId, runtime.body, 'savedDatasource', runtime.connectorId);
+  const rows = (Array.isArray(rawRows) ? rawRows : []).map(normalizeBiDeviceQueryRow);
+  return {
+    query,
+    rows,
+    columns: collectBiDeviceQueryColumns(rows),
+    fetchedAt: new Date().toISOString(),
   };
 }
 

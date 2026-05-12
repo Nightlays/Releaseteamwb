@@ -14,6 +14,7 @@ import { Charts } from './modules/Charts';
 import { BiAudience } from './modules/BiAudience';
 import { BiUsers } from './modules/BiUsers';
 import { Devices } from './modules/Devices';
+import { DeviceQueries } from './modules/DeviceQueries';
 import { Launch } from './modules/Launch';
 import { CreateRun } from './modules/CreateRun';
 import { ChpCollect } from './modules/ChpCollect';
@@ -83,6 +84,8 @@ function ModuleContent({
       return <div key={key}><BiUsers /></div>;
     case 'devices':
       return <div key={key}><Devices /></div>;
+    case 'deviceQueries':
+      return <div key={key}><DeviceQueries /></div>;
     case 'launch':
       return <div key={key}><Launch /></div>;
     case 'createrun':
