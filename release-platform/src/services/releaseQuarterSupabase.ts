@@ -1,7 +1,6 @@
 import { classifyLocomotiveTags, compareRelease, type PlatformKey, type QuarterAnalysisRow, type ReleaseIssueMeta } from './releasePages';
 
-const SUPABASE_URL = 'https://hjlnudkbdhovoaxglkmq.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_5FDmZ6-2PIyW3qo6IeYuAg_p20zTP_M';
+import { STORAGE_REST_URL, storageHeaders } from './storageRest';
 
 type QuarterTableName = 'release_quarter_android' | 'release_quarter_ios';
 
@@ -187,14 +186,9 @@ function rowPayload(row: QuarterAnalysisRow, releaseFrom: string, releaseTo: str
 
 async function supabaseUpsert(table: QuarterTableName, payload: unknown[]) {
   if (!payload.length) return 0;
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=version`, {
+  const response = await fetch(`${STORAGE_REST_URL}/${table}?on_conflict=version`, {
     method: 'POST',
-    headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=minimal',
-    },
+    headers: storageHeaders('resolution=merge-duplicates,return=minimal'),
     body: JSON.stringify(payload),
   });
 
@@ -206,13 +200,9 @@ async function supabaseUpsert(table: QuarterTableName, payload: unknown[]) {
 }
 
 async function supabaseSelect(table: QuarterTableName) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*`, {
+  const response = await fetch(`${STORAGE_REST_URL}/${table}?select=*`, {
     method: 'GET',
-    headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-      Accept: 'application/json',
-    },
+    headers: storageHeaders(),
   });
 
   if (!response.ok) {

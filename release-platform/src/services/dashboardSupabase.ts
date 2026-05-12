@@ -8,8 +8,8 @@ import type {
 import type { DashboardHistoryPoint, DashboardPrediction } from './releasePrediction';
 import type { AllureLaunchResult } from '../types';
 
-const SUPABASE_URL = 'https://hjlnudkbdhovoaxglkmq.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_5FDmZ6-2PIyW3qo6IeYuAg_p20zTP_M';
+import { STORAGE_REST_URL, storageHeaders } from './storageRest';
+
 const DASHBOARD_TABLE = 'dashboard_snapshots';
 
 interface DashboardSnapshotRecord {
@@ -269,15 +269,7 @@ function snapshotRow(input: DashboardSnapshotInput) {
   };
 }
 
-function headers(prefer?: string) {
-  return {
-    apikey: SUPABASE_PUBLISHABLE_KEY,
-    Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    ...(prefer ? { Prefer: prefer } : {}),
-  };
-}
+const headers = storageHeaders;
 
 async function assertOk(response: Response, operation: string) {
   if (response.ok) return;
@@ -293,7 +285,7 @@ export async function loadDashboardSnapshotHistory(version: string, projectId: s
     order: 'snapshot_at.desc',
     limit: String(Math.max(1, Math.min(240, limit))),
   });
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${DASHBOARD_TABLE}?${query}`, {
+  const response = await fetch(`${STORAGE_REST_URL}/${DASHBOARD_TABLE}?${query}`, {
     method: 'GET',
     headers: headers(),
   });
@@ -326,7 +318,7 @@ export async function loadLatestDashboardSnapshot(version: string, projectId: st
     order: 'snapshot_at.desc',
     limit: '1',
   });
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${DASHBOARD_TABLE}?${query}`, {
+  const response = await fetch(`${STORAGE_REST_URL}/${DASHBOARD_TABLE}?${query}`, {
     method: 'GET',
     headers: headers(),
   });
@@ -337,7 +329,7 @@ export async function loadLatestDashboardSnapshot(version: string, projectId: st
 }
 
 export async function saveDashboardSnapshot(input: DashboardSnapshotInput) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${DASHBOARD_TABLE}`, {
+  const response = await fetch(`${STORAGE_REST_URL}/${DASHBOARD_TABLE}`, {
     method: 'POST',
     headers: headers('return=representation'),
     body: JSON.stringify(snapshotRow(input)),

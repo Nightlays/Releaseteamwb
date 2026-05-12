@@ -1,24 +1,15 @@
 import type { SwatReleaseReport } from './swat';
 import type { UwuReport } from './uvu';
+import { STORAGE_REST_URL, storageHeaders } from './storageRest';
 
-const SUPABASE_URL = 'https://hjlnudkbdhovoaxglkmq.supabase.co';
-const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_5FDmZ6-2PIyW3qo6IeYuAg_p20zTP_M';
+const SUPABASE_REST_URL = STORAGE_REST_URL;
 
 interface ReportPayloadRecord {
   release?: unknown;
   report_payload?: unknown;
 }
 
-function headers(prefer?: string) {
-  return {
-    apikey: SUPABASE_PUBLISHABLE_KEY,
-    Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    ...(prefer ? { Prefer: prefer } : {}),
-  };
-}
+const headers = storageHeaders;
 
 async function assertOk(response: Response, operation: string) {
   if (response.ok) return;
