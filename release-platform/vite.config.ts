@@ -9,16 +9,15 @@ const repoRoot = path.resolve(__dirname, '..');
 const legacyRoot = path.resolve(__dirname, 'legacy');
 const postgresRestPrefix = '/api/postgres/rest/v1/';
 const postgresTables = new Map<string, string>([
-  ['dashboard_snapshots',      '"charts"."dashboard_snapshots"'],
-  ['charts_reports',           '"charts"."charts_reports"'],
-  ['charts_release_metrics',   '"charts"."charts_release_metrics"'],
-  ['charts_release_snapshots', '"charts"."charts_release_snapshots"'],
-  ['charts_ml_dataset',        '"charts"."charts_ml_dataset"'],
-  ['release_quarter_android',  '"release"."release_quarter_android"'],
-  ['release_quarter_ios',      '"release"."release_quarter_ios"'],
-  ['learnhub_records',         '"reference"."learnhub_records"'],
-  ['uvu_release_reports',      '"release"."uvu_release_reports"'],
-  ['swat_release_reports',     '"release"."swat_release_reports"'],
+  ['dashboard_snapshots',      '"release_platform"."dashboard_snapshots"'],
+  ['charts_reports',           '"release_platform"."charts_reports"'],
+  ['charts_release_metrics',   '"release_platform"."charts_release_metrics"'],
+  ['charts_release_snapshots', '"release_platform"."charts_release_snapshots"'],
+  ['charts_ml_dataset',        '"release_platform"."charts_ml_dataset"'],
+  ['release_quarter_android',  '"release_platform"."release_quarter_android"'],
+  ['release_quarter_ios',      '"release_platform"."release_quarter_ios"'],
+  ['uvu_release_reports',      '"release_platform"."uvu_release_reports"'],
+  ['swat_release_reports',     '"release_platform"."swat_release_reports"'],
 ]);
 const legacyRoutePrefix = '/legacy/';
 const legacyDirs = new Set(['mascots', 'tools']);
