@@ -202,12 +202,22 @@ function normalizeRowsPayload(payload: unknown) {
   return [];
 }
 
+function serializeValue(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (Array.isArray(value)) {
+    if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null) return JSON.stringify(value);
+    return value;
+  }
+  if (typeof value === 'object') return JSON.stringify(value);
+  return value;
+}
+
 function insertSql(table: string, rows: Record<string, unknown>[], conflictColumns: string[], returning: boolean) {
   const columns = Array.from(new Set(rows.flatMap(row => Object.keys(row))));
   if (!columns.length) throw new Error('Empty insert payload');
   const values: unknown[] = [];
   const placeholders = rows.map(row => `(${columns.map(column => {
-    values.push(row[column] ?? null);
+    values.push(serializeValue(row[column]));
     return `$${values.length}`;
   }).join(', ')})`);
   const updateColumns = columns.filter(column => !conflictColumns.includes(column));
