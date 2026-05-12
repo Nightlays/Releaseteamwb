@@ -8,17 +8,17 @@ import react from '@vitejs/plugin-react';
 const repoRoot = path.resolve(__dirname, '..');
 const legacyRoot = path.resolve(__dirname, 'legacy');
 const postgresRestPrefix = '/api/postgres/rest/v1/';
-const postgresTables = new Set([
-  'dashboard_snapshots',
-  'charts_reports',
-  'charts_release_metrics',
-  'charts_release_snapshots',
-  'charts_ml_dataset',
-  'release_quarter_android',
-  'release_quarter_ios',
-  'learnhub_records',
-  'uvu_release_reports',
-  'swat_release_reports',
+const postgresTables = new Map<string, string>([
+  ['dashboard_snapshots',      '"charts"."dashboard_snapshots"'],
+  ['charts_reports',           '"charts"."charts_reports"'],
+  ['charts_release_metrics',   '"charts"."charts_release_metrics"'],
+  ['charts_release_snapshots', '"charts"."charts_release_snapshots"'],
+  ['charts_ml_dataset',        '"charts"."charts_ml_dataset"'],
+  ['release_quarter_android',  '"release"."release_quarter_android"'],
+  ['release_quarter_ios',      '"release"."release_quarter_ios"'],
+  ['learnhub_records',         '"reference"."learnhub_records"'],
+  ['uvu_release_reports',      '"release"."uvu_release_reports"'],
+  ['swat_release_reports',     '"release"."swat_release_reports"'],
 ]);
 const legacyRoutePrefix = '/legacy/';
 const legacyDirs = new Set(['mascots', 'tools']);
@@ -126,8 +126,9 @@ function cleanIdentifier(value: string) {
 
 function pgTableName(value: string) {
   const normalized = String(value || '').trim();
-  if (!postgresTables.has(normalized)) throw new Error(`Postgres table is not allowed: ${normalized}`);
-  return cleanIdentifier(normalized);
+  const qualified = postgresTables.get(normalized);
+  if (!qualified) throw new Error(`Postgres table is not allowed: ${normalized}`);
+  return qualified;
 }
 
 function selectColumns(value: string | null) {
