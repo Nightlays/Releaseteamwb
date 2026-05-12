@@ -1,0 +1,57 @@
+ports:
+  - name: http
+    containerPort: 80
+    protocol: TCP
+
+service:
+  enabled: true
+  type: ClusterIP
+  externalTrafficPolicy: Local
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+
+persistence:
+  enabled: true
+  version: v2
+  emptyDir:
+    volumes:
+      - name: "var"
+        mountPath: /var/cache/nginx
+      - name: "tmp"
+        mountPath: /tmp
+      - name: "run"
+        mountPath: /run/nginx
+
+# Fallback for charts that don't read persistence.emptyDir in job mode
+volumes:
+  - name: nginx-cache
+    emptyDir: {}
+  - name: nginx-tmp
+    emptyDir: {}
+  - name: nginx-run
+    emptyDir: {}
+volumeMounts:
+  - name: nginx-cache
+    mountPath: /var/cache/nginx
+  - name: nginx-tmp
+    mountPath: /tmp
+  - name: nginx-run
+    mountPath: /run/nginx
+
+ingress:
+  enabled: true
+  version: v2
+  allowNonClusterIPService: true
+  ingressClassName: {{ .Helm.Release.Namespace }}
+  objects:
+    - servicePort: 80
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /$2
+        nginx.ingress.kubernetes.io/proxy-buffering: "on"
+        nginx.ingress.kubernetes.io/proxy-buffer-size: "64k"
+      hosts:
+        - name: {{ .Helm.Release.Namespace }}-ingress-controller.{{ .Helm.Release.Namespace }}.{{ .Helm.Release.Cluster }}
+          path: /{{ .Helm.Release.Name }}(/|$)(.*)

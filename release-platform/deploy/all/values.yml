@@ -1,0 +1,84 @@
+replicaCount: 1
+
+image:
+  repository: {{.Helm.Release.Image}}
+  tag: {{.Helm.Release.Tag}}
+  pullPolicy: IfNotPresent
+
+ports:
+  - name: http
+    containerPort: 80
+    protocol: TCP
+
+service:
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+
+imagePullSecrets:
+  - name: harbor-wii-integrations-registry-secret
+
+ingress:
+  enabled: true
+  version: v2
+  allowNonClusterIPService: true
+  ingressClassName: {{ .Helm.Release.Namespace }}
+  objects:
+    - servicePort: 80
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+        nginx.ingress.kubernetes.io/rewrite-target: /$2
+      hosts:
+        - name: {{ .Helm.Release.Namespace }}-ingress-controller.{{ .Helm.Release.Namespace }}.{{ .Helm.Release.Cluster }}
+          path: /{{ .Helm.Release.Name }}(/|$)(.*)
+
+extraVolumes:
+  - name: nginx-cache
+    emptyDir: {}
+  - name: nginx-tmp
+    emptyDir: {}
+  - name: nginx-run
+    emptyDir: {}
+extraVolumeMounts:
+  - name: nginx-cache
+    mountPath: /var/cache/nginx
+  - name: nginx-tmp
+    mountPath: /tmp
+  - name: nginx-run
+    mountPath: /run/nginx
+
+persistence:
+  enabled: true
+  version: v2
+  emptyDir:
+    volumes:
+      - name: nginxcache
+        mountPath: /var/cache/nginx
+      - name: tmp
+        mountPath: /tmp
+      - name: run
+        mountPath: /run/nginx
+
+# Fallback for charts that don't read persistence.emptyDir in job mode
+volumes:
+  - name: nginx-cache
+    emptyDir: {}
+  - name: nginx-tmp
+    emptyDir: {}
+  - name: nginx-run
+    emptyDir: {}
+volumeMounts:
+  - name: nginx-cache
+    mountPath: /var/cache/nginx
+  - name: nginx-tmp
+    mountPath: /tmp
+  - name: nginx-run
+    mountPath: /run/nginx
+
+chartMeta:
+  owner: "koreysha.ilya"
+  maintainers:
+    - ilyasov.dmitriy4
+    - aksenov.dmitriy11
