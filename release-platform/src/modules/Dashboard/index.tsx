@@ -27,6 +27,7 @@ import {
   InfoRow,
   Input,
   Progress,
+  Select,
   Table,
   Td,
   Th,
@@ -1724,11 +1725,13 @@ export function Dashboard() {
   const [elapsed, setElapsed] = useState(0);
   const loadStartRef = useRef(0);
   const [error, setError] = useState('');
-  const [storageStatus, setStorageStatus] = useState('Supabase: история не загружена');
+  const [storageStatus, setStorageStatus] = useState('История не загружена');
   const [previousSnapshot, setPreviousSnapshot] = useState<DashboardHistoryPoint | null>(() => readSnapshot(initialForm.version));
   const [showBlockerBanner, setShowBlockerBanner] = useState(false);
   const [customDeadline, setCustomDeadline] = useState(initialForm.customDeadline);
   const [dbVersions, setDbVersions] = useState<string[]>([]);
+  const [selectedDbVersion, setSelectedDbVersion] = useState('');
+  const [loadingSnapshot, setLoadingSnapshot] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(600);
   const abortRef = useRef<AbortController | null>(null);
@@ -1763,6 +1766,33 @@ export function Dashboard() {
     setPreviousSnapshot(stored.historyPoint);
   }, []);
 
+  const loadSnapshotFromDb = useCallback(async (ver: string) => {
+    if (!ver) return;
+    setLoadingSnapshot(true);
+    setStorageStatus('Загружаем из БД…');
+    try {
+      const [remoteHistory, latestSnapshot] = await Promise.all([
+        loadDashboardSnapshotHistory(ver, settings.projectId, DASHBOARD_REMOTE_HISTORY_LIMIT),
+        loadLatestDashboardSnapshot(ver, settings.projectId),
+      ]);
+      setVersion(ver);
+      if (remoteHistory.length) {
+        setHistory(remoteHistory);
+        setPreviousSnapshot(latestHistoryPoint(remoteHistory));
+      }
+      if (latestSnapshot) {
+        applyStoredSnapshot(latestSnapshot);
+        setStorageStatus(`БД: загружено · ${ver} · ${remoteHistory.length} срезов`);
+      } else {
+        setStorageStatus(`БД: нет snapshot для версии ${ver}`);
+      }
+    } catch (e) {
+      setStorageStatus(`БД: ошибка загрузки — ${(e as Error).message}`);
+    } finally {
+      setLoadingSnapshot(false);
+    }
+  }, [settings.projectId, applyStoredSnapshot]);
+
   const load = useCallback(async () => {
     if (!settings.allureBase || !settings.projectId || !settings.allureToken) {
       setError('Заполни Allure Base, Project ID и API токен в настройках.');
@@ -1788,13 +1818,13 @@ export function Dashboard() {
         useProxy: settings.useProxy,
       };
 
-      setLoadingStep('Читаем историю Supabase…');
+      setLoadingStep('Читаем историю БД…');
       let remoteHistory: DashboardHistoryPoint[] = [];
       try {
         remoteHistory = await loadDashboardSnapshotHistory(version, settings.projectId, DASHBOARD_REMOTE_HISTORY_LIMIT);
-        setStorageStatus(remoteHistory.length ? `Supabase: загружено ${remoteHistory.length} срезов` : 'Supabase: история по версии пока пустая');
+        setStorageStatus(remoteHistory.length ? `БД:загружено ${remoteHistory.length} срезов` : 'БД:история по версии пока пустая');
       } catch (storageError) {
-        setStorageStatus(`Supabase: fallback на localStorage (${(storageError as Error).message || 'ошибка чтения'})`);
+        setStorageStatus(`БД:fallback на localStorage (${(storageError as Error).message || 'ошибка чтения'})`);
       }
       const localHistory = readHistory(version);
       const baselineHistory = remoteHistory.length ? remoteHistory : localHistory;
@@ -1914,7 +1944,7 @@ export function Dashboard() {
       }
 
       setLoadedPct(96);
-      setLoadingStep('Записываем Supabase snapshot…');
+      setLoadingStep('Записываем snapshot в БД…');
       try {
         const saved = await saveDashboardSnapshot({
           projectId: settings.projectId,
@@ -1930,9 +1960,9 @@ export function Dashboard() {
         });
         const savedHistory = mergeHistoryPoints(version, saved.history, [nextSnapshot]);
         setHistory(savedHistory);
-        setStorageStatus(`Supabase: snapshot записан${saved.id ? ` · ${saved.id.slice(0, 8)}` : ''} · ${savedHistory.length} срезов`);
+        setStorageStatus(`БД:snapshot записан${saved.id ? ` · ${saved.id.slice(0, 8)}` : ''} · ${savedHistory.length} срезов`);
       } catch (storageError) {
-        setStorageStatus(`Supabase: не удалось записать snapshot (${(storageError as Error).message || 'ошибка записи'})`);
+        setStorageStatus(`БД:не удалось записать snapshot (${(storageError as Error).message || 'ошибка записи'})`);
       }
 
       setLoadedPct(100);
@@ -1958,7 +1988,7 @@ export function Dashboard() {
     const localHistory = readHistory(version);
     setHistory(localHistory);
     setPreviousSnapshot(latestHistoryPoint(localHistory) || readSnapshot(version));
-    setStorageStatus('Supabase: читаем историю…');
+    setStorageStatus('БД:читаем историю…');
 
     Promise.all([
       loadDashboardSnapshotHistory(version, settings.projectId, DASHBOARD_REMOTE_HISTORY_LIMIT),
@@ -1969,9 +1999,9 @@ export function Dashboard() {
         if (remoteHistory.length) {
           setHistory(remoteHistory);
           setPreviousSnapshot(latestHistoryPoint(remoteHistory));
-          setStorageStatus(`Supabase: загружено ${remoteHistory.length} срезов${latestSnapshot ? ' · UI восстановлен' : ''}`);
+          setStorageStatus(`БД:загружено ${remoteHistory.length} срезов${latestSnapshot ? ' · UI восстановлен' : ''}`);
         } else {
-          setStorageStatus('Supabase: история по версии пока пустая');
+          setStorageStatus('БД:история по версии пока пустая');
         }
         if (latestSnapshot) {
           applyStoredSnapshot(latestSnapshot);
@@ -1996,7 +2026,7 @@ export function Dashboard() {
       })
       .catch(storageError => {
         if (!active) return;
-        setStorageStatus(`Supabase: fallback на localStorage (${(storageError as Error).message || 'ошибка чтения'})`);
+        setStorageStatus(`БД:fallback на localStorage (${(storageError as Error).message || 'ошибка чтения'})`);
       });
 
     return () => {
@@ -2108,13 +2138,31 @@ export function Dashboard() {
               value={version}
               onChange={event => setVersion(event.target.value)}
               placeholder="7.3.5420"
-              list="dashboard-db-versions"
               style={{ width: 150 }}
             />
-            <datalist id="dashboard-db-versions">
-              {dbVersions.map(v => <option key={v} value={v} />)}
-            </datalist>
           </div>
+          {dbVersions.length > 0 && (
+            <div>
+              <FieldLabel>Загрузить из БД</FieldLabel>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Select
+                  value={selectedDbVersion}
+                  onChange={event => setSelectedDbVersion(event.target.value)}
+                  style={{ width: 160 }}
+                >
+                  <option value="">— релиз —</option>
+                  {dbVersions.map(v => <option key={v} value={v}>{v}</option>)}
+                </Select>
+                <Button
+                  variant="secondary"
+                  onClick={() => loadSnapshotFromDb(selectedDbVersion)}
+                  disabled={!selectedDbVersion || loadingSnapshot}
+                >
+                  {loadingSnapshot ? '…' : '↓'}
+                </Button>
+              </div>
+            </div>
+          )}
           <div>
             <FieldLabel>Дедлайн (вручную, МСК)</FieldLabel>
             <Input
@@ -2181,7 +2229,7 @@ export function Dashboard() {
                 { label: 'Readiness', from: 62, to: 76 },
                 { label: 'История', from: 76, to: 90 },
                 { label: 'ML', from: 90, to: 96 },
-                { label: 'Supabase', from: 96, to: 100 },
+                { label: 'БД', from: 96, to: 100 },
               ].map(step => {
                 const done = loadedPct > step.to;
                 const active = loadedPct >= step.from && loadedPct <= step.to && !done;
@@ -2257,7 +2305,7 @@ export function Dashboard() {
           borderRadius: 999,
           border: '1px solid var(--border)',
           background: 'var(--surface-soft)',
-          color: storageStatus.includes('не удалось') || storageStatus.includes('fallback') ? '#F59E0B' : '#22C55E',
+          color: storageStatus.includes('не удалось') || storageStatus.includes('ошибка') || storageStatus.includes('нет snapshot') ? '#F59E0B' : '#22C55E',
           fontSize: 11,
           fontWeight: 700,
           maxWidth: 520,
