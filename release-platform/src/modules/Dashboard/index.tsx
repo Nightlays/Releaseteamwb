@@ -1961,6 +1961,7 @@ export function Dashboard() {
         const savedHistory = mergeHistoryPoints(version, saved.history, [nextSnapshot]);
         setHistory(savedHistory);
         setStorageStatus(`БД:snapshot записан${saved.id ? ` · ${saved.id.slice(0, 8)}` : ''} · ${savedHistory.length} срезов`);
+        loadAvailableDashboardVersions(settings.projectId).then(setDbVersions).catch(() => {});
       } catch (storageError) {
         setStorageStatus(`БД:не удалось записать snapshot (${(storageError as Error).message || 'ошибка записи'})`);
       }
@@ -2141,28 +2142,27 @@ export function Dashboard() {
               style={{ width: 150 }}
             />
           </div>
-          {dbVersions.length > 0 && (
-            <div>
-              <FieldLabel>Загрузить из БД</FieldLabel>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <Select
-                  value={selectedDbVersion}
-                  onChange={event => setSelectedDbVersion(event.target.value)}
-                  style={{ width: 160 }}
-                >
-                  <option value="">— релиз —</option>
-                  {dbVersions.map(v => <option key={v} value={v}>{v}</option>)}
-                </Select>
-                <Button
-                  variant="secondary"
-                  onClick={() => loadSnapshotFromDb(selectedDbVersion)}
-                  disabled={!selectedDbVersion || loadingSnapshot}
-                >
-                  {loadingSnapshot ? '…' : '↓'}
-                </Button>
-              </div>
+          <div>
+            <FieldLabel>Загрузить из БД</FieldLabel>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Select
+                value={selectedDbVersion}
+                onChange={event => setSelectedDbVersion(event.target.value)}
+                style={{ width: 160 }}
+                disabled={dbVersions.length === 0}
+              >
+                <option value="">{dbVersions.length === 0 ? '— нет данных —' : '— релиз —'}</option>
+                {dbVersions.map(v => <option key={v} value={v}>{v}</option>)}
+              </Select>
+              <Button
+                variant="secondary"
+                onClick={() => loadSnapshotFromDb(selectedDbVersion)}
+                disabled={!selectedDbVersion || loadingSnapshot}
+              >
+                {loadingSnapshot ? '…' : '↓'}
+              </Button>
             </div>
-          )}
+          </div>
           <div>
             <FieldLabel>Дедлайн (вручную, МСК)</FieldLabel>
             <Input
