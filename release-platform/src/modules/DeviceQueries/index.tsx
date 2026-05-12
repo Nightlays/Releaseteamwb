@@ -781,7 +781,7 @@ export function DeviceQueries() {
   }, [activeKind, activePayload, search, userSearch]);
 
   const columns = activePayload?.columns?.length ? activePayload.columns : ['value'];
-  const displayRows = useMemo(() => {
+  const displayRows = useMemo<BiDeviceQueryRow[]>(() => {
     const brandRows = aggregateRowsByBrand(activeKind, filteredRows, columns);
     if (activeKind !== 'foldList') return brandRows;
     const modelColumn = findModelColumn(activeKind, columns);

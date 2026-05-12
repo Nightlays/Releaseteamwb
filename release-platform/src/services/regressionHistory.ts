@@ -1,4 +1,4 @@
-import { proxyJson } from './proxy';
+import { proxyFetch } from './proxy';
 
 export interface RegressionRunRecord {
   id: string;
@@ -54,11 +54,11 @@ function buildGasSaveUrl(gasUrl: string) {
 async function gasFetch(cfg: GasConfig, url: string, init?: RequestInit): Promise<Response> {
   const proxyBase = String(cfg.proxyBase || '').trim();
   if (cfg.useProxy !== false && proxyBase) {
-    return proxyJson(
+    return proxyFetch(
       { base: proxyBase, mode: 'query' },
       url,
-      init,
-    ) as unknown as Response;
+      init
+    );
   }
   return fetch(url, init);
 }

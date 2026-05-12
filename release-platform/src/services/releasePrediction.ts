@@ -122,6 +122,18 @@ let catboostManifestVersionPromise: Promise<string | null> | null = null;
 let catboostSessionVersion: string | null = null;
 const CATBOOST_TRAINED_AT_STORAGE_KEY = 'wb_graphs_catboost_trained_at_v1';
 
+interface CatboostBundlePayload {
+  base64?: unknown;
+  metadata?: {
+    trainedAt?: unknown;
+    version?: unknown;
+  };
+  meta?: {
+    trainedAt?: unknown;
+    version?: unknown;
+  };
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -251,8 +263,12 @@ function extractTrainedAtFromPayload(payload: unknown) {
   const direct = normalizeModelVersion((payload as { trainedAt?: unknown; version?: unknown }).trainedAt)
     || normalizeModelVersion((payload as { trainedAt?: unknown; version?: unknown }).version);
   if (direct) return direct;
-  const nestedMeta = (payload as { meta?: { trainedAt?: unknown; version?: unknown } }).meta;
-  return normalizeModelVersion(nestedMeta?.trainedAt) || normalizeModelVersion(nestedMeta?.version);
+  const nestedMeta = (payload as CatboostBundlePayload).meta;
+  const nestedMetadata = (payload as CatboostBundlePayload).metadata;
+  return normalizeModelVersion(nestedMeta?.trainedAt)
+    || normalizeModelVersion(nestedMeta?.version)
+    || normalizeModelVersion(nestedMetadata?.trainedAt)
+    || normalizeModelVersion(nestedMetadata?.version);
 }
 
 function updateCatboostSessionVersion(version: unknown) {
@@ -492,6 +508,48 @@ function resolveLegacyAsset(path: string) {
   return new URL(`legacy/${path}`, new URL('.', window.location.href)).toString();
 }
 
+function readGlobalCatboostBundle() {
+  return (globalThis as typeof globalThis & { WB_CATBOOST_ONNX_MODEL?: CatboostBundlePayload }).WB_CATBOOST_ONNX_MODEL || null;
+}
+
+function decodeBase64Bytes(base64: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function loadCatboostBundle(version: string | null) {
+  const existing = readGlobalCatboostBundle();
+  if (existing?.base64) return existing;
+  if (typeof document === 'undefined') return null;
+
+  await new Promise<void>((resolve, reject) => {
+    const src = buildVersionedAssetUrl('catboost_release_risk.bundle.js', version);
+    const current = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
+    if (current) {
+      if (readGlobalCatboostBundle()?.base64) {
+        resolve();
+        return;
+      }
+      current.addEventListener('load', () => resolve(), { once: true });
+      current.addEventListener('error', () => reject(new Error('CatBoost bundle failed to load')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('CatBoost bundle failed to load'));
+    document.head.appendChild(script);
+  }).catch(() => {});
+
+  return readGlobalCatboostBundle();
+}
+
 async function getCatboostSession() {
   const storedVersion = readStoredCatboostVersion();
   if (storedVersion && storedVersion !== catboostSessionVersion) {
@@ -512,9 +570,19 @@ async function getCatboostSession() {
 
     try {
       const response = await fetch(buildVersionedAssetUrl('catboost_release_risk.onnx', version), { cache: 'no-store' });
-      if (!response.ok) return null;
-      const binary = new Uint8Array(await response.arrayBuffer());
-      return await ort.InferenceSession.create(binary, {
+      const binary = response.ok
+        ? new Uint8Array(await response.arrayBuffer())
+        : null;
+      const bundle = binary ? null : await loadCatboostBundle(version);
+      const bundleBase64 = typeof bundle?.base64 === 'string' ? bundle.base64 : '';
+      const modelBinary = binary || (bundleBase64 ? decodeBase64Bytes(bundleBase64) : null);
+      const bundleVersion = extractTrainedAtFromPayload(bundle);
+      if (bundleVersion && bundleVersion !== catboostSessionVersion) {
+        catboostSessionVersion = bundleVersion;
+        persistCatboostVersion(bundleVersion);
+      }
+      if (!modelBinary) return null;
+      return await ort.InferenceSession.create(modelBinary, {
         executionProviders: ['wasm'],
         graphOptimizationLevel: 'all',
       });
