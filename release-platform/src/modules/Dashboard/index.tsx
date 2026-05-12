@@ -54,6 +54,7 @@ import {
 import {
   loadLatestDashboardSnapshot,
   loadDashboardSnapshotHistory,
+  loadAvailableDashboardVersions,
   saveDashboardSnapshot,
   type DashboardStoredSnapshot,
 } from '../../services/dashboardSupabase';
@@ -1727,6 +1728,7 @@ export function Dashboard() {
   const [previousSnapshot, setPreviousSnapshot] = useState<DashboardHistoryPoint | null>(() => readSnapshot(initialForm.version));
   const [showBlockerBanner, setShowBlockerBanner] = useState(false);
   const [customDeadline, setCustomDeadline] = useState(initialForm.customDeadline);
+  const [dbVersions, setDbVersions] = useState<string[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(600);
   const abortRef = useRef<AbortController | null>(null);
@@ -2007,6 +2009,10 @@ export function Dashboard() {
   }, [version, customDeadline]);
 
   useEffect(() => {
+    loadAvailableDashboardVersions(settings.projectId).then(setDbVersions).catch(() => {});
+  }, [settings.projectId]);
+
+  useEffect(() => {
     if (didAutoLoadRef.current) return;
     if (!settings.allureBase || !settings.projectId || !settings.allureToken) return;
     didAutoLoadRef.current = true;
@@ -2098,7 +2104,16 @@ export function Dashboard() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div>
             <FieldLabel>Версия релиза</FieldLabel>
-            <Input value={version} onChange={event => setVersion(event.target.value)} placeholder="7.3.5420" style={{ width: 150 }} />
+            <Input
+              value={version}
+              onChange={event => setVersion(event.target.value)}
+              placeholder="7.3.5420"
+              list="dashboard-db-versions"
+              style={{ width: 150 }}
+            />
+            <datalist id="dashboard-db-versions">
+              {dbVersions.map(v => <option key={v} value={v} />)}
+            </datalist>
           </div>
           <div>
             <FieldLabel>Дедлайн (вручную, МСК)</FieldLabel>

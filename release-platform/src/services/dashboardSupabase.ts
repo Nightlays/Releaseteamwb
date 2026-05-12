@@ -343,3 +343,23 @@ export async function saveDashboardSnapshot(input: DashboardSnapshotInput) {
     history: history.length ? history : sortHistory([input.snapshot], 48),
   };
 }
+
+export async function loadAvailableDashboardVersions(projectId: string, limit = 120) {
+  const query = new URLSearchParams({
+    select: 'version',
+    project_id: `eq.${String(projectId || '').trim() || '7'}`,
+    order: 'snapshot_at.desc',
+    limit: String(Math.max(1, Math.min(240, limit))),
+  });
+  const response = await fetch(`${STORAGE_REST_URL}/${DASHBOARD_TABLE}?${query}`, {
+    method: 'GET',
+    headers: headers(),
+  });
+  await assertOk(response, 'select versions');
+  const payload = await response.json();
+  return Array.from(new Set(
+    (Array.isArray(payload) ? payload : [])
+      .map(record => String((record as DashboardSnapshotRecord).version || '').trim())
+      .filter(Boolean),
+  ));
+}
