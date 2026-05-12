@@ -4,4 +4,3 @@
 .claude/
 *.log
 *.pid
-node_modules/
