@@ -17,7 +17,7 @@ export const DEFAULT_SERVICE_LAUNCHER_ITEMS: ServiceLauncherItem[] = [
   {
     id: 'learnhub',
     label: 'Learning\nHub',
-    href: 'https://releaseteamwb.ru/LearnHub-Portal.html',
+    href: 'http://wii-front-ingress-controller.wii-front.k8s.stage-dm/frontend',
     color: 'linear-gradient(135deg,#7C3AED,#9B5CFF)',
     icon: (
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

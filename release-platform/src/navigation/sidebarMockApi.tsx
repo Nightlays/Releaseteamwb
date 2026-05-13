@@ -43,7 +43,7 @@ const MOCK_SIDEBAR_NAVIGATION: SidebarNavigationApiDto = {
     {
       id: 'learnhub',
       label: 'Learning\nHub',
-      href: 'https://releaseteamwb.ru/LearnHub-Portal.html',
+      href: 'http://wii-front-ingress-controller.wii-front.k8s.stage-dm/frontend',
       color: 'linear-gradient(135deg,#7C3AED,#9B5CFF)',
       icon: 'learnhub',
     },

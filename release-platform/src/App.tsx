@@ -472,7 +472,7 @@ function Layout() {
     if (!module || !canAccessModule(module, auth.role, allowedLegacyIds)) return;
 
     if (module.openNewTab) {
-      window.open(buildLegacyModuleUrl(module, settings), '_blank', 'noopener');
+      window.open(module.externalUrl || buildLegacyModuleUrl(module, settings), '_blank', 'noopener');
       return;
     }
 
@@ -528,7 +528,7 @@ function Layout() {
           mlReady={mlReady}
           theme={theme}
           onRefresh={() => setRefreshKey(prev => prev + 1)}
-          onOpenLegacy={() => window.open(buildLegacyModuleUrl(currentModule, settings), '_blank', 'noopener')}
+          onOpenLegacy={() => window.open(currentModule.externalUrl || buildLegacyModuleUrl(currentModule, settings), '_blank', 'noopener')}
           onSetTheme={setTheme}
           showLegacyButton={currentModule.showLegacyButton !== false}
         />

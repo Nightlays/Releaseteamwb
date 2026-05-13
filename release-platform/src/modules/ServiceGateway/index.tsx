@@ -86,7 +86,7 @@ export const SERVICE_GATEWAY_ITEMS: ServiceGatewayItem[] = [
   {
     id: 'learnhub',
     label: 'Learning Hub',
-    href: 'https://releaseteamwb.ru/LearnHub-Portal.html',
+    href: 'http://wii-front-ingress-controller.wii-front.k8s.stage-dm/frontend',
     color: 'linear-gradient(135deg,#7C3AED,#9B5CFF)',
     icon: learnHubIcon(),
     cardDescription: 'Обучение, внутренние материалы и единый доступ в Learning Hub.',
@@ -96,7 +96,7 @@ export const SERVICE_GATEWAY_ITEMS: ServiceGatewayItem[] = [
     headlineSuffix: 'системно',
     subtitle: 'Портал помогает собирать программы обучения, материалы, инструкции и треки развития команды.',
     description: 'Learning Hub позволяет обучать сотрудников, хранить внутренние материалы, вести базу знаний и подключать людей к процессам по единому стандарту.',
-    authTarget: { type: 'external', href: 'https://releaseteamwb.ru/LearnHub-Portal.html' },
+    authTarget: { type: 'external', href: 'http://wii-front-ingress-controller.wii-front.k8s.stage-dm/frontend' },
   },
   {
     id: 'project',

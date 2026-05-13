@@ -34,6 +34,7 @@ export interface ModuleDefinition {
   superadminOnly?: boolean;
   openNewTab?: boolean;
   showLegacyButton?: boolean;
+  externalUrl?: string;
 }
 
 // ── Icons (14×14, currentColor, viewBox 0 0 22 22) ──────────────────────────
@@ -356,6 +357,7 @@ export const MODULES: ModuleDefinition[] = [
     icon: icLearnHub,
     explicitAccess: true,
     openNewTab: true,
+    externalUrl: 'http://wii-front-ingress-controller.wii-front.k8s.stage-dm/frontend',
   },
   {
     id: 'access',

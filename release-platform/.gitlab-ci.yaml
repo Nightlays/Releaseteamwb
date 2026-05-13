@@ -51,6 +51,9 @@ variables:
   # # custom name for Harbor project which doesn't match your root group
   REGISTRY_PROJECT: "wii-integrations"
 
+  CI_TMPL_ENV_RUNNER_TAG: "stage"
+  CI_TMPL_ENVIRONMENT_NAME: "stage"
+
   #
   # Optional example vars
   #
