@@ -412,7 +412,17 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 16px;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: clamp(10px, 1vw, 18px);
+  margin: 0;
+}
+
+.charts-shell > * {
+  width: 100%;
+  min-width: 0;
 }
 
 .charts-header {
@@ -697,10 +707,11 @@ a { color: inherit; text-decoration: none; }
   border-top: 1px solid var(--border);
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 220px;
+  max-height: min(360px, 42vh);
 }
 .charts-data-table {
   width: 100%;
+  min-width: 900px;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -1367,6 +1378,9 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
 }
 
 .charts-design-intro {
@@ -1817,6 +1831,47 @@ a { color: inherit; text-decoration: none; }
 .charts-design-card {
   min-width: 0;
   overflow: hidden;
+}
+
+.charts-shell [data-export-kind] {
+  min-width: 0;
+}
+
+.charts-shell canvas {
+  max-width: 100%;
+}
+
+@media (min-width: 1440px) {
+  .charts-design-grid {
+    gap: 16px;
+  }
+
+  .charts-design-grid--one {
+    gap: 16px;
+  }
+
+  .charts-legacy-ml-domain-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .charts-legacy-ml-domain-grid > div:first-child {
+    grid-column: span 3;
+  }
+}
+
+@media (min-width: 1880px) {
+  .charts-shell {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .charts-design-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .charts-design-kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }
 
 .charts-design-llm-insight {

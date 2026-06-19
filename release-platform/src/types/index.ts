@@ -76,8 +76,31 @@ function normalizeDeployLabToken(value: unknown): string {
   return compact.replace(/^['"]+|['"]+$/g, '').trim();
 }
 
+function defaultApiBase() {
+  const base = import.meta.env.BASE_URL || './';
+  if (base && base !== './') return `${base.replace(/\/$/, '')}/api`;
+  return 'api';
+}
+
+function isLoopbackUrl(value: string): boolean {
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.startsWith('127.');
+  } catch {
+    return false;
+  }
+}
+
+function normalizeProxyBase(value: unknown): string {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw || isLoopbackUrl(raw)) {
+    return defaultApiBase();
+  }
+  return raw;
+}
+
 export const DEFAULT_SETTINGS: AppSettings = {
-  proxyBase:    'http://localhost:8787',
+  proxyBase:    defaultApiBase(),
   proxyMode:    'query',
   useProxy:     true,
   allureBase:   'https://allure-testops.wb.ru',
@@ -85,10 +108,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ytBase:       'https://youtrack.wildberries.ru',
   ytToken:      '',
   biCookie:     '',
-  glmBase:      'http://localhost:8789/v1',
+  glmBase:      '',
   glmKey:       '',
   glmModel:     'glm-4',
-  mlHelperBase: 'http://127.0.0.1:8788',
+  mlHelperBase: '',
   projectId:    '7',
   deployLabToken: '',
   gitlabCookie:  '',
@@ -104,7 +127,7 @@ export function normalizeSettings(input?: Partial<AppSettings> | null): AppSetti
   const value = input || {};
 
   return {
-    proxyBase: typeof value.proxyBase === 'string' ? value.proxyBase : DEFAULT_SETTINGS.proxyBase,
+    proxyBase: normalizeProxyBase(value.proxyBase),
     proxyMode: value.proxyMode === 'prefix' ? 'prefix' : DEFAULT_SETTINGS.proxyMode,
     useProxy: typeof value.useProxy === 'boolean' ? value.useProxy : DEFAULT_SETTINGS.useProxy,
     allureBase: typeof value.allureBase === 'string' ? value.allureBase : DEFAULT_SETTINGS.allureBase,

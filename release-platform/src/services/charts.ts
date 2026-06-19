@@ -559,6 +559,8 @@ const GITLAB_PIPELINE_PAGE_SIZE = 100;
 const DEPLOY_ISSUES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/issues';
 const DEPLOY_BASE_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
 const DEPLOY_DEPLOY_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/deploy';
+const DEPLOY_RELEASES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/releases/{prefix}';
+const deployReleaseSummariesCache = new Map<string, Promise<DeployReleaseSummary[]>>();
 const WIKI_DEV_OUTAGES_URL = 'https://wiki.wb.ru/api/v1/space/308/article/6157';
 const BAND_ANDROID_DEV_FAILURES_CHANNEL_ID = 'csbuypwc93yozfazeqkkncboch';
 const BAND_DEFAULT_LOOKBACK_DAYS = 365;
@@ -685,6 +687,11 @@ interface DeployIssue {
   type?: unknown;
   tags?: Array<string | { name?: string }>;
   merged_after_cutoff?: boolean;
+}
+
+interface DeployReleaseSummary {
+  releaseId: string;
+  version: string;
 }
 
 interface YtIssueResponse {
@@ -1012,6 +1019,127 @@ export function buildMajorReleaseRange(from: string, to: string) {
   }
 
   return out;
+}
+
+function normalizedDeployRelease(value: string) {
+  const parsed = parseVersion(value);
+  if (!parsed) return String(value || '').trim();
+  return `${parsed.majorN}.${parsed.minorN}.${parsed.buildStrNorm}`;
+}
+
+function deployUrlFromTemplate(template: string, prefix: 'IOS' | 'ANDROID', release: string) {
+  return template.replace('{prefix}', prefix).replace('{rel}', release);
+}
+
+function versionFromDeployReleaseId(prefix: 'IOS' | 'ANDROID', releaseId: unknown) {
+  const raw = String(releaseId || '').trim();
+  const marker = `${prefix}_`;
+  return raw.toUpperCase().startsWith(marker) ? raw.slice(marker.length) : '';
+}
+
+function normalizeDeployReleaseSummaries(payload: unknown, prefix: 'IOS' | 'ANDROID') {
+  const list = Array.isArray((payload as { releases?: unknown[] } | null)?.releases)
+    ? (payload as { releases: unknown[] }).releases
+    : Array.isArray(payload)
+      ? payload
+      : Array.isArray((payload as { data?: unknown[] } | null)?.data)
+        ? (payload as { data: unknown[] }).data
+        : Array.isArray((payload as { content?: unknown[] } | null)?.content)
+          ? (payload as { content: unknown[] }).content
+          : [];
+
+  return list.map(item => {
+    const record = item as Record<string, unknown>;
+    const releaseId = String(record.release_id || record.releaseId || '').trim();
+    const version = String(record.version || versionFromDeployReleaseId(prefix, releaseId)).trim();
+    if (!parseVersion(version)) return null;
+    return {
+      releaseId: releaseId || `${prefix}_${normalizedDeployRelease(version)}`,
+      version: normalizedDeployRelease(version),
+    } satisfies DeployReleaseSummary;
+  }).filter(Boolean) as DeployReleaseSummary[];
+}
+
+async function fetchDeployReleaseSummaries(cfg: ChartsConfig, prefix: 'IOS' | 'ANDROID', token: string) {
+  const cleanToken = normalizeDeployLabToken(token);
+  const cacheKey = [
+    prefix,
+    String(cfg.proxyBase || '').trim(),
+    cfg.proxyMode || 'query',
+    cfg.useProxy === false ? 'raw' : 'proxy',
+    cleanToken.slice(0, 16),
+  ].join('|');
+
+  let promise = deployReleaseSummariesCache.get(cacheKey);
+  if (!promise) {
+    const url = DEPLOY_RELEASES_URL_TMPL.replace('{prefix}', prefix);
+    promise = fetchJson<unknown>(cfg, url, { headers: buildDeployHeaders(cleanToken) }, false)
+      .then(payload => normalizeDeployReleaseSummaries(payload, prefix));
+    deployReleaseSummariesCache.set(cacheKey, promise);
+  }
+  return promise;
+}
+
+async function buildDeployReleaseCandidates(
+  cfg: ChartsConfig,
+  prefix: 'IOS' | 'ANDROID',
+  release: string,
+  token: string,
+) {
+  const candidates = new Set<string>();
+  const requested = String(release || '').trim();
+  const normalized = normalizedDeployRelease(requested);
+  if (requested) candidates.add(requested);
+  if (normalized) candidates.add(normalized);
+
+  const summaries = await fetchDeployReleaseSummaries(cfg, prefix, token).catch(() => []);
+  const wanted = normalizedDeployRelease(requested);
+  for (const summary of summaries) {
+    const summaryVersion = normalizedDeployRelease(summary.version);
+    const summaryIdVersion = normalizedDeployRelease(versionFromDeployReleaseId(prefix, summary.releaseId));
+    if (summaryVersion === wanted || summaryIdVersion === wanted || summary.releaseId === `${prefix}_${requested}`) {
+      if (summary.version) candidates.add(summary.version);
+      const releaseIdVersion = versionFromDeployReleaseId(prefix, summary.releaseId);
+      if (releaseIdVersion) candidates.add(releaseIdVersion);
+    }
+  }
+
+  return Array.from(candidates);
+}
+
+async function fetchDeployJsonWithReleaseFallback<T>(
+  cfg: ChartsConfig,
+  prefix: 'IOS' | 'ANDROID',
+  release: string,
+  template: string,
+  token: string,
+): Promise<T> {
+  let lastError: Error | null = null;
+  const tried = new Set<string>();
+  const directCandidates = Array.from(new Set([String(release || '').trim(), normalizedDeployRelease(release)].filter(Boolean)));
+
+  for (const candidate of directCandidates) {
+    if (tried.has(candidate)) continue;
+    tried.add(candidate);
+    try {
+      return await fetchJson<T>(cfg, deployUrlFromTemplate(template, prefix, candidate), { headers: buildDeployHeaders(token) });
+    } catch (error) {
+      lastError = error as Error;
+    }
+  }
+
+  const resolvedCandidates = await buildDeployReleaseCandidates(cfg, prefix, release, token);
+  for (const candidate of resolvedCandidates) {
+    if (tried.has(candidate)) continue;
+    tried.add(candidate);
+    try {
+      return await fetchJson<T>(cfg, deployUrlFromTemplate(template, prefix, candidate), { headers: buildDeployHeaders(token) });
+    } catch (error) {
+      lastError = error as Error;
+    }
+  }
+
+  throw lastError || new Error(`DeployLab ${prefix}_${release}: release data not found`);
 }
 
 function normalizeLogin(value: unknown) {
@@ -1624,11 +1752,12 @@ function classifyDeployIssue(issue: DeployIssue) {
 async function fetchDeployIssuesList(cfg: ChartsConfig, prefix: 'IOS' | 'ANDROID', release: string) {
   const token = String(cfg.deployLabToken || '').trim();
   if (!token) return [];
-  const url = DEPLOY_ISSUES_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
-  const data = await fetchJson<unknown>(
+  const data = await fetchDeployJsonWithReleaseFallback<unknown>(
     cfg,
-    url,
-    { headers: buildDeployHeaders(token) }
+    prefix,
+    release,
+    DEPLOY_ISSUES_URL_TMPL,
+    token
   );
   if (Array.isArray(data)) return data as DeployIssue[];
   if (Array.isArray((data as { data?: unknown[] })?.data)) return (data as { data: DeployIssue[] }).data;
@@ -1811,14 +1940,11 @@ async function fetchDeployDates(cfg: ChartsConfig, prefix: 'IOS' | 'ANDROID', re
   const token = String(cfg.deployLabToken || '').trim();
   if (!token) return { cutoff: null as string | null, storeMsLocal: null as number | null };
 
-  const baseUrl = DEPLOY_BASE_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
-  const deployUrl = DEPLOY_DEPLOY_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
-
   const [cutoffIso, storeMsLocal] = await Promise.all([
-    fetchJson<Record<string, unknown>>(cfg, baseUrl, { headers: buildDeployHeaders(token) })
+    fetchDeployJsonWithReleaseFallback<Record<string, unknown>>(cfg, prefix, release, DEPLOY_BASE_URL_TMPL, token)
       .then(base => String(base?.cutoff_date || '') || null)
       .catch(() => null),
-    fetchJson<Record<string, unknown>>(cfg, deployUrl, { headers: buildDeployHeaders(token) })
+    fetchDeployJsonWithReleaseFallback<Record<string, unknown>>(cfg, prefix, release, DEPLOY_DEPLOY_URL_TMPL, token)
       .then(deploy => (
         prefix === 'ANDROID'
           ? extractEarliestNoteDate(deploy, 'Google Play')

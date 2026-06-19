@@ -79,7 +79,7 @@ function ModuleContent({
     case 'goals':
       return <div key={key} style={{ height: '100%' }}><GoalsPortal /></div>;
     case 'charts':
-      return <div key={key}><Charts /></div>;
+      return <div key={key} style={{ width: '100%', minHeight: '100%' }}><Charts /></div>;
     case 'biusers':
       return <div key={key}><BiUsers /></div>;
     case 'devices':

@@ -26,6 +26,10 @@ function buildFallbackUrl(opts: ProxyOptions, targetUrl: string): string | null 
   return `${base}/?url=` + encodeURIComponent(targetUrl);
 }
 
+function isAbortError(error: unknown) {
+  return (error as { name?: string } | null)?.name === 'AbortError';
+}
+
 export async function proxyFetch(
   opts: ProxyOptions,
   targetUrl: string,
@@ -39,7 +43,16 @@ export async function proxyFetch(
   };
   const primaryUrl = buildUrl(opts, targetUrl);
   const fallbackUrl = buildFallbackUrl(opts, targetUrl);
-  const response = await fetch(primaryUrl, requestInit);
+  let response: Response;
+
+  try {
+    response = await fetch(primaryUrl, requestInit);
+  } catch (error) {
+    if (isAbortError(error) || !fallbackUrl || fallbackUrl === primaryUrl) {
+      throw error;
+    }
+    return fetch(fallbackUrl, requestInit);
+  }
 
   if (response.status !== 404 || !fallbackUrl || fallbackUrl === primaryUrl) {
     return response;

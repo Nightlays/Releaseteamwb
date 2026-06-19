@@ -134,6 +134,43 @@ function formatReleaseShort(value: string) {
   return parts.join('.');
 }
 
+function chartTickStep(total: number) {
+  if (total <= 10) return 1;
+  if (total <= 18) return 2;
+  if (total <= 32) return 3;
+  return Math.ceil(total / 10);
+}
+
+function shouldRenderChartTick(index: number, total: number) {
+  if (total <= 0) return false;
+  if (index === 0 || index === total - 1) return true;
+  return index % chartTickStep(total) === 0;
+}
+
+function compactChartAxisLabel(label: unknown) {
+  const raw = String(label || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+
+  const releaseIndex = raw.toLowerCase().indexOf('релиз ');
+  if (releaseIndex > 0) {
+    const datePart = raw.slice(0, releaseIndex).replace(/[·•|-]+$/g, '').trim();
+    const releasePart = raw.slice(releaseIndex).trim();
+    return datePart ? [datePart, releasePart] : releasePart;
+  }
+
+  const dateMatch = raw.match(/^(\d{1,2}\s+[а-яё]{3,})(?:\s+(.+))?$/i);
+  if (dateMatch?.[2]) {
+    return [dateMatch[1], dateMatch[2]];
+  }
+
+  return raw;
+}
+
+function formatChartTooltipTitle(items: Array<{ label?: string }> | undefined) {
+  const label = String(items?.[0]?.label || '').replace(/\s+/g, ' ').trim();
+  return label || '';
+}
+
 function formatMinutesToClock(minutes: number | null | undefined) {
   const value = Number(minutes);
   if (!Number.isFinite(value)) return '—';
@@ -658,11 +695,14 @@ function LineChart({
             borderWidth: 1,
             padding: 10,
             cornerRadius: 12,
-            callbacks: tooltipFormatter ? {
+            callbacks: {
+              title: formatChartTooltipTitle,
               label(context) {
-                return tooltipFormatter(Number(context.parsed.y || 0), String(context.dataset.label || ''));
+                return tooltipFormatter
+                  ? tooltipFormatter(Number(context.parsed.y || 0), String(context.dataset.label || ''))
+                  : `${context.dataset.label || ''}: ${context.formattedValue}`;
               },
-            } : undefined,
+            },
           },
         },
         scales: {
@@ -671,8 +711,13 @@ function LineChart({
             ticks: {
               color: palette.textSoft,
               maxRotation: 0,
-              autoSkip: true,
+              autoSkip: false,
+              padding: 8,
               font: { size: 10, family: 'IBM Plex Sans, system-ui', weight: 500 },
+              callback(_value, index) {
+                if (!shouldRenderChartTick(index, labels.length)) return '';
+                return compactChartAxisLabel(labels[index]);
+              },
             },
             border: { color: palette.grid },
           },
@@ -837,11 +882,14 @@ function BarChart({
             borderWidth: 1,
             padding: 10,
             cornerRadius: 12,
-            callbacks: tooltipFormatter ? {
+            callbacks: {
+              title: formatChartTooltipTitle,
               label(context) {
-                return tooltipFormatter(Number(context.parsed.y || 0), String(context.dataset.label || ''));
+                return tooltipFormatter
+                  ? tooltipFormatter(Number(context.parsed.y || 0), String(context.dataset.label || ''))
+                  : `${context.dataset.label || ''}: ${context.formattedValue}`;
               },
-            } : undefined,
+            },
           },
         },
         scales: {
@@ -851,8 +899,13 @@ function BarChart({
             ticks: {
               color: palette.textSoft,
               maxRotation: 0,
-              autoSkip: true,
+              autoSkip: false,
+              padding: 8,
               font: { size: 10, family: 'IBM Plex Sans, system-ui', weight: 500 },
+              callback(_value, index) {
+                if (!shouldRenderChartTick(index, labels.length)) return '';
+                return compactChartAxisLabel(labels[index]);
+              },
             },
             border: { color: palette.grid },
           },
@@ -2395,7 +2448,7 @@ export function Charts() {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const loaded = await loadLatestChartsReportFromSupabase({ projectId: settings.projectId, releaseFrom: from, releaseTo: to, compareMode });
+        const loaded = await loadLatestChartsReportFromSupabase({ projectId: settings.projectId, releaseFrom: from, releaseTo: to, compareMode: serviceCompareMode });
         if (cancelled || !loaded?.report) return;
         setReport(loaded.report);
         setSelectedReleases([]);
@@ -2440,9 +2493,9 @@ export function Charts() {
           setDbFilteredReport(null);
           return;
         }
-        const built = rebuildChartsReportFromReleaseSnapshots(ordered, { sourceReport: report, compareMode });
+        const built = rebuildChartsReportFromReleaseSnapshots(ordered, { sourceReport: report, compareMode: serviceCompareMode });
         const helperBase = String(built.ml.helperHealth.base || settings.mlHelperBase || '').trim();
-        const refreshed = await refreshChartsMlStateForReport(built, buildMlIoConfig(helperBase), compareMode).catch(() => built);
+        const refreshed = await refreshChartsMlStateForReport(built, buildMlIoConfig(helperBase), serviceCompareMode).catch(() => built);
         if (!cancelled) {
           setDbFilteredReport(refreshed);
           setHelperOnline(refreshed.ml.helperHealth.online);
@@ -2485,7 +2538,7 @@ export function Charts() {
         projectId: settings.projectId,
         releaseFrom,
         releaseTo,
-        compareMode,
+        compareMode: serviceCompareMode,
       }).catch(loadError => {
         pushLog(`Supabase: ${(loadError as Error)?.message || String(loadError)}`, 'warn');
         return null;
@@ -2518,7 +2571,7 @@ export function Charts() {
         glmModel: settings.glmModel,
         signal: controller.signal,
       }, releaseFrom, releaseTo, {
-        compareMode,
+        compareMode: serviceCompareMode,
         onLog: (text, level = 'info') => pushLog(text, level),
         onProgress: (done, total) => setProgress({ done, total }),
       });
@@ -2534,7 +2587,7 @@ export function Charts() {
           projectId: settings.projectId,
           releaseFrom,
           releaseTo,
-          compareMode,
+          compareMode: serviceCompareMode,
         });
         pushLog(`Supabase: отчёт сохранён (${saved.metrics} метрик, ${saved.ml} ML-записей).`, 'ok');
       } catch (dbError) {
@@ -2594,7 +2647,7 @@ export function Charts() {
         projectId: settings.projectId,
         releaseFrom,
         releaseTo,
-        compareMode,
+        compareMode: serviceCompareMode,
       });
       if (!loaded) {
         pushLog('Supabase: отчёт для выбранного диапазона не найден.', 'warn');
@@ -2622,7 +2675,7 @@ export function Charts() {
         projectId: settings.projectId,
         releaseFrom,
         releaseTo,
-        compareMode,
+        compareMode: serviceCompareMode,
       });
       pushLog(`Supabase: отчёт сохранён вручную (${saved.metrics} метрик, ${saved.ml} ML-записей).`, 'ok');
     } catch (error) {
@@ -2675,7 +2728,7 @@ export function Charts() {
           },
         },
         ioConfig,
-        compareMode
+        serviceCompareMode
       ).catch(() => null);
       if (refreshed) {
         setReport(refreshed);
@@ -2735,7 +2788,7 @@ export function Charts() {
           },
         },
         ioConfig,
-        compareMode
+        serviceCompareMode
       ).catch(() => null);
       if (refreshed) {
         setReport(refreshed);
@@ -2757,7 +2810,7 @@ export function Charts() {
                 },
               },
             };
-            const summaryState = rebuildChartsSummaryState(next, compareMode);
+            const summaryState = rebuildChartsSummaryState(next, serviceCompareMode);
             return {
               ...next,
               aiContext: summaryState.aiContext,
@@ -2783,7 +2836,7 @@ export function Charts() {
       const helperBase = String(report?.ml.helperHealth.base || settings.mlHelperBase || '').trim();
       await retrainChartsMlViaHelper(helperBase);
       if (report) {
-        const refreshed = await refreshChartsMlStateForReport(report, buildMlIoConfig(helperBase), compareMode);
+        const refreshed = await refreshChartsMlStateForReport(report, buildMlIoConfig(helperBase), serviceCompareMode);
         setReport(refreshed);
         setHelperOnline(refreshed.ml.helperHealth.online);
       } else {
