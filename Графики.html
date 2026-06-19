@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body class="min-h-screen wb-graphs">
-   <div class="max-w-screen-2xl mx-auto px-4 py-6">
+   <div class="wb-graphs-page mx-auto px-4 py-6">
     <header class="flex items-center justify-between gap-3 flex-wrap">
       <div class="brand-badge">
         <span class="brand-dot"></span>
@@ -1024,7 +1024,7 @@
               <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                 <div class="md:col-span-5">
                   <label class="block text-xs font-semibold text-[#111827] mb-1" for="proxyBaseInput">Proxy Base URL</label>
-                  <input class="input mono text-xs" id="proxyBaseInput" type="text" placeholder="http://127.0.0.1:8787" />
+                  <input class="input mono text-xs" id="proxyBaseInput" type="text" placeholder="api" />
                 </div>
                 <div class="md:col-span-5">
                   <label class="block text-xs font-semibold text-[#111827] mb-1" for="mlHelperBaseInput">ML Helper Base URL</label>
@@ -1071,6 +1071,21 @@
           const SWAT_LIST_URL = 'https://script.google.com/macros/s/AKfycbzLmb5ATmHOip7REPsl_iSLH2GuEHui0W_czyrPgW_8G1Wl-RY8CiM2UeAdqQQEwoNx-Q/exec';
           const LS_PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
           const LS_ML_HELPER_RUNTIME_KEY = 'rb_ml_helper_runtime_v1';
+          const DEFAULT_PROXY_BASE = 'api';
+          const DEFAULT_ML_HELPER_BASE = 'http://127.0.0.1:8788';
+          function isLoopbackBase(value){
+            try{
+              const host = new URL(String(value || '').trim(), window.location.href).hostname.toLowerCase();
+              return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1' || host.startsWith('127.');
+            }catch(_){
+              return false;
+            }
+          }
+          function normalizeProxyBase(value, fallback = DEFAULT_PROXY_BASE){
+            const raw = String(value || '').trim().replace(/\/+$/, '');
+            if(!raw) return fallback;
+            return isLoopbackBase(raw) ? fallback : raw;
+          }
           function readRuntimeProxyBase(){
             try {
               const q = new URLSearchParams(window.location.search);
@@ -1088,7 +1103,7 @@
                 if (parsed && parsed.base) return String(parsed.base).trim();
               }
             } catch (e) {}
-            return 'http://127.0.0.1:8787';
+            return DEFAULT_PROXY_BASE;
           }
           function readMlHelperBase(){
             try {
@@ -1103,9 +1118,9 @@
                 if(parsed && parsed.base) return String(parsed.base).trim();
               }
             } catch (e) {}
-            return 'http://127.0.0.1:8788';
+            return DEFAULT_ML_HELPER_BASE;
           }
-          let PROXY_BASE = readRuntimeProxyBase().replace(/\/+$/, '');
+          let PROXY_BASE = normalizeProxyBase(readRuntimeProxyBase());
           let ML_HELPER_BASE = readMlHelperBase().replace(/\/+$/, '');
           const LS_COLLAPSE_KEY = 'wb_all_table_collapsed';
           const WIKI_DEV_OUTAGES_URL = 'https://wiki.wb.ru/api/v1/space/308/article/6157';
@@ -1117,6 +1132,8 @@
           const DEPLOY_BASE_URL_TMPL   = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
           const DEPLOY_DEPLOY_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/deploy';
           const DEPLOY_ISSUES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/issues';
+          const DEPLOY_RELEASES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/releases/{prefix}';
+          const deployReleaseSummariesCache = new Map();
           const GITLAB_BASE_URL = 'https://gitlab.wildberries.ru';
           const GITLAB_GRAPHQL_URL = `${GITLAB_BASE_URL}/api/graphql`;
           const GITLAB_PIPELINE_PAGE_SIZE = 100;
@@ -5887,10 +5904,16 @@
             return s.trim().toLowerCase();
           }
 
-          function getDeployToken(){
-            const raw = (inpDeployToken?.value || '').trim();
+          function normalizeDeployLabToken(value){
+            const raw = String(value || '').trim();
             if(!raw) return '';
+            const headerMatch = raw.match(/authorization-deploy-lab\s*:\s*Bearer\s+([^\s;]+)/i);
+            if(headerMatch?.[1]) return headerMatch[1].trim();
             return raw.replace(/^Bearer\s+/i, '').trim();
+          }
+
+          function getDeployToken(){
+            return normalizeDeployLabToken(inpDeployToken?.value || '');
           }
 
           function normalizeAllureToken(value){
@@ -6033,7 +6056,7 @@
           }
 
           function buildProxyRequestUrl(targetUrl){
-            const p = new URL(PROXY_BASE);
+            const p = new URL(PROXY_BASE, window.location.href);
             if (!/\/proxy$/i.test(p.pathname)) {
               p.pathname = p.pathname.replace(/\/+$/, '') + '/proxy';
             }
@@ -6042,7 +6065,7 @@
           }
 
           function buildProxyHealthUrl(){
-            const p = new URL(PROXY_BASE);
+            const p = new URL(PROXY_BASE, window.location.href);
             if (/\/proxy$/i.test(p.pathname)) {
               p.pathname = p.pathname.replace(/\/proxy$/i, '/health');
             } else {
@@ -6261,13 +6284,112 @@
             return /aborted/i.test(String(error?.message || ''));
           }
 
+          function buildDeployUrl(template, prefix, release){
+            return template
+              .replace('{prefix}', encodeURIComponent(prefix))
+              .replace('{rel}', encodeURIComponent(release));
+          }
+
+          function normalizeDeployReleaseValue(value){
+            const raw = String(value || '').trim();
+            if(!raw) return '';
+            const withoutPrefix = raw.replace(/^(IOS|ANDROID)_/i, '');
+            const parsed = parseVersion(withoutPrefix);
+            return parsed ? formatRelease(parsed) : withoutPrefix;
+          }
+
+          function collectDeployReleaseStrings(value, out = []){
+            if(!value) return out;
+            if(typeof value === 'string' || typeof value === 'number'){
+              out.push(String(value));
+              return out;
+            }
+            if(Array.isArray(value)){
+              value.forEach(item => collectDeployReleaseStrings(item, out));
+              return out;
+            }
+            if(typeof value === 'object'){
+              ['id', 'name', 'title', 'release', 'version', 'code'].forEach(key => {
+                if(value[key] !== undefined && value[key] !== null) out.push(String(value[key]));
+              });
+              ['data', 'items', 'content', 'results', 'releases'].forEach(key => {
+                if(value[key]) collectDeployReleaseStrings(value[key], out);
+              });
+            }
+            return out;
+          }
+
+          async function fetchDeployReleaseSummaries(prefix, signal){
+            const token = getDeployToken();
+            const cacheKey = `${PROXY_BASE}|${prefix}|${token.length}|${token.slice(0, 8)}`;
+            if(deployReleaseSummariesCache.has(cacheKey)) return deployReleaseSummariesCache.get(cacheKey);
+
+            const request = proxyGetJson(DEPLOY_RELEASES_URL_TMPL.replace('{prefix}', encodeURIComponent(prefix)), deployHeaders(), signal)
+              .then(payload => collectDeployReleaseStrings(payload))
+              .catch(error => {
+                deployReleaseSummariesCache.delete(cacheKey);
+                throw error;
+              });
+
+            deployReleaseSummariesCache.set(cacheKey, request);
+            return request;
+          }
+
+          function buildDirectDeployReleaseCandidates(release){
+            const targetNorm = normalizeDeployReleaseValue(release);
+            return [...new Set([String(release || '').trim(), targetNorm].filter(Boolean))];
+          }
+
+          async function buildDeployReleaseCandidates(prefix, release, signal){
+            const targetNorm = normalizeDeployReleaseValue(release);
+            const candidates = buildDirectDeployReleaseCandidates(release);
+
+            try{
+              const summaries = await fetchDeployReleaseSummaries(prefix, signal);
+              for(const item of summaries){
+                const raw = String(item || '').trim();
+                if(!raw) continue;
+                const clean = raw.replace(/^(IOS|ANDROID)_/i, '');
+                if(normalizeDeployReleaseValue(clean) === targetNorm){
+                  candidates.push(clean);
+                  candidates.push(raw.replace(new RegExp(`^${prefix}_`, 'i'), ''));
+                }
+              }
+            }catch(e){
+              if(isAbortLikeError(e, signal)) throw e;
+            }
+
+            return [...new Set(candidates)];
+          }
+
+          async function fetchDeployJsonWithReleaseFallback(prefix, release, template, signal){
+            const directCandidates = buildDirectDeployReleaseCandidates(release);
+            let lastErr = null;
+            for(const rel of directCandidates){
+              try{
+                return await proxyGetJson(buildDeployUrl(template, prefix, rel), deployHeaders(), signal);
+              }catch(e){
+                if(isAbortLikeError(e, signal)) throw e;
+                lastErr = e;
+              }
+            }
+            const candidates = await buildDeployReleaseCandidates(prefix, release, signal);
+            for(const rel of candidates.filter(rel => !directCandidates.includes(rel))){
+              try{
+                return await proxyGetJson(buildDeployUrl(template, prefix, rel), deployHeaders(), signal);
+              }catch(e){
+                if(isAbortLikeError(e, signal)) throw e;
+                lastErr = e;
+              }
+            }
+            if(lastErr) throw lastErr;
+            return null;
+          }
+
           async function fetchDeployIssueCount(prefix, release, signal){
             const tok = getDeployToken();
             if(!tok) return 0;
-            const url = DEPLOY_ISSUES_URL_TMPL
-              .replace('{prefix}', prefix)
-              .replace('{rel}', release);
-            const data = await proxyGetJson(url, deployHeaders(), signal);
+            const data = await fetchDeployJsonWithReleaseFallback(prefix, release, DEPLOY_ISSUES_URL_TMPL, signal);
             if(!Array.isArray(data)) return 0;
             let n = 0;
             for(const item of data){
@@ -6280,11 +6402,7 @@
             const tok = getDeployToken();
             if(!tok) return [];
 
-            const url = DEPLOY_ISSUES_URL_TMPL
-              .replace('{prefix}', prefix)
-              .replace('{rel}', release);
-
-            const data = await proxyGetJson(url, deployHeaders(), signal);
+            const data = await fetchDeployJsonWithReleaseFallback(prefix, release, DEPLOY_ISSUES_URL_TMPL, signal);
             if(Array.isArray(data)) return data;
             if(Array.isArray(data?.data)) return data.data;
             if(Array.isArray(data?.content)) return data.content;
@@ -6837,6 +6955,24 @@
             const hours = Math.floor(total / 60);
             const mins = total % 60;
             return `${hours}:${String(mins).padStart(2, '0')}`;
+          }
+
+          function shouldRenderDenseDateTick(index, total){
+            if(total <= 1) return true;
+            const maxTicks = 14;
+            const step = Math.max(1, Math.ceil(total / maxTicks));
+            return index === 0 || index === total - 1 || index % step === 0;
+          }
+
+          function compactDenseDateTickLabel(label){
+            if(Array.isArray(label)) return label[0] || '';
+            return String(label || '');
+          }
+
+          function denseDateTickCallback(value, index){
+            const labels = this?.chart?.data?.labels || [];
+            if(!shouldRenderDenseDateTick(index, labels.length)) return '';
+            return compactDenseDateTickLabel(labels[index] ?? this?.getLabelForValue?.(value));
           }
 
           function formatDevDowntimeDateTime(date){
@@ -7989,21 +8125,18 @@
             const tok = getDeployToken();
             if(!tok) return { cutoff: null, store: null };
 
-            const baseUrl = DEPLOY_BASE_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
-            const deployUrl = DEPLOY_DEPLOY_URL_TMPL.replace('{prefix}', prefix).replace('{rel}', release);
-
             let cutoffIso = null;
             let storeMsLocal = null;
 
             try{
-              const base = await proxyGetJson(baseUrl, deployHeaders(), signal);
+              const base = await fetchDeployJsonWithReleaseFallback(prefix, release, DEPLOY_BASE_URL_TMPL, signal);
               cutoffIso = base?.cutoff_date || null;
             }catch(e){
               cutoffIso = null;
             }
 
             try{
-              const dep = await proxyGetJson(deployUrl, deployHeaders(), signal);
+              const dep = await fetchDeployJsonWithReleaseFallback(prefix, release, DEPLOY_DEPLOY_URL_TMPL, signal);
               if(prefix === 'ANDROID'){
                 storeMsLocal = extractEarliestNoteDate(dep, 'Google Play');
               }else{
@@ -8861,8 +8994,8 @@
           }
 
           function syncRuntimeBaseSettings(){
-            PROXY_BASE = normalizeRuntimeBase(proxyBaseInput?.value || PROXY_BASE, 'http://127.0.0.1:8787');
-            ML_HELPER_BASE = normalizeRuntimeBase(mlHelperBaseInput?.value || ML_HELPER_BASE, 'http://127.0.0.1:8788');
+            PROXY_BASE = normalizeProxyBase(proxyBaseInput?.value || PROXY_BASE);
+            ML_HELPER_BASE = normalizeRuntimeBase(mlHelperBaseInput?.value || ML_HELPER_BASE, DEFAULT_ML_HELPER_BASE);
             if(proxyBaseInput) proxyBaseInput.value = PROXY_BASE;
             if(mlHelperBaseInput) mlHelperBaseInput.value = ML_HELPER_BASE;
           }
@@ -11526,7 +11659,12 @@
                 interaction: { mode: 'nearest', intersect: false },
                 scales: {
                   x: {
-                    ticks: { maxRotation: 0, autoSkip: false },
+                    ticks: {
+                      maxRotation: 0,
+                      autoSkip: false,
+                      padding: 8,
+                      callback: denseDateTickCallback
+                    },
                     grid: { color: 'rgba(148,163,184,.25)' }
                   },
                   y: {
@@ -11622,7 +11760,12 @@
                 interaction: { mode: 'nearest', intersect: false },
                 scales: {
                   x: {
-                    ticks: { maxRotation: 0, autoSkip: false },
+                    ticks: {
+                      maxRotation: 0,
+                      autoSkip: false,
+                      padding: 8,
+                      callback: denseDateTickCallback
+                    },
                     grid: { color: 'rgba(148,163,184,.25)' }
                   },
                   y: {

@@ -506,8 +506,20 @@ tbody tr:hover td.day-cell.day-not-worked{ background: rgba(253,164,175,0.70) !i
       color:#111827;
       font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
     }
-    /* widen overall layout to fit wide tables */
-    .max-w-screen-2xl{max-width:1960px}
+    /* Graph dashboard uses the full iframe/page width so dense charts do not compress labels. */
+    .wb-graphs .wb-graphs-page,
+    .wb-graphs .max-w-screen-2xl{
+      width:100%;
+      max-width:none;
+      box-sizing:border-box;
+    }
+    @media (min-width:1280px){
+      .wb-graphs .wb-graphs-page,
+      .wb-graphs .max-w-screen-2xl{
+        padding-left:20px !important;
+        padding-right:20px !important;
+      }
+    }
     .card{background:#fff;border:1px solid #efe5f4;border-radius:var(--r-xl);box-shadow:var(--card)}
     .brand-badge{display:flex;align-items:center;gap:.55rem;background:#fff;border:1px solid #efe5f4;padding:.55rem .7rem;border-radius:999px;box-shadow:0 8px 20px rgba(155,92,255,.12)}
     .brand-dot{width:10px;height:10px;border-radius:99px;background:linear-gradient(90deg,var(--wb-primary),var(--wb-secondary));box-shadow:0 0 0 4px rgba(155,92,255,.14)}

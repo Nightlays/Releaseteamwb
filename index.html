@@ -3215,7 +3215,7 @@ body, .dp-topbar, .dp-sidebar, .dp-modal, .dp-btn, .dp-role-btn, .dp-nav-btn, .d
   const RB_REMOTE_CONFIG_URL = 'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec';
   const RB_REMOTE_CONFIG_NAME = 'rb_roles_access.json';
   const RB_PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
-  const RB_DEFAULT_PROXY_BASE = 'http://localhost:8787';
+  const RB_DEFAULT_PROXY_BASE = 'api';
   const RB_CUSTOM_USERS_KEY = 'rb_custom_users_v1';
   const RB_FALLBACK_CONFIG = {
     roles: [
@@ -3436,8 +3436,10 @@ body, .dp-topbar, .dp-sidebar, .dp-modal, .dp-btn, .dp-role-btn, .dp-nav-btn, .d
   }
 
   function normalizeRbacProxyBase(raw) {
+    const source = String(raw || '').trim();
+    const normalizedSource = /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::8787)?(?:\/|$)/i.test(source) ? RB_DEFAULT_PROXY_BASE : source;
     try {
-      const abs = new URL(String(raw || '').trim(), window.location.href);
+      const abs = new URL(normalizedSource, window.location.href);
       return abs.toString().replace(/\/+$/, '');
     } catch (e) {
       return '';
@@ -4070,14 +4072,21 @@ const NAV = [
 const MODULES = NAV.filter(n => n.id);
 
 const PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
-const DEFAULT_PROXY_BASE = 'http://localhost:8787';
+const DEFAULT_PROXY_BASE = 'api';
 
 // ── Proxy utils ────────────────────────────────────────────────────────────
 function toAbsUrl(raw) {
   if (!raw?.trim()) return '';
   try { return new URL(raw.trim(), location.href).toString(); } catch { return ''; }
 }
-function normalizeProxyBase(raw) { const a = toAbsUrl(raw); return a ? a.replace(/\/+$/, '') : ''; }
+function isLegacyLocalProxyBase(raw) {
+  return /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::8787)?(?:\/|$)/i.test(String(raw || '').trim());
+}
+function normalizeProxyBase(raw) {
+  const source = isLegacyLocalProxyBase(raw) ? DEFAULT_PROXY_BASE : raw;
+  const a = toAbsUrl(source);
+  return a ? a.replace(/\/+$/, '') : '';
+}
 function loadRuntimeProxy() {
   try {
     const p = JSON.parse(localStorage.getItem(PROXY_RUNTIME_KEY) || '{}');

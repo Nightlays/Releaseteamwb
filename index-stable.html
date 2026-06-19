@@ -1554,7 +1554,7 @@ table { font-size: 13.5px; }
   const RB_REMOTE_CONFIG_URL = 'https://script.google.com/macros/s/AKfycby1MNW_-mbMh8ukBs94kOc0KXM43yZae7gmCgSLoK9a4Tx3F0JY4lMdQHoWhxyJ1j1XYQ/exec';
   const RB_REMOTE_CONFIG_NAME = 'rb_roles_access.json';
   const RB_PROXY_RUNTIME_KEY = 'rb_proxy_runtime_v1';
-  const RB_DEFAULT_PROXY_BASE = 'http://localhost:8787';
+  const RB_DEFAULT_PROXY_BASE = 'api';
   const RB_CUSTOM_USERS_KEY = 'rb_custom_users_v1';
   const RB_FALLBACK_CONFIG = {
     roles: [
@@ -1775,8 +1775,10 @@ table { font-size: 13.5px; }
   }
 
   function normalizeRbacProxyBase(raw) {
+    const source = String(raw || '').trim();
+    const normalizedSource = /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::8787)?(?:\/|$)/i.test(source) ? RB_DEFAULT_PROXY_BASE : source;
     try {
-      const abs = new URL(String(raw || '').trim(), window.location.href);
+      const abs = new URL(normalizedSource, window.location.href);
       return abs.toString().replace(/\/+$/, '');
     } catch (e) {
       return '';
