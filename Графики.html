@@ -1075,8 +1075,17 @@
           const DEFAULT_ML_HELPER_BASE = 'http://127.0.0.1:8788';
           function isLoopbackBase(value){
             try{
-              const host = new URL(String(value || '').trim(), window.location.href).hostname.toLowerCase();
-              return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1' || host.startsWith('127.');
+              const url = new URL(String(value || '').trim(), window.location.href);
+              const host = url.hostname.toLowerCase();
+              const port = url.port;
+              return (port === '8787' || port === '') && (
+                host === 'localhost' ||
+                host === '0.0.0.0' ||
+                host === '127.0.0.1' ||
+                host === '[::1]' ||
+                host === '::1' ||
+                host.startsWith('127.')
+              );
             }catch(_){
               return false;
             }
@@ -1085,6 +1094,10 @@
             const raw = String(value || '').trim().replace(/\/+$/, '');
             if(!raw) return fallback;
             return isLoopbackBase(raw) ? fallback : raw;
+          }
+          function getEffectiveProxyBase(){
+            PROXY_BASE = normalizeProxyBase(PROXY_BASE);
+            return PROXY_BASE;
           }
           function readRuntimeProxyBase(){
             try {
@@ -6056,7 +6069,7 @@
           }
 
           function buildProxyRequestUrl(targetUrl){
-            const p = new URL(PROXY_BASE, window.location.href);
+            const p = new URL(getEffectiveProxyBase(), window.location.href);
             if (!/\/proxy$/i.test(p.pathname)) {
               p.pathname = p.pathname.replace(/\/+$/, '') + '/proxy';
             }
@@ -6065,7 +6078,7 @@
           }
 
           function buildProxyHealthUrl(){
-            const p = new URL(PROXY_BASE, window.location.href);
+            const p = new URL(getEffectiveProxyBase(), window.location.href);
             if (/\/proxy$/i.test(p.pathname)) {
               p.pathname = p.pathname.replace(/\/proxy$/i, '/health');
             } else {

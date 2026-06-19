@@ -194,7 +194,14 @@ async function proxyRequest(req, res) {
     return;
   }
 
-  Readable.fromWeb(upstream.body).pipe(res);
+  const upstreamStream = Readable.fromWeb(upstream.body);
+  upstreamStream.on("error", (error) => {
+    if (!res.destroyed) res.destroy(error);
+  });
+  res.on("close", () => {
+    upstreamStream.destroy();
+  });
+  upstreamStream.pipe(res);
 }
 
 const server = http.createServer(async (req, res) => {
