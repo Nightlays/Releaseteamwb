@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
 const { Readable } = require("node:stream");
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
+const STATIC_DIR = process.env.STATIC_DIR ? path.resolve(process.env.STATIC_DIR) : "";
 
 function setCors(req, res) {
   const defaults = [
@@ -62,6 +65,59 @@ function isAllowedTarget(value) {
   } catch {
     return false;
   }
+}
+
+function safeStaticPath(urlPathname) {
+  if (!STATIC_DIR) return null;
+  const decoded = decodeURIComponent(urlPathname || "/");
+  const clean = decoded === "/" ? "/index.html" : decoded;
+  const target = path.resolve(STATIC_DIR, `.${clean}`);
+  if (target !== STATIC_DIR && !target.startsWith(`${STATIC_DIR}${path.sep}`)) return null;
+  return target;
+}
+
+function contentTypeFor(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  return {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".ico": "image/x-icon",
+    ".wasm": "application/wasm"
+  }[ext] || "application/octet-stream";
+}
+
+function serveStatic(req, res, url) {
+  if (!STATIC_DIR || !["GET", "HEAD"].includes(req.method)) return false;
+  const filePath = safeStaticPath(url.pathname);
+  if (!filePath) return false;
+
+  let stat;
+  try {
+    stat = fs.statSync(filePath);
+    if (stat.isDirectory()) return false;
+  } catch {
+    return false;
+  }
+
+  res.writeHead(200, {
+    "Content-Type": contentTypeFor(filePath),
+    "Content-Length": stat.size,
+    "Cache-Control": "no-cache"
+  });
+  if (req.method === "HEAD") {
+    res.end();
+    return true;
+  }
+  fs.createReadStream(filePath).pipe(res);
+  return true;
 }
 
 async function readBody(req) {
@@ -151,18 +207,19 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "GET" && url.pathname === "/health") {
+  if (req.method === "GET" && (url.pathname === "/health" || url.pathname === "/api/health")) {
     json(req, res, 200, {
       ok: true,
       status: "ok",
       proxy: "standalone",
       host: HOST,
-      port: PORT
+      port: PORT,
+      static: Boolean(STATIC_DIR)
     });
     return;
   }
 
-  if (url.pathname === "/proxy") {
+  if (url.pathname === "/proxy" || url.pathname === "/api/proxy") {
     try {
       await proxyRequest(req, res);
     } catch (error) {
@@ -174,6 +231,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (serveStatic(req, res, url)) return;
+
   json(req, res, 404, {
     ok: false,
     error: `Not found: ${url.pathname}`
@@ -181,5 +240,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`[proxy] listening on http://${HOST}:${PORT}`);
+  const staticInfo = STATIC_DIR ? `, static ${STATIC_DIR}` : "";
+  console.log(`[proxy] listening on http://${HOST}:${PORT}${staticInfo}`);
 });
