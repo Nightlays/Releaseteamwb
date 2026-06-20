@@ -6970,6 +6970,79 @@
             return `${hours}:${String(mins).padStart(2, '0')}`;
           }
 
+          function getAxisTickCapacity(scale, minPixelsPerTick = 108){
+            const width = Number(scale?.chart?.chartArea?.width || scale?.width || 0);
+            if(!Number.isFinite(width) || width <= 0) return 8;
+            return Math.max(3, Math.floor(width / minPixelsPerTick));
+          }
+
+          function shouldRenderAxisTick(index, total, scale, minPixelsPerTick = 108){
+            if(total <= 1) return true;
+            const maxTicks = getAxisTickCapacity(scale, minPixelsPerTick);
+            if(total <= maxTicks) return true;
+            const step = Math.max(1, Math.ceil((total - 1) / Math.max(1, maxTicks - 1)));
+            if(index === 0 || index === total - 1) return true;
+
+            const previousBeforeLast = Math.floor((total - 2) / step) * step;
+            if(index === previousBeforeLast && (total - 1 - index) < Math.ceil(step * 0.7)) return false;
+            return index % step === 0;
+          }
+
+          function splitReleaseAxisLabel(label){
+            const raw = Array.isArray(label) ? String(label.join(' ') || '') : String(label || '');
+            const clean = raw.replace(/^релиз\s*/i, '').trim();
+            const match = clean.match(/^(\d+\.\d+)\.(\d+)$/);
+            if(match) return [match[1], match[2]];
+            if(clean.length > 10 && clean.includes('.')){
+              const parts = clean.split('.');
+              return [parts.slice(0, 2).join('.'), parts.slice(2).join('.')].filter(Boolean);
+            }
+            return clean ? [clean] : '';
+          }
+
+          function splitDateReleaseAxisLabel(label){
+            if(Array.isArray(label)){
+              const date = String(label[0] || '').trim();
+              const release = String(label[1] || '').replace(/^релиз\s*/i, '').trim();
+              return [date, release ? `релиз ${release}` : ''].filter(Boolean);
+            }
+            return splitReleaseAxisLabel(label);
+          }
+
+          function releaseAxisTickCallback(value, index){
+            const labels = this?.chart?.data?.labels || [];
+            if(!shouldRenderAxisTick(index, labels.length, this, 92)) return '';
+            return splitReleaseAxisLabel(labels[index] ?? this?.getLabelForValue?.(value));
+          }
+
+          function dateReleaseAxisTickCallback(value, index){
+            const labels = this?.chart?.data?.labels || [];
+            if(!shouldRenderAxisTick(index, labels.length, this, 126)) return '';
+            return splitDateReleaseAxisLabel(labels[index] ?? this?.getLabelForValue?.(value));
+          }
+
+          function releaseAxisTicks(){
+            return {
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: false,
+              padding: 8,
+              font: { size: 11, lineHeight: 1.16 },
+              callback: releaseAxisTickCallback
+            };
+          }
+
+          function dateReleaseAxisTicks(){
+            return {
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: false,
+              padding: 10,
+              font: { size: 11, lineHeight: 1.2 },
+              callback: dateReleaseAxisTickCallback
+            };
+          }
+
           function shouldRenderDenseDateTick(index, total){
             if(total <= 1) return true;
             const maxTicks = 14;
@@ -7959,7 +8032,7 @@
                   maintainAspectRatio: false,
                   interaction: { mode: 'nearest', intersect: false },
                   scales: {
-                    x: { ticks: { maxRotation: 0, autoSkip: true }, grid: { display: false } },
+                    x: { ticks: releaseAxisTicks(), grid: { display: false } },
                     y: { beginAtZero: true, ticks: { precision: 0 } }
                   },
                   plugins: {
@@ -11108,7 +11181,7 @@
                 },
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                  x: { ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  x: { ticks: releaseAxisTicks(), grid: { color: 'rgba(148,163,184,.25)' } },
                   y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
                 }
               }
@@ -11181,7 +11254,7 @@
                 },
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  x: { bounds: 'data', ticks: releaseAxisTicks(), grid: { color: 'rgba(148,163,184,.25)' } },
                   y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
                 }
               }
@@ -11254,7 +11327,7 @@
                 },
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  x: { bounds: 'data', ticks: releaseAxisTicks(), grid: { color: 'rgba(148,163,184,.25)' } },
                   y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
                 }
               }
@@ -11311,7 +11384,7 @@
                 },
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  x: { bounds: 'data', ticks: releaseAxisTicks(), grid: { color: 'rgba(148,163,184,.25)' } },
                   y: {
                     beginAtZero: true,
                     grid: { color: 'rgba(148,163,184,.25)' },
@@ -11376,7 +11449,7 @@
                 },
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  x: { bounds: 'data', ticks: releaseAxisTicks(), grid: { color: 'rgba(148,163,184,.25)' } },
                   y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
                 }
               }
@@ -11439,7 +11512,7 @@
                 },
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                  x: { bounds: 'data', ticks: { maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(148,163,184,.25)' } },
+                  x: { bounds: 'data', ticks: releaseAxisTicks(), grid: { color: 'rgba(148,163,184,.25)' } },
                   y: { beginAtZero: true, grace: '12%', grid: { color: 'rgba(148,163,184,.25)' } }
                 }
               }
@@ -11570,7 +11643,7 @@
                 scales: {
                   x: {
                     bounds: 'data',
-                    ticks: { maxRotation: 0, autoSkip: true },
+                    ticks: releaseAxisTicks(),
                     grid: { color: 'rgba(148,163,184,.25)' }
                   },
                   y: {
@@ -11672,12 +11745,7 @@
                 interaction: { mode: 'nearest', intersect: false },
                 scales: {
                   x: {
-                    ticks: {
-                      maxRotation: 0,
-                      autoSkip: false,
-                      padding: 8,
-                      callback: denseDateTickCallback
-                    },
+                    ticks: dateReleaseAxisTicks(),
                     grid: { color: 'rgba(148,163,184,.25)' }
                   },
                   y: {
@@ -11773,12 +11841,7 @@
                 interaction: { mode: 'nearest', intersect: false },
                 scales: {
                   x: {
-                    ticks: {
-                      maxRotation: 0,
-                      autoSkip: false,
-                      padding: 8,
-                      callback: denseDateTickCallback
-                    },
+                    ticks: dateReleaseAxisTicks(),
                     grid: { color: 'rgba(148,163,184,.25)' }
                   },
                   y: {
@@ -11900,7 +11963,7 @@
                 scales: {
                   x: {
                     bounds: 'data',
-                    ticks: { maxRotation: 0, autoSkip: true },
+                    ticks: releaseAxisTicks(),
                     grid: { color: 'rgba(148,163,184,.25)' }
                   },
                   y: {
