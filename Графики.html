@@ -6311,6 +6311,17 @@
             return parsed ? formatRelease(parsed) : withoutPrefix;
           }
 
+          function compactDeployReleaseValue(value){
+            const raw = String(value || '').trim();
+            if(!raw) return '';
+            const withoutPrefix = raw.replace(/^(IOS|ANDROID)_/i, '');
+            const parsed = parseVersion(withoutPrefix);
+            if(!parsed) return withoutPrefix;
+            const compactBuild = String(parsed.buildStrNorm || parsed.build || '')
+              .replace(/0+$/g, '') || '0';
+            return `${parsed.majorN}.${parsed.minorN}.${compactBuild}`;
+          }
+
           function collectDeployReleaseStrings(value, out = []){
             if(!value) return out;
             if(typeof value === 'string' || typeof value === 'number'){
@@ -6350,28 +6361,12 @@
 
           function buildDirectDeployReleaseCandidates(release){
             const targetNorm = normalizeDeployReleaseValue(release);
-            return [...new Set([String(release || '').trim(), targetNorm].filter(Boolean))];
+            const compact = compactDeployReleaseValue(release);
+            return [...new Set([compact, String(release || '').trim(), targetNorm].filter(Boolean))];
           }
 
           async function buildDeployReleaseCandidates(prefix, release, signal){
-            const targetNorm = normalizeDeployReleaseValue(release);
             const candidates = buildDirectDeployReleaseCandidates(release);
-
-            try{
-              const summaries = await fetchDeployReleaseSummaries(prefix, signal);
-              for(const item of summaries){
-                const raw = String(item || '').trim();
-                if(!raw) continue;
-                const clean = raw.replace(/^(IOS|ANDROID)_/i, '');
-                if(normalizeDeployReleaseValue(clean) === targetNorm){
-                  candidates.push(clean);
-                  candidates.push(raw.replace(new RegExp(`^${prefix}_`, 'i'), ''));
-                }
-              }
-            }catch(e){
-              if(isAbortLikeError(e, signal)) throw e;
-            }
-
             return [...new Set(candidates)];
           }
 
