@@ -1145,8 +1145,6 @@
           const DEPLOY_BASE_URL_TMPL   = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}';
           const DEPLOY_DEPLOY_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/deploy';
           const DEPLOY_ISSUES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/{prefix}_{rel}/issues';
-          const DEPLOY_RELEASES_URL_TMPL = 'https://deploy-lab-api.wb.ru/releaseboss/admin_panel/releases/{prefix}';
-          const deployReleaseSummariesCache = new Map();
           const GITLAB_BASE_URL = 'https://gitlab.wildberries.ru';
           const GITLAB_GRAPHQL_URL = `${GITLAB_BASE_URL}/api/graphql`;
           const GITLAB_PIPELINE_PAGE_SIZE = 100;
@@ -6057,6 +6055,8 @@
                 return await fetcher();
               }catch(e){
                 lastErr = e;
+                const status = Number(e?.status || 0);
+                if(status >= 400 && status < 500) break;
                 if(i < maxTries - 1){
                   const jitter = Math.floor(Math.random() * 120);
                   const waitMs = baseDelay * Math.pow(2, i) + jitter;
@@ -6095,7 +6095,12 @@
                 signal,
                 cache: 'no-store'
               });
-              if(!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
+              if(!r.ok){
+                const err = new Error(`Proxy HTTP ${r.status}: ${targetUrl}`);
+                err.status = r.status;
+                err.targetUrl = targetUrl;
+                throw err;
+              }
               const text = await r.text();
               try{
                 return JSON.parse(text);
@@ -6261,13 +6266,24 @@
             const tok = getDeployToken();
             if(!tok) return null;
 
-            const url = `https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/${prefix}_${release}/notification_history`;
             try {
               const headers = {
                 ...deployHeaders(),
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
               };
-              const response = await proxyGetJson(url, headers, signal);
+              let response = null;
+              let lastErr = null;
+              for(const rel of buildDirectDeployReleaseCandidates(release)){
+                const url = `https://deploy-lab-api.wb.ru/releaseboss/admin_panel/release/${prefix}_${encodeURIComponent(rel)}/notification_history`;
+                try{
+                  response = await proxyGetJson(url, headers, signal);
+                  break;
+                }catch(e){
+                  if(isAbortLikeError(e, signal)) return null;
+                  lastErr = e;
+                }
+              }
+              if(!response && lastErr) throw lastErr;
               if (!Array.isArray(response?.logs)) return null;
 
               // Берём самый НОВЫЙ лог (максимальная date) среди сообщений с "Новый черипик"
@@ -6286,7 +6302,7 @@
               return labelFromMsLocal(maxMsLocal);
             } catch (e) {
               if(isAbortLikeError(e, signal)) return null;
-              console.error('Error fetching last cherepik:', e);
+              if(Number(e?.status || 0) !== 404) console.error('Error fetching last cherepik:', e);
               return null;
             }
           }
@@ -6320,43 +6336,6 @@
             const compactBuild = String(parsed.buildStrNorm || parsed.build || '')
               .replace(/0+$/g, '') || '0';
             return `${parsed.majorN}.${parsed.minorN}.${compactBuild}`;
-          }
-
-          function collectDeployReleaseStrings(value, out = []){
-            if(!value) return out;
-            if(typeof value === 'string' || typeof value === 'number'){
-              out.push(String(value));
-              return out;
-            }
-            if(Array.isArray(value)){
-              value.forEach(item => collectDeployReleaseStrings(item, out));
-              return out;
-            }
-            if(typeof value === 'object'){
-              ['id', 'name', 'title', 'release', 'version', 'code'].forEach(key => {
-                if(value[key] !== undefined && value[key] !== null) out.push(String(value[key]));
-              });
-              ['data', 'items', 'content', 'results', 'releases'].forEach(key => {
-                if(value[key]) collectDeployReleaseStrings(value[key], out);
-              });
-            }
-            return out;
-          }
-
-          async function fetchDeployReleaseSummaries(prefix, signal){
-            const token = getDeployToken();
-            const cacheKey = `${PROXY_BASE}|${prefix}|${token.length}|${token.slice(0, 8)}`;
-            if(deployReleaseSummariesCache.has(cacheKey)) return deployReleaseSummariesCache.get(cacheKey);
-
-            const request = proxyGetJson(DEPLOY_RELEASES_URL_TMPL.replace('{prefix}', encodeURIComponent(prefix)), deployHeaders(), signal)
-              .then(payload => collectDeployReleaseStrings(payload))
-              .catch(error => {
-                deployReleaseSummariesCache.delete(cacheKey);
-                throw error;
-              });
-
-            deployReleaseSummariesCache.set(cacheKey, request);
-            return request;
           }
 
           function buildDirectDeployReleaseCandidates(release){
