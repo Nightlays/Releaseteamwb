@@ -1366,10 +1366,10 @@
         const PDF_MAX_BYTES = 300 * 1024 * 1024;
         const PDF_PAGE_CONTENT_RATIO = (297 - 20) / (210 - 20);
         const PDF_EXPORT_PRESETS = [
-          { summaryScale: 2.5, cardScale: 2.2, tableScale: 2.3, summaryImageType: 'PNG', cardImageType: 'PNG', tableImageType: 'PNG', imageCompression: 'MEDIUM', summaryWidth: 1520, cardWidth: 1640, tableWidth: 1720 },
-          { summaryScale: 2.0, cardScale: 1.72, tableScale: 1.82, summaryImageType: 'PNG', cardImageType: 'JPEG', tableImageType: 'PNG', cardImageQuality: 0.86, imageCompression: 'MEDIUM', summaryWidth: 1260, cardWidth: 1380, tableWidth: 1380 },
+          { summaryScale: 1.0, cardScale: 1.0, tableScale: 1.0, summaryImageType: 'JPEG', cardImageType: 'JPEG', tableImageType: 'JPEG', summaryImageQuality: 0.7, cardImageQuality: 0.58, tableImageQuality: 0.68, imageCompression: 'FAST', summaryWidth: 960, cardWidth: 1040, tableWidth: 1040 },
+          { summaryScale: 1.3, cardScale: 1.15, tableScale: 1.2, summaryImageType: 'JPEG', cardImageType: 'JPEG', tableImageType: 'JPEG', summaryImageQuality: 0.74, cardImageQuality: 0.64, tableImageQuality: 0.72, imageCompression: 'FAST', summaryWidth: 1000, cardWidth: 1120, tableWidth: 1120 },
           { summaryScale: 1.55, cardScale: 1.35, tableScale: 1.45, summaryImageType: 'JPEG', cardImageType: 'JPEG', tableImageType: 'JPEG', summaryImageQuality: 0.86, cardImageQuality: 0.76, tableImageQuality: 0.84, imageCompression: 'FAST', summaryWidth: 1100, cardWidth: 1240, tableWidth: 1240 },
-          { summaryScale: 1.3, cardScale: 1.15, tableScale: 1.2, summaryImageType: 'JPEG', cardImageType: 'JPEG', tableImageType: 'JPEG', summaryImageQuality: 0.74, cardImageQuality: 0.64, tableImageQuality: 0.72, imageCompression: 'FAST', summaryWidth: 1000, cardWidth: 1120, tableWidth: 1120 }
+          { summaryScale: 2.0, cardScale: 1.72, tableScale: 1.82, summaryImageType: 'PNG', cardImageType: 'JPEG', tableImageType: 'PNG', cardImageQuality: 0.86, imageCompression: 'MEDIUM', summaryWidth: 1260, cardWidth: 1380, tableWidth: 1380 }
         ];
 
         function getPdfCaptureWidth(node, fallback = 1200, min = 960, max = 1800){
@@ -2189,6 +2189,7 @@
             const restoreCollapsed = expandCollapsedForPdf();
             let finalBlob = null;
             let usedPreset = PDF_EXPORT_PRESETS[PDF_EXPORT_PRESETS.length - 1];
+            showToast('PDF собирается, это может занять до минуты...', true);
             document.body.classList.add('pdf-export');
             try{
               await waitForPdfFonts(document);
@@ -2376,6 +2377,7 @@
             }
             const filename = !chartsOnly ? 'WB_All_Charts.pdf' : (includeMl ? 'WB_Charts_ML.pdf' : 'WB_Charts_Only.pdf');
             downloadBlob(finalBlob, filename);
+            showToast(`PDF готов: ${filename}`, true);
           }catch(e){
             console.error('PDF export failed', e);
             showToast(`PDF ошибка: ${e?.message || e}`, false);
